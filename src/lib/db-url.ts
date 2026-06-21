@@ -1,9 +1,22 @@
 /** Next.js production build / prisma generate 중에는 DB 연결이 필요 없음 */
-const BUILD_PLACEHOLDER_URL =
-  "postgresql://build:build@127.0.0.1:5432/build?schema=public";
+const BUILD_PLACEHOLDER_HOST = "127.0.0.1";
+const BUILD_PLACEHOLDER_DB = "build";
 
 function isBuildPlaceholder(url: string | undefined): boolean {
-  return url === BUILD_PLACEHOLDER_URL;
+  if (!url) return false;
+
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === "postgresql:" &&
+      parsed.hostname === BUILD_PLACEHOLDER_HOST &&
+      parsed.pathname.replace(/^\//, "") === BUILD_PLACEHOLDER_DB &&
+      parsed.username === "build" &&
+      parsed.password === "build"
+    );
+  } catch {
+    return false;
+  }
 }
 
 function buildFromPgEnv(): string | undefined {
@@ -68,7 +81,9 @@ export function getDatabaseUrl(options: GetDatabaseUrlOptions = {}): string {
     );
   }
 
-  if (!required) return BUILD_PLACEHOLDER_URL;
+  if (!required) {
+    return "postgresql://build:build@127.0.0.1:5432/build?schema=public";
+  }
 
   if (onRailway) {
     throw new Error(

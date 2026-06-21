@@ -3,6 +3,7 @@ import { GameCard } from "@/components/home/GameCard";
 import { GAMES } from "@/lib/games";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 const FEATURES = [
@@ -48,7 +49,16 @@ export default async function HomePage() {
     <main className="mx-auto min-h-screen max-w-lg bg-gradient-to-b from-sky-50 to-white pb-8">
       <header className="relative overflow-hidden bg-white px-4 pb-4 pt-6 shadow-sm">
         <div className="absolute left-4 top-4 text-2xl">🕹️⛑️</div>
-        <div className="absolute right-4 top-2 text-4xl">👷</div>
+        {session.user.role === "ADMIN" ? (
+          <Link
+            href="/admin"
+            className="absolute right-4 top-4 z-10 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-600"
+          >
+            관리자
+          </Link>
+        ) : (
+          <div className="absolute right-4 top-2 text-4xl">👷</div>
+        )}
         <div className="text-center">
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
             YK

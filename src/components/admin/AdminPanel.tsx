@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { signOut } from "next-auth/react";
 
 interface UserRow {
@@ -65,12 +66,20 @@ export function AdminPanel() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">관리자 패널</h1>
-        <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
-          className="rounded-lg bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300"
-        >
-          로그아웃
-        </button>
+        <div className="flex gap-2">
+          <Link
+            href="/home"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            홈으로
+          </Link>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="rounded-lg bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300"
+          >
+            로그아웃
+          </button>
+        </div>
       </div>
 
       <div className="rounded-xl bg-white p-4 shadow">
