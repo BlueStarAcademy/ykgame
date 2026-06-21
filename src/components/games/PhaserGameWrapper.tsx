@@ -1,24 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { GameId } from "@/lib/games";
 import { getGameById } from "@/lib/games";
 import { getMissionConfig, loadSceneClass } from "@/games/registry";
 import type { GameResult } from "@/games/shared/types";
-import { GameResultScreen } from "./GameResultScreen";
 
 interface PhaserGameWrapperProps {
   gameId: GameId;
+  onEnd: (result: GameResult) => void;
 }
 
-export function PhaserGameWrapper({ gameId }: PhaserGameWrapperProps) {
+export function PhaserGameWrapper({ gameId, onEnd }: PhaserGameWrapperProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<{ destroy: (v: boolean) => void } | null>(null);
-  const [result, setResult] = useState<GameResult | null>(null);
+  const onEndRef = useRef(onEnd);
   const game = getGameById(gameId);
 
+  onEndRef.current = onEnd;
+
   useEffect(() => {
-    if (!containerRef.current || result) return;
+    if (!containerRef.current) return;
 
     let destroyed = false;
 
@@ -52,7 +54,7 @@ export function PhaserGameWrapper({ gameId }: PhaserGameWrapperProps) {
       phaserGame.scene.start(`mission-${gameId}`, {
         config,
         onEnd: (gameResult: GameResult) => {
-          setResult(gameResult);
+          onEndRef.current(gameResult);
           phaserGame.destroy(true);
         },
       });
@@ -67,25 +69,17 @@ export function PhaserGameWrapper({ gameId }: PhaserGameWrapperProps) {
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };
-  }, [gameId, result]);
-
-  if (result) {
-    return <GameResultScreen gameId={gameId} result={result} />;
-  }
+  }, [gameId]);
 
   return (
     <div className="mx-auto w-full max-w-lg">
       <div
-        className="mb-2 rounded-t-xl px-4 py-3 text-white"
-        style={{ backgroundColor: game?.headerColor }}
-      >
-        <p className="text-sm font-bold">{game?.brandEn}</p>
-        <p className="text-xs opacity-90">{game?.mission}</p>
-      </div>
-      <div
         ref={containerRef}
         className="h-[480px] w-full overflow-hidden rounded-b-xl bg-sky-200 shadow-lg"
       />
+      <p className="mt-2 text-center text-xs text-gray-400">
+        {game?.brandKo} · {game?.mission}
+      </p>
     </div>
   );
 }

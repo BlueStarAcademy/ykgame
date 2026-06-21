@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { getGameById } from "@/lib/games";
 import { isValidGameId } from "@/games/registry";
 import { GamePlayClient } from "@/components/games/GamePlayClient";
+import { AppShell } from "@/components/layout/AppShell";
+import { prisma } from "@/lib/prisma";
 
 export default async function GamePage({
   params,
@@ -18,11 +20,18 @@ export default async function GamePage({
 
   getGameById(gameId);
 
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { currency: true, nickname: true },
+  });
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-sky-100 to-white p-4">
-      <div className="mx-auto max-w-lg">
-        <GamePlayClient gameId={gameId} />
-      </div>
-    </main>
+    <AppShell
+      nickname={user?.nickname ?? session.user.nickname ?? ""}
+      currency={user?.currency ?? 0}
+      role={session.user.role}
+    >
+      <GamePlayClient gameId={gameId} />
+    </AppShell>
   );
 }

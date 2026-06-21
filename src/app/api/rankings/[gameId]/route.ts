@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 import { getGameById, getMonthKey } from "@/lib/games";
+import { getMonthlyRankings, getUserGameStats } from "@/lib/rankings";
 
 export async function GET(
   _request: Request,
@@ -13,23 +14,13 @@ export async function GET(
   }
 
   const monthKey = getMonthKey();
+  const rankings = await getMonthlyRankings(gameId, 10, monthKey);
 
-  const scores = await prisma.gameScore.findMany({
-    where: { gameId, monthKey },
-    orderBy: { score: "desc" },
-    take: 10,
-    include: {
-      user: { select: { nickname: true, loginId: true } },
-    },
-  });
+  const session = await auth();
+  let myStats = null;
+  if (session?.user) {
+    myStats = await getUserGameStats(gameId, session.user.id, monthKey);
+  }
 
-  const rankings = scores.map((s, index) => ({
-    rank: index + 1,
-    nickname: s.user.nickname ?? s.user.loginId,
-    score: s.score,
-    stars: s.stars,
-    playTime: s.playTime,
-  }));
-
-  return NextResponse.json({ monthKey, rankings });
+  return NextResponse.json({ monthKey, rankings, myStats });
 }
