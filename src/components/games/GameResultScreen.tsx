@@ -1,0 +1,114 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import type { GameId } from "@/lib/games";
+import { getGameById, calculateStars } from "@/lib/games";
+import type { GameResult } from "@/games/shared/types";
+
+interface RankingEntry {
+  rank: number;
+  nickname: string;
+  score: number;
+  stars: number;
+}
+
+interface GameResultScreenProps {
+  gameId: GameId;
+  result: GameResult;
+}
+
+function medal(rank: number) {
+  if (rank === 1) return "🥇";
+  if (rank === 2) return "🥈";
+  if (rank === 3) return "🥉";
+  return `${rank}`;
+}
+
+export function GameResultScreen({ gameId, result }: GameResultScreenProps) {
+  const game = getGameById(gameId);
+  const stars = calculateStars(result.progress);
+  const [rankings, setRankings] = useState<RankingEntry[]>([]);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    async function saveAndLoad() {
+      await fetch("/api/scores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameId,
+          progress: result.progress,
+          playTime: result.playTime,
+          timeLeft: result.timeLeft,
+        }),
+      });
+      setSaved(true);
+
+      const res = await fetch(`/api/rankings/${gameId}`);
+      const data = await res.json();
+      setRankings(data.rankings ?? []);
+    }
+    saveAndLoad();
+  }, [gameId, result.progress, result.playTime, result.timeLeft]);
+
+  return (
+    <div className="mx-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg">
+      <h2 className="text-center text-xl font-bold" style={{ color: game?.color }}>
+        {result.completed ? "미션 완료!" : "시간 종료"}
+      </h2>
+      <p className="mt-1 text-center text-sm text-gray-500">{game?.brandEn}</p>
+
+      <div className="my-6 text-center">
+        <p className="text-4xl text-yellow-400">
+          {"★".repeat(stars)}
+          {"☆".repeat(3 - stars)}
+        </p>
+        <p className="mt-2 text-2xl font-bold text-gray-800">{result.progress}%</p>
+        <p className="text-sm text-gray-500">
+          플레이 시간 {result.playTime}초 · 남은 시간 {result.timeLeft}초
+        </p>
+        {saved && stars > 0 && (
+          <p className="mt-2 text-sm text-green-600">⭐ {stars}별 획득!</p>
+        )}
+      </div>
+
+      <div className="mb-4 rounded-xl bg-gray-50 p-4">
+        <h3 className="mb-2 text-sm font-bold text-gray-700">이번 달 Top 10</h3>
+        {rankings.length === 0 ? (
+          <p className="text-xs text-gray-400">랭킹 데이터 없음</p>
+        ) : (
+          <ul className="space-y-1">
+            {rankings.slice(0, 10).map((r) => (
+              <li key={r.rank} className="flex justify-between text-sm">
+                <span>
+                  {medal(r.rank)} {r.nickname}
+                </span>
+                <span className="text-gray-600">{r.score}점</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <Link
+          href={`/games/${gameId}`}
+          className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300"
+        >
+          재시도
+        </Link>
+        <Link
+          href="/home"
+          className="flex-1 rounded-lg py-3 text-center font-medium text-white hover:opacity-90"
+          style={{ backgroundColor: game?.color }}
+        >
+          홈으로
+        </Link>
+      </div>
+      {!saved && (
+        <p className="mt-2 text-center text-xs text-gray-400">점수 저장 중...</p>
+      )}
+    </div>
+  );
+}
