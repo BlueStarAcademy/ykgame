@@ -50,5 +50,6 @@ export function ensureAuthSecret({ fatal = true } = {}) {
     return false;
   }
 
+  process.env.NEXTAUTH_SECRET ??= process.env.AUTH_SECRET;
   return true;
 }

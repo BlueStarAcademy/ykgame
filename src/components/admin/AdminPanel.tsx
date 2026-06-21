@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
+import { clientLogout } from "@/lib/client-logout";
 
 interface UserRow {
   id: string;
@@ -74,7 +74,7 @@ export function AdminPanel() {
             홈으로
           </Link>
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={() => clientLogout()}
             className="rounded-lg bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300"
           >
             로그아웃

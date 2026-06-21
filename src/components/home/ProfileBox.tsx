@@ -1,6 +1,6 @@
 "use client";
 
-import { signOut } from "next-auth/react";
+import { clientLogout } from "@/lib/client-logout";
 
 interface ProfileBoxProps {
   nickname: string;
@@ -22,7 +22,7 @@ export function ProfileBox({ nickname, currency, totalStars }: ProfileBoxProps) 
           </div>
         </div>
         <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={() => clientLogout()}
           className="rounded-lg bg-white/20 px-3 py-1.5 text-sm hover:bg-white/30"
         >
           로그아웃

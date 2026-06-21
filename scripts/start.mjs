@@ -24,8 +24,8 @@ if (!hasDatabase) {
   process.exit(1);
 }
 
-if (!process.env.AUTH_URL && process.env.RAILWAY_PUBLIC_DOMAIN) {
-  process.env.AUTH_URL = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+if (process.env.RAILWAY_ENVIRONMENT) {
+  process.env.AUTH_TRUST_HOST ??= "true";
 }
 
 process.env.HOSTNAME = host;

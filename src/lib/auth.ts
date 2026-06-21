@@ -3,7 +3,10 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import { authConfig } from "./auth.config";
+import { ensureAuthSecretEnv, resolveAuthSecret } from "./auth-secret";
 import type { Role } from "@/generated/prisma/client";
+
+ensureAuthSecretEnv();
 
 declare module "next-auth" {
   interface Session {
@@ -38,6 +41,7 @@ declare module "next-auth" {
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
+  secret: resolveAuthSecret(),
   providers: [
     Credentials({
       credentials: {

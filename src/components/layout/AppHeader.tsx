@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { clientLogout } from "@/lib/client-logout";
 
 interface AppHeaderProps {
   nickname?: string;
@@ -44,7 +45,7 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
           </span>
 
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={() => clientLogout()}
             className="rounded-lg bg-gray-100 px-2.5 py-1 text-[10px] font-medium text-gray-600 hover:bg-gray-200"
           >
             로그아웃

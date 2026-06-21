@@ -12,7 +12,7 @@ export function getAppUrl(): string {
 }
 
 export function ensureRailwayEnv(): void {
-  if (!process.env.AUTH_URL && process.env.RAILWAY_PUBLIC_DOMAIN) {
-    process.env.AUTH_URL = getAppUrl();
+  if (process.env.RAILWAY_ENVIRONMENT) {
+    process.env.AUTH_TRUST_HOST ??= "true";
   }
 }
