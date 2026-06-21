@@ -14,6 +14,8 @@ function createPrismaClient() {
     new pg.Pool({
       connectionString: getDatabaseUrl({ required: true }),
       max: 10,
+      connectionTimeoutMillis: 5_000,
+      idleTimeoutMillis: 30_000,
     });
 
   if (process.env.NODE_ENV !== "production") {

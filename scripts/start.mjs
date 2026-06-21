@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 
 const port = process.env.PORT || "3000";
+const host = "0.0.0.0";
 
 function missingEnv(name) {
   const value = process.env[name];
@@ -30,13 +31,20 @@ if (!process.env.AUTH_URL && process.env.RAILWAY_PUBLIC_DOMAIN) {
   process.env.AUTH_URL = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
 }
 
-process.env.HOSTNAME = "0.0.0.0";
+process.env.HOSTNAME = host;
+
+console.log(`Starting Next.js on ${host}:${port}...`);
 
 const nextBin = resolve(process.cwd(), "node_modules/next/dist/bin/next");
 
-const child = spawn(process.execPath, [nextBin, "start", "-H", "0.0.0.0", "-p", port], {
+const child = spawn(process.execPath, [nextBin, "start", "-H", host, "-p", port], {
   stdio: "inherit",
   env: process.env,
+});
+
+child.on("error", (error) => {
+  console.error("Failed to start Next.js:", error);
+  process.exit(1);
 });
 
 child.on("exit", (code) => process.exit(code ?? 0));
