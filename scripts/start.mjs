@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
+import { ensureAuthSecret } from "./ensure-auth-secret.mjs";
 
 const port = process.env.PORT || "3000";
 const host = "0.0.0.0";
@@ -10,16 +11,12 @@ function missingEnv(name) {
   return !value || value.trim() === "";
 }
 
+ensureAuthSecret();
+
 const hasDatabase =
   !missingEnv("DATABASE_URL") ||
   !missingEnv("DATABASE_PUBLIC_URL") ||
   !missingEnv("PGHOST");
-
-if (missingEnv("AUTH_SECRET")) {
-  console.error("FATAL: AUTH_SECRET is not set.");
-  console.error("Railway → ykgame-web → Variables → AUTH_SECRET (openssl rand -base64 32)");
-  process.exit(1);
-}
 
 if (!hasDatabase) {
   console.error("FATAL: DATABASE_URL is not set.");

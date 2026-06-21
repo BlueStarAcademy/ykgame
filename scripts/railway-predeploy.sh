@@ -14,6 +14,22 @@ is_placeholder_url() {
   esac
 }
 
+if [ -z "$AUTH_SECRET" ] && [ -n "$NEXTAUTH_SECRET" ]; then
+  export AUTH_SECRET="$NEXTAUTH_SECRET"
+fi
+
+if [ -z "$AUTH_SECRET" ]; then
+  echo "ERROR: AUTH_SECRET is not configured."
+  echo ""
+  echo "Railway Dashboard → ykgame-web 서비스 → Variables:"
+  echo "  1. New Variable"
+  echo "  2. Name: AUTH_SECRET"
+  echo "  3. Value: openssl rand -base64 32 로 생성한 값"
+  echo ""
+  echo "(Postgres 서비스가 아닌 웹 서비스에 설정해야 합니다.)"
+  exit 1
+fi
+
 if [ -z "$DATABASE_URL" ] && [ -z "$DATABASE_PUBLIC_URL" ] && [ -z "$PGHOST" ]; then
   echo "ERROR: DATABASE_URL is not configured."
   echo ""
