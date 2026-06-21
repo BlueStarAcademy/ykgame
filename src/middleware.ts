@@ -9,6 +9,11 @@ const authPaths = ["/login", "/signup"];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
+
+  if (pathname === "/api/health") {
+    return NextResponse.next();
+  }
+
   const isLoggedIn = !!req.auth;
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
   const isAuthPage = authPaths.some((p) => pathname.startsWith(p));

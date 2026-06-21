@@ -42,3 +42,6 @@ next-env.d.ts
 
 /dev.db
 *.db-journal
+
+# prisma client — postinstall에서 생성
+/src/generated/prisma

@@ -1,61 +1,82 @@
 # YK건기 브랜드 캐주얼 게임
 
-YK건기 장비 브랜드(얀마, 존디어, 마니또 등) 8종 미니게임을 즐길 수 있는 모바일 웹 플랫폼입니다.
-
-## 기능
-
-- **로그인/회원가입**: 아이디·비밀번호, 아이디 저장, 자동 로그인
-- **소셜 로그인**: 카카오/구글 버튼 UI (API 키 설정 후 연동 가능)
-- **닉네임 설정**: 최초 로그인 시 1회
-- **홈 화면**: 프로필 박스 + 8개 게임 카드
-- **8개 미니게임**: Phaser 3 기반 터치 조작
-- **랭킹/재화**: 월간 Top 10, 별(재화) 획득
-- **관리자**: 회원 관리, 재화 지급/차감
+YK건기 장비 브랜드 8종 미니게임을 즐길 수 있는 모바일 웹 플랫폼입니다.
 
 ## 관리자 계정
 
-- **아이디**: `ykgameadmin`
-- **비밀번호**: `123456`
+- **아이디**: `ykgameadmin` / **비밀번호**: `123456`
 
-## 로컬 실행
+---
+
+## Railway 자동 배포 (GitHub 연동)
+
+GitHub에 push하면 Railway가 자동으로 빌드·배포합니다.
+
+### 최초 1회 — Railway 대시보드 설정
+
+1. **Postgres** 서비스가 같은 프로젝트에 있는지 확인
+2. **ykgame-web** 서비스 → **Variables** 탭:
+
+| 변수 | 값 |
+|------|-----|
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (Reference 추가) |
+| `AUTH_SECRET` | `openssl rand -base64 32` 결과값 |
+
+3. **Settings → Networking → Generate Domain**
+4. GitHub에 push → 자동 배포 시작
+
+> `AUTH_URL`은 Railway 도메인(`RAILWAY_PUBLIC_DOMAIN`)으로 **자동 설정**됩니다.  
+> 배포 시 **migrate + admin seed**도 자동 실행됩니다 (`scripts/railway-predeploy.sh`).
+
+### 자동 적용되는 항목
+
+- `railway.toml` / `nixpacks.toml` — 빌드·배포 설정
+- Pre-deploy: `prisma migrate deploy` + admin seed
+- PostgreSQL adapter (Railway internal URL)
+- Health check: `/api/health`
+- PORT / AUTH_URL 자동 처리
+
+---
+
+## 로컬 실행 (Railway Postgres 공유)
 
 ```bash
 npm install
-cp .env.example .env
-npx prisma migrate dev
-npm run db:seed
+cp .env.example .env   # DATABASE_PUBLIC_URL 입력
 npm run dev
 ```
 
-브라우저에서 http://localhost:3000 접속
+`.env` 예시:
+
+```env
+DATABASE_PUBLIC_URL="postgresql://...@xxx.proxy.rlwy.net:PORT/railway"
+DATABASE_URL="postgresql://...@postgres.railway.internal:5432/railway"
+AUTH_SECRET="local-dev-secret"
+AUTH_URL="http://localhost:3000"
+```
+
+로컬에서는 `DATABASE_PUBLIC_URL`이 자동 사용됩니다.
+
+```bash
+npx prisma migrate deploy   # 최초 1회
+npm run db:seed               # 최초 1회 (선택)
+npm run dev
+```
+
+---
 
 ## 환경 변수
 
-| 변수 | 설명 |
-|------|------|
-| `DATABASE_URL` | SQLite: `file:./dev.db` / PostgreSQL: 연결 문자열 |
-| `AUTH_SECRET` | NextAuth JWT 시크릿 |
-| `AUTH_URL` | 앱 URL (예: `http://localhost:3000`) |
-| `KAKAO_CLIENT_ID` | 카카오 OAuth (선택) |
-| `GOOGLE_CLIENT_ID` | Google OAuth (선택) |
+| 변수 | 로컬 | Railway |
+|------|------|---------|
+| `DATABASE_PUBLIC_URL` | Public URL | 불필요 |
+| `DATABASE_URL` | internal URL (참고용) | `${{Postgres.DATABASE_URL}}` |
+| `AUTH_SECRET` | 직접 입력 | 직접 입력 (필수) |
+| `AUTH_URL` | `http://localhost:3000` | 자동 (`RAILWAY_PUBLIC_DOMAIN`) |
 
-## 배포 (Vercel + PostgreSQL)
+자세한 Railway Variables 예시: [`railway.env.example`](railway.env.example)
 
-1. Neon/Supabase 등에서 PostgreSQL 생성
-2. `DATABASE_URL`을 PostgreSQL 연결 문자열로 설정
-3. `prisma/schema.prisma`의 `provider`를 `postgresql`로 변경
-4. Vercel에 배포 후 `AUTH_SECRET`, `AUTH_URL` 설정
-5. `npx prisma migrate deploy` 실행
-
-## 프로젝트 구조
-
-```
-src/
-├── app/           # 페이지 및 API 라우트
-├── components/    # UI 컴포넌트
-├── games/         # Phaser 미니게임
-└── lib/           # auth, prisma, games 설정
-```
+---
 
 ## 게임 목록
 

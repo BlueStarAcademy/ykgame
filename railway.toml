@@ -1,0 +1,12 @@
+[build]
+builder = "nixpacks"
+buildCommand = "npm run build"
+watchPatterns = ["src/**", "prisma/**", "public/**"]
+
+[deploy]
+preDeployCommand = "sh scripts/railway-predeploy.sh"
+startCommand = "node scripts/start.mjs"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
