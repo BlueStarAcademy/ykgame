@@ -5,7 +5,7 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { getDatabaseUrl } from "../src/lib/db-url";
 import bcrypt from "bcryptjs";
 
-const pool = new pg.Pool({ connectionString: getDatabaseUrl() });
+const pool = new pg.Pool({ connectionString: getDatabaseUrl({ required: true }) });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 

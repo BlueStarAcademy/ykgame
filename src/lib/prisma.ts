@@ -12,7 +12,7 @@ function createPrismaClient() {
   const pool =
     globalForPrisma.pgPool ??
     new pg.Pool({
-      connectionString: getDatabaseUrl(),
+      connectionString: getDatabaseUrl({ required: true }),
       max: 10,
     });
 

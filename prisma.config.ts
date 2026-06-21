@@ -8,6 +8,7 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: getDatabaseUrl(),
+    // prisma generate는 DB 연결 불필요 — placeholder 허용
+    url: getDatabaseUrl({ required: false }),
   },
 });

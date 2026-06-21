@@ -1,10 +1,6 @@
-/** Next.js production build 중에는 DB 연결이 필요 없음 */
+/** Next.js production build / prisma generate 중에는 DB 연결이 필요 없음 */
 const BUILD_PLACEHOLDER_URL =
   "postgresql://build:build@127.0.0.1:5432/build?schema=public";
-
-function isProductionBuildPhase(): boolean {
-  return process.env.NEXT_PHASE === "phase-production-build";
-}
 
 function isBuildPlaceholder(url: string | undefined): boolean {
   return url === BUILD_PLACEHOLDER_URL;
@@ -35,64 +31,55 @@ function railwaySetupHint(): string {
   );
 }
 
+type GetDatabaseUrlOptions = {
+  /** false: prisma generate 등 DB 미연결 단계용 placeholder 허용 */
+  required?: boolean;
+};
+
 /**
  * Railway Postgres 연결 URL resolver.
  *
  * - Railway 배포: DATABASE_URL (postgres.railway.internal) 사용
  * - 로컬 개발: DATABASE_PUBLIC_URL (proxy.rlwy.net) 사용
  */
-export function getDatabaseUrl(): string {
+export function getDatabaseUrl(options: GetDatabaseUrlOptions = {}): string {
+  const { required = false } = options;
   const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT);
   const internal = process.env.DATABASE_URL;
   const publicUrl = process.env.DATABASE_PUBLIC_URL;
   const fromPg = buildFromPgEnv();
 
-  if (onRailway) {
-    const url = pickFirstUrl([
-      internal,
-      process.env.DATABASE_PRIVATE_URL,
-      process.env.POSTGRES_URL,
-      fromPg,
-      publicUrl,
-    ]);
+  const resolved = pickFirstUrl([
+    onRailway ? internal : undefined,
+    publicUrl,
+    !onRailway ? internal : undefined,
+    process.env.DATABASE_PRIVATE_URL,
+    process.env.POSTGRES_URL,
+    fromPg,
+    onRailway ? publicUrl : undefined,
+  ]);
 
-    if (url) return url;
+  if (resolved) return resolved;
 
-    throw new Error(
-      "Railway에서 DATABASE_URL이 비어 있습니다.\n" + railwaySetupHint(),
-    );
-  }
-
-  if (publicUrl) return publicUrl;
-
-  if (internal && !internal.includes("railway.internal")) {
-    return internal;
-  }
-
-  if (internal?.includes("railway.internal")) {
+  if (internal?.includes("railway.internal") && !onRailway) {
     throw new Error(
       "로컬에서는 Railway internal URL에 접속할 수 없습니다. " +
         ".env에 DATABASE_PUBLIC_URL(Railway Postgres → Connect → Public URL)을 설정하세요.",
     );
   }
 
-  const fallback = pickFirstUrl([
-    fromPg,
-    process.env.DATABASE_PRIVATE_URL,
-    process.env.POSTGRES_URL,
-  ]);
-  if (fallback) return fallback;
+  if (!required) return BUILD_PLACEHOLDER_URL;
 
-  if (isProductionBuildPhase() || isBuildPlaceholder(internal)) {
-    return BUILD_PLACEHOLDER_URL;
+  if (onRailway) {
+    throw new Error(
+      "Railway에서 DATABASE_URL이 비어 있습니다.\n" + railwaySetupHint(),
+    );
   }
-
-  if (internal) return internal;
 
   throw new Error("DATABASE_URL 또는 DATABASE_PUBLIC_URL 환경 변수가 필요합니다.");
 }
 
-/** pre-deploy 스크립트용 — URL 존재 여부만 검사 */
+/** pre-deploy / 런타임 DB 연결 — 실제 URL 필수 */
 export function assertDatabaseUrlConfigured(): void {
-  getDatabaseUrl();
+  getDatabaseUrl({ required: true });
 }
