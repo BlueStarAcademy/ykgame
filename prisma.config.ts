@@ -1,16 +1,6 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
-
-function resolveDatabaseUrl(): string {
-  const internal = process.env.DATABASE_URL;
-  const publicUrl = process.env.DATABASE_PUBLIC_URL;
-  const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT);
-
-  if (onRailway && internal) return internal;
-  if (publicUrl) return publicUrl;
-  if (internal && !internal.includes("railway.internal")) return internal;
-  return internal ?? "";
-}
+import { getDatabaseUrl } from "./src/lib/db-url";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -18,6 +8,6 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: resolveDatabaseUrl(),
+    url: getDatabaseUrl(),
   },
 });
