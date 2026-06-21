@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm run build"
+buildCommand = "DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build npm run build"
 watchPatterns = ["src/**", "prisma/**", "public/**"]
 
 [deploy]
