@@ -20,7 +20,7 @@ GitHub에 push하면 Railway가 자동으로 빌드·배포합니다.
 | 변수 | 값 |
 |------|-----|
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (Reference 추가) |
-| `AUTH_SECRET` | `openssl rand -base64 32` 결과값 |
+| `AUTH_SECRET` | `openssl rand -base64 32` 결과값 (미설정 시 Railway에서 자동 생성) |
 
 3. **Settings → Networking → Generate Domain**
 4. GitHub에 push → 자동 배포 시작
