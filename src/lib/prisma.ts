@@ -6,20 +6,20 @@ import { getDatabaseUrl } from "./db-url";
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   pgPool: pg.Pool | undefined;
+  dbUrl: string | undefined;
 };
 
-function createPrismaClient() {
-  const pool =
-    globalForPrisma.pgPool ??
-    new pg.Pool({
-      connectionString: getDatabaseUrl({ required: true }),
-      max: 10,
-      connectionTimeoutMillis: 5_000,
-      idleTimeoutMillis: 30_000,
-    });
+function createPrismaClient(connectionString: string) {
+  const pool = new pg.Pool({
+    connectionString,
+    max: 10,
+    connectionTimeoutMillis: 5_000,
+    idleTimeoutMillis: 30_000,
+  });
 
   if (process.env.NODE_ENV !== "production") {
     globalForPrisma.pgPool = pool;
+    globalForPrisma.dbUrl = connectionString;
   }
 
   const adapter = new PrismaPg(pool);
@@ -27,9 +27,20 @@ function createPrismaClient() {
 }
 
 function getPrismaClient(): PrismaClient {
-  if (!globalForPrisma.prisma) {
-    globalForPrisma.prisma = createPrismaClient();
+  const connectionString = getDatabaseUrl({ required: true });
+
+  if (
+    globalForPrisma.prisma &&
+    globalForPrisma.dbUrl === connectionString
+  ) {
+    return globalForPrisma.prisma;
   }
+
+  if (globalForPrisma.pgPool) {
+    void globalForPrisma.pgPool.end();
+  }
+
+  globalForPrisma.prisma = createPrismaClient(connectionString);
   return globalForPrisma.prisma;
 }
 

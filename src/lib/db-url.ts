@@ -27,9 +27,21 @@ function buildFromPgEnv(): string | undefined {
   return `postgresql://${PGUSER}:${encodeURIComponent(PGPASSWORD)}@${PGHOST}:${port}/${PGDATABASE}`;
 }
 
+function isRailwayInternal(url: string): boolean {
+  try {
+    return new URL(url).hostname.endsWith("railway.internal");
+  } catch {
+    return false;
+  }
+}
+
 function pickFirstUrl(candidates: Array<string | undefined>): string | undefined {
+  const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT);
+
   for (const url of candidates) {
-    if (url && !isBuildPlaceholder(url)) return url;
+    if (!url || isBuildPlaceholder(url)) continue;
+    if (!onRailway && isRailwayInternal(url)) continue;
+    return url;
   }
   return undefined;
 }

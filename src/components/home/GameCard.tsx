@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { GameConfig } from "@/lib/games";
+import { GameCardSprite } from "@/components/home/GameCardSprite";
 
 interface GameCardProps {
   game: GameConfig;
@@ -62,15 +63,8 @@ export function GameCard({ game, progress }: GameCardProps) {
         <div className="absolute bottom-2 right-2 rounded bg-black/30 px-2 py-0.5 text-xs text-white">
           {score > 0 ? `${score}점` : "0%"}
         </div>
-        <div className="text-4xl opacity-80">
-          {game.number === 1 && "🚜"}
-          {game.number === 2 && "🌾"}
-          {game.number === 3 && "🏗️"}
-          {game.number === 4 && "🛣️"}
-          {game.number === 5 && "🚧"}
-          {game.number === 6 && "🐄"}
-          {game.number === 7 && "🔨"}
-          {game.number === 8 && "⛰️"}
+        <div className="absolute bottom-1 right-3 drop-shadow-md">
+          <GameCardSprite gameId={game.id} className="scale-125" />
         </div>
       </div>
 

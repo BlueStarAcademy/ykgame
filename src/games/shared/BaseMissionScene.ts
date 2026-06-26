@@ -1,5 +1,11 @@
 import Phaser from "phaser";
 import type { GameEndCallback, MissionConfig } from "./types";
+import {
+  createEquipmentSprite,
+  ensureEquipmentAnims,
+  loadEquipmentSpriteSheet,
+  playEquipmentAnim,
+} from "./spriteHelper";
 
 export abstract class BaseMissionScene extends Phaser.Scene {
   protected progress = 0;
@@ -21,7 +27,12 @@ export abstract class BaseMissionScene extends Phaser.Scene {
     this.timeLeft = data.config.duration;
   }
 
+  preload() {
+    loadEquipmentSpriteSheet(this, this.missionConfig.gameId);
+  }
+
   create() {
+    ensureEquipmentAnims(this, this.missionConfig.gameId);
     const { width, height } = this.scale;
     this.cameras.main.setBackgroundColor("#87CEEB");
 
@@ -94,6 +105,14 @@ export abstract class BaseMissionScene extends Phaser.Scene {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+
+  protected spawnEquipmentSprite(x: number, y: number, scale = 1.5) {
+    return createEquipmentSprite(this, this.missionConfig.gameId, x, y, scale);
+  }
+
+  protected setEquipmentWorking(sprite: Phaser.GameObjects.Sprite, working: boolean) {
+    playEquipmentAnim(sprite, this.missionConfig.gameId, working);
   }
 
   protected abstract createMission(): void;

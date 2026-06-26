@@ -14,3 +14,17 @@ body {
 * {
   -webkit-tap-highlight-color: transparent;
 }
+
+@keyframes game-card-sprite {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -256px 0;
+  }
+}
+
+.game-card-sprite {
+  image-rendering: pixelated;
+  animation: game-card-sprite 0.8s steps(4) infinite;
+}

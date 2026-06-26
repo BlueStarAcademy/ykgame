@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { BaseMissionScene } from "../shared/BaseMissionScene";
 
 export class CollectMissionScene extends BaseMissionScene {
-  private player!: Phaser.GameObjects.Rectangle;
+  private player!: Phaser.GameObjects.Sprite;
   private items: Phaser.GameObjects.Rectangle[] = [];
   private cursors!: {
     up: Phaser.GameObjects.Arc;
@@ -16,7 +16,7 @@ export class CollectMissionScene extends BaseMissionScene {
 
   protected createMission() {
     const { width, height } = this.scale;
-    this.player = this.add.rectangle(width / 2, height * 0.5, 40, 30, this.missionConfig.brandColor);
+    this.player = this.spawnEquipmentSprite(width / 2, height * 0.5);
     this.instructionText.setText("D-pad로 이동 · ACTION으로 작업");
 
     for (let i = 0; i < this.target + 5; i++) {
@@ -91,6 +91,9 @@ export class CollectMissionScene extends BaseMissionScene {
   }
 
   protected updateMission(_delta: number) {
+    const moving = this.velocity.x !== 0 || this.velocity.y !== 0;
+    this.setEquipmentWorking(this.player, moving);
+
     this.player.x = Phaser.Math.Clamp(
       this.player.x + this.velocity.x,
       20,
@@ -105,7 +108,7 @@ export class CollectMissionScene extends BaseMissionScene {
 }
 
 export class DriveMissionScene extends BaseMissionScene {
-  private vehicle!: Phaser.GameObjects.Rectangle;
+  private vehicle!: Phaser.GameObjects.Sprite;
   private fillBar!: Phaser.GameObjects.Graphics;
   private speed = 0;
   private forwardBtn!: Phaser.GameObjects.Arc;
@@ -114,7 +117,7 @@ export class DriveMissionScene extends BaseMissionScene {
 
   protected createMission() {
     const { width, height } = this.scale;
-    this.vehicle = this.add.rectangle(80, height * 0.55, 50, 30, this.missionConfig.brandColor);
+    this.vehicle = this.spawnEquipmentSprite(80, height * 0.55);
     this.fillBar = this.add.graphics();
     this.instructionText.setText("전진 버튼으로 작업 진행");
     this.drawBar();
@@ -163,6 +166,8 @@ export class DriveMissionScene extends BaseMissionScene {
   }
 
   protected updateMission(_delta: number) {
+    this.setEquipmentWorking(this.vehicle, this.speed > 0);
+
     if (this.speed > 0) {
       this.vehicle.x += this.speed;
       if (this.vehicle.x > this.scale.width + 20) {
@@ -175,7 +180,7 @@ export class DriveMissionScene extends BaseMissionScene {
 }
 
 export class DeliverMissionScene extends BaseMissionScene {
-  private player!: Phaser.GameObjects.Rectangle;
+  private player!: Phaser.GameObjects.Sprite;
   private cargo: Phaser.GameObjects.Rectangle | null = null;
   private carrying = false;
   private dropZone!: Phaser.GameObjects.Rectangle;
@@ -183,7 +188,7 @@ export class DeliverMissionScene extends BaseMissionScene {
 
   protected createMission() {
     const { width, height } = this.scale;
-    this.player = this.add.rectangle(width / 2, height * 0.5, 45, 35, this.missionConfig.brandColor);
+    this.player = this.spawnEquipmentSprite(width / 2, height * 0.5);
     this.dropZone = this.add.rectangle(width - 60, height * 0.55, 50, 50, 0xffffff, 0.3);
     this.add.text(width - 60, height * 0.55, "목표", { fontSize: "12px", color: "#fff" }).setOrigin(0.5);
     this.spawnCargo();
@@ -248,6 +253,9 @@ export class DeliverMissionScene extends BaseMissionScene {
   }
 
   protected updateMission(_delta: number) {
+    const moving = this.velocity.x !== 0 || this.velocity.y !== 0;
+    this.setEquipmentWorking(this.player, moving || this.carrying);
+
     this.player.x = Phaser.Math.Clamp(this.player.x + this.velocity.x, 25, this.scale.width - 25);
     this.player.y = Phaser.Math.Clamp(
       this.player.y + this.velocity.y,
@@ -258,13 +266,15 @@ export class DeliverMissionScene extends BaseMissionScene {
 }
 
 export class CompactMissionScene extends BaseMissionScene {
-  private vehicle!: Phaser.GameObjects.Rectangle;
+  private vehicle!: Phaser.GameObjects.Sprite;
   private vibrating = false;
   private bar!: Phaser.GameObjects.Graphics;
+  private vehicleBaseY = 0;
 
   protected createMission() {
     const { width, height } = this.scale;
-    this.vehicle = this.add.rectangle(width / 2, height * 0.55, 55, 35, this.missionConfig.brandColor);
+    this.vehicleBaseY = height * 0.55;
+    this.vehicle = this.spawnEquipmentSprite(width / 2, this.vehicleBaseY);
     this.bar = this.add.graphics();
     this.instructionText.setText("전진 + 진동으로 도로 다지기");
     this.drawBar();
@@ -295,11 +305,15 @@ export class CompactMissionScene extends BaseMissionScene {
   }
 
   protected updateMission(delta: number) {
+    this.setEquipmentWorking(this.vehicle, this.vibrating);
+
     if (this.vibrating) {
       this.progress += (delta / 1000) * 2;
       this.progress = Math.min(this.target, this.progress);
       this.drawBar();
-      this.vehicle.setScale(1 + Math.sin(this.elapsed * 20) * 0.05);
+      this.vehicle.y = this.vehicleBaseY + Math.sin(this.elapsed * 20) * 3;
+    } else {
+      this.vehicle.y = this.vehicleBaseY;
     }
   }
 }
@@ -308,17 +322,19 @@ export class SortMissionScene extends BaseMissionScene {
   private counts = { coarse: 0, medium: 0, fine: 0 };
   private targets = { coarse: 4, medium: 4, fine: 4 };
   private labels: Phaser.GameObjects.Text[] = [];
+  private crusher!: Phaser.GameObjects.Sprite;
+  private crushing = false;
 
   protected createMission() {
     this.target = 12;
+    const { width, height } = this.scale;
+    this.crusher = this.spawnEquipmentSprite(width / 2, height * 0.48, 2);
     this.instructionText.setText("크기별 버튼으로 암석 분류");
-    const { width } = this.scale;
     [" coarse:0/4", "medium:0/4", "fine:0/4"].forEach((_, i) => {
       const t = this.add.text(20, 55 + i * 22, "", { fontSize: "14px", color: "#fff", backgroundColor: "#00000088", padding: { x: 6, y: 2 } });
       this.labels.push(t);
     });
     this.updateLabels();
-    void width;
   }
 
   private updateLabels() {
@@ -345,23 +361,29 @@ export class SortMissionScene extends BaseMissionScene {
           this.counts[key]++;
           this.addProgress(1);
           this.updateLabels();
+          this.crushing = true;
+          this.time.delayedCall(400, () => {
+            this.crushing = false;
+          });
         }
       });
     });
   }
 
-  protected updateMission(_delta: number) {}
+  protected updateMission(_delta: number) {
+    this.setEquipmentWorking(this.crusher, this.crushing);
+  }
 }
 
 export class PaveMissionScene extends BaseMissionScene {
-  private vehicle!: Phaser.GameObjects.Rectangle;
+  private vehicle!: Phaser.GameObjects.Sprite;
   private paving = false;
   private width_ = 1;
   private bar!: Phaser.GameObjects.Graphics;
 
   protected createMission() {
     const { width, height } = this.scale;
-    this.vehicle = this.add.rectangle(60, height * 0.55, 50, 28, this.missionConfig.brandColor);
+    this.vehicle = this.spawnEquipmentSprite(60, height * 0.55);
     this.bar = this.add.graphics();
     this.instructionText.setText("전진 + 폭 조절로 포장");
     this.drawBar();
@@ -391,6 +413,8 @@ export class PaveMissionScene extends BaseMissionScene {
   }
 
   protected updateMission(delta: number) {
+    this.setEquipmentWorking(this.vehicle, this.paving);
+
     if (this.paving) {
       this.vehicle.x += 2;
       this.progress += (delta / 1000) * this.width_;

@@ -19,6 +19,8 @@ export interface GameConfig {
   color: string;
   headerColor: string;
   controlType: "dpad" | "steering" | "buttons";
+  /** Animated sprite sheet used on home cards and in Phaser gameplay */
+  spriteSheet: string;
 }
 
 export const GAMES: GameConfig[] = [
@@ -34,6 +36,7 @@ export const GAMES: GameConfig[] = [
     color: "#E53935",
     headerColor: "#C62828",
     controlType: "dpad",
+    spriteSheet: "/games/yanmar/sprite.png",
   },
   {
     id: "johndeere",
@@ -47,6 +50,7 @@ export const GAMES: GameConfig[] = [
     color: "#2E7D32",
     headerColor: "#1B5E20",
     controlType: "steering",
+    spriteSheet: "/games/johndeere/sprite.png",
   },
   {
     id: "manitou",
@@ -60,6 +64,7 @@ export const GAMES: GameConfig[] = [
     color: "#8B1A1A",
     headerColor: "#6B0F0F",
     controlType: "dpad",
+    spriteSheet: "/games/manitou/sprite.png",
   },
   {
     id: "wirtgen",
@@ -73,6 +78,7 @@ export const GAMES: GameConfig[] = [
     color: "#1565C0",
     headerColor: "#0D47A1",
     controlType: "steering",
+    spriteSheet: "/games/wirtgen/sprite.png",
   },
   {
     id: "voegle",
@@ -86,6 +92,7 @@ export const GAMES: GameConfig[] = [
     color: "#00838F",
     headerColor: "#006064",
     controlType: "steering",
+    spriteSheet: "/games/voegle/sprite.png",
   },
   {
     id: "gehl",
@@ -99,6 +106,7 @@ export const GAMES: GameConfig[] = [
     color: "#F9A825",
     headerColor: "#F57F17",
     controlType: "dpad",
+    spriteSheet: "/games/gehl/sprite.png",
   },
   {
     id: "hamm",
@@ -112,6 +120,7 @@ export const GAMES: GameConfig[] = [
     color: "#EF6C00",
     headerColor: "#E65100",
     controlType: "steering",
+    spriteSheet: "/games/hamm/sprite.png",
   },
   {
     id: "kleemann",
@@ -125,6 +134,7 @@ export const GAMES: GameConfig[] = [
     color: "#1A237E",
     headerColor: "#0D1642",
     controlType: "buttons",
+    spriteSheet: "/games/kleemann/sprite.png",
   },
 ];
 

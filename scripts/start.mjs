@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "dotenv/config";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { ensureAuthSecret } from "./ensure-auth-secret.mjs";
