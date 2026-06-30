@@ -49,7 +49,7 @@ export default async function HomePage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         {GAMES.map((game) => (
           <GameCard
             key={game.id}

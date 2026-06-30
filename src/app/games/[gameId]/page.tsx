@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getGameById } from "@/lib/games";
+import { getGameById, isGameAvailable } from "@/lib/games";
 import { isValidGameId } from "@/games/registry";
 import { GamePlayClient } from "@/components/games/GamePlayClient";
 import { AppShell } from "@/components/layout/AppShell";
@@ -17,6 +17,7 @@ export default async function GamePage({
 
   const { gameId } = await params;
   if (!isValidGameId(gameId)) notFound();
+  if (!isGameAvailable(gameId)) redirect("/home");
 
   getGameById(gameId);
 

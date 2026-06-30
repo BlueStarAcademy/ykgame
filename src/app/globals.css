@@ -28,3 +28,202 @@ body {
   image-rendering: pixelated;
   animation: game-card-sprite 0.8s steps(4) infinite;
 }
+
+.game-card-sprite-locked {
+  animation-play-state: paused;
+}
+
+@keyframes yanmar-card-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes yanmar-card-flip {
+  0%,
+  49.9% {
+    transform: scaleX(1);
+  }
+  50%,
+  99.9% {
+    transform: scaleX(-1);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+.game-card-hero-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.game-card-yanmar-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-card-yanmar-flip {
+  transform-origin: center center;
+  animation: yanmar-card-flip 4.8s linear infinite;
+}
+
+.game-card-yanmar-image {
+  height: 3rem;
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+  transform-origin: center center;
+  animation: yanmar-card-bob 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35));
+}
+
+.game-card-yanmar-wrap.game-card-sprite-locked .game-card-yanmar-flip,
+.game-card-yanmar-wrap.game-card-sprite-locked .game-card-yanmar-image {
+  animation-play-state: paused;
+}
+
+@keyframes card-shimmer {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* ── Active card: floating 3D tile ── */
+.game-card-active {
+  display: block;
+  perspective: 900px;
+  transform-style: preserve-3d;
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+
+.game-card-active .game-card-surface {
+  overflow: hidden;
+  border-radius: 1rem;
+  background: white;
+  transform-style: preserve-3d;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 4px 8px -2px rgba(0, 0, 0, 0.08),
+    0 12px 24px -6px rgba(0, 0, 0, 0.14),
+    0 20px 40px -12px rgba(0, 0, 0, 0.1);
+}
+
+.game-card-active:hover .game-card-surface {
+  transform: translateY(-5px) rotateX(3deg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 2px 4px rgba(0, 0, 0, 0.06),
+    0 8px 16px -4px rgba(0, 0, 0, 0.12),
+    0 20px 36px -8px rgba(0, 0, 0, 0.18),
+    0 32px 56px -16px rgba(0, 0, 0, 0.14);
+}
+
+.game-card-active:active .game-card-surface {
+  transform: translateY(-1px) rotateX(1deg) scale(0.98);
+  transition-duration: 0.1s;
+}
+
+/* ── Locked card: recessed panel ── */
+.game-card-locked {
+  display: block;
+  cursor: not-allowed;
+  user-select: none;
+  opacity: 0.88;
+}
+
+.game-card-locked .game-card-surface {
+  overflow: hidden;
+  border-radius: 1rem;
+  background: white;
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(0, 0, 0, 0.04),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Header depth ── */
+.game-card-badge {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* ── Preview: lighting & vignette ── */
+.game-card-preview::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 10%, rgba(255, 255, 255, 0.28) 0%, transparent 60%),
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.1) 1px, transparent 0),
+    linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.25) 100%);
+  background-size: auto, 12px 12px, auto;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.game-card-active:hover .game-card-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 65%
+  );
+  animation: card-shimmer 1.2s ease-in-out;
+  pointer-events: none;
+}
+
+/* ── Stat pills: convex glass chips ── */
+.game-card-stat-pill {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* ── Sprite: lifted off the ground ── */
+.game-card-sprite-wrap {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.game-card-active:hover .game-card-sprite-wrap:not(.game-card-hero-wrap) {
+  transform: translateY(-2px);
+  transition: transform 0.25s ease;
+}
+
+/* ── Coming Soon badge: embossed pill ── */
+.game-card-soon-badge {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* ── Footer: inset tray ── */
+.game-card-footer {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.04);
+}

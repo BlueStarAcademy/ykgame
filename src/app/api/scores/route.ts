@@ -6,6 +6,7 @@ import {
   calculateStars,
   getGameById,
   getMonthKey,
+  isGameAvailable,
 } from "@/lib/games";
 
 export async function POST(request: Request) {
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
   const game = getGameById(gameId);
   if (!game) {
     return NextResponse.json({ error: "Invalid game" }, { status: 400 });
+  }
+  if (!isGameAvailable(gameId)) {
+    return NextResponse.json({ error: "Game not available" }, { status: 403 });
   }
 
   const stars = calculateStars(progress);

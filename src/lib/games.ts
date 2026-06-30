@@ -138,6 +138,12 @@ export const GAMES: GameConfig[] = [
   },
 ];
 
+export const AVAILABLE_GAME_IDS: GameId[] = ["yanmar"];
+
+export function isGameAvailable(id: string): boolean {
+  return AVAILABLE_GAME_IDS.includes(id as GameId);
+}
+
 export function getGameById(id: string): GameConfig | undefined {
   return GAMES.find((g) => g.id === id);
 }
