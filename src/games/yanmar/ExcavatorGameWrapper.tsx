@@ -13,6 +13,12 @@ import {
   createInitialTerrain,
   type ExcavatorSimState,
 } from "./ExcavatorScene";
+import { createHydraulicVelocity, type HydraulicVelocity } from "./controls";
+import { ExcavatorMinimap } from "./ExcavatorMinimap";
+import { DigHintPanel } from "./DigHintPanel";
+import { DumpHintPanel } from "./DumpHintPanel";
+import { ControlsGuidePanel } from "./ControlsGuidePanel";
+import { createDigFeedback, type DigFeedback } from "./bucket";
 import type { TerrainData } from "./terrain";
 import {
   createScoreState,
@@ -26,6 +32,7 @@ import {
   ALL_CONTROLS,
   checkTutorialStepComplete,
   TUTORIAL_STEPS,
+  waypointDistance,
   type GameMode,
   type TutorialStep,
 } from "./tutorial";
@@ -41,9 +48,10 @@ function formatTime(seconds: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function resetSim(sim: ExcavatorSimState) {
+function resetSim(sim: ExcavatorSimState, vel: HydraulicVelocity) {
   const init = createInitialSim();
   Object.assign(sim, init);
+  Object.assign(vel, createHydraulicVelocity());
 }
 
 export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGameWrapperProps) {
@@ -55,14 +63,44 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     right: { x: 0, y: 0 },
     travel: 0,
   });
-  const [hud, setHud] = useState({ progress: 0, timeLeft: config.duration, bucketLoad: 0 });
+  const [hud, setHud] = useState({
+    progress: 0,
+    timeLeft: config.duration,
+    bucketLoad: 0,
+    goalDist: 0,
+    boom: 0.45,
+  });
   const [stepCompleteFlash, setStepCompleteFlash] = useState(false);
+  const [showControlsGuide, setShowControlsGuide] = useState(false);
   const endedRef = useRef(false);
   const elapsedRef = useRef(0);
   const tutorialDumpRef = useRef(0);
   const tutorialCompletingRef = useRef(false);
   const tutorialIndexRef = useRef(0);
+  const digFeedbackRef = useRef<DigFeedback>(createDigFeedback());
+  const [digFeedback, setDigFeedback] = useState<DigFeedback>(createDigFeedback());
+  const digHudTickRef = useRef(0);
   const lastHudProgressRef = useRef(-1);
+
+  const syncDigHud = useCallback(() => {
+    digHudTickRef.current += 1;
+    if (digHudTickRef.current % 6 !== 0) return;
+    const fb = digFeedbackRef.current;
+    setDigFeedback((prev) =>
+      prev.inDigZone === fb.inDigZone &&
+      prev.inDumpZone === fb.inDumpZone &&
+      prev.tipOnGround === fb.tipOnGround &&
+      prev.bucketCurled === fb.bucketCurled &&
+      prev.digging === fb.digging
+        ? prev
+        : { ...fb },
+    );
+    setHud((h) => {
+      const boom = simRef.current.boom;
+      if (Math.abs(h.boom - boom) < 0.01) return h;
+      return { ...h, boom };
+    });
+  }, []);
 
   const inputRef = useRef(input);
   inputRef.current = input;
@@ -71,6 +109,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
   modeRef.current = mode;
 
   const simRef = useRef<ExcavatorSimState>(createInitialSim());
+  const velRef = useRef<HydraulicVelocity>(createHydraulicVelocity());
   const terrainRef = useRef<TerrainData>(createInitialTerrain());
   const scoreRef = useRef<DiggingScoreState>(
     createScoreState(config.target, config.duration),
@@ -90,22 +129,24 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
   allowedRef.current = allowed;
 
   const startGame = useCallback(() => {
-    resetSim(simRef.current);
+    resetSim(simRef.current, velRef.current);
     terrainRef.current = createInitialTerrain();
     scoreRef.current = createScoreState(config.target, config.duration);
     tutorialDumpRef.current = 0;
     endedRef.current = false;
     elapsedRef.current = 0;
     lastHudProgressRef.current = -1;
-    setHud({ progress: 0, timeLeft: config.duration, bucketLoad: 0 });
+    setHud({ progress: 0, timeLeft: config.duration, bucketLoad: 0, goalDist: 0, boom: 0.45 });
     setMode("game");
   }, [config.duration, config.target]);
 
   const startTutorial = useCallback(() => {
-    resetSim(simRef.current);
+    resetSim(simRef.current, velRef.current);
     terrainRef.current = createInitialTerrain();
     tutorialDumpRef.current = 0;
     tutorialCompletingRef.current = false;
+    tutorialIndexRef.current = 0;
+    tutorialStepRef.current = TUTORIAL_STEPS[0] ?? null;
     setTutorialIndex(0);
     setMode("tutorial");
   }, []);
@@ -117,30 +158,46 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     window.setTimeout(() => setStepCompleteFlash(false), 600);
 
     const next = tutorialIndexRef.current + 1;
-    if (next >= TUTORIAL_STEPS.length) {
-      startGame();
-    } else {
-      setTutorialIndex(next);
-    }
+    tutorialIndexRef.current = next;
+    tutorialStepRef.current = TUTORIAL_STEPS[next] ?? null;
+    setTutorialIndex(next);
+
     window.setTimeout(() => {
       tutorialCompletingRef.current = false;
-    }, 800);
-  }, [startGame]);
+    }, 900);
+  }, []);
 
   const handleTutorialTick = useCallback(() => {
     if (modeRef.current !== "tutorial") return;
+    if (tutorialCompletingRef.current) return;
+
     const step = tutorialStepRef.current;
     if (!step) return;
-    if (
-      checkTutorialStepComplete(step, simRef.current, tutorialDumpRef.current)
-    ) {
+
+    if (checkTutorialStepComplete(step, simRef.current, tutorialDumpRef.current)) {
+      const next = tutorialIndexRef.current + 1;
+      if (next >= TUTORIAL_STEPS.length) {
+        startGame();
+        return;
+      }
       advanceTutorial();
     }
     const load = simRef.current.bucketLoad;
-    setHud((h) =>
-      Math.abs(h.bucketLoad - load) < 0.02 ? h : { ...h, bucketLoad: load },
-    );
-  }, [advanceTutorial]);
+    setHud((h) => {
+      const goalDist =
+        step.waypoint != null
+          ? Math.round(waypointDistance(simRef.current, step.waypoint))
+          : h.goalDist;
+      if (
+        Math.abs(h.bucketLoad - load) < 0.02 &&
+        h.goalDist === goalDist
+      ) {
+        return h;
+      }
+      return { ...h, bucketLoad: load, goalDist };
+    });
+    syncDigHud();
+  }, [advanceTutorial, startGame, syncDigHud]);
 
   const handleProgress = useCallback(
     (dumped: number, progress: number) => {
@@ -183,6 +240,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
         bucketLoad: simRef.current.bucketLoad,
         progress: getProgress(scoreRef.current),
       }));
+      syncDigHud();
 
       if (isTimeUp(scoreRef.current) && !isComplete(scoreRef.current)) {
         endedRef.current = true;
@@ -199,7 +257,27 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [mode, onEnd]);
+  }, [mode, onEnd, syncDigHud]);
+
+  useEffect(() => {
+    if (tutorialStep?.id !== "dig") return;
+    const sim = simRef.current;
+    sim.bucketLoad = 0;
+    tutorialDumpRef.current = 0;
+    if (sim.boom < 0.7) sim.boom = 0.75;
+    if (sim.bucket > -0.5) sim.bucket = -0.75;
+    setHud((h) => ({ ...h, bucketLoad: 0, boom: sim.boom }));
+  }, [tutorialIndex, tutorialStep?.id]);
+
+  useEffect(() => {
+    if (tutorialStep?.id !== "dump") return;
+    const sim = simRef.current;
+    tutorialDumpRef.current = 0;
+    if (sim.bucketLoad < 0.25) {
+      sim.bucketLoad = 0.45;
+      setHud((h) => ({ ...h, bucketLoad: sim.bucketLoad }));
+    }
+  }, [tutorialIndex, tutorialStep?.id]);
 
   useEffect(() => {
     const keys = new Set<string>();
@@ -246,8 +324,25 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           immersive ? "h-full" : "h-[520px] rounded-b-xl shadow-lg"
         }`}
       >
+        {mode !== "intro" && (
+          <div className="absolute inset-x-0 top-2 z-30 flex justify-center px-2">
+            <button
+              type="button"
+              onClick={() => setShowControlsGuide(true)}
+              className="rounded-lg border border-white/20 bg-black/65 px-3 py-1 text-xs font-semibold text-white shadow-md backdrop-blur-sm hover:bg-black/80"
+            >
+              기능
+            </button>
+          </div>
+        )}
+
+        <ControlsGuidePanel
+          open={showControlsGuide}
+          onClose={() => setShowControlsGuide(false)}
+        />
+
         {mode === "game" && (
-          <div className="absolute left-0 right-0 top-0 z-20 flex justify-between p-2">
+          <div className="absolute left-0 right-0 top-0 z-20 flex justify-between p-2 pr-[6.5rem] pt-10">
             <div className="rounded-lg bg-black/60 px-3 py-1 text-sm font-bold text-white">
               진행: {hud.progress}%
             </div>
@@ -265,16 +360,48 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           </div>
         )}
 
+        {mode !== "intro" && (
+          <ExcavatorMinimap
+            simRef={simRef}
+            terrainRef={terrainRef}
+            tutorialStepRef={tutorialStepRef}
+            visible
+          />
+        )}
+
+        {(mode === "tutorial" && tutorialStep?.id === "dig") || mode === "game" ? (
+          <DigHintPanel
+            feedback={digFeedback}
+            bucketLoad={hud.bucketLoad}
+            boom={hud.boom}
+            show={mode === "game" || tutorialStep?.id === "dig"}
+          />
+        ) : null}
+
+        {mode === "tutorial" && tutorialStep?.id === "dump" ? (
+          <DumpHintPanel
+            bucketLoad={hud.bucketLoad}
+            inDumpZone={digFeedback.inDumpZone}
+            show
+          />
+        ) : null}
+
+        {mode === "tutorial" && tutorialStep?.waypoint && (
+          <div className="absolute left-2 top-2 z-20 rounded-lg bg-sky-600/85 px-2 py-1 text-[10px] font-semibold text-white">
+            목표까지 {hud.goalDist}m
+          </div>
+        )}
+
         {mode === "game" && (
           <>
-            <div className="absolute left-2 top-10 z-20 rounded-lg bg-black/50 px-2 py-1 text-xs text-white">
+            <div className="absolute left-2 top-[7.5rem] z-20 rounded-lg bg-black/50 px-2 py-1 text-xs text-white">
               적재 {Math.round(hud.bucketLoad * 100)}%
             </div>
-            <div className="absolute right-2 top-10 z-20 rounded-lg bg-orange-600/80 px-2 py-1 text-[10px] text-white">
-              🟠 굴착구역
+            <div className="absolute right-2 top-[6.5rem] z-20 rounded-lg bg-orange-600/80 px-2 py-1 text-[10px] text-white">
+              🟠 굴착
             </div>
-            <div className="absolute right-2 top-[4.5rem] z-20 rounded-lg bg-green-600/80 px-2 py-1 text-[10px] text-white">
-              🟢 덤프존
+            <div className="absolute right-2 top-[8.25rem] z-20 rounded-lg bg-green-600/80 px-2 py-1 text-[10px] text-white">
+              🟢 덤프
             </div>
           </>
         )}
@@ -292,12 +419,14 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
             <ExcavatorScene
               inputRef={inputRef}
               simRef={simRef}
+              velRef={velRef}
               terrainRef={terrainRef}
               scoreRef={scoreRef}
               modeRef={modeRef}
               allowedRef={allowedRef}
               tutorialStepRef={tutorialStepRef}
               tutorialDumpRef={tutorialDumpRef}
+              digFeedbackRef={digFeedbackRef}
               onProgress={handleProgress}
               onTutorialTick={handleTutorialTick}
             />

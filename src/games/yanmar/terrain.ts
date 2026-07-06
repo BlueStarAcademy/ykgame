@@ -1,23 +1,55 @@
-const GRID_SIZE = 32;
-const CELL = 1.5;
+export const GRID_SIZE = 48;
+export const CELL_SIZE = 2;
 
 export interface TerrainData {
   heights: Float32Array;
+  baseHeights: Float32Array;
   gridSize: number;
   cellSize: number;
   originX: number;
   originZ: number;
 }
 
+export function getMapWorldBounds(terrain: TerrainData) {
+  const span = terrain.gridSize * terrain.cellSize;
+  return {
+    minX: terrain.originX,
+    maxX: terrain.originX + span,
+    minZ: terrain.originZ,
+    maxZ: terrain.originZ + span,
+  };
+}
+
 export function createTerrain(
-  originX = -24,
-  originZ = -10,
+  originX = -48,
+  originZ = -48,
 ): TerrainData {
   const heights = new Float32Array(GRID_SIZE * GRID_SIZE);
-  for (let i = 0; i < heights.length; i++) {
-    heights[i] = 0.8 + Math.random() * 0.3;
+  for (let gz = 0; gz < GRID_SIZE; gz++) {
+    for (let gx = 0; gx < GRID_SIZE; gx++) {
+      const idx = gz * GRID_SIZE + gx;
+      const wx = originX + (gx + 0.5) * CELL_SIZE;
+      const wz = originZ + (gz + 0.5) * CELL_SIZE;
+      let h = 0.75 + Math.random() * 0.15;
+      const ddx = wx - DIG_ZONE.x;
+      const ddz = wz - DIG_ZONE.z;
+      const dist = Math.sqrt(ddx * ddx + ddz * ddz);
+      if (dist < DIG_ZONE.radius) {
+        // 굴착 구역 — 흙 더미 (눈에 띄게 높게)
+        const mound = 1 - dist / DIG_ZONE.radius;
+        h = 0.9 + mound * 1.1 + Math.random() * 0.2;
+      }
+      heights[idx] = h;
+    }
   }
-  return { heights, gridSize: GRID_SIZE, cellSize: CELL, originX, originZ };
+  return {
+    heights,
+    baseHeights: heights.slice(),
+    gridSize: GRID_SIZE,
+    cellSize: CELL_SIZE,
+    originX,
+    originZ,
+  };
 }
 
 export function worldToCell(
@@ -74,8 +106,9 @@ export function sampleHeight(terrain: TerrainData, wx: number, wz: number): numb
   return getHeight(terrain, cell.gx, cell.gz);
 }
 
-export const DIG_ZONE = { x: -5, z: 5, radius: 8 };
-export const DUMP_ZONE = { x: 12, z: -5, radius: 5 };
+/** 굴착·덤프 구역 (확장 맵 기준) */
+export const DIG_ZONE = { x: 4, z: 18, radius: 12 };
+export const DUMP_ZONE = { x: 32, z: -12, radius: 8 };
 
 export function isInDumpZone(wx: number, wz: number): boolean {
   const dx = wx - DUMP_ZONE.x;
