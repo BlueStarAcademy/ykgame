@@ -1,17 +1,30 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "YK건기 브랜드 캐주얼 게임",
-  description: "장비를 쉽고 재미있게 체험하는 YK건기 미니게임",
+  title: "YK건기 중장비 체험",
+  description:
+    "YK건기 중장비를 게임으로 직접 체험하세요. 얀마 굴착기 1인칭 시뮬레이터와 8종 브랜드 미니게임.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "YKGAME",
+  },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
+  },
 };
 
-export const viewport = {
+export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#C62828",
 };
 
 export default function RootLayout({

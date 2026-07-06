@@ -19,7 +19,8 @@ export interface MissionConfig {
     | "drive"
     | "pave"
     | "compact"
-    | "sort";
+    | "sort"
+    | "excavate";
   brandColor: number;
   headerColor: number;
 }

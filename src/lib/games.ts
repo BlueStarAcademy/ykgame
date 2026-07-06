@@ -18,7 +18,7 @@ export interface GameConfig {
   duration: number;
   color: string;
   headerColor: string;
-  controlType: "dpad" | "steering" | "buttons";
+  controlType: "dpad" | "steering" | "buttons" | "excavator";
   /** Animated sprite sheet used on home cards and in Phaser gameplay */
   spriteSheet: string;
 }
@@ -31,11 +31,11 @@ export const GAMES: GameConfig[] = [
     brandEn: "YANMAR",
     mission: "굴삭기로 흙을 퍼서 옮기기",
     description:
-      "굴삭기를 조작해 흙을 파서 목표 지점까지 옮기세요. D-pad로 이동하고 버튼으로 작업합니다.",
+      "1인칭 운전실 시점에서 실제 조이스틱 조작법으로 굴착기를 운전하세요. 흙을 파서 덤프 존에 하역하면 점수를 획득합니다.",
     duration: 90,
     color: "#E53935",
     headerColor: "#C62828",
-    controlType: "dpad",
+    controlType: "excavator",
     spriteSheet: "/games/yanmar/sprite.png",
   },
   {

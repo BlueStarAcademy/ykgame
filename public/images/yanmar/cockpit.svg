@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 340" fill="none">
+  <defs>
+    <linearGradient id="dash" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3d3d3d"/>
+      <stop offset="100%" stop-color="#1a1a1a"/>
+    </linearGradient>
+    <linearGradient id="stickBase" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4a4a4a"/>
+      <stop offset="100%" stop-color="#222"/>
+    </linearGradient>
+    <radialGradient id="knob" cx="35%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#ef5350"/>
+      <stop offset="100%" stop-color="#b71c1c"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="340" fill="url(#dash)"/>
+  <rect x="0" y="0" width="800" height="88" fill="#2b2b2b"/>
+  <rect x="0" y="86" width="800" height="2" fill="#111"/>
+
+  <rect x="24" y="18" width="108" height="52" rx="6" fill="#111" stroke="#444" stroke-width="1.5"/>
+  <text x="78" y="42" text-anchor="middle" fill="#4caf50" font-family="monospace" font-size="13">RPM</text>
+  <text x="78" y="58" text-anchor="middle" fill="#8bc34a" font-family="monospace" font-size="16" font-weight="bold">1800</text>
+
+  <rect x="668" y="18" width="108" height="52" rx="6" fill="#111" stroke="#444" stroke-width="1.5"/>
+  <text x="722" y="42" text-anchor="middle" fill="#ff9800" font-family="monospace" font-size="11">HYDR</text>
+  <text x="722" y="58" text-anchor="middle" fill="#ffb74d" font-family="monospace" font-size="14" font-weight="bold">OK</text>
+
+  <rect x="310" y="14" width="180" height="60" rx="8" fill="#1a1a1a" stroke="#444" stroke-width="1.5"/>
+  <text x="400" y="40" text-anchor="middle" fill="#e53935" font-family="sans-serif" font-size="20" font-weight="bold" letter-spacing="2">YANMAR</text>
+  <text x="400" y="60" text-anchor="middle" fill="#888" font-family="sans-serif" font-size="11">VIO ??? ???</text>
+
+  <!-- Left joystick base -->
+  <ellipse cx="180" cy="248" rx="72" ry="68" fill="url(#stickBase)" stroke="#555" stroke-width="2"/>
+  <ellipse cx="180" cy="248" rx="58" ry="54" fill="#1a1a1a" stroke="#444" stroke-width="1"/>
+  <circle id="left-knob" cx="180" cy="248" r="22" fill="url(#knob)" stroke="#7f0000" stroke-width="1.5"/>
+  <text x="180" y="318" text-anchor="middle" fill="#aaa" font-family="sans-serif" font-size="12">? ???? · ??/??</text>
+
+  <!-- Right joystick base -->
+  <ellipse cx="620" cy="248" rx="72" ry="68" fill="url(#stickBase)" stroke="#555" stroke-width="2"/>
+  <ellipse cx="620" cy="248" rx="58" ry="54" fill="#1a1a1a" stroke="#444" stroke-width="1"/>
+  <circle id="right-knob" cx="620" cy="248" r="22" fill="url(#knob)" stroke="#7f0000" stroke-width="1.5"/>
+  <text x="620" y="318" text-anchor="middle" fill="#aaa" font-family="sans-serif" font-size="12">? ???? · ?/??</text>
+
+  <!-- Armrest hints -->
+  <rect x="0" y="120" width="120" height="200" rx="0" fill="#252525" opacity="0.5"/>
+  <rect x="680" y="120" width="120" height="200" rx="0" fill="#252525" opacity="0.5"/>
+</svg>

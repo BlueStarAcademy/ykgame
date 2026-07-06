@@ -3,7 +3,7 @@
 import type { GameId } from "@/lib/games";
 import { getSpriteSheetPath, SPRITE_FRAME_COUNT, SPRITE_FRAME_WIDTH } from "@/games/shared/equipmentArt";
 
-const YANMAR_CARD_IMAGE = "/images/yanmar.webp";
+const YANMAR_CARD_IMAGE = "/images/yanmar/cockpit.svg";
 
 interface GameCardSpriteProps {
   gameId: GameId;

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { withPwaQuery } from "@/lib/pwa-mode";
 
 export function SignupForm() {
   const router = useRouter();
@@ -131,7 +132,7 @@ export function SignupForm() {
 
       <p className="mt-5 text-center text-sm text-gray-500">
         이미 계정이 있으신가요?{" "}
-        <Link href="/login" className="font-medium text-blue-600 hover:underline">
+        <Link href={withPwaQuery("/login")} className="font-medium text-blue-600 hover:underline">
           로그인
         </Link>
       </p>

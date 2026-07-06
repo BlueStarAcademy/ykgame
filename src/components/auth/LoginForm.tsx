@@ -1,15 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { withPwaQuery, isPwaMode } from "@/lib/pwa-mode";
 
 const STORAGE_KEY = "ykgame_saved_login_id";
 const AUTO_LOGIN_KEY = "ykgame_auto_login";
 
 export function LoginForm() {
+  return (
+    <Suspense>
+      <LoginFormInner />
+    </Suspense>
+  );
+}
+
+function LoginFormInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/home";
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [saveId, setSaveId] = useState(false);
@@ -54,7 +65,8 @@ export function LoginForm() {
     }
 
     router.refresh();
-    router.push("/");
+    const dest = callbackUrl.startsWith("/") ? callbackUrl : "/home";
+    router.push(isPwaMode() ? withPwaQuery(dest) : dest);
   }
 
   async function handleOAuth(provider: "kakao" | "google") {
@@ -152,7 +164,7 @@ export function LoginForm() {
 
       <p className="mt-5 text-center text-sm text-gray-500">
         계정이 없으신가요?{" "}
-        <Link href="/signup" className="font-medium text-blue-600 hover:underline">
+        <Link href={withPwaQuery("/signup")} className="font-medium text-blue-600 hover:underline">
           회원가입
         </Link>
       </p>

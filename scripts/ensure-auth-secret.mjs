@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 
 function deriveFromDatabaseUrl() {
   const dbUrl =
-    process.env.DATABASE_URL?.trim() ||
     process.env.DATABASE_PUBLIC_URL?.trim() ||
+    process.env.DATABASE_URL?.trim() ||
     process.env.DATABASE_PRIVATE_URL?.trim();
 
   if (!dbUrl) return undefined;
@@ -22,16 +22,19 @@ export function ensureAuthSecret({ fatal = true } = {}) {
     process.env.AUTH_SECRET = process.env.NEXTAUTH_SECRET.trim();
   }
 
-  if (!process.env.AUTH_SECRET?.trim() && process.env.RAILWAY_ENVIRONMENT) {
+  if (!process.env.AUTH_SECRET?.trim()) {
     const derived = deriveFromDatabaseUrl();
     if (derived) {
       process.env.AUTH_SECRET = derived;
-      console.warn(
-        "WARN: AUTH_SECRET not set — using auto-derived secret on Railway.",
-      );
-      console.warn(
-        "      Railway → ykgame-web → Variables → AUTH_SECRET 설정을 권장합니다.",
-      );
+      process.env.NEXTAUTH_SECRET = derived;
+      if (process.env.RAILWAY_ENVIRONMENT) {
+        console.warn(
+          "WARN: AUTH_SECRET not set — using auto-derived secret on Railway.",
+        );
+        console.warn(
+          "      Railway → ykgame-web → Variables → AUTH_SECRET 설정을 권장합니다.",
+        );
+      }
       return true;
     }
   }

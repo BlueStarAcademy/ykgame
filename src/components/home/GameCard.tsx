@@ -83,7 +83,9 @@ function CardInner({ game, progress, locked }: CardInnerProps) {
             </div>
             <div className="absolute bottom-2 left-2 z-10">
               <StatPill>
-                {game.controlType === "dpad"
+                {game.controlType === "excavator"
+                  ? "🕹️ 조이스틱"
+                  : game.controlType === "dpad"
                   ? "🎮 D-pad"
                   : game.controlType === "steering"
                     ? "🛞 조향"

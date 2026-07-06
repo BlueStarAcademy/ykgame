@@ -13,7 +13,10 @@ cmds = ["npm install"]
 
 [phases.build]
 # Railway 빌드 단계에는 Postgres가 없으므로 placeholder URL 사용
-cmds = ["DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build npm run build"]
+cmds = [
+  "npm run assets:generate",
+  "DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build npm run build",
+]
 
 [start]
 cmd = "node scripts/start.mjs"

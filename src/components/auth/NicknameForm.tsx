@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { withPwaQuery } from "@/lib/pwa-mode";
 
 export function NicknameForm() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export function NicknameForm() {
     }
 
     await update({ user: { nickname: data.nickname, currency: data.currency } });
-    router.push("/home");
+    router.push(withPwaQuery("/home"));
     router.refresh();
   }
 

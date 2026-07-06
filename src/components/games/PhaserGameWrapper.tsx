@@ -5,13 +5,15 @@ import type { GameId } from "@/lib/games";
 import { getGameById } from "@/lib/games";
 import { getMissionConfig, loadSceneClass } from "@/games/registry";
 import type { GameResult } from "@/games/shared/types";
+import { ExcavatorGameWrapper } from "@/games/yanmar/ExcavatorGameWrapper";
 
 interface PhaserGameWrapperProps {
   gameId: GameId;
   onEnd: (result: GameResult) => void;
+  immersive?: boolean;
 }
 
-export function PhaserGameWrapper({ gameId, onEnd }: PhaserGameWrapperProps) {
+function PhaserMissionGame({ gameId, onEnd, immersive = false }: PhaserGameWrapperProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<{ destroy: (v: boolean) => void } | null>(null);
   const onEndRef = useRef(onEnd);
@@ -41,7 +43,7 @@ export function PhaserGameWrapper({ gameId, onEnd }: PhaserGameWrapperProps) {
         type: Phaser.AUTO,
         parent: containerRef.current,
         width: containerRef.current.clientWidth || 360,
-        height: 480,
+        height: containerRef.current.clientHeight || 480,
         backgroundColor: "#87CEEB",
         scale: {
           mode: Phaser.Scale.FIT,
@@ -72,14 +74,27 @@ export function PhaserGameWrapper({ gameId, onEnd }: PhaserGameWrapperProps) {
   }, [gameId]);
 
   return (
-    <div className="mx-auto w-full max-w-lg">
+    <div className={immersive ? "h-full w-full" : "mx-auto w-full max-w-lg"}>
       <div
         ref={containerRef}
-        className="h-[480px] w-full overflow-hidden rounded-b-xl bg-sky-200 shadow-lg"
+        className={
+          immersive
+            ? "h-full w-full overflow-hidden bg-sky-200"
+            : "h-[480px] w-full overflow-hidden rounded-b-xl bg-sky-200 shadow-lg"
+        }
       />
-      <p className="mt-2 text-center text-xs text-gray-400">
-        {game?.brandKo} · {game?.mission}
-      </p>
+      {!immersive && (
+        <p className="mt-2 text-center text-xs text-gray-400">
+          {game?.brandKo} · {game?.mission}
+        </p>
+      )}
     </div>
   );
+}
+
+export function PhaserGameWrapper({ gameId, onEnd, immersive = false }: PhaserGameWrapperProps) {
+  if (gameId === "yanmar") {
+    return <ExcavatorGameWrapper onEnd={onEnd} immersive={immersive} />;
+  }
+  return <PhaserMissionGame gameId={gameId} onEnd={onEnd} immersive={immersive} />;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import type { GameId } from "@/lib/games";
@@ -36,33 +36,43 @@ export function GameResultScreen({ gameId, result, onRetry }: GameResultScreenPr
   const [myRank, setMyRank] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
+  const savedRef = useRef(false);
+  const updateRef = useRef(update);
+  updateRef.current = update;
 
   useEffect(() => {
+    if (savedRef.current) return;
+    savedRef.current = true;
+
     async function saveAndLoad() {
-      const saveRes = await fetch("/api/scores", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          gameId,
-          progress: result.progress,
-          playTime: result.playTime,
-          timeLeft: result.timeLeft,
-        }),
-      });
-      const saveData = await saveRes.json();
-      setSaved(true);
+      try {
+        const saveRes = await fetch("/api/scores", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            gameId,
+            progress: result.progress,
+            playTime: result.playTime,
+            timeLeft: result.timeLeft,
+          }),
+        });
+        const saveData = await saveRes.json();
+        setSaved(true);
 
-      if (saveData.currency !== undefined) {
-        await update({ user: { currency: saveData.currency } });
+        if (saveData.currency !== undefined) {
+          await updateRef.current({ user: { currency: saveData.currency } });
+        }
+
+        const res = await fetch(`/api/rankings/${gameId}`);
+        const data = await res.json();
+        setRankings(data.rankings ?? []);
+        setMyRank(data.myStats?.rank ?? null);
+      } catch {
+        savedRef.current = false;
       }
-
-      const res = await fetch(`/api/rankings/${gameId}`);
-      const data = await res.json();
-      setRankings(data.rankings ?? []);
-      setMyRank(data.myStats?.rank ?? null);
     }
-    saveAndLoad();
-  }, [gameId, result.progress, result.playTime, result.timeLeft, update]);
+    void saveAndLoad();
+  }, [gameId, result.progress, result.playTime, result.timeLeft]);
 
   const nickname = session?.user?.nickname ?? "";
 

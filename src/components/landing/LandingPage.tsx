@@ -1,0 +1,112 @@
+import Link from "next/link";
+import { GAMES } from "@/lib/games";
+import { COMPANY, EXPERIENCE_STEPS } from "@/lib/landing-content";
+import { LandingEquipmentCard } from "./LandingEquipmentCard";
+import { PwaExperienceButton } from "./PwaExperienceButton";
+import { WebExperienceSection } from "./WebExperienceSection";
+
+const PWA_LOGIN = "/login?pwa=1&callbackUrl=/home";
+
+export function LandingPage() {
+  return (
+    <main className="landing-page relative flex h-[100dvh] flex-col overflow-hidden text-gray-900">
+      <div className="landing-bg pointer-events-none absolute inset-0" aria-hidden />
+      <div className="landing-grid pointer-events-none absolute inset-0 opacity-40" aria-hidden />
+
+      <div className="relative z-10 mx-auto w-full max-w-lg shrink-0 px-3 pt-3 pb-2">
+        <header className="flex flex-col items-center text-center">
+          <div className="flex items-center justify-center gap-2.5">
+            <div className="landing-logo flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-base font-black tracking-tighter text-white">
+              YK
+            </div>
+            <h1 className="text-lg font-bold leading-tight tracking-tight text-gray-900">
+              중장비 체험존
+            </h1>
+          </div>
+          <p className="mt-1 max-w-xs text-[10px] leading-relaxed text-gray-400">
+            {COMPANY.tagline}
+          </p>
+        </header>
+
+        <div className="mt-2">
+          <WebExperienceSection compact />
+          <PwaExperienceButton
+            href={PWA_LOGIN}
+            className="landing-cta mx-auto flex w-full max-w-[200px] items-center justify-center rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-md"
+          >
+            체험하기
+          </PwaExperienceButton>
+        </div>
+      </div>
+
+      <div className="landing-scroll relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-4 pb-10">
+        <section className="landing-stats mb-7 mt-1 grid grid-cols-4 divide-x divide-gray-100">
+          {COMPANY.stats.map((s) => (
+            <div key={s.label} className="px-1 py-1 text-center">
+              <p className="text-base font-semibold tracking-tight text-gray-900">{s.value}</p>
+              <p className="mt-0.5 text-[9px] font-medium uppercase tracking-wide text-gray-400">
+                {s.label}
+              </p>
+            </div>
+          ))}
+        </section>
+
+        <section className="mb-8">
+          <div className="landing-section-head mb-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-red-500">
+              Global Lineup
+            </p>
+            <h2 className="mt-1 text-base font-semibold tracking-tight text-gray-900">
+              글로벌 브랜드 라인업
+            </h2>
+            <p className="mt-1 text-[11px] leading-relaxed text-gray-400">
+              YK건기가 수입·판매하는 8개 브랜드 중장비
+            </p>
+          </div>
+          <div className="space-y-4">
+            {GAMES.map((game) => (
+              <LandingEquipmentCard key={game.id} game={game} />
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-8">
+          <div className="landing-section-head mb-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-red-500">
+              How to Play
+            </p>
+            <h2 className="mt-1 text-base font-semibold tracking-tight text-gray-900">
+              체험 방법
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {EXPERIENCE_STEPS.map((item) => (
+              <div key={item.step} className="landing-step flex items-center gap-3">
+                <span className="landing-step-num">{item.step}</span>
+                <div className="min-w-0 flex-1 border-b border-gray-50 pb-3">
+                  <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <footer className="landing-footer pt-5 text-center">
+          <p className="text-[11px] font-medium tracking-wide text-gray-500">{COMPANY.name}</p>
+          <p className="mt-1 text-[10px] text-gray-300">
+            장비를 쉽고 재미있게 체험하는 미니게임
+          </p>
+          <Link
+            href={COMPANY.homepage}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-block text-[10px] tracking-wide text-gray-300 transition hover:text-red-500"
+          >
+            sunnyyk.co.kr
+          </Link>
+        </footer>
+      </div>
+    </main>
+  );
+}

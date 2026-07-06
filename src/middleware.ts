@@ -1,11 +1,23 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
+import { resolveAuthSecret } from "@/lib/auth-secret";
 import { NextResponse } from "next/server";
 
-const { auth } = NextAuth(authConfig);
+const { auth } = NextAuth({
+  ...authConfig,
+  secret: resolveAuthSecret(),
+});
 
-const publicPaths = ["/login", "/signup"];
+const publicPaths = ["/login", "/signup", "/"];
 const authPaths = ["/login", "/signup"];
+
+function redirectWithPwa(req: { nextUrl: URL }, path: string) {
+  const url = new URL(path, req.nextUrl);
+  if (req.nextUrl.searchParams.get("pwa") === "1") {
+    url.searchParams.set("pwa", "1");
+  }
+  return NextResponse.redirect(url);
+}
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -20,23 +32,28 @@ export default auth((req) => {
   const isAuthPage = authPaths.some((p) => pathname.startsWith(p));
   const isAdmin = pathname.startsWith("/admin");
 
-  if (!isLoggedIn && !isPublic && pathname !== "/") {
+  if (!isLoggedIn && !isPublic) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
   if (isLoggedIn && isAuthPage) {
     const user = req.auth?.user;
     if (!user?.nickname) {
-      return NextResponse.redirect(new URL("/nickname", req.url));
+      return redirectWithPwa(req, "/nickname");
     }
-    return NextResponse.redirect(new URL("/home", req.url));
+    const callback = req.nextUrl.searchParams.get("callbackUrl");
+    const dest =
+      callback && callback.startsWith("/") && !callback.startsWith("//")
+        ? callback
+        : "/home";
+    return redirectWithPwa(req, dest);
   }
 
   if (isLoggedIn && req.auth?.user) {
     const user = req.auth.user;
 
     if (!user.nickname && pathname !== "/nickname") {
-      return NextResponse.redirect(new URL("/nickname", req.url));
+      return redirectWithPwa(req, "/nickname");
     }
 
     if (user.nickname && pathname === "/nickname") {
@@ -48,8 +65,7 @@ export default auth((req) => {
     }
   }
 
-  if (pathname === "/") {
-    if (!isLoggedIn) return NextResponse.redirect(new URL("/login", req.url));
+  if (pathname === "/" && isLoggedIn) {
     const user = req.auth?.user;
     if (!user?.nickname) {
       return NextResponse.redirect(new URL("/nickname", req.url));
@@ -61,5 +77,7 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|assets|api/health).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icons|images|games|assets|api/health|manifest.webmanifest).*)",
+  ],
 };

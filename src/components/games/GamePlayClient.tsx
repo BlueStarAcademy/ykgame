@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { PhaserGameWrapper } from "@/components/games/PhaserGameWrapper";
+import { GameImmersiveOverlay } from "@/components/games/GameImmersiveOverlay";
 import { RankingBoard } from "@/components/games/RankingBoard";
 import type { GameId } from "@/lib/games";
 import { getGameById } from "@/lib/games";
@@ -23,6 +24,7 @@ interface MyStats {
 type GamePhase = "lobby" | "playing" | "result";
 
 function controlLabel(type: string) {
+  if (type === "excavator") return "🕹️ 듀얼 조이스틱";
   if (type === "dpad") return "🎮 D-pad 조작";
   if (type === "steering") return "🛞 조향 휠 조작";
   return "🔘 버튼 조작";
@@ -60,6 +62,10 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
 
   const handleStart = () => {
     setPhase("playing");
+  };
+
+  const handleExitGame = () => {
+    setPhase("lobby");
   };
 
   const handleGameEnd = (gameResult: GameResult) => {
@@ -130,6 +136,13 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
               </div>
             </div>
 
+            <div className="rounded-xl border border-green-100 bg-green-50 p-3 text-center">
+              <p className="text-xs font-medium text-green-800">📱 PWA 전체화면 체험</p>
+              <p className="mt-0.5 text-[10px] text-green-700">
+                시작하기를 누르면 자동으로 전체화면으로 전환됩니다
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl bg-blue-50 p-3 text-center">
                 <p className="text-xs text-blue-600">내 순위</p>
@@ -165,35 +178,21 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
       )}
 
       {phase === "playing" && (
-        <div>
-          <div
-            className="mb-2 flex items-center justify-between rounded-t-xl px-4 py-2.5 text-white"
-            style={{ backgroundColor: game.headerColor }}
-          >
-            <div className="flex gap-4">
-              <div>
-                <p className="text-[10px] opacity-80">내 순위</p>
-                <p className="text-sm font-bold">
-                  {myStats.rank ? `#${myStats.rank}` : "-"}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] opacity-80">최고 점수</p>
-                <p className="text-sm font-bold">
-                  {myStats.bestScore > 0 ? `${myStats.bestScore}점` : "-"}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowRanking(true)}
-              className="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold hover:bg-white/30"
-            >
-              📊 랭킹보드
-            </button>
-          </div>
-
-          <PhaserGameWrapper gameId={gameId} onEnd={handleGameEnd} />
-        </div>
+        <GameImmersiveOverlay
+          active
+          headerColor={game.headerColor}
+          brandKo={game.brandKo}
+          onExit={handleExitGame}
+          onShowRanking={() => setShowRanking(true)}
+          myRank={myStats.rank}
+          bestScore={myStats.bestScore}
+        >
+          <PhaserGameWrapper
+            gameId={gameId}
+            onEnd={handleGameEnd}
+            immersive
+          />
+        </GameImmersiveOverlay>
       )}
 
       <RankingBoard
