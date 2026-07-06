@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { enablePwaMode } from "@/lib/pwa-mode";
-import { lockPortrait, requestFullscreen } from "@/lib/fullscreen";
+import { enablePersistentPortraitLock, lockPortrait } from "@/lib/fullscreen";
 
 interface PwaExperienceButtonProps {
   href: string;
@@ -14,11 +14,11 @@ interface PwaExperienceButtonProps {
 export function PwaExperienceButton({ href, className, children }: PwaExperienceButtonProps) {
   const router = useRouter();
 
-  async function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
+  function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
     enablePwaMode();
     lockPortrait();
-    await requestFullscreen();
+    enablePersistentPortraitLock();
     router.push(href);
   }
 

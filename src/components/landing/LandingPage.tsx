@@ -5,9 +5,11 @@ import { LandingEquipmentCard } from "./LandingEquipmentCard";
 import { PwaExperienceButton } from "./PwaExperienceButton";
 import { WebExperienceSection } from "./WebExperienceSection";
 
-const PWA_LOGIN = "/login?pwa=1&callbackUrl=/home";
+interface LandingPageProps {
+  ctaHref: string;
+}
 
-export function LandingPage() {
+export function LandingPage({ ctaHref }: LandingPageProps) {
   return (
     <main className="landing-page relative flex h-[100dvh] flex-col overflow-hidden text-gray-900">
       <div className="landing-bg pointer-events-none absolute inset-0" aria-hidden />
@@ -31,7 +33,7 @@ export function LandingPage() {
         <div className="mt-2">
           <WebExperienceSection compact />
           <PwaExperienceButton
-            href={PWA_LOGIN}
+            href={ctaHref}
             className="landing-cta mx-auto flex w-full max-w-[200px] items-center justify-center rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-md"
           >
             체험하기

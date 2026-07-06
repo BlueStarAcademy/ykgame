@@ -1,16 +1,16 @@
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { LandingPage } from "@/components/landing/LandingPage";
+import { auth } from "@/lib/auth";
+import { withPwaQuery } from "@/lib/pwa-mode";
 
 export default async function RootPage() {
   const session = await auth();
 
+  let ctaHref = withPwaQuery("/login?callbackUrl=/home");
   if (session?.user) {
-    if (!session.user.nickname) {
-      redirect("/nickname");
-    }
-    redirect("/home");
+    ctaHref = session.user.nickname
+      ? withPwaQuery("/home")
+      : withPwaQuery("/nickname");
   }
 
-  return <LandingPage />;
+  return <LandingPage ctaHref={ctaHref} />;
 }

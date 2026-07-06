@@ -245,6 +245,24 @@ html.pwa-mode body {
   overscroll-behavior: none;
 }
 
+html.portrait-only body {
+  overscroll-behavior: none;
+}
+
+/* 모바일 가로 모드: 본문 숨김 (오버레이만 표시) */
+@media screen and (orientation: landscape) and (max-height: 520px) {
+  html.portrait-only body {
+    overflow: hidden;
+  }
+}
+
+html.pwa-mode,
+html.pwa-mode body {
+  min-height: 100dvh;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
 /* ── Landing page ── */
 .landing-page {
   background: #f8fafc;

@@ -88,8 +88,8 @@ export const BRAND_PROFILES: Record<
 };
 
 export const EXPERIENCE_STEPS = [
-  { step: "01", title: "체험하기", desc: "QR 스캔 또는 버튼으로 PWA 전체화면 진입" },
-  { step: "02", title: "로그인", desc: "간편 가입 후 닉네임 설정" },
+  { step: "01", title: "소개 페이지", desc: "앱 실행 또는 사이트 접속으로 YK건기 체험존 소개 확인" },
+  { step: "02", title: "체험하기", desc: "QR·버튼으로 로그인 (이미 로그인 시 바로 홈 이동)" },
   { step: "03", title: "장비 선택", desc: "8개 브랜드 중 원하는 미니게임 선택" },
   { step: "04", title: "직접 운전", desc: "실제 조작법으로 미션 수행·랭킹 도전" },
 ] as const;

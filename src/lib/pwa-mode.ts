@@ -29,6 +29,14 @@ export function withPwaQuery(path: string): string {
   return url.pathname + url.search;
 }
 
+/** QR·공유용 랜딩 URL (절대 경로) — 항상 소개 페이지부터 진입 */
+export function buildPwaLandingUrl(
+  origin = typeof window !== "undefined" ? window.location.origin : "",
+): string {
+  const params = new URLSearchParams({ [PWA_QUERY]: "1" });
+  return `${origin}/?${params.toString()}`;
+}
+
 /** QR·공유용 로그인 URL (절대 경로) */
 export function buildPwaLoginUrl(
   callbackUrl = "/home",

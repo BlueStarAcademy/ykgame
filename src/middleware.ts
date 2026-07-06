@@ -65,14 +65,6 @@ export default auth((req) => {
     }
   }
 
-  if (pathname === "/" && isLoggedIn) {
-    const user = req.auth?.user;
-    if (!user?.nickname) {
-      return NextResponse.redirect(new URL("/nickname", req.url));
-    }
-    return NextResponse.redirect(new URL("/home", req.url));
-  }
-
   return NextResponse.next();
 });
 

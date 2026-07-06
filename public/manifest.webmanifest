@@ -2,7 +2,7 @@
   "name": "YK건기 중장비 체험",
   "short_name": "YKGAME",
   "description": "YK건기 중장비를 게임으로 직접 체험하세요",
-  "start_url": "/login?pwa=1&callbackUrl=/home",
+  "start_url": "/?pwa=1",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

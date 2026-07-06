@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  enablePersistentPortraitLock,
   exitFullscreen,
   isFullscreenSupported,
+  isMobileDevice,
   isStandalonePwa,
   lockPortrait,
   requestFullscreen,
+  shouldUseBrowserFullscreen,
   unlockOrientation,
 } from "@/lib/fullscreen";
 
@@ -23,14 +26,23 @@ export function useGameFullscreen({ active, containerRef }: UseGameFullscreenOpt
   const enter = useCallback(async () => {
     setImmersive(true);
     lockPortrait();
-    const ok = await requestFullscreen(containerRef?.current ?? null);
-    setApiFullscreen(ok);
+
+    if (shouldUseBrowserFullscreen()) {
+      const ok = await requestFullscreen(containerRef?.current ?? null);
+      setApiFullscreen(ok);
+    } else {
+      setApiFullscreen(false);
+    }
   }, [containerRef]);
 
   const leave = useCallback(async () => {
     setImmersive(false);
     setApiFullscreen(false);
-    unlockOrientation();
+    if (!isMobileDevice()) {
+      unlockOrientation();
+    } else {
+      lockPortrait();
+    }
     await exitFullscreen();
   }, []);
 
@@ -39,10 +51,16 @@ export function useGameFullscreen({ active, containerRef }: UseGameFullscreenOpt
       leave();
       return;
     }
-    // active 전환 시 자동 진입은 호출측(시작 버튼)에서 enter() 호출
   }, [active, leave]);
 
   useEffect(() => {
+    if (!active) return;
+    return enablePersistentPortraitLock();
+  }, [active]);
+
+  useEffect(() => {
+    if (!shouldUseBrowserFullscreen()) return;
+
     const onChange = () => {
       setApiFullscreen(!!document.fullscreenElement);
       if (!document.fullscreenElement && !active) {
@@ -57,7 +75,7 @@ export function useGameFullscreen({ active, containerRef }: UseGameFullscreenOpt
     immersive,
     apiFullscreen,
     isStandalone: isStandalonePwa(),
-    canFullscreen: isFullscreenSupported(),
+    canFullscreen: isFullscreenSupported() && shouldUseBrowserFullscreen(),
     enter,
     leave,
   };

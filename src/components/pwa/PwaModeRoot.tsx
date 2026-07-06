@@ -3,7 +3,11 @@
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { activatePwaFromSearchParams, isPwaMode } from "@/lib/pwa-mode";
-import { isStandalonePwa, lockPortrait, requestFullscreen } from "@/lib/fullscreen";
+import {
+  enablePersistentPortraitLock,
+  isStandalonePwa,
+  lockPortrait,
+} from "@/lib/fullscreen";
 
 function PwaModeRootInner({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
@@ -22,7 +26,7 @@ function PwaModeRootInner({ children }: { children: React.ReactNode }) {
 
     document.documentElement.classList.add("pwa-mode");
     lockPortrait();
-    requestFullscreen();
+    const releasePortraitLock = enablePersistentPortraitLock();
 
     const prevOverflow = document.body.style.overflow;
     if (pathname !== "/") {
@@ -30,6 +34,7 @@ function PwaModeRootInner({ children }: { children: React.ReactNode }) {
     }
 
     return () => {
+      releasePortraitLock();
       document.body.style.overflow = prevOverflow;
     };
   }, [searchParams, pathname]);
