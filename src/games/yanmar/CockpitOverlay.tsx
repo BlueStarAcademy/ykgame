@@ -231,7 +231,6 @@ function GameJoystick({
           transition: active ? "none" : "left 120ms ease, top 120ms ease, transform 120ms ease",
         }}
       >
-        <div className="absolute bottom-0 left-1/2 h-[24%] w-[82%] -translate-x-1/2 rounded-[44%] border border-black/70 bg-gradient-to-b from-[#252b33] to-[#07090c] shadow-[0_8px_12px_rgba(0,0,0,0.46)]" />
         <div
           className="absolute left-1/2 top-0 h-[91%] w-[68%] -translate-x-1/2 border-2 border-black/75 bg-gradient-to-br from-[#6b747f] via-[#252b34] to-[#080a0f] shadow-[inset_7px_9px_10px_rgba(255,255,255,0.15),inset_-7px_-10px_10px_rgba(0,0,0,0.52),0_11px_15px_rgba(0,0,0,0.48)]"
           style={{
