@@ -230,14 +230,34 @@ function ExcavatorArm({
                 <cylinderGeometry args={[0.17, 0.17, 0.42, 18]} />
                 <meshStandardMaterial color="#38414a" roughness={0.36} metalness={0.38} />
               </mesh>
-              <mesh position={[bucketLen / 2, -0.15, 0]} rotation={[0, 0, -Math.PI / 2]}>
-                <boxGeometry args={[bucketLen, 0.5, 0.8]} />
-                <meshStandardMaterial color="#59616b" metalness={0.38} roughness={0.48} />
-              </mesh>
-              <mesh position={[bucketLen * 0.92, -0.33, 0]} rotation={[0, 0, -Math.PI / 2]}>
-                <boxGeometry args={[0.12, 0.16, 0.92]} />
-                <meshStandardMaterial color="#e4e8eb" metalness={0.45} roughness={0.3} />
-              </mesh>
+              <group position={[bucketLen * 0.42, -0.2, 0]} rotation={[0, 0, -0.18]}>
+                <mesh position={[0.1, 0.02, 0]}>
+                  <boxGeometry args={[0.95, 0.18, 0.88]} />
+                  <meshStandardMaterial color="#515a64" metalness={0.42} roughness={0.46} />
+                </mesh>
+                <mesh position={[0.0, 0.23, 0]} rotation={[0, 0, -0.35]}>
+                  <boxGeometry args={[0.9, 0.12, 0.84]} />
+                  <meshStandardMaterial color="#66707a" metalness={0.36} roughness={0.5} />
+                </mesh>
+                <mesh position={[0.18, -0.16, 0.48]} rotation={[0.16, 0, 0]}>
+                  <boxGeometry args={[0.92, 0.46, 0.08]} />
+                  <meshStandardMaterial color="#3d4650" metalness={0.42} roughness={0.42} />
+                </mesh>
+                <mesh position={[0.18, -0.16, -0.48]} rotation={[-0.16, 0, 0]}>
+                  <boxGeometry args={[0.92, 0.46, 0.08]} />
+                  <meshStandardMaterial color="#3d4650" metalness={0.42} roughness={0.42} />
+                </mesh>
+                <mesh position={[0.62, -0.28, 0]}>
+                  <boxGeometry args={[0.16, 0.14, 1.02]} />
+                  <meshStandardMaterial color="#dfe5ea" metalness={0.55} roughness={0.28} />
+                </mesh>
+                {[-0.36, 0, 0.36].map((z) => (
+                  <mesh key={z} position={[0.78, -0.36, z]} rotation={[0, 0, -0.35]}>
+                    <coneGeometry args={[0.08, 0.32, 4]} />
+                    <meshStandardMaterial color="#f2f5f7" metalness={0.52} roughness={0.25} />
+                  </mesh>
+                ))}
+              </group>
               <mesh
                 ref={dirtRef}
                 position={[bucketLen * 0.45, -0.05, 0]}

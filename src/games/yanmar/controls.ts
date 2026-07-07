@@ -181,7 +181,7 @@ export function applyControls(
     DAMPING.swing,
     dt,
   );
-  vel.arm = approach(vel.arm, left.y * CONTROL_SPEED.arm, ACCEL.arm, DAMPING.arm, dt);
+  vel.arm = approach(vel.arm, -left.y * CONTROL_SPEED.arm, ACCEL.arm, DAMPING.arm, dt);
   const leftTrack = travel.left;
   const rightTrack = travel.right;
   const trackAverage = (leftTrack + rightTrack) / 2;
@@ -211,7 +211,7 @@ export function applyControls(
   );
   vel.bucket = approach(
     vel.bucket,
-    right.x * CONTROL_SPEED.bucket,
+    -right.x * CONTROL_SPEED.bucket,
     ACCEL.bucket,
     DAMPING.bucket,
     dt,
