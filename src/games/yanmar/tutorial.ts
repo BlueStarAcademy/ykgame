@@ -33,7 +33,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "travel",
     title: "1. 주행",
-    instruction: "주행 레버로 앞으로 — 파란 목표 링까지 이동",
+    instruction: "좌우 주행 레버를 둘 다 앞으로 — 파란 목표 링까지 이동",
     highlight: "travel",
     allowed: { leftX: false, leftY: false, rightX: false, rightY: false, travel: true },
     waypoint: { x: -18, z: -10, radius: 3 },
@@ -41,7 +41,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "swing",
     title: "2. 스윙",
-    instruction: "좌 조이스틱 우측 — 상부체 회전",
+    instruction: "좌 조이스틱 좌측 — 상부체 선회",
     highlight: "left",
     allowed: { leftX: true, leftY: false, rightX: false, rightY: false, travel: false },
     swingTarget: 0.45,
@@ -49,7 +49,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "arm",
     title: "3. 암",
-    instruction: "좌 조이스틱 앞 — 암 뻗기",
+    instruction: "좌 조이스틱 뒤 — 암 뻗기",
     highlight: "left",
     allowed: { leftX: false, leftY: true, rightX: false, rightY: false, travel: false },
     armMax: -0.35,
@@ -73,7 +73,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "dig",
     title: "6. 굴착",
-    instruction: "주황 구역에서 흙을 파서 적재 35% 이상",
+    instruction: "주황 구역에서 붐을 내리고 버킷을 우측으로 말아 적재 35% 이상",
     highlight: "both",
     allowed: { ...ALL_CONTROLS },
     loadMin: 0.35,
@@ -81,7 +81,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "dump",
     title: "7. 하역",
-    instruction: "초록 구역에서 버킷 펴기 — 흙 비우기",
+    instruction: "초록 구역에서 우 조이스틱 좌측 — 버킷 펴기",
     highlight: "both",
     allowed: { ...ALL_CONTROLS },
     dumpMin: 0.12,

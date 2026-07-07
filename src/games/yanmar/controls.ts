@@ -1,7 +1,7 @@
 /** 얀마 SV08-1 조작 매핑 — YK건기 조작 도면 기준 */
 
 export const YANMAR_ASSETS = {
-  cockpit: "/images/yanmar/cockpit-game-controls.png",
+  cockpit: "/images/yanmar/cockpit-game-controls-overlay.png",
   cockpitFallback: "/images/yanmar/cockpit.svg",
   controlsGuide: "/images/yanmar/controls-guide.webp",
 } as const;
@@ -18,6 +18,7 @@ export const COCKPIT_LAYOUT = {
   blade: { cx: 0.625, cy: 0.25, radius: 0.04, travel: 0.045 },
   throttle: { cx: 0.415, cy: 0.18, radius: 0.038, travel: 0.04 },
   hydraulicSpeed: { cx: 0.685, cy: -0.025, radius: 0.038, travel: 0.04 },
+  rightPedal: { cx: 0.66, cy: 0.505, width: 0.06, height: 0.19 },
   horn: { cx: 0.831, cy: 0.047, radius: 0.014 },
 } as const;
 
@@ -59,8 +60,8 @@ export const CONTROL_LABELS = {
   left: {
     xNeg: "스윙 좌",
     xPos: "스윙 우",
-    yPos: "암 뻗음",
-    yNeg: "암 당김",
+    yPos: "암 당김",
+    yNeg: "암 뻗음",
   },
   right: {
     yPos: "붐 하강",

@@ -13,7 +13,11 @@ import type { TutorialStep } from "./tutorial";
 
 interface CockpitOverlayProps {
   input: ExcavatorControlState;
-  onInputChange: (input: ExcavatorControlState) => void;
+  onInputChange: (
+    input:
+      | ExcavatorControlState
+      | ((current: ExcavatorControlState) => ExcavatorControlState),
+  ) => void;
   auxiliary: AuxiliaryControlState;
   onAuxiliaryChange: (input: AuxiliaryControlState) => void;
   allowed: ControlMask;
@@ -220,6 +224,21 @@ function GameJoystick({
       </div>
 
       <div
+        className="pointer-events-none absolute z-[24]"
+        style={{
+          left: `${layout.cx * 100}%`,
+          top: `${layout.cy * 100}%`,
+          width: "8.2%",
+          height: "25%",
+          transform: "translate(-50%, -50%)",
+        }}
+      >
+        <div className="absolute inset-x-[6%] bottom-[2%] h-[78%] rounded-[42%_42%_34%_34%] bg-gradient-to-br from-[#6f7781] via-[#343b44] to-[#14191f] shadow-[inset_7px_8px_10px_rgba(255,255,255,0.13),inset_-8px_-10px_12px_rgba(0,0,0,0.46),0_10px_18px_rgba(0,0,0,0.45)]" />
+        <div className="absolute left-1/2 top-[16%] h-[62%] w-[46%] -translate-x-1/2 rounded-[38%] bg-gradient-to-b from-[#0d1015] via-[#161b22] to-[#050608] shadow-[inset_0_4px_7px_rgba(255,255,255,0.06)]" />
+        <div className="absolute left-1/2 top-[48%] h-[18%] w-[76%] -translate-x-1/2 rounded-full bg-black/35 blur-[2px]" />
+      </div>
+
+      <div
         className="pointer-events-none absolute z-[25]"
         style={{
           left: `${layout.cx * 100}%`,
@@ -308,8 +327,8 @@ function TravelLever({
     pointer.onRelease();
   };
 
-  const w = `${layout.radius * 120}%`;
-  const h = `${layout.radius * 280}%`;
+  const w = `${layout.radius * 190}%`;
+  const h = `${layout.radius * 380}%`;
   const knobY = -value * layout.travel * 100;
 
   return (
@@ -533,6 +552,65 @@ function SpeedModeLever({
   );
 }
 
+function PedalSwingToggle({
+  activeValue,
+  onChange,
+}: {
+  activeValue: number;
+  onChange: (value: number) => void;
+}) {
+  const pedal = COCKPIT_LAYOUT.rightPedal;
+
+  const toggle = (value: number) => {
+    onChange(activeValue === value ? 0 : value);
+  };
+
+  return (
+    <div
+      className="absolute z-40"
+      style={{
+        left: `${pedal.cx * 100}%`,
+        top: `${pedal.cy * 100}%`,
+        width: `${pedal.width * 100}%`,
+        height: `${pedal.height * 100}%`,
+        transform: "translate(-50%, -50%)",
+      }}
+      aria-label="우측 페달 붐 스윙"
+    >
+      <button
+        type="button"
+        className={`absolute inset-x-0 top-0 h-1/2 rounded-t-lg border border-white/10 ${
+          activeValue > 0
+            ? "bg-sky-400/30 shadow-[0_0_10px_rgba(56,189,248,0.55)]"
+            : "bg-black/5"
+        }`}
+        onClick={() => toggle(1)}
+        aria-pressed={activeValue > 0}
+        aria-label="우측 페달 위쪽: 암 우측 회전"
+      >
+        <span className="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 rounded bg-black/60 px-1 text-[8px] font-bold text-white">
+          우
+        </span>
+      </button>
+      <button
+        type="button"
+        className={`absolute inset-x-0 bottom-0 h-1/2 rounded-b-lg border border-white/10 ${
+          activeValue < 0
+            ? "bg-amber-400/30 shadow-[0_0_10px_rgba(251,191,36,0.55)]"
+            : "bg-black/5"
+        }`}
+        onClick={() => toggle(-1)}
+        aria-pressed={activeValue < 0}
+        aria-label="우측 페달 아래쪽: 암 좌측 회전"
+      >
+        <span className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 rounded bg-black/60 px-1 text-[8px] font-bold text-white">
+          좌
+        </span>
+      </button>
+    </div>
+  );
+}
+
 export function CockpitOverlay({
   input,
   onInputChange,
@@ -550,12 +628,12 @@ export function CockpitOverlay({
 
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-black">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={YANMAR_ASSETS.cockpit}
           alt="얀마 게임형 굴착기 조작 패널"
-          className="mx-auto block w-full max-w-lg select-none"
+          className="mx-auto block w-full max-w-lg select-none drop-shadow-[0_-10px_24px_rgba(0,0,0,0.45)]"
           draggable={false}
         />
       </div>
@@ -568,7 +646,10 @@ export function CockpitOverlay({
             enabled={allowed.travel && !auxiliary.safetyLocked}
             highlighted={highlightTravel}
             onChange={(left) =>
-              onInputChange({ ...input, travel: { ...input.travel, left } })
+              onInputChange((current) => ({
+                ...current,
+                travel: { ...current.travel, left },
+              }))
             }
           />
           <TravelLever
@@ -577,20 +658,21 @@ export function CockpitOverlay({
             enabled={allowed.travel && !auxiliary.safetyLocked}
             highlighted={highlightTravel}
             onChange={(right) =>
-              onInputChange({ ...input, travel: { ...input.travel, right } })
+              onInputChange((current) => ({
+                ...current,
+                travel: { ...current.travel, right },
+              }))
             }
-          />
-          <AuxLever
-            label="붐 스윙"
-            layout={COCKPIT_LAYOUT.boomSwing}
-            value={auxiliary.boomSwing}
-            onChange={(boomSwing) => onAuxiliaryChange({ ...auxiliary, boomSwing })}
           />
           <AuxLever
             label="블레이드"
             layout={COCKPIT_LAYOUT.blade}
             value={auxiliary.blade}
             onChange={(blade) => onAuxiliaryChange({ ...auxiliary, blade })}
+          />
+          <PedalSwingToggle
+            activeValue={auxiliary.boomSwing}
+            onChange={(boomSwing) => onAuxiliaryChange({ ...auxiliary, boomSwing })}
           />
           <AuxLever
             label="엔진 회전수"

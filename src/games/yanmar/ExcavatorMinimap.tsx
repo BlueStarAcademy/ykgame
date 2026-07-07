@@ -26,7 +26,7 @@ function worldToMinimap(
   const nz = (z - bounds.minZ) / (bounds.maxZ - bounds.minZ);
   return {
     px: PAD + nx * inner,
-    py: PAD + (1 - nz) * inner,
+    py: PAD + nz * inner,
   };
 }
 
@@ -130,7 +130,7 @@ export function ExcavatorMinimap({
       const player = worldToMinimap(sim.posX, sim.posZ, bounds);
       const facing = sim.heading + sim.swing;
       const dirX = Math.sin(facing);
-      const dirY = -Math.cos(facing);
+      const dirY = Math.cos(facing);
       const tipLen = 6;
       const baseLen = 3.5;
       const halfW = 3.2;

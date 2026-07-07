@@ -13,7 +13,7 @@ function boomHint(boom: number, tipOnGround: boolean) {
   if (tipOnGround) return "버킷이 땅에 닿음";
   if (boom < 0.7) return "우레버 앞으로 밀기 — 붐 하강";
   if (boom < 1.05) return "우레버 더 앞으로 — 붐 계속 내리기";
-  return "좌레버 앞+뒤로 암 조절하며 버킷을 땅에";
+  return "좌레버 뒤+앞으로 암 조절하며 버킷을 땅에";
 }
 
 interface DigHintContentProps {
@@ -48,8 +48,8 @@ export function DigHintContent({
         bucketLoad >= 0.35
           ? "흙 적재 완료!"
           : feedback.digging
-            ? "좌레버 뒤로 — 암 당기며 퍼올리기"
-            : "버킷 말고 암 당겨 흙 퍼올리기",
+            ? "좌레버 뒤로 — 암을 뻗으며 퍼올리기"
+            : "버킷 말고 암을 뻗어 흙 퍼올리기",
     },
   ];
 

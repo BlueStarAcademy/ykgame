@@ -498,7 +498,12 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           <CockpitOverlay
             input={input}
             onInputChange={(next) =>
-              setInput(filterInput(next, allowedRef.current))
+              setInput((current) =>
+                filterInput(
+                  typeof next === "function" ? next(current) : next,
+                  allowedRef.current,
+                ),
+              )
             }
             auxiliary={auxiliary}
             onAuxiliaryChange={handleAuxiliaryChange}
