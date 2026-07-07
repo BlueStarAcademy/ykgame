@@ -1,13 +1,24 @@
 "use client";
 
 import { YANMAR_ASSETS } from "./controls";
+import type { DigFeedback } from "./bucket";
+import { DigHintContent } from "./DigHintPanel";
 
 interface ControlsGuidePanelProps {
   open: boolean;
   onClose: () => void;
+  digFeedback: DigFeedback;
+  bucketLoad: number;
+  boom: number;
 }
 
-export function ControlsGuidePanel({ open, onClose }: ControlsGuidePanelProps) {
+export function ControlsGuidePanel({
+  open,
+  onClose,
+  digFeedback,
+  bucketLoad,
+  boom,
+}: ControlsGuidePanelProps) {
   if (!open) return null;
 
   return (
@@ -46,6 +57,14 @@ export function ControlsGuidePanel({ open, onClose }: ControlsGuidePanelProps) {
         <p className="mx-auto mt-3 max-w-lg text-center text-[10px] leading-relaxed text-white/55">
           ① 좌 조이스틱 · ② 주행 레버 · ⑤ 우 조이스틱 — 핀치로 확대해 보세요
         </p>
+        <div className="mx-auto mt-4 max-w-lg rounded-xl border border-orange-300/20 bg-black/45 p-3 shadow-xl">
+          <DigHintContent
+            feedback={digFeedback}
+            bucketLoad={bucketLoad}
+            boom={boom}
+            compact
+          />
+        </div>
       </div>
     </div>
   );

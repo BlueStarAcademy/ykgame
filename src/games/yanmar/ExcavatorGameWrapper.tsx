@@ -22,7 +22,7 @@ import {
 } from "./ExcavatorScene";
 import { createHydraulicVelocity, type HydraulicVelocity } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
-import { DigHintPanel } from "./DigHintPanel";
+import { BoomLoadGauge } from "./DigHintPanel";
 import { DumpHintPanel } from "./DumpHintPanel";
 import { ControlsGuidePanel } from "./ControlsGuidePanel";
 import { createDigFeedback, type DigFeedback } from "./bucket";
@@ -307,7 +307,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     sim.bucketLoad = 0;
     tutorialDumpRef.current = 0;
     if (sim.boom < 0.7) sim.boom = 0.75;
-    if (sim.bucket > -0.5) sim.bucket = -0.75;
+    if (sim.bucket < 0.5) sim.bucket = 0.75;
     setHud((h) => ({ ...h, bucketLoad: 0, boom: sim.boom }));
   }, [tutorialIndex, tutorialStep?.id]);
 
@@ -374,22 +374,31 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           immersive ? "h-full" : "h-[520px] rounded-b-xl shadow-lg"
         }`}
       >
-        {mode !== "intro" && (
-          <div className="absolute inset-x-0 top-0 z-30 flex justify-center bg-gradient-to-b from-black/55 to-transparent px-2 py-2">
-            <button
-              type="button"
-              onClick={() => setShowControlsGuide(true)}
-              className="rounded-lg border border-white/20 bg-black/65 px-3 py-1 text-xs font-semibold text-white shadow-md backdrop-blur-sm hover:bg-black/80"
-            >
-              기능정보
-            </button>
-          </div>
-        )}
-
         <ControlsGuidePanel
           open={showControlsGuide}
           onClose={() => setShowControlsGuide(false)}
+          digFeedback={digFeedback}
+          bucketLoad={hud.bucketLoad}
+          boom={hud.boom}
         />
+
+        {mode === "tutorial" && tutorialStep && (
+          <div className="absolute left-2 top-2 z-40 w-[8.75rem] rounded-xl border border-amber-300/20 bg-black/75 p-2 text-white shadow-xl backdrop-blur-sm">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-amber-300">{tutorialStep.title}</p>
+              <p className="mt-0.5 text-[10px] leading-tight text-white/85">
+                {tutorialStep.instruction}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={startGame}
+              className="mx-auto mt-2 block rounded bg-white/10 px-2 py-0.5 text-[9px] font-medium hover:bg-white/20"
+            >
+              건너뛰기
+            </button>
+          </div>
+        )}
 
         {mode === "game" && (
           <div className="absolute left-0 right-0 top-0 z-20 flex justify-between p-2 pr-[8rem] pt-10">
@@ -421,15 +430,6 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           />
         )}
 
-        {(mode === "tutorial" && tutorialStep?.id === "dig") || mode === "game" ? (
-          <DigHintPanel
-            feedback={digFeedback}
-            bucketLoad={hud.bucketLoad}
-            boom={hud.boom}
-            show={mode === "game" || tutorialStep?.id === "dig"}
-          />
-        ) : null}
-
         {mode === "tutorial" && tutorialStep?.id === "dump" ? (
           <DumpHintPanel
             bucketLoad={hud.bucketLoad}
@@ -439,16 +439,24 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
         ) : null}
 
         {mode === "tutorial" && tutorialStep?.waypoint && (
-          <div className="absolute left-2 top-2 z-20 rounded-lg bg-sky-600/85 px-2 py-1 text-[10px] font-semibold text-white">
+          <div className="absolute left-2 top-[5.25rem] z-20 rounded-lg bg-sky-600/85 px-2 py-1 text-[10px] font-semibold text-white">
             목표까지 {hud.goalDist}m
+          </div>
+        )}
+
+        {mode !== "intro" && (
+          <div
+            className="pointer-events-none absolute left-3 z-30 w-[min(13rem,46vw)] rounded-xl border border-white/10 bg-black/55 px-3 py-2 shadow-xl backdrop-blur-sm"
+            style={{
+              bottom: `calc(min(100vw, 32rem) * ${COCKPIT_LAYOUT.height / COCKPIT_LAYOUT.width} + 3.25rem)`,
+            }}
+          >
+            <BoomLoadGauge bucketLoad={hud.bucketLoad} />
           </div>
         )}
 
         {mode === "game" && (
           <>
-            <div className="absolute left-2 top-[7.5rem] z-20 rounded-lg bg-black/50 px-2 py-1 text-xs text-white">
-              적재 {Math.round(hud.bucketLoad * 100)}%
-            </div>
             <div className="absolute right-2 top-[8.75rem] z-20 rounded-lg bg-orange-600/80 px-2 py-1 text-[10px] text-white">
               🟠 굴착
             </div>
@@ -496,8 +504,17 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
             onAuxiliaryChange={handleAuxiliaryChange}
             allowed={allowed}
             tutorialStep={tutorialStep}
-            onSkipTutorial={mode === "tutorial" ? startGame : undefined}
           />
+        )}
+
+        {mode !== "intro" && (
+          <button
+            type="button"
+            onClick={() => setShowControlsGuide(true)}
+            className="absolute bottom-3 right-3 z-50 rounded-xl border border-white/20 bg-black/70 px-3 py-2 text-xs font-semibold text-white shadow-xl backdrop-blur-sm hover:bg-black/85"
+          >
+            기능정보
+          </button>
         )}
 
         {mode === "game" && (

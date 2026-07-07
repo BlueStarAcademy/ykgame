@@ -24,7 +24,7 @@ export interface TutorialStep {
   armMin?: number;
   armMax?: number;
   boomMin?: number;
-  bucketMax?: number;
+  bucketMin?: number;
   loadMin?: number;
   dumpMin?: number;
 }
@@ -65,10 +65,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "bucket",
     title: "5. 버킷",
-    instruction: "우 조이스틱 좌 — 버킷 말기",
+    instruction: "우 조이스틱 우 — 버킷 말기",
     highlight: "right",
     allowed: { leftX: false, leftY: false, rightX: true, rightY: false, travel: false },
-    bucketMax: -0.7,
+    bucketMin: 0.7,
   },
   {
     id: "dig",
@@ -116,7 +116,7 @@ export function checkTutorialStepComplete(
     case "boom":
       return step.boomMin != null && sim.boom >= step.boomMin;
     case "bucket":
-      return step.bucketMax != null && sim.bucket <= step.bucketMax;
+      return step.bucketMin != null && sim.bucket >= step.bucketMin;
     case "dig":
       return step.loadMin != null && sim.bucketLoad >= step.loadMin;
     case "dump":

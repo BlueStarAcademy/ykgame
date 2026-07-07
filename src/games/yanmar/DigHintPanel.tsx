@@ -16,9 +16,19 @@ function boomHint(boom: number, tipOnGround: boolean) {
   return "좌레버 앞+뒤로 암 조절하며 버킷을 땅에";
 }
 
-export function DigHintPanel({ feedback, bucketLoad, boom, show }: DigHintPanelProps) {
-  if (!show) return null;
+interface DigHintContentProps {
+  feedback: DigFeedback;
+  bucketLoad: number;
+  boom: number;
+  compact?: boolean;
+}
 
+export function DigHintContent({
+  feedback,
+  bucketLoad,
+  boom,
+  compact = false,
+}: DigHintContentProps) {
   const steps = [
     {
       ok: feedback.inDigZone,
@@ -30,7 +40,7 @@ export function DigHintPanel({ feedback, bucketLoad, boom, show }: DigHintPanelP
     },
     {
       ok: feedback.bucketCurled,
-      label: feedback.bucketCurled ? "버킷 말기 완료" : "우조버 왼쪽 — 버킷 말기",
+      label: feedback.bucketCurled ? "버킷 말기 완료" : "우조버 오른쪽 — 버킷 말기",
     },
     {
       ok: bucketLoad >= 0.35,
@@ -43,15 +53,11 @@ export function DigHintPanel({ feedback, bucketLoad, boom, show }: DigHintPanelP
     },
   ];
 
-  const boomPct = Math.round(
-    ((boom - 0.45) / (1.45 - 0.45)) * 100,
-  );
-
   return (
-    <div className="absolute left-2 bottom-[58%] z-20 max-w-[10.5rem] rounded-lg bg-black/70 px-2 py-1.5 text-white shadow-lg backdrop-blur-sm">
+    <div className={compact ? "text-white" : "rounded-lg bg-black/70 px-2 py-1.5 text-white"}>
       <p className="text-[10px] font-bold text-orange-300">굴착 방법</p>
       <p className="mt-0.5 text-[8px] text-white/50">
-        우레버 앞=붐↓ · 뒤=붐↑ · 좌=버킷말기
+        우레버 앞=붐↓ · 뒤=붐↑ · 우=버킷말기
       </p>
       <ul className="mt-1.5 space-y-1">
         {steps.map((s, i) => (
@@ -63,24 +69,40 @@ export function DigHintPanel({ feedback, bucketLoad, boom, show }: DigHintPanelP
           </li>
         ))}
       </ul>
-      <div className="mt-2 flex items-center gap-2">
-        <span className="shrink-0 text-[8px] text-white/50">붐</span>
-        <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/15">
+      {compact ? null : <BoomLoadGauge bucketLoad={bucketLoad} />}
+    </div>
+  );
+}
+
+export function BoomLoadGauge({
+  bucketLoad,
+}: {
+  bucketLoad: number;
+}) {
+  const loadPct = Math.round(bucketLoad * 100);
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="w-8 shrink-0 text-[9px] font-semibold text-orange-200">적재</span>
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/15">
           <div
-            className="h-full rounded-full bg-sky-400 transition-all duration-100"
-            style={{ width: `${Math.max(0, Math.min(100, boomPct))}%` }}
+            className="h-full rounded-full bg-orange-400 transition-all duration-150"
+            style={{ width: `${loadPct}%` }}
           />
         </div>
+        <span className="w-8 text-right text-[9px] text-white/65">{loadPct}%</span>
       </div>
-      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/15">
-        <div
-          className="h-full rounded-full bg-orange-400 transition-all duration-150"
-          style={{ width: `${Math.round(bucketLoad * 100)}%` }}
-        />
-      </div>
-      <p className="mt-0.5 text-center text-[8px] text-white/60">
-        적재 {Math.round(bucketLoad * 100)}%
-      </p>
+    </div>
+  );
+}
+
+export function DigHintPanel({ feedback, bucketLoad, boom, show }: DigHintPanelProps) {
+  if (!show) return null;
+
+  return (
+    <div className="absolute left-2 bottom-[43%] z-20 max-w-[10.5rem] rounded-lg shadow-lg backdrop-blur-sm">
+      <DigHintContent feedback={feedback} bucketLoad={bucketLoad} boom={boom} />
     </div>
   );
 }

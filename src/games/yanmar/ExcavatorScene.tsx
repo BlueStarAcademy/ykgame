@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/refs */
 
 import { useMemo, useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import type { AuxiliaryControlState, ExcavatorControlState, ControlMask } from "./controls";
 import {
@@ -137,6 +137,7 @@ function ExcavatorArm({
   const dirtRef = useRef<THREE.Mesh>(null);
   const tipRef = useRef<THREE.Mesh>(null);
   const bladeRef = useRef<THREE.Group>(null);
+  const yanmarLogo = useLoader(THREE.TextureLoader, "/images/yanmar/yanmar-logo-white.png");
 
   const boomLen = 3;
   const armLen = 2.5;
@@ -152,8 +153,8 @@ function ExcavatorArm({
     if (boomSwingRef.current) boomSwingRef.current.rotation.y = (aux?.boomSwing ?? 0) * 0.38;
     // Match the visual pivots to bucket.ts: segment direction is (sin(theta), cos(theta)).
     if (boomRef.current) boomRef.current.rotation.z = Math.PI / 2 - s.boom;
-    if (armRef.current) armRef.current.rotation.z = -s.arm;
-    if (bucketRef.current) bucketRef.current.rotation.z = -s.bucket;
+    if (armRef.current) armRef.current.rotation.z = s.arm * 1.18;
+    if (bucketRef.current) bucketRef.current.rotation.z = s.bucket * 1.02;
     if (bladeRef.current) bladeRef.current.position.y = 0.25 + (aux?.blade ?? 0) * 0.36;
     if (dirtRef.current) {
       const load = s.bucketLoad;
@@ -202,14 +203,25 @@ function ExcavatorArm({
           <meshStandardMaterial color="#2b3139" roughness={0.38} metalness={0.32} />
         </mesh>
         <group ref={boomRef}>
-          <mesh position={[boomLen / 2, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-            <capsuleGeometry args={[0.16, boomLen, 8, 16]} />
+          <mesh position={[boomLen / 2, 0, 0]}>
+            <boxGeometry args={[boomLen, 0.34, 0.3]} />
             <meshStandardMaterial color="#d92323" roughness={0.42} metalness={0.12} />
           </mesh>
-          <mesh position={[boomLen / 2, 0.03, 0]} rotation={[0, 0, -Math.PI / 2]}>
-            <capsuleGeometry args={[0.07, boomLen * 0.86, 6, 12]} />
+          <mesh position={[boomLen / 2, 0.19, 0]}>
+            <boxGeometry args={[boomLen * 0.88, 0.08, 0.18]} />
             <meshStandardMaterial color="#f9c74f" roughness={0.35} metalness={0.16} />
           </mesh>
+          {[1, -1].map((side) => (
+            <mesh key={side} position={[boomLen * 0.46, 0.03, side * 0.158]} scale={[-1, 1, 1]}>
+              <planeGeometry args={[1.35, 0.26]} />
+              <meshBasicMaterial
+                map={yanmarLogo}
+                transparent
+                depthWrite={false}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+          ))}
 
           <group ref={armRef} position={[boomLen, 0, 0]}>
             <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
@@ -309,6 +321,7 @@ function SimLoop({
   scoreRef,
   modeRef,
   allowedRef,
+  auxiliaryRef,
   tutorialDumpRef,
   digFeedbackRef,
   onProgress,
@@ -325,7 +338,8 @@ function SimLoop({
     const filtered = filterInput(raw, allowed);
     const fb = digFeedbackRef.current;
 
-    applyControls(sim, filtered, dt, velRef.current);
+    const hydraulicSpeedScale = auxiliaryRef.current?.highSpeed ? 1 : 0.5;
+    applyControls(sim, filtered, dt, velRef.current, hydraulicSpeedScale);
     onTutorialTick();
 
     const tip = getBucketTipWorld(sim);
@@ -333,9 +347,10 @@ function SimLoop({
     const depthBelow = groundH - tip.y;
     const inZone = isInDigZone(tip.x, tip.z);
     const inDump = isInDumpZone(tip.x, tip.z);
-    const tipOnGround = depthBelow > -0.55 && depthBelow < 1.8;
+    const bucketInWorkRange = depthBelow > -3.2 && depthBelow < 2.2;
+    const tipOnGround = depthBelow > -1.2 && depthBelow < 2.2;
     const curled = isBucketCurled(sim.boom, sim.bucket);
-    const canLoad = curled && tipOnGround;
+    const canLoad = curled && bucketInWorkRange;
 
     fb.inDigZone = inZone;
     fb.inDumpZone = inDump;
@@ -351,7 +366,7 @@ function SimLoop({
     const digRate = isTutorial ? 5.5 : 3.5;
     const loadRate = isTutorial ? 2.2 : 1.2;
 
-    if (inZone && tipOnGround && sim.bucketLoad < 1) {
+    if (inZone && bucketInWorkRange && sim.bucketLoad < 1) {
       const scrape = Math.max(0.15, depthBelow + 0.6);
       const dug = digAt(terrainRef.current, tip.x, tip.z, 2.6, scrape * dt * digRate);
       fb.digging = dug > 0.002;

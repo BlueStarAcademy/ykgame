@@ -9,15 +9,16 @@ export const YANMAR_ASSETS = {
 export const COCKPIT_LAYOUT = {
   width: 1024,
   height: 576,
-  left: { cx: 0.205, cy: 0.17, radius: 0.085, travel: 0.05 },
-  right: { cx: 0.795, cy: 0.17, radius: 0.085, travel: 0.05 },
+  left: { cx: 0.218, cy: 0.105, radius: 0.085, travel: 0.05 },
+  right: { cx: 0.808, cy: 0.105, radius: 0.085, travel: 0.05 },
   travelLeft: { cx: 0.485, cy: 0.205, radius: 0.043, travel: 0.068 },
   travelRight: { cx: 0.528, cy: 0.205, radius: 0.043, travel: 0.068 },
   travelBoth: { cx: 0.5065, cy: 0.205, radius: 0.052, travel: 0.068 },
   boomSwing: { cx: 0.395, cy: 0.25, radius: 0.04, travel: 0.045 },
   blade: { cx: 0.625, cy: 0.25, radius: 0.04, travel: 0.045 },
   throttle: { cx: 0.415, cy: 0.18, radius: 0.038, travel: 0.04 },
-  horn: { cx: 0.818, cy: 0.085, radius: 0.014 },
+  hydraulicSpeed: { cx: 0.685, cy: -0.025, radius: 0.038, travel: 0.04 },
+  horn: { cx: 0.831, cy: 0.047, radius: 0.014 },
 } as const;
 
 export interface JoystickInput {
@@ -64,8 +65,8 @@ export const CONTROL_LABELS = {
   right: {
     yPos: "붐 하강",
     yNeg: "붐 상승",
-    xNeg: "버킷 말기",
-    xPos: "버킷 펴기",
+    xNeg: "버킷 펴기",
+    xPos: "버킷 말기",
   },
   travel: {
     forward: "주행 전진",
@@ -131,10 +132,9 @@ const DAMPING = {
 } as const;
 
 export const JOINT_LIMITS = {
-  swing: { min: -Math.PI, max: Math.PI },
   boom: { min: -0.15, max: 1.45 },
-  arm: { min: -1.5, max: 0.55 },
-  bucket: { min: -1.8, max: 0.8 },
+  arm: { min: -2.35, max: 0.55 },
+  bucket: { min: -2.1, max: 2.1 },
 } as const;
 
 export interface HydraulicVelocity {
@@ -171,6 +171,7 @@ export function applyControls(
   input: ExcavatorControlState,
   dt: number,
   vel: HydraulicVelocity,
+  hydraulicSpeedScale = 1,
 ) {
   const { left, right, travel } = input;
 
@@ -181,11 +182,17 @@ export function applyControls(
     DAMPING.swing,
     dt,
   );
-  vel.arm = approach(vel.arm, -left.y * CONTROL_SPEED.arm, ACCEL.arm, DAMPING.arm, dt);
+  vel.arm = approach(
+    vel.arm,
+    -left.y * CONTROL_SPEED.arm * hydraulicSpeedScale,
+    ACCEL.arm,
+    DAMPING.arm,
+    dt,
+  );
   const leftTrack = travel.left;
   const rightTrack = travel.right;
   const trackAverage = (leftTrack + rightTrack) / 2;
-  const trackDelta = rightTrack - leftTrack;
+  const trackDelta = leftTrack - rightTrack;
 
   vel.travel = approach(
     vel.travel,
@@ -204,21 +211,20 @@ export function applyControls(
   // 우 조이스틱 앞=붐 하강(각도↑·버킷↓), 뒤=붐 상승 — 3D 암 골격과 일치
   vel.boom = approach(
     vel.boom,
-    right.y * CONTROL_SPEED.boom,
+    right.y * CONTROL_SPEED.boom * hydraulicSpeedScale,
     ACCEL.boom,
     DAMPING.boom,
     dt,
   );
   vel.bucket = approach(
     vel.bucket,
-    -right.x * CONTROL_SPEED.bucket,
+    right.x * CONTROL_SPEED.bucket * hydraulicSpeedScale,
     ACCEL.bucket,
     DAMPING.bucket,
     dt,
   );
 
   state.swing += vel.swing * dt;
-  state.swing = clamp(state.swing, JOINT_LIMITS.swing.min, JOINT_LIMITS.swing.max);
   state.heading += vel.trackTurn * dt;
 
   state.arm += vel.arm * dt;
@@ -240,11 +246,11 @@ function clamp(v: number, min: number, max: number) {
 }
 
 export function canLoadBucket(boom: number, bucket: number) {
-  return boom > 0.55 && bucket < -0.25;
+  return boom > 0.55 && bucket > 0.25;
 }
 
 export function canDumpBucket(bucket: number) {
-  return bucket > 0.25;
+  return bucket < -0.25;
 }
 
 export const ALL_CONTROLS: ControlMask = {
