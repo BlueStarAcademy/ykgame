@@ -61,6 +61,103 @@ function resetSim(sim: ExcavatorSimState, vel: HydraulicVelocity) {
   Object.assign(vel, createHydraulicVelocity());
 }
 
+function GameStartModal({
+  duration,
+  onStart,
+}: {
+  duration: number;
+  onStart: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-xs rounded-2xl bg-white p-5 text-center shadow-2xl">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-red-600">Game Mode</p>
+        <h2 className="mt-1 text-lg font-black text-gray-900">굴착 미션 시작</h2>
+        <p className="mt-2 text-xs leading-relaxed text-gray-600">
+          제한시간 {duration}초 동안 흙을 굴착해 초록 하역 구역에 비우면 점수가 올라갑니다.
+        </p>
+        <button
+          type="button"
+          onClick={onStart}
+          className="mt-4 w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white shadow-lg hover:bg-red-500"
+        >
+          시작하기
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TutorialSelectModal({
+  open,
+  activeId,
+  onClose,
+  onSelect,
+  onFreePlay,
+}: {
+  open: boolean;
+  activeId: string | null;
+  onClose: () => void;
+  onSelect: (index: number) => void;
+  onFreePlay: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="bg-gradient-to-br from-red-600 to-red-800 px-4 py-3 text-white">
+          <p className="text-[10px] font-semibold uppercase tracking-widest opacity-80">Practice</p>
+          <h2 className="mt-1 text-base font-black">튜토리얼 선택</h2>
+          <p className="mt-1 text-[11px] opacity-85">원하는 조작만 골라서 연습할 수 있습니다.</p>
+        </div>
+        <div className="max-h-[60vh] space-y-2 overflow-y-auto p-3">
+          <button
+            type="button"
+            onClick={onFreePlay}
+            className={`w-full rounded-xl border px-3 py-2 text-left text-xs font-bold ${
+              activeId == null
+                ? "border-red-300 bg-red-50 text-red-700"
+                : "border-gray-200 text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            자유동작
+            <span className="mt-0.5 block text-[10px] font-medium text-gray-500">
+              튜토리얼 없이 모든 조작을 자유롭게 사용
+            </span>
+          </button>
+          {TUTORIAL_STEPS.map((step, index) => (
+            <button
+              key={step.id}
+              type="button"
+              onClick={() => onSelect(index)}
+              className={`w-full rounded-xl border px-3 py-2 text-left text-xs ${
+                activeId === step.id
+                  ? "border-amber-300 bg-amber-50 text-amber-800"
+                  : "border-gray-200 text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <span className="font-bold">{step.title}</span>
+              <span className="mt-0.5 block text-[10px] leading-tight text-gray-500">
+                {step.instruction}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="border-t border-gray-100 p-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-xl border border-gray-200 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGameWrapperProps) {
   const config = getMissionConfig("yanmar");
   const [mode, setMode] = useState<GameMode>("intro");
@@ -82,6 +179,8 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
   });
   const [stepCompleteFlash, setStepCompleteFlash] = useState(false);
   const [showControlsGuide, setShowControlsGuide] = useState(false);
+  const [showTutorialMenu, setShowTutorialMenu] = useState(false);
+  const [showTouchZones, setShowTouchZones] = useState(false);
   const endedRef = useRef(false);
   const elapsedRef = useRef(0);
   const tutorialDumpRef = useRef(0);
@@ -129,7 +228,11 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
   const tutorialStepRef = useRef<TutorialStep | null>(tutorialStep);
 
   const baseAllowed: ControlMask =
-    mode === "game" ? ALL_CONTROLS : (tutorialStep?.allowed ?? ALL_CONTROLS);
+    mode === "gameReady"
+      ? LOCKED_CONTROLS
+      : mode === "tutorial"
+        ? (tutorialStep?.allowed ?? ALL_CONTROLS)
+        : ALL_CONTROLS;
   const allowed: ControlMask = auxiliary.safetyLocked ? LOCKED_CONTROLS : baseAllowed;
 
   const allowedRef = useRef<ControlMask>(allowed);
@@ -157,9 +260,11 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     auxiliaryRef.current = auxiliary;
   }, [auxiliary]);
 
-  const handleAuxiliaryChange = useCallback((next: AuxiliaryControlState) => {
-    setAuxiliary(next);
-    if (next.safetyLocked) {
+  const handleAuxiliaryChange = useCallback((next: AuxiliaryControlState | ((current: AuxiliaryControlState) => AuxiliaryControlState)) => {
+    const resolved = typeof next === "function" ? next(auxiliaryRef.current) : next;
+    auxiliaryRef.current = resolved;
+    setAuxiliary(resolved);
+    if (resolved.safetyLocked) {
       setInput({
         left: { x: 0, y: 0 },
         right: { x: 0, y: 0 },
@@ -168,7 +273,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     }
   }, [setAuxiliary, setInput]);
 
-  const startGame = useCallback(() => {
+  const resetYanmarSession = useCallback(() => {
     resetSim(simRef.current, velRef.current);
     terrainRef.current = createInitialTerrain();
     scoreRef.current = createScoreState(config.target, config.duration);
@@ -176,38 +281,62 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     endedRef.current = false;
     elapsedRef.current = 0;
     lastHudProgressRef.current = -1;
-    setAuxiliary(createAuxiliaryControls());
-    setHud({ progress: 0, timeLeft: config.duration, bucketLoad: 0, goalDist: 0, boom: 0.45 });
-    setMode("game");
-  }, [config.duration, config.target, setAuxiliary, setHud, setMode]);
-
-  const startTutorial = useCallback(() => {
-    resetSim(simRef.current, velRef.current);
-    terrainRef.current = createInitialTerrain();
-    tutorialDumpRef.current = 0;
     tutorialCompletingRef.current = false;
-    tutorialIndexRef.current = 0;
-    tutorialStepRef.current = TUTORIAL_STEPS[0] ?? null;
-    setAuxiliary(createAuxiliaryControls());
+    const nextAuxiliary = createAuxiliaryControls();
+    auxiliaryRef.current = nextAuxiliary;
+    setAuxiliary(nextAuxiliary);
+    setInput({
+      left: { x: 0, y: 0 },
+      right: { x: 0, y: 0 },
+      travel: { left: 0, right: 0 },
+    });
+    setHud({ progress: 0, timeLeft: config.duration, bucketLoad: 0, goalDist: 0, boom: 0.45 });
+  }, [config.duration, config.target, setAuxiliary, setHud, setInput]);
+
+  const enterPracticeMode = useCallback(() => {
+    resetYanmarSession();
+    tutorialStepRef.current = null;
     setTutorialIndex(0);
+    setShowTouchZones(true);
+    setShowTutorialMenu(true);
+    setMode("practice");
+  }, [resetYanmarSession, setMode, setShowTouchZones, setShowTutorialMenu, setTutorialIndex]);
+
+  const enterGameMode = useCallback(() => {
+    resetYanmarSession();
+    tutorialStepRef.current = null;
+    setShowTouchZones(false);
+    setShowTutorialMenu(false);
+    setMode("gameReady");
+  }, [resetYanmarSession, setMode, setShowTouchZones, setShowTutorialMenu]);
+
+  const startGame = useCallback(() => {
+    endedRef.current = false;
+    elapsedRef.current = 0;
+    scoreRef.current.timeLeft = config.duration;
+    setHud((h) => ({ ...h, progress: 0, timeLeft: config.duration }));
+    setMode("game");
+  }, [config.duration, setHud, setMode]);
+
+  const startTutorial = useCallback((index: number) => {
+    resetYanmarSession();
+    const step = TUTORIAL_STEPS[index] ?? null;
+    tutorialCompletingRef.current = false;
+    tutorialIndexRef.current = index;
+    tutorialStepRef.current = step;
+    setTutorialIndex(index);
+    setShowTutorialMenu(false);
+    setShowTouchZones(true);
     setMode("tutorial");
-  }, [setAuxiliary, setMode, setTutorialIndex]);
+  }, [resetYanmarSession, setMode, setShowTouchZones, setShowTutorialMenu, setTutorialIndex]);
 
-  const advanceTutorial = useCallback(() => {
-    if (tutorialCompletingRef.current) return;
-    tutorialCompletingRef.current = true;
-    setStepCompleteFlash(true);
-    window.setTimeout(() => setStepCompleteFlash(false), 600);
-
-    const next = tutorialIndexRef.current + 1;
-    tutorialIndexRef.current = next;
-    tutorialStepRef.current = TUTORIAL_STEPS[next] ?? null;
-    setTutorialIndex(next);
-
-    window.setTimeout(() => {
-      tutorialCompletingRef.current = false;
-    }, 900);
-  }, [setStepCompleteFlash, setTutorialIndex]);
+  const startFreePractice = useCallback(() => {
+    resetYanmarSession();
+    tutorialStepRef.current = null;
+    setShowTutorialMenu(false);
+    setShowTouchZones(true);
+    setMode("practice");
+  }, [resetYanmarSession, setMode, setShowTouchZones, setShowTutorialMenu]);
 
   const handleTutorialTick = useCallback(() => {
     if (modeRef.current !== "tutorial") return;
@@ -217,12 +346,14 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     if (!step) return;
 
     if (checkTutorialStepComplete(step, simRef.current, tutorialDumpRef.current)) {
-      const next = tutorialIndexRef.current + 1;
-      if (next >= TUTORIAL_STEPS.length) {
-        startGame();
-        return;
-      }
-      advanceTutorial();
+      tutorialCompletingRef.current = true;
+      setStepCompleteFlash(true);
+      window.setTimeout(() => setStepCompleteFlash(false), 600);
+      window.setTimeout(() => {
+        tutorialCompletingRef.current = false;
+        tutorialStepRef.current = null;
+        setMode("practice");
+      }, 900);
     }
     const load = simRef.current.bucketLoad;
     setHud((h) => {
@@ -239,7 +370,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
       return { ...h, bucketLoad: load, goalDist };
     });
     syncDigHud();
-  }, [advanceTutorial, startGame, syncDigHud, setHud]);
+  }, [syncDigHud, setHud, setMode, setStepCompleteFlash]);
 
   const handleProgress = useCallback(
     (dumped: number, progress: number) => {
@@ -307,7 +438,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     sim.bucketLoad = 0;
     tutorialDumpRef.current = 0;
     if (sim.boom < 0.7) sim.boom = 0.75;
-    if (sim.bucket < 0.5) sim.bucket = 0.75;
+    if (sim.bucket > -0.5) sim.bucket = -0.75;
     setHud((h) => ({ ...h, bucketLoad: 0, boom: sim.boom }));
   }, [tutorialIndex, tutorialStep?.id]);
 
@@ -381,9 +512,34 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           bucketLoad={hud.bucketLoad}
           boom={hud.boom}
         />
+        <TutorialSelectModal
+          open={showTutorialMenu}
+          activeId={tutorialStep?.id ?? null}
+          onClose={() => setShowTutorialMenu(false)}
+          onSelect={startTutorial}
+          onFreePlay={startFreePractice}
+        />
+
+        {mode === "gameReady" && (
+          <GameStartModal duration={config.duration} onStart={startGame} />
+        )}
+
+        {mode !== "intro" && mode !== "gameReady" && (
+          <div className="absolute left-2 top-2 z-50 flex gap-1.5">
+            {(mode === "practice" || mode === "tutorial") && (
+              <button
+                type="button"
+                onClick={() => setShowTutorialMenu(true)}
+                className="rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
+              >
+                튜토리얼
+              </button>
+            )}
+          </div>
+        )}
 
         {mode === "tutorial" && tutorialStep && (
-          <div className="absolute left-2 top-2 z-40 w-[8.75rem] rounded-xl border border-amber-300/20 bg-black/75 p-2 text-white shadow-xl backdrop-blur-sm">
+          <div className="absolute left-2 top-12 z-40 w-[8.75rem] rounded-xl border border-amber-300/20 bg-black/75 p-2 text-white shadow-xl backdrop-blur-sm">
             <div className="min-w-0">
               <p className="text-[10px] font-bold text-amber-300">{tutorialStep.title}</p>
               <p className="mt-0.5 text-[10px] leading-tight text-white/85">
@@ -392,10 +548,10 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
             </div>
             <button
               type="button"
-              onClick={startGame}
+              onClick={startFreePractice}
               className="mx-auto mt-2 block rounded bg-white/10 px-2 py-0.5 text-[9px] font-medium hover:bg-white/20"
             >
-              건너뛰기
+              자유동작
             </button>
           </div>
         )}
@@ -417,7 +573,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
               bottom: `calc(${((COCKPIT_LAYOUT.height / COCKPIT_LAYOUT.width) * 100).toFixed(1)}% + 2.75rem)`,
             }}
           >
-            {tutorialIndex + 1}/{TUTORIAL_STEPS.length}
+            선택 연습 {tutorialIndex + 1}/{TUTORIAL_STEPS.length}
           </div>
         )}
 
@@ -509,7 +665,22 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
             onAuxiliaryChange={handleAuxiliaryChange}
             allowed={allowed}
             tutorialStep={tutorialStep}
+            showTouchZones={showTouchZones}
           />
+        )}
+
+        {mode !== "intro" && mode !== "gameReady" && (
+          <button
+            type="button"
+            onClick={() => setShowTouchZones((show) => !show)}
+            className={`absolute bottom-3 left-3 z-50 rounded-xl border px-3 py-2 text-xs font-semibold shadow-xl backdrop-blur-sm ${
+              showTouchZones
+                ? "border-white/20 bg-black/70 text-sky-300 hover:bg-black/85"
+                : "border-white/20 bg-black/70 text-white/65 hover:bg-black/85"
+            }`}
+          >
+            터치범위 {showTouchZones ? "ON" : "OFF"}
+          </button>
         )}
 
         {mode !== "intro" && (
@@ -522,18 +693,8 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           </button>
         )}
 
-        {mode === "game" && (
-          <button
-            type="button"
-            onClick={startTutorial}
-            className="absolute bottom-[57%] right-3 z-20 rounded-lg bg-black/55 px-2.5 py-1 text-xs text-white backdrop-blur hover:bg-black/70"
-          >
-            조작 연습
-          </button>
-        )}
-
         {mode === "intro" && (
-          <TutorialIntro onStartTutorial={startTutorial} onSkip={startGame} />
+          <TutorialIntro onStartPractice={enterPracticeMode} onEnterGame={enterGameMode} />
         )}
       </div>
       {!immersive && (

@@ -20,7 +20,7 @@ export function DumpHintPanel({ bucketLoad, inDumpZone, show }: DumpHintPanelPro
     },
     {
       ok: false,
-      label: "우조버 왼쪽 — 버킷 펴기",
+      label: "우조버 오른쪽 — 버킷 펴기",
     },
   ];
 

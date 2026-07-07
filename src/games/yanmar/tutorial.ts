@@ -3,7 +3,7 @@ import type { ControlMask } from "./controls";
 import { ALL_CONTROLS } from "./controls";
 
 export type { ControlMask };
-export type GameMode = "intro" | "tutorial" | "game";
+export type GameMode = "intro" | "practice" | "tutorial" | "gameReady" | "game";
 
 export type TutorialHighlight = "left" | "right" | "travel" | "both" | null;
 
@@ -24,7 +24,7 @@ export interface TutorialStep {
   armMin?: number;
   armMax?: number;
   boomMin?: number;
-  bucketMin?: number;
+  bucketMax?: number;
   loadMin?: number;
   dumpMin?: number;
 }
@@ -65,15 +65,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "bucket",
     title: "5. 버킷",
-    instruction: "우 조이스틱 우 — 버킷 말기",
+    instruction: "우 조이스틱 좌 — 버킷 말기",
     highlight: "right",
     allowed: { leftX: false, leftY: false, rightX: true, rightY: false, travel: false },
-    bucketMin: 0.7,
+    bucketMax: -0.7,
   },
   {
     id: "dig",
     title: "6. 굴착",
-    instruction: "주황 구역에서 붐을 내리고 버킷을 우측으로 말아 적재 35% 이상",
+    instruction: "주황 구역에서 붐을 내리고 버킷을 좌측으로 말아 적재 35% 이상",
     highlight: "both",
     allowed: { ...ALL_CONTROLS },
     loadMin: 0.35,
@@ -81,7 +81,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "dump",
     title: "7. 하역",
-    instruction: "초록 구역에서 우 조이스틱 좌측 — 버킷 펴기",
+    instruction: "초록 구역에서 우 조이스틱 우측 — 버킷 펴기",
     highlight: "both",
     allowed: { ...ALL_CONTROLS },
     dumpMin: 0.12,
@@ -116,7 +116,7 @@ export function checkTutorialStepComplete(
     case "boom":
       return step.boomMin != null && sim.boom >= step.boomMin;
     case "bucket":
-      return step.bucketMin != null && sim.bucket >= step.bucketMin;
+      return step.bucketMax != null && sim.bucket <= step.bucketMax;
     case "dig":
       return step.loadMin != null && sim.bucketLoad >= step.loadMin;
     case "dump":

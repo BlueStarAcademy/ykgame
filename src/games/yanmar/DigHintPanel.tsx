@@ -40,7 +40,7 @@ export function DigHintContent({
     },
     {
       ok: feedback.bucketCurled,
-      label: feedback.bucketCurled ? "버킷 말기 완료" : "우조버 오른쪽 — 버킷 말기",
+      label: feedback.bucketCurled ? "버킷 말기 완료" : "우조버 왼쪽 — 버킷 말기",
     },
     {
       ok: bucketLoad >= 0.35,
@@ -57,7 +57,7 @@ export function DigHintContent({
     <div className={compact ? "text-white" : "rounded-lg bg-black/70 px-2 py-1.5 text-white"}>
       <p className="text-[10px] font-bold text-orange-300">굴착 방법</p>
       <p className="mt-0.5 text-[8px] text-white/50">
-        우레버 앞=붐↓ · 뒤=붐↑ · 우=버킷말기
+        우레버 앞=붐↓ · 뒤=붐↑ · 좌=버킷말기
       </p>
       <ul className="mt-1.5 space-y-1">
         {steps.map((s, i) => (

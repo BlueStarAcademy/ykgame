@@ -18,7 +18,7 @@ export const COCKPIT_LAYOUT = {
   blade: { cx: 0.625, cy: 0.25, radius: 0.04, travel: 0.045 },
   throttle: { cx: 0.415, cy: 0.18, radius: 0.038, travel: 0.04 },
   hydraulicSpeed: { cx: 0.685, cy: -0.025, radius: 0.038, travel: 0.04 },
-  rightPedal: { cx: 0.66, cy: 0.505, width: 0.06, height: 0.19 },
+  rightPedal: { cx: 0.66, cy: 0.365, width: 0.07, height: 0.19 },
   horn: { cx: 0.831, cy: 0.047, radius: 0.014 },
 } as const;
 
@@ -40,10 +40,8 @@ export interface ExcavatorControlState {
 
 export interface AuxiliaryControlState {
   boomSwing: number;
-  trackWidth: number;
   blade: number;
   throttle: number;
-  workLight: boolean;
   highSpeed: boolean;
   safetyLocked: boolean;
 }
@@ -66,8 +64,8 @@ export const CONTROL_LABELS = {
   right: {
     yPos: "붐 하강",
     yNeg: "붐 상승",
-    xNeg: "버킷 펴기",
-    xPos: "버킷 말기",
+    xNeg: "버킷 말기",
+    xPos: "버킷 펴기",
   },
   travel: {
     forward: "주행 전진",
@@ -95,10 +93,8 @@ export function filterInput(
 export function createAuxiliaryControls(): AuxiliaryControlState {
   return {
     boomSwing: 0,
-    trackWidth: 0,
     blade: 0,
     throttle: 0,
-    workLight: false,
     highSpeed: false,
     safetyLocked: false,
   };
@@ -247,11 +243,11 @@ function clamp(v: number, min: number, max: number) {
 }
 
 export function canLoadBucket(boom: number, bucket: number) {
-  return boom > 0.55 && bucket > 0.25;
+  return boom > 0.55 && bucket < -0.25;
 }
 
 export function canDumpBucket(bucket: number) {
-  return bucket < -0.25;
+  return bucket > 0.25;
 }
 
 export const ALL_CONTROLS: ControlMask = {

@@ -2,7 +2,7 @@
 
 /* eslint-disable react-hooks/immutability */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   AuxiliaryControlState,
   ControlMask,
@@ -19,9 +19,14 @@ interface CockpitOverlayProps {
       | ((current: ExcavatorControlState) => ExcavatorControlState),
   ) => void;
   auxiliary: AuxiliaryControlState;
-  onAuxiliaryChange: (input: AuxiliaryControlState) => void;
+  onAuxiliaryChange: (
+    input:
+      | AuxiliaryControlState
+      | ((current: AuxiliaryControlState) => AuxiliaryControlState),
+  ) => void;
   allowed: ControlMask;
   tutorialStep: TutorialStep | null;
+  showTouchZones: boolean;
 }
 
 interface JoystickLayout {
@@ -39,9 +44,7 @@ interface HornLayout {
 
 type AxisValue = { x: number; y: number };
 
-function clamp(v: number, min = -1, max = 1) {
-  return Math.max(min, Math.min(max, v));
-}
+const PEDAL_SWING_SPEED_PER_SECOND = 0.85;
 
 function playHorn() {
   const AudioContextCtor =
@@ -107,6 +110,7 @@ interface GameJoystickProps {
   value: AxisValue;
   enabled: { x: boolean; y: boolean };
   highlighted: boolean;
+  showTouchZone: boolean;
   onChange: (x: number, y: number) => void;
   hornLayout?: HornLayout;
 }
@@ -117,6 +121,7 @@ function GameJoystick({
   value,
   enabled,
   highlighted,
+  showTouchZone,
   onChange,
   hornLayout,
 }: GameJoystickProps) {
@@ -215,6 +220,15 @@ function GameJoystick({
         }}
         aria-label={side === "left" ? "좌 조이스틱" : "우 조이스틱"}
       >
+        {showTouchZone && (
+          <div
+            className={`pointer-events-none absolute inset-0 rounded-full border ${
+              side === "left"
+                ? "border-red-200/35 bg-red-400/[0.01]"
+                : "border-sky-200/35 bg-sky-400/[0.01]"
+            } shadow-[inset_0_0_18px_rgba(255,255,255,0.01)] backdrop-blur-[1px]`}
+          />
+        )}
         {highlighted && (
           <div className="yanmar-joystick-highlight absolute inset-[-10%] rounded-full border-2 border-amber-300/95 bg-amber-300/10" />
         )}
@@ -243,48 +257,43 @@ function GameJoystick({
         style={{
           left: `${layout.cx * 100}%`,
           top: `calc(${layout.cy * 100}% + ${visualY}%)`,
-          width: "7.4%",
-          height: "25.5%",
+          width: "10.2%",
+          height: "30.5%",
           transform: `translate(calc(-50% + ${visualX}%), -50%) rotateX(${leanY}deg) rotateZ(${leanX}deg)`,
-          transformOrigin: "50% 100%",
+          transformOrigin: "50% 92%",
           transition: active ? "none" : "left 120ms ease, top 120ms ease, transform 120ms ease",
         }}
       >
-        <div
-          className="absolute left-1/2 top-0 h-[91%] w-[68%] -translate-x-1/2 border-2 border-black/75 bg-gradient-to-br from-[#6b747f] via-[#252b34] to-[#080a0f] shadow-[inset_7px_9px_10px_rgba(255,255,255,0.15),inset_-7px_-10px_10px_rgba(0,0,0,0.52),0_11px_15px_rgba(0,0,0,0.48)]"
-          style={{
-            borderRadius: "42% 28% 34% 34% / 16% 18% 36% 36%",
-            clipPath: "polygon(13% 0%, 83% 0%, 94% 15%, 72% 100%, 29% 100%, 6% 18%)",
-          }}
-        >
-          <div className="absolute left-[13%] top-[3%] h-[16%] w-[68%] rounded-[32%] bg-gradient-to-b from-white/18 to-white/4" />
-          <div className="absolute left-[18%] top-[12%] h-[35%] w-[38%] rounded-full bg-white/13 blur-[1px]" />
-          <div className="absolute right-[14%] top-[8%] h-[24%] w-[16%] rounded-full bg-white/8" />
-          {hornLayout && (
-            <span
-              className="absolute left-1/2 top-[6%] aspect-square w-[28%] -translate-x-1/2 rounded-full border-2 border-black/70 bg-gradient-to-br from-white via-[#d7d4cc] to-[#8b8781] shadow-[0_3px_7px_rgba(0,0,0,0.55),inset_0_2px_2px_rgba(255,255,255,0.75)]"
-              aria-hidden
-            />
-          )}
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/images/yanmar/main-joystick-${side}.png`}
+          alt=""
+          className="h-full w-full object-contain drop-shadow-[0_10px_12px_rgba(0,0,0,0.5)]"
+          draggable={false}
+          aria-hidden
+        />
       </div>
     </>
   );
 }
 
 interface TravelLeverProps {
+  side: "left" | "right";
   layout: JoystickLayout;
   value: number;
   enabled: boolean;
   highlighted: boolean;
+  showTouchZone: boolean;
   onChange: (value: number) => void;
 }
 
 function TravelLever({
+  side,
   layout,
   value,
   enabled,
   highlighted,
+  showTouchZone,
   onChange,
 }: TravelLeverProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
@@ -327,20 +336,22 @@ function TravelLever({
     pointer.onRelease();
   };
 
-  const w = `${layout.radius * 190}%`;
-  const h = `${layout.radius * 380}%`;
-  const knobY = -value * layout.travel * 100;
+  const hitboxCenterOffset = side === "left" ? "-6.4%" : "6.4%";
+  const hitboxWidth = "12.8%";
+  const hitboxTopOffset = "-8%";
+  const hitboxHeight = "32%";
+  const knobY = -value * layout.travel * 145;
 
   return (
     <>
       <div
         ref={zoneRef}
-        className={`absolute z-30 touch-none rounded-xl ${!enabled ? "pointer-events-none" : ""}`}
+        className={`absolute z-40 touch-none rounded-xl ${!enabled ? "pointer-events-none" : ""}`}
         style={{
-          left: `${layout.cx * 100}%`,
-          top: `${layout.cy * 100}%`,
-          width: w,
-          height: h,
+          left: `calc(${layout.cx * 100}% + ${hitboxCenterOffset})`,
+          top: `calc(${layout.cy * 100}% + ${hitboxTopOffset})`,
+          width: hitboxWidth,
+          height: hitboxHeight,
           transform: "translate(-50%, -50%)",
         }}
         onPointerDown={handleStart}
@@ -355,6 +366,18 @@ function TravelLever({
         }}
         aria-label="주행 레버"
       >
+        {showTouchZone && (
+          <>
+            <div
+              className={`pointer-events-none absolute inset-0 rounded-xl border ${
+                side === "left"
+                  ? "border-sky-200/35 bg-sky-400/[0.01]"
+                  : "border-violet-200/35 bg-violet-400/[0.01]"
+              } shadow-[inset_0_0_14px_rgba(255,255,255,0.01)] backdrop-blur-[1px]`}
+            />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 h-[76%] w-[18%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/25 bg-white/[0.008]" />
+          </>
+        )}
         {highlighted && (
           <div className="absolute inset-[-8%] rounded-xl border-2 border-amber-300/95 bg-amber-300/10" />
         )}
@@ -381,89 +404,89 @@ function TravelLever({
   );
 }
 
-interface AuxLeverProps {
-  label: string;
+interface DualTravelCenterProps {
   layout: JoystickLayout;
-  value: number;
+  enabled: boolean;
+  highlighted: boolean;
+  showTouchZone: boolean;
   onChange: (value: number) => void;
 }
 
-function AuxLever({ label, layout, value, onChange }: AuxLeverProps) {
+function DualTravelCenter({
+  layout,
+  enabled,
+  highlighted,
+  showTouchZone,
+  onChange,
+}: DualTravelCenterProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
   const pointer = usePointerRelease(() => onChange(0));
-  const [active, setActive] = useState(false);
 
   const updateFromEvent = useCallback(
     (clientY: number) => {
       const zone = zoneRef.current;
       if (!zone) return;
       const rect = zone.getBoundingClientRect();
-      const center = rect.top + rect.height / 2;
-      onChange(clamp(-(clientY - center) / (rect.height / 2)));
+      const cy = rect.top + rect.height / 2;
+      const maxR = rect.height / 2;
+      const dy = Math.max(-maxR, Math.min(maxR, clientY - cy));
+      onChange(-dy / maxR);
     },
     [onChange],
   );
 
-  const start = (e: React.PointerEvent) => {
+  const handleStart = (e: React.PointerEvent) => {
+    if (!enabled) return;
     e.preventDefault();
     pointer.dragging.current = true;
     pointer.pointerIdRef.current = e.pointerId;
-    setActive(true);
     zoneRef.current?.setPointerCapture(e.pointerId);
     updateFromEvent(e.clientY);
   };
 
-  const move = (e: React.PointerEvent) => {
+  const handleMove = (e: React.PointerEvent) => {
     if (!pointer.dragging.current || pointer.pointerIdRef.current !== e.pointerId) return;
     updateFromEvent(e.clientY);
   };
 
-  const end = (e: React.PointerEvent) => {
+  const handleEnd = (e: React.PointerEvent) => {
     if (pointer.pointerIdRef.current !== e.pointerId) return;
     pointer.releaseCapture(zoneRef.current);
-    setActive(false);
     pointer.onRelease();
   };
 
   return (
-    <>
-      <div
-        ref={zoneRef}
-        className="absolute z-30 touch-none rounded-full"
-        style={{
-          left: `${layout.cx * 100}%`,
-          top: `${layout.cy * 100}%`,
-          width: `${layout.radius * 160}%`,
-          height: `${layout.radius * 260}%`,
-          transform: "translate(-50%, -50%)",
-        }}
-        onPointerDown={start}
-        onPointerMove={move}
-        onPointerUp={end}
-        onPointerCancel={end}
-        onLostPointerCapture={() => {
-          pointer.dragging.current = false;
-          pointer.pointerIdRef.current = null;
-          setActive(false);
-          onChange(0);
-        }}
-        aria-label={label}
-      />
-      <div
-        className="pointer-events-none absolute z-[25]"
-        style={{
-          left: `${layout.cx * 100}%`,
-          top: `calc(${layout.cy * 100}% + ${-value * layout.travel * 100}%)`,
-          width: "3.2%",
-          height: "15%",
-          transform: `translate(-50%, -50%) rotateX(${value * 10}deg)`,
-          transition: active ? "none" : "top 120ms ease, transform 120ms ease",
-        }}
-      >
-        <div className="absolute bottom-0 left-1/2 h-[76%] w-[30%] -translate-x-1/2 rounded-full bg-gradient-to-b from-[#12161c] to-[#050608]" />
-        <div className="absolute left-1/2 top-0 h-[43%] w-full -translate-x-1/2 rounded-full border border-black/70 bg-gradient-to-br from-[#5b6571] to-[#11151b] shadow-md" />
-      </div>
-    </>
+    <div
+      ref={zoneRef}
+      className={`absolute z-30 touch-none rounded-xl ${!enabled ? "pointer-events-none" : ""}`}
+      style={{
+        left: `${layout.cx * 100}%`,
+        top: `calc(${layout.cy * 100}% - 8%)`,
+        width: "10.2%",
+        height: "31%",
+        transform: "translate(-50%, -50%)",
+      }}
+      onPointerDown={handleStart}
+      onPointerMove={handleMove}
+      onPointerUp={handleEnd}
+      onPointerCancel={handleEnd}
+      onLostPointerCapture={() => {
+        pointer.dragging.current = false;
+        pointer.pointerIdRef.current = null;
+        onChange(0);
+      }}
+      aria-label="좌우 주행 레버 동시 조작"
+    >
+      {showTouchZone && (
+        <>
+          <div className="pointer-events-none absolute inset-0 rounded-xl border border-emerald-200/32 bg-emerald-400/[0.01] shadow-[inset_0_0_14px_rgba(255,255,255,0.01)] backdrop-blur-[1px]" />
+          <div className="pointer-events-none absolute left-1/2 top-1/2 h-[74%] w-[20%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/25 bg-white/[0.008]" />
+        </>
+      )}
+      {highlighted && (
+        <div className="absolute inset-[-8%] rounded-xl border-2 border-amber-300/80 bg-amber-300/10" />
+      )}
+    </div>
   );
 }
 
@@ -472,13 +495,12 @@ interface ToggleButtonProps {
   active: boolean;
   cx: number;
   cy: number;
-  color: "green" | "blue" | "amber" | "red";
+  color: "blue" | "amber" | "red";
   onToggle: () => void;
 }
 
 function ToggleButton({ label, active, cx, cy, color, onToggle }: ToggleButtonProps) {
   const activeColors = {
-    green: "from-lime-300 to-emerald-600 shadow-emerald-400/70",
     blue: "from-sky-200 to-blue-600 shadow-sky-400/70",
     amber: "from-amber-200 to-orange-600 shadow-orange-400/70",
     red: "from-red-300 to-red-700 shadow-red-400/70",
@@ -510,11 +532,13 @@ function SpeedModeLever({
   active,
   cx,
   cy,
+  showTouchZone,
   onToggle,
 }: {
   active: boolean;
   cx: number;
   cy: number;
+  showTouchZone: boolean;
   onToggle: () => void;
 }) {
   return (
@@ -532,6 +556,9 @@ function SpeedModeLever({
       aria-pressed={active}
       aria-label={active ? "유압 속도 x2" : "유압 속도 x1"}
     >
+      {showTouchZone && (
+        <span className="pointer-events-none absolute inset-[-8%] rounded-full border border-sky-200/32 bg-sky-400/[0.01] shadow-[inset_0_0_12px_rgba(255,255,255,0.01)]" />
+      )}
       <span className="pointer-events-none absolute inset-x-[10%] top-[2%] h-[96%] rounded-full bg-gradient-to-b from-black via-black/95 to-[#11151b]/90 shadow-[0_0_14px_rgba(0,0,0,0.8)]" />
       <span
         className={`pointer-events-none absolute left-1/2 -top-[10%] z-20 -translate-x-1/2 rounded-full border px-1.5 py-0.5 text-[9px] font-black shadow-lg ${
@@ -552,61 +579,148 @@ function SpeedModeLever({
   );
 }
 
-function PedalSwingToggle({
+function PedalSwingControl({
   activeValue,
+  showTouchZone,
   onChange,
 }: {
   activeValue: number;
+  showTouchZone: boolean;
   onChange: (value: number) => void;
 }) {
   const pedal = COCKPIT_LAYOUT.rightPedal;
+  const valueRef = useRef(activeValue);
+  const directionRef = useRef(0);
+  const frameRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef<number | null>(null);
 
-  const toggle = (value: number) => {
-    onChange(activeValue === value ? 0 : value);
+  useEffect(() => {
+    valueRef.current = activeValue;
+  }, [activeValue]);
+
+  const stopAnimation = useCallback(() => {
+    directionRef.current = 0;
+    lastFrameTimeRef.current = null;
+    if (frameRef.current != null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+  }, []);
+
+  const animate = useCallback(
+    (time: number) => {
+      const direction = directionRef.current;
+      if (direction === 0) {
+        frameRef.current = null;
+        lastFrameTimeRef.current = null;
+        return;
+      }
+
+      const previousTime = lastFrameTimeRef.current ?? time;
+      const deltaSeconds = Math.min((time - previousTime) / 1000, 0.05);
+      lastFrameTimeRef.current = time;
+
+      const current = valueRef.current;
+      const next =
+        direction > 0
+          ? Math.min(1, current + PEDAL_SWING_SPEED_PER_SECOND * deltaSeconds)
+          : Math.max(-1, current - PEDAL_SWING_SPEED_PER_SECOND * deltaSeconds);
+
+      if (Math.abs(next - current) > 0.001) {
+        valueRef.current = next;
+        onChange(next);
+      }
+
+      if (Math.abs(next) >= 1) {
+        stopAnimation();
+        return;
+      }
+
+      frameRef.current = requestAnimationFrame(animate);
+    },
+    [onChange, stopAnimation],
+  );
+
+  useEffect(() => stopAnimation, [stopAnimation]);
+
+  const press = (e: React.PointerEvent<HTMLButtonElement>, value: number) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    directionRef.current = value;
+    lastFrameTimeRef.current = null;
+    if (frameRef.current == null) {
+      frameRef.current = requestAnimationFrame(animate);
+    }
   };
+
+  const release = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      /* already released */
+    }
+    stopAnimation();
+  };
+
+  const topPressAmount = Math.max(0, activeValue);
+  const bottomPressAmount = Math.max(0, -activeValue);
 
   return (
     <div
-      className="absolute z-40"
+      className="absolute z-40 select-none"
       style={{
         left: `${pedal.cx * 100}%`,
         top: `${pedal.cy * 100}%`,
         width: `${pedal.width * 100}%`,
         height: `${pedal.height * 100}%`,
         transform: "translate(-50%, -50%)",
+        WebkitTouchCallout: "none",
       }}
+      onContextMenu={(e) => e.preventDefault()}
       aria-label="우측 페달 붐 스윙"
     >
+      {showTouchZone && (
+        <div className="pointer-events-none absolute inset-0 rounded-lg border border-amber-200/32 bg-amber-400/[0.01] shadow-[inset_0_0_12px_rgba(255,255,255,0.01)]" />
+      )}
       <button
         type="button"
-        className={`absolute inset-x-0 top-0 h-1/2 rounded-t-lg border border-white/10 ${
-          activeValue > 0
-            ? "bg-sky-400/30 shadow-[0_0_10px_rgba(56,189,248,0.55)]"
+        className={`absolute inset-x-0 top-0 h-1/2 rounded-t-lg border border-white/10 transition-[box-shadow,background-color] duration-300 ease-out ${
+          activeValue > 0.02
+            ? "bg-black/25 shadow-[inset_0_7px_12px_rgba(0,0,0,0.58)]"
             : "bg-black/5"
         }`}
-        onClick={() => toggle(1)}
+        style={{
+          transform: `translateY(${topPressAmount * 0.35}rem) scale(${1 - topPressAmount * 0.03})`,
+        }}
+        onPointerDown={(e) => press(e, 1)}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onLostPointerCapture={stopAnimation}
+        onContextMenu={(e) => e.preventDefault()}
         aria-pressed={activeValue > 0}
         aria-label="우측 페달 위쪽: 암 우측 회전"
-      >
-        <span className="pointer-events-none absolute left-1/2 top-1 -translate-x-1/2 rounded bg-black/60 px-1 text-[8px] font-bold text-white">
-          우
-        </span>
-      </button>
+      />
       <button
         type="button"
-        className={`absolute inset-x-0 bottom-0 h-1/2 rounded-b-lg border border-white/10 ${
-          activeValue < 0
-            ? "bg-amber-400/30 shadow-[0_0_10px_rgba(251,191,36,0.55)]"
+        className={`absolute inset-x-0 bottom-0 h-1/2 rounded-b-lg border border-white/10 transition-[box-shadow,background-color] duration-300 ease-out ${
+          activeValue < -0.02
+            ? "bg-black/25 shadow-[inset_0_-7px_12px_rgba(0,0,0,0.58)]"
             : "bg-black/5"
         }`}
-        onClick={() => toggle(-1)}
+        style={{
+          transform: `translateY(${-bottomPressAmount * 0.35}rem) scale(${1 - bottomPressAmount * 0.03})`,
+        }}
+        onPointerDown={(e) => press(e, -1)}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onLostPointerCapture={stopAnimation}
+        onContextMenu={(e) => e.preventDefault()}
         aria-pressed={activeValue < 0}
         aria-label="우측 페달 아래쪽: 암 좌측 회전"
-      >
-        <span className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 rounded bg-black/60 px-1 text-[8px] font-bold text-white">
-          좌
-        </span>
-      </button>
+      />
     </div>
   );
 }
@@ -618,6 +732,7 @@ export function CockpitOverlay({
   onAuxiliaryChange,
   allowed,
   tutorialStep,
+  showTouchZones,
 }: CockpitOverlayProps) {
   const aspect = (COCKPIT_LAYOUT.height / COCKPIT_LAYOUT.width) * 100;
   const highlightLeft =
@@ -641,10 +756,12 @@ export function CockpitOverlay({
       <div className="absolute inset-x-0 bottom-0 z-20 mx-auto w-full max-w-lg">
         <div className="relative w-full" style={{ paddingBottom: `${aspect}%` }}>
           <TravelLever
+            side="left"
             layout={COCKPIT_LAYOUT.travelLeft}
             value={input.travel.left}
             enabled={allowed.travel && !auxiliary.safetyLocked}
             highlighted={highlightTravel}
+            showTouchZone={showTouchZones}
             onChange={(left) =>
               onInputChange((current) => ({
                 ...current,
@@ -653,10 +770,12 @@ export function CockpitOverlay({
             }
           />
           <TravelLever
+            side="right"
             layout={COCKPIT_LAYOUT.travelRight}
             value={input.travel.right}
             enabled={allowed.travel && !auxiliary.safetyLocked}
             highlighted={highlightTravel}
+            showTouchZone={showTouchZones}
             onChange={(right) =>
               onInputChange((current) => ({
                 ...current,
@@ -664,21 +783,22 @@ export function CockpitOverlay({
               }))
             }
           />
-          <AuxLever
-            label="블레이드"
-            layout={COCKPIT_LAYOUT.blade}
-            value={auxiliary.blade}
-            onChange={(blade) => onAuxiliaryChange({ ...auxiliary, blade })}
+          <DualTravelCenter
+            layout={COCKPIT_LAYOUT.travelBoth}
+            enabled={allowed.travel && !auxiliary.safetyLocked}
+            highlighted={highlightTravel}
+            showTouchZone={showTouchZones}
+            onChange={(value) =>
+              onInputChange((current) => ({
+                ...current,
+                travel: { left: value, right: value },
+              }))
+            }
           />
-          <PedalSwingToggle
+          <PedalSwingControl
             activeValue={auxiliary.boomSwing}
-            onChange={(boomSwing) => onAuxiliaryChange({ ...auxiliary, boomSwing })}
-          />
-          <AuxLever
-            label="엔진 회전수"
-            layout={COCKPIT_LAYOUT.throttle}
-            value={auxiliary.throttle}
-            onChange={(throttle) => onAuxiliaryChange({ ...auxiliary, throttle })}
+            showTouchZone={showTouchZones}
+            onChange={(boomSwing) => onAuxiliaryChange((current) => ({ ...current, boomSwing }))}
           />
           <div
             className="pointer-events-none absolute z-[24] rounded-full bg-gradient-to-b from-black via-black/95 to-[#11151b]/90 shadow-[0_0_18px_rgba(0,0,0,0.9)]"
@@ -694,7 +814,10 @@ export function CockpitOverlay({
             cx={COCKPIT_LAYOUT.hydraulicSpeed.cx}
             cy={COCKPIT_LAYOUT.hydraulicSpeed.cy}
             active={auxiliary.highSpeed}
-            onToggle={() => onAuxiliaryChange({ ...auxiliary, highSpeed: !auxiliary.highSpeed })}
+            showTouchZone={showTouchZones}
+            onToggle={() =>
+              onAuxiliaryChange((current) => ({ ...current, highSpeed: !current.highSpeed }))
+            }
           />
           <GameJoystick
             side="left"
@@ -705,6 +828,7 @@ export function CockpitOverlay({
               y: allowed.leftY && !auxiliary.safetyLocked,
             }}
             highlighted={highlightLeft}
+            showTouchZone={showTouchZones}
             onChange={(x, y) => onInputChange({ ...input, left: { x, y } })}
           />
           <GameJoystick
@@ -716,35 +840,15 @@ export function CockpitOverlay({
               y: allowed.rightY && !auxiliary.safetyLocked,
             }}
             highlighted={highlightRight}
+            showTouchZone={showTouchZones}
             onChange={(x, y) => onInputChange({ ...input, right: { x, y } })}
             hornLayout={COCKPIT_LAYOUT.horn}
           />
           <ToggleButton
-            label="등"
-            color="green"
-            cx={0.395}
-            cy={0.18}
-            active={auxiliary.workLight}
-            onToggle={() => onAuxiliaryChange({ ...auxiliary, workLight: !auxiliary.workLight })}
-          />
-          <ToggleButton
-            label="폭"
-            color="amber"
-            cx={0.43}
-            cy={0.29}
-            active={auxiliary.trackWidth > 0}
-            onToggle={() =>
-              onAuxiliaryChange({
-                ...auxiliary,
-                trackWidth: auxiliary.trackWidth > 0 ? -1 : 1,
-              })
-            }
-          />
-          <ToggleButton
             label="잠"
             color="red"
-            cx={0.57}
-            cy={0.29}
+            cx={0.345}
+            cy={0.18}
             active={auxiliary.safetyLocked}
             onToggle={() =>
               onAuxiliaryChange({
@@ -760,10 +864,6 @@ export function CockpitOverlay({
             <span className="text-white/35">|</span>
             <span className={auxiliary.highSpeed ? "text-sky-300" : "text-white/45"}>
               유압 {auxiliary.highSpeed ? "x2" : "x1"}
-            </span>
-            <span className="text-white/35">|</span>
-            <span className={auxiliary.workLight ? "text-lime-300" : "text-white/45"}>
-              작업등 {auxiliary.workLight ? "ON" : "OFF"}
             </span>
           </div>
         </div>

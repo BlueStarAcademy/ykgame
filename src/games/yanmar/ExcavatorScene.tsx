@@ -122,6 +122,158 @@ function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
   );
 }
 
+function LinkPin({
+  x,
+  y,
+  z = 0,
+  radius = 0.18,
+  width = 0.5,
+}: {
+  x: number;
+  y: number;
+  z?: number;
+  radius?: number;
+  width?: number;
+}) {
+  return (
+    <group position={[x, y, z]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[radius, radius, width, 24]} />
+        <meshStandardMaterial color="#1f252c" roughness={0.34} metalness={0.45} />
+      </mesh>
+      {[1, -1].map((side) => (
+        <mesh
+          key={side}
+          position={[0, 0, side * (width / 2 + 0.012)]}
+          rotation={[Math.PI / 2, 0, 0]}
+        >
+          <cylinderGeometry args={[radius * 0.72, radius * 0.72, 0.035, 24]} />
+          <meshStandardMaterial color="#d8dee5" roughness={0.26} metalness={0.58} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0, width / 2 + 0.034]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[radius * 0.28, radius * 0.28, 0.03, 16]} />
+        <meshStandardMaterial color="#6d747d" roughness={0.22} metalness={0.7} />
+      </mesh>
+    </group>
+  );
+}
+
+function HydraulicCylinder({
+  x,
+  y,
+  length,
+  angle = 0,
+}: {
+  x: number;
+  y: number;
+  length: number;
+  angle?: number;
+}) {
+  return (
+    <group position={[x, y, 0]} rotation={[0, 0, angle]}>
+      <mesh position={[-length * 0.12, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
+        <capsuleGeometry args={[0.09, length * 0.52, 8, 16]} />
+        <meshStandardMaterial color="#151a20" roughness={0.28} metalness={0.42} />
+      </mesh>
+      <mesh position={[length * 0.22, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
+        <capsuleGeometry args={[0.035, length * 0.48, 6, 12]} />
+        <meshStandardMaterial color="#dfe7ee" roughness={0.18} metalness={0.78} />
+      </mesh>
+      {[-length * 0.42, length * 0.48].map((pinX) => (
+        <mesh key={pinX} position={[pinX, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.08, 0.08, 0.42, 18]} />
+          <meshStandardMaterial color="#252c34" roughness={0.3} metalness={0.45} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function RedLinkPanel({
+  length,
+  height,
+  sideDepth,
+  logo,
+  logoWidth = 1.2,
+  logoHeight = 0.24,
+  logoX,
+}: {
+  length: number;
+  height: number;
+  sideDepth: number;
+  logo?: THREE.Texture;
+  logoWidth?: number;
+  logoHeight?: number;
+  logoX?: number;
+}) {
+  return (
+    <>
+      {[1, -1].map((side) => (
+        <group key={side} position={[0, 0, side * sideDepth]}>
+          <mesh position={[length / 2, 0, 0]}>
+            <boxGeometry args={[length, height, 0.08]} />
+            <meshStandardMaterial color="#d92121" roughness={0.42} metalness={0.12} />
+          </mesh>
+          <mesh position={[length / 2, height * 0.34, 0.046]}>
+            <boxGeometry args={[length * 0.82, height * 0.12, 0.025]} />
+            <meshStandardMaterial color="#ff5a44" roughness={0.38} metalness={0.12} />
+          </mesh>
+          <mesh position={[length / 2, -height * 0.36, 0.048]}>
+            <boxGeometry args={[length * 0.72, height * 0.1, 0.025]} />
+            <meshStandardMaterial color="#941515" roughness={0.48} metalness={0.08} />
+          </mesh>
+          <mesh position={[length * 0.18, height * 0.05, 0.052]} rotation={[0, 0, -0.34]}>
+            <boxGeometry args={[length * 0.18, height * 0.16, 0.028]} />
+            <meshStandardMaterial color="#11151a" roughness={0.65} metalness={0.1} />
+          </mesh>
+          {logo && logoX != null && (
+            <mesh position={[logoX, 0.04, side * 0.056]} scale={[-1, 1, 1]}>
+              <planeGeometry args={[logoWidth, logoHeight]} />
+              <meshBasicMaterial
+                map={logo}
+                transparent
+                depthWrite={false}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+          )}
+        </group>
+      ))}
+      <mesh position={[length / 2, 0, 0]}>
+        <boxGeometry args={[length * 0.92, height * 0.72, sideDepth * 1.65]} />
+        <meshStandardMaterial color="#b51a1a" roughness={0.5} metalness={0.08} />
+      </mesh>
+    </>
+  );
+}
+
+function createLabelTexture(text: string) {
+  if (typeof document === "undefined") return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 160;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = "900 76px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = "rgba(255,255,255,0.96)";
+  ctx.strokeText(text, 256, 80);
+  ctx.fillStyle = "#0b6edc";
+  ctx.fillText(text.slice(0, 2), 184, 80);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(text.slice(2), 310, 80);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function ExcavatorArm({
   simRef,
   auxiliaryRef,
@@ -138,6 +290,16 @@ function ExcavatorArm({
   const tipRef = useRef<THREE.Mesh>(null);
   const bladeRef = useRef<THREE.Group>(null);
   const yanmarLogo = useLoader(THREE.TextureLoader, "/images/yanmar/yanmar-logo-white.png");
+  const ykLogo = useMemo(() => createLabelTexture("YK건기"), []);
+  const bucketSideShape = useMemo(() => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.38, 0.18);
+    shape.quadraticCurveTo(-0.02, 0.38, 0.36, 0.2);
+    shape.lineTo(0.86, -0.36);
+    shape.quadraticCurveTo(0.42, -0.66, -0.2, -0.38);
+    shape.quadraticCurveTo(-0.42, -0.18, -0.38, 0.18);
+    return shape;
+  }, []);
 
   const boomLen = 3;
   const armLen = 2.5;
@@ -203,70 +365,86 @@ function ExcavatorArm({
           <meshStandardMaterial color="#2b3139" roughness={0.38} metalness={0.32} />
         </mesh>
         <group ref={boomRef}>
-          <mesh position={[boomLen / 2, 0, 0]}>
-            <boxGeometry args={[boomLen, 0.34, 0.3]} />
-            <meshStandardMaterial color="#d92323" roughness={0.42} metalness={0.12} />
+          <RedLinkPanel
+            length={boomLen}
+            height={0.42}
+            sideDepth={0.155}
+            logo={ykLogo ?? undefined}
+            logoWidth={0.82}
+            logoHeight={0.28}
+            logoX={boomLen * 0.48}
+          />
+          <LinkPin x={0} y={0} radius={0.21} width={0.58} />
+          <LinkPin x={boomLen} y={0} radius={0.19} width={0.54} />
+          <LinkPin x={boomLen * 0.32} y={0.34} radius={0.13} width={0.5} />
+          <HydraulicCylinder x={boomLen * 0.58} y={0.43} length={boomLen * 0.62} angle={0.08} />
+          <mesh position={[boomLen * 0.58, 0.28, 0]}>
+            <boxGeometry args={[boomLen * 0.55, 0.045, 0.34]} />
+            <meshStandardMaterial color="#ef3b2f" roughness={0.36} metalness={0.12} />
           </mesh>
-          <mesh position={[boomLen / 2, 0.19, 0]}>
-            <boxGeometry args={[boomLen * 0.88, 0.08, 0.18]} />
-            <meshStandardMaterial color="#f9c74f" roughness={0.35} metalness={0.16} />
-          </mesh>
-          {[1, -1].map((side) => (
-            <mesh key={side} position={[boomLen * 0.46, 0.03, side * 0.158]} scale={[-1, 1, 1]}>
-              <planeGeometry args={[1.35, 0.26]} />
-              <meshBasicMaterial
-                map={yanmarLogo}
-                transparent
-                depthWrite={false}
-                side={THREE.DoubleSide}
-              />
-            </mesh>
-          ))}
 
           <group ref={armRef} position={[boomLen, 0, 0]}>
-            <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.22, 0.22, 0.46, 20]} />
-              <meshStandardMaterial color="#303741" roughness={0.36} metalness={0.34} />
-            </mesh>
-            <mesh position={[armLen / 2, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-              <capsuleGeometry args={[0.13, armLen, 8, 16]} />
-              <meshStandardMaterial color="#c61f1f" roughness={0.44} metalness={0.14} />
-            </mesh>
-            <mesh position={[armLen / 2, 0.03, 0]} rotation={[0, 0, -Math.PI / 2]}>
-              <capsuleGeometry args={[0.055, armLen * 0.78, 6, 12]} />
-              <meshStandardMaterial color="#ffcf57" roughness={0.35} metalness={0.12} />
+            <RedLinkPanel
+              length={armLen}
+              height={0.36}
+              sideDepth={0.135}
+              logo={yanmarLogo}
+              logoWidth={1.08}
+              logoHeight={0.24}
+              logoX={armLen * 0.52}
+            />
+            <LinkPin x={0} y={0} radius={0.18} width={0.52} />
+            <LinkPin x={armLen} y={0} radius={0.15} width={0.48} />
+            <HydraulicCylinder x={armLen * 0.43} y={0.34} length={armLen * 0.72} angle={-0.05} />
+            <mesh position={[armLen * 0.58, 0.2, 0]}>
+              <boxGeometry args={[armLen * 0.54, 0.04, 0.3]} />
+              <meshStandardMaterial color="#ef3b2f" roughness={0.36} metalness={0.12} />
             </mesh>
 
             <group ref={bucketRef} position={[armLen, 0, 0]}>
-              <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                <cylinderGeometry args={[0.17, 0.17, 0.42, 18]} />
-                <meshStandardMaterial color="#38414a" roughness={0.36} metalness={0.38} />
-              </mesh>
-              <group position={[bucketLen * 0.42, -0.2, 0]} rotation={[0, 0, -0.18]}>
-                <mesh position={[0.1, 0.02, 0]}>
-                  <boxGeometry args={[0.95, 0.18, 0.88]} />
-                  <meshStandardMaterial color="#515a64" metalness={0.42} roughness={0.46} />
+              <LinkPin x={0} y={0} radius={0.16} width={0.5} />
+              <HydraulicCylinder x={-0.18} y={0.27} length={0.9} angle={-0.38} />
+              <group position={[bucketLen * 0.38, -0.18, 0]} rotation={[0, 0, -0.22]}>
+                {[1, -1].map((side) => (
+                  <mesh key={side} position={[0, 0, side * 0.5]}>
+                    <shapeGeometry args={[bucketSideShape]} />
+                    <meshStandardMaterial
+                      color="#242b34"
+                      metalness={0.5}
+                      roughness={0.38}
+                      side={THREE.DoubleSide}
+                    />
+                  </mesh>
+                ))}
+                {[
+                  { x: -0.12, y: 0.13, r: -0.52, w: 0.68, c: "#505b66" },
+                  { x: 0.08, y: -0.02, r: -0.32, w: 0.82, c: "#343d47" },
+                  { x: 0.28, y: -0.18, r: -0.12, w: 0.9, c: "#20272f" },
+                  { x: 0.48, y: -0.34, r: 0.08, w: 0.78, c: "#151a21" },
+                ].map((plate) => (
+                  <mesh key={`${plate.x}-${plate.y}`} position={[plate.x, plate.y, 0]} rotation={[0, 0, plate.r]}>
+                    <boxGeometry args={[plate.w, 0.12, 0.94]} />
+                    <meshStandardMaterial color={plate.c} metalness={0.48} roughness={0.42} />
+                  </mesh>
+                ))}
+                <mesh position={[-0.26, 0.18, 0]} rotation={[0, 0, -0.35]}>
+                  <boxGeometry args={[0.32, 0.18, 1.02]} />
+                  <meshStandardMaterial color="#66717c" metalness={0.38} roughness={0.46} />
                 </mesh>
-                <mesh position={[0.0, 0.23, 0]} rotation={[0, 0, -0.35]}>
-                  <boxGeometry args={[0.9, 0.12, 0.84]} />
-                  <meshStandardMaterial color="#66707a" metalness={0.36} roughness={0.5} />
+                {[1, -1].map((side) => (
+                  <mesh key={side} position={[-0.22, 0.13, side * 0.535]} rotation={[Math.PI / 2, 0, 0]}>
+                    <cylinderGeometry args={[0.11, 0.11, 0.06, 18]} />
+                    <meshStandardMaterial color="#d5dbe1" metalness={0.62} roughness={0.24} />
+                  </mesh>
+                ))}
+                <mesh position={[0.78, -0.43, 0]} rotation={[0, 0, -0.18]}>
+                  <boxGeometry args={[0.2, 0.12, 1.1]} />
+                  <meshStandardMaterial color="#cfd6dd" metalness={0.58} roughness={0.26} />
                 </mesh>
-                <mesh position={[0.18, -0.16, 0.48]} rotation={[0.16, 0, 0]}>
-                  <boxGeometry args={[0.92, 0.46, 0.08]} />
-                  <meshStandardMaterial color="#3d4650" metalness={0.42} roughness={0.42} />
-                </mesh>
-                <mesh position={[0.18, -0.16, -0.48]} rotation={[-0.16, 0, 0]}>
-                  <boxGeometry args={[0.92, 0.46, 0.08]} />
-                  <meshStandardMaterial color="#3d4650" metalness={0.42} roughness={0.42} />
-                </mesh>
-                <mesh position={[0.62, -0.28, 0]}>
-                  <boxGeometry args={[0.16, 0.14, 1.02]} />
-                  <meshStandardMaterial color="#dfe5ea" metalness={0.55} roughness={0.28} />
-                </mesh>
-                {[-0.36, 0, 0.36].map((z) => (
-                  <mesh key={z} position={[0.78, -0.36, z]} rotation={[0, 0, -0.35]}>
-                    <coneGeometry args={[0.08, 0.32, 4]} />
-                    <meshStandardMaterial color="#f2f5f7" metalness={0.52} roughness={0.25} />
+                {[-0.44, -0.22, 0, 0.22, 0.44].map((z) => (
+                  <mesh key={z} position={[0.78, -0.42, z]} rotation={[0, 0, Math.PI + 0.72]}>
+                    <coneGeometry args={[0.105, 0.18, 4]} />
+                    <meshStandardMaterial color="#cfd6dd" metalness={0.58} roughness={0.24} />
                   </mesh>
                 ))}
               </group>
@@ -555,15 +733,11 @@ function AuxiliarySceneEffects({
 }: {
   auxiliaryRef: React.RefObject<AuxiliaryControlState>;
 }) {
-  const lightRef = useRef<THREE.SpotLight>(null);
   const beaconRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
     const aux = auxiliaryRef.current;
     if (!aux) return;
-    if (lightRef.current) {
-      lightRef.current.intensity = aux.workLight ? 2.8 : 0;
-    }
     if (beaconRef.current) {
       beaconRef.current.visible = aux.highSpeed || aux.safetyLocked;
       beaconRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 8) * 0.12);
@@ -576,15 +750,6 @@ function AuxiliarySceneEffects({
 
   return (
     <>
-      <spotLight
-        ref={lightRef}
-        position={[0, 12, -18]}
-        angle={0.42}
-        penumbra={0.55}
-        distance={70}
-        intensity={0}
-        color="#fff4c0"
-      />
       <mesh ref={beaconRef} position={[0, 5.2, -4]} visible={false}>
         <sphereGeometry args={[0.45, 16, 16]} />
         <meshBasicMaterial color="#29b6f6" transparent opacity={0.75} />
