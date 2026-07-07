@@ -10,7 +10,7 @@ const MISSION_META: Record<
   GameId,
   Pick<MissionConfig, "target" | "duration" | "missionType">
 > = {
-  yanmar: { target: 10, duration: 90, missionType: "excavate" },
+  yanmar: { target: 1, duration: 0, missionType: "excavate" },
   johndeere: { target: 16, duration: 90, missionType: "fill" },
   manitou: { target: 5, duration: 90, missionType: "deliver" },
   wirtgen: { target: 20, duration: 75, missionType: "drive" },

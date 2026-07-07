@@ -137,16 +137,12 @@ function GameJoystick({
       const rect = zone.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      const maxR = rect.width / 2;
-      let dx = clientX - cx;
-      let dy = clientY - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > maxR) {
-        dx = (dx / dist) * maxR;
-        dy = (dy / dist) * maxR;
-      }
-      const rawX = enabled.x ? dx / maxR : 0;
-      const rawY = enabled.y ? -dy / maxR : 0;
+      const halfW = rect.width / 2;
+      const halfH = rect.height / 2;
+      const dx = Math.max(-halfW, Math.min(halfW, clientX - cx));
+      const dy = Math.max(-halfH, Math.min(halfH, clientY - cy));
+      const rawX = enabled.x ? dx / halfW : 0;
+      const rawY = enabled.y ? -dy / halfH : 0;
       const useX = Math.abs(rawX) >= Math.abs(rawY);
       const nx = useX ? rawX : 0;
       const ny = useX ? 0 : rawY;
@@ -188,7 +184,6 @@ function GameJoystick({
     pointer.onRelease();
   };
 
-  const size = `${layout.radius * 200}%`;
   const visualX = value.x * layout.travel * 48;
   const visualY = -value.y * layout.travel * 42;
   const leanX = value.x * 16;
@@ -199,12 +194,12 @@ function GameJoystick({
     <>
       <div
         ref={zoneRef}
-        className={`absolute z-30 touch-none rounded-full ${isDisabled ? "pointer-events-none" : ""}`}
+        className={`absolute z-50 touch-none rounded-2xl ${isDisabled ? "pointer-events-none" : ""}`}
         style={{
           left: `${layout.cx * 100}%`,
           top: `${layout.cy * 100}%`,
-          width: size,
-          height: size,
+          width: "12%",
+          height: "34%",
           transform: "translate(-50%, -50%)",
         }}
         onPointerDown={handleStart}
@@ -222,7 +217,7 @@ function GameJoystick({
       >
         {showTouchZone && (
           <div
-            className={`pointer-events-none absolute inset-0 rounded-full border ${
+            className={`pointer-events-none absolute inset-0 rounded-2xl border ${
               side === "left"
                 ? "border-red-200/35 bg-red-400/[0.01]"
                 : "border-sky-200/35 bg-sky-400/[0.01]"
@@ -233,27 +228,12 @@ function GameJoystick({
           <div className="yanmar-joystick-highlight absolute inset-[-10%] rounded-full border-2 border-amber-300/95 bg-amber-300/10" />
         )}
         {isDisabled && (
-          <div className="absolute inset-0 rounded-full bg-black/25 backdrop-blur-[1px]" />
+          <div className="absolute inset-0 rounded-2xl bg-black/20" />
         )}
       </div>
 
       <div
-        className="pointer-events-none absolute z-[24]"
-        style={{
-          left: `${layout.cx * 100}%`,
-          top: `${layout.cy * 100}%`,
-          width: "8.2%",
-          height: "25%",
-          transform: "translate(-50%, -50%)",
-        }}
-      >
-        <div className="absolute inset-x-[6%] bottom-[2%] h-[78%] rounded-[42%_42%_34%_34%] bg-gradient-to-br from-[#6f7781] via-[#343b44] to-[#14191f] shadow-[inset_7px_8px_10px_rgba(255,255,255,0.13),inset_-8px_-10px_12px_rgba(0,0,0,0.46),0_10px_18px_rgba(0,0,0,0.45)]" />
-        <div className="absolute left-1/2 top-[16%] h-[62%] w-[46%] -translate-x-1/2 rounded-[38%] bg-gradient-to-b from-[#0d1015] via-[#161b22] to-[#050608] shadow-[inset_0_4px_7px_rgba(255,255,255,0.06)]" />
-        <div className="absolute left-1/2 top-[48%] h-[18%] w-[76%] -translate-x-1/2 rounded-full bg-black/35 blur-[2px]" />
-      </div>
-
-      <div
-        className="pointer-events-none absolute z-[25]"
+        className="pointer-events-none absolute z-[55]"
         style={{
           left: `${layout.cx * 100}%`,
           top: `calc(${layout.cy * 100}% + ${visualY}%)`,
@@ -268,7 +248,7 @@ function GameJoystick({
         <img
           src={`/images/yanmar/main-joystick-${side}.png`}
           alt=""
-          className="h-full w-full object-contain drop-shadow-[0_10px_12px_rgba(0,0,0,0.5)]"
+          className="h-full w-full object-contain drop-shadow-[0_6px_8px_rgba(0,0,0,0.45)]"
           draggable={false}
           aria-hidden
         />
@@ -309,7 +289,8 @@ function TravelLever({
       const maxR = rect.height / 2;
       let dy = clientY - cy;
       dy = Math.max(-maxR, Math.min(maxR, dy));
-      onChange(-dy / maxR);
+      const value = Math.max(-1, Math.min(1, -dy / maxR));
+      onChange(value);
     },
     [onChange],
   );
@@ -430,7 +411,8 @@ function DualTravelCenter({
       const cy = rect.top + rect.height / 2;
       const maxR = rect.height / 2;
       const dy = Math.max(-maxR, Math.min(maxR, clientY - cy));
-      onChange(-dy / maxR);
+      const value = Math.max(-1, Math.min(1, -dy / maxR));
+      onChange(value);
     },
     [onChange],
   );
@@ -621,24 +603,24 @@ function PedalSwingControl({
       lastFrameTimeRef.current = time;
 
       const current = valueRef.current;
-      const next =
-        direction > 0
-          ? Math.min(1, current + PEDAL_SWING_SPEED_PER_SECOND * deltaSeconds)
-          : Math.max(-1, current - PEDAL_SWING_SPEED_PER_SECOND * deltaSeconds);
+      let next = current;
 
-      if (Math.abs(next - current) > 0.001) {
+      if (direction > 0) {
+        next = Math.min(1, current + PEDAL_SWING_SPEED_PER_SECOND * deltaSeconds);
+        if (next >= 1 - 1e-4) next = 1;
+      } else {
+        next = Math.max(-1, current - PEDAL_SWING_SPEED_PER_SECOND * deltaSeconds);
+        if (next <= -1 + 1e-4) next = -1;
+      }
+
+      if (next !== current) {
         valueRef.current = next;
         onChange(next);
       }
 
-      if (Math.abs(next) >= 1) {
-        stopAnimation();
-        return;
-      }
-
       frameRef.current = requestAnimationFrame(animate);
     },
-    [onChange, stopAnimation],
+    [onChange],
   );
 
   useEffect(() => stopAnimation, [stopAnimation]);
@@ -662,6 +644,10 @@ function PedalSwingControl({
     } catch {
       /* already released */
     }
+    stopAnimation();
+  };
+
+  const handleLostCapture = () => {
     stopAnimation();
   };
 
@@ -698,7 +684,7 @@ function PedalSwingControl({
         onPointerDown={(e) => press(e, 1)}
         onPointerUp={release}
         onPointerCancel={release}
-        onLostPointerCapture={stopAnimation}
+        onLostPointerCapture={handleLostCapture}
         onContextMenu={(e) => e.preventDefault()}
         aria-pressed={activeValue > 0}
         aria-label="우측 페달 위쪽: 암 우측 회전"
@@ -716,7 +702,7 @@ function PedalSwingControl({
         onPointerDown={(e) => press(e, -1)}
         onPointerUp={release}
         onPointerCancel={release}
-        onLostPointerCapture={stopAnimation}
+        onLostPointerCapture={handleLostCapture}
         onContextMenu={(e) => e.preventDefault()}
         aria-pressed={activeValue < 0}
         aria-label="우측 페달 아래쪽: 암 좌측 회전"
@@ -753,7 +739,7 @@ export function CockpitOverlay({
         />
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 z-20 mx-auto w-full max-w-lg">
+      <div className="absolute inset-x-0 bottom-0 z-20 mx-auto w-full max-w-lg touch-none">
         <div className="relative w-full" style={{ paddingBottom: `${aspect}%` }}>
           <TravelLever
             side="left"
@@ -800,16 +786,6 @@ export function CockpitOverlay({
             showTouchZone={showTouchZones}
             onChange={(boomSwing) => onAuxiliaryChange((current) => ({ ...current, boomSwing }))}
           />
-          <div
-            className="pointer-events-none absolute z-[24] rounded-full bg-gradient-to-b from-black via-black/95 to-[#11151b]/90 shadow-[0_0_18px_rgba(0,0,0,0.9)]"
-            style={{
-              left: `${COCKPIT_LAYOUT.hydraulicSpeed.cx * 100}%`,
-              top: `calc(${COCKPIT_LAYOUT.hydraulicSpeed.cy * 100}% + 14%)`,
-              width: "8%",
-              height: "34%",
-              transform: "translate(-50%, -50%)",
-            }}
-          />
           <SpeedModeLever
             cx={COCKPIT_LAYOUT.hydraulicSpeed.cx}
             cy={COCKPIT_LAYOUT.hydraulicSpeed.cy}
@@ -818,31 +794,6 @@ export function CockpitOverlay({
             onToggle={() =>
               onAuxiliaryChange((current) => ({ ...current, highSpeed: !current.highSpeed }))
             }
-          />
-          <GameJoystick
-            side="left"
-            layout={COCKPIT_LAYOUT.left}
-            value={input.left}
-            enabled={{
-              x: allowed.leftX && !auxiliary.safetyLocked,
-              y: allowed.leftY && !auxiliary.safetyLocked,
-            }}
-            highlighted={highlightLeft}
-            showTouchZone={showTouchZones}
-            onChange={(x, y) => onInputChange({ ...input, left: { x, y } })}
-          />
-          <GameJoystick
-            side="right"
-            layout={COCKPIT_LAYOUT.right}
-            value={input.right}
-            enabled={{
-              x: allowed.rightX && !auxiliary.safetyLocked,
-              y: allowed.rightY && !auxiliary.safetyLocked,
-            }}
-            highlighted={highlightRight}
-            showTouchZone={showTouchZones}
-            onChange={(x, y) => onInputChange({ ...input, right: { x, y } })}
-            hornLayout={COCKPIT_LAYOUT.horn}
           />
           <ToggleButton
             label="잠"
@@ -856,6 +807,35 @@ export function CockpitOverlay({
                 safetyLocked: !auxiliary.safetyLocked,
               })
             }
+          />
+          <GameJoystick
+            side="left"
+            layout={COCKPIT_LAYOUT.left}
+            value={input.left}
+            enabled={{
+              x: allowed.leftX && !auxiliary.safetyLocked,
+              y: allowed.leftY && !auxiliary.safetyLocked,
+            }}
+            highlighted={highlightLeft}
+            showTouchZone={showTouchZones}
+            onChange={(x, y) =>
+              onInputChange((current) => ({ ...current, left: { x, y } }))
+            }
+          />
+          <GameJoystick
+            side="right"
+            layout={COCKPIT_LAYOUT.right}
+            value={input.right}
+            enabled={{
+              x: allowed.rightX && !auxiliary.safetyLocked,
+              y: allowed.rightY && !auxiliary.safetyLocked,
+            }}
+            highlighted={highlightRight}
+            showTouchZone={showTouchZones}
+            onChange={(x, y) =>
+              onInputChange((current) => ({ ...current, right: { x, y } }))
+            }
+            hornLayout={COCKPIT_LAYOUT.horn}
           />
           <div className="pointer-events-none absolute bottom-[5%] left-1/2 z-30 flex -translate-x-1/2 gap-1 rounded-full bg-black/60 px-2 py-1 text-[8px] font-bold text-white shadow-lg backdrop-blur-sm">
             <span className={auxiliary.safetyLocked ? "text-red-300" : "text-emerald-300"}>

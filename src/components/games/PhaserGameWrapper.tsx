@@ -11,6 +11,7 @@ interface PhaserGameWrapperProps {
   gameId: GameId;
   onEnd: (result: GameResult) => void;
   immersive?: boolean;
+  initialPlayMode?: "practice" | "game";
 }
 
 function PhaserMissionGame({ gameId, onEnd, immersive = false }: PhaserGameWrapperProps) {
@@ -92,9 +93,20 @@ function PhaserMissionGame({ gameId, onEnd, immersive = false }: PhaserGameWrapp
   );
 }
 
-export function PhaserGameWrapper({ gameId, onEnd, immersive = false }: PhaserGameWrapperProps) {
+export function PhaserGameWrapper({
+  gameId,
+  onEnd,
+  immersive = false,
+  initialPlayMode,
+}: PhaserGameWrapperProps) {
   if (gameId === "yanmar") {
-    return <ExcavatorGameWrapper onEnd={onEnd} immersive={immersive} />;
+    return (
+      <ExcavatorGameWrapper
+        onEnd={onEnd}
+        immersive={immersive}
+        initialPlayMode={initialPlayMode}
+      />
+    );
   }
   return <PhaserMissionGame gameId={gameId} onEnd={onEnd} immersive={immersive} />;
 }

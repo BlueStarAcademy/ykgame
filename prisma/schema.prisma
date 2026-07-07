@@ -12,17 +12,38 @@ enum Role {
   ADMIN
 }
 
+enum RewardType {
+  STAR
+  COUPON
+}
+
+enum CouponType {
+  YK_PARTS_DISCOUNT
+  EQUIPMENT_RENTAL_DISCOUNT
+}
+
+enum EquipmentPart {
+  ARM
+  BOOM
+  BUCKET
+  ENGINE
+}
+
 model User {
-  id           String      @id @default(cuid())
-  loginId      String      @unique
-  email        String      @unique
-  passwordHash String
-  nickname     String?     @unique
-  role         Role        @default(USER)
-  currency     Int         @default(0)
-  isActive     Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  gameScores   GameScore[]
+  id                   String                 @id @default(cuid())
+  loginId              String                 @unique
+  email                String                 @unique
+  passwordHash         String
+  nickname             String?                @unique
+  role                 Role                   @default(USER)
+  currency             Int                    @default(0)
+  isActive             Boolean                @default(true)
+  createdAt            DateTime               @default(now())
+  gameScores           GameScore[]
+  rewardInventoryItems UserRewardInventory[]
+  coupons              UserCoupon[]
+  equipmentUpgrades    UserEquipmentUpgrade[]
+  mails                UserMail[]
 }
 
 model GameScore {
@@ -38,4 +59,64 @@ model GameScore {
 
   @@index([gameId, monthKey, score])
   @@index([userId, gameId])
+}
+
+model UserRewardInventory {
+  id        String     @id @default(cuid())
+  userId    String
+  gameId    String?
+  type      RewardType
+  amount    Int        @default(0)
+  metadata  Json?
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, type])
+}
+
+model UserCoupon {
+  id          String     @id @default(cuid())
+  userId      String
+  type        CouponType
+  discountPct Int
+  barcodeCode String     @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime   @default(now())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([userId, type])
+}
+
+model UserEquipmentUpgrade {
+  id        String        @id @default(cuid())
+  userId    String
+  gameId    String        @default("yanmar")
+  part      EquipmentPart
+  level     Int           @default(0)
+  updatedAt DateTime      @updatedAt
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId, part])
+  @@index([userId, gameId])
+}
+
+model UserMail {
+  id                String      @id @default(cuid())
+  userId            String
+  title             String
+  body              String?
+  currencyAmount    Int         @default(0)
+  couponType        CouponType?
+  couponDiscountPct Int?
+  readAt            DateTime?
+  claimedAt         DateTime?
+  createdAt         DateTime    @default(now())
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, claimedAt])
 }

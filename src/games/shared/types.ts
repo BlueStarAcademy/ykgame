@@ -6,6 +6,8 @@ export interface GameResult {
   playTime: number;
   timeLeft: number;
   completed: boolean;
+  arcadeScore?: number;
+  mode?: "game" | "practice" | "tutorial";
 }
 
 export interface MissionConfig {

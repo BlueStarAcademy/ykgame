@@ -129,9 +129,9 @@ const DAMPING = {
 } as const;
 
 export const JOINT_LIMITS = {
-  boom: { min: -0.15, max: 1.45 },
-  arm: { min: -2.35, max: 0.55 },
-  bucket: { min: -2.1, max: 2.1 },
+  boom: { min: 0.06, max: 1.45 },
+  arm: { min: -2.05, max: 0.55 },
+  bucket: { min: -0.05, max: 3.6 },
 } as const;
 
 export interface HydraulicVelocity {
@@ -169,6 +169,7 @@ export function applyControls(
   dt: number,
   vel: HydraulicVelocity,
   hydraulicSpeedScale = 1,
+  travelSpeedScale = 1,
 ) {
   const { left, right, travel } = input;
 
@@ -193,7 +194,7 @@ export function applyControls(
 
   vel.travel = approach(
     vel.travel,
-    trackAverage * CONTROL_SPEED.travel,
+    trackAverage * CONTROL_SPEED.travel * travelSpeedScale,
     ACCEL.travel,
     DAMPING.travel,
     dt,
@@ -243,7 +244,7 @@ function clamp(v: number, min: number, max: number) {
 }
 
 export function canLoadBucket(boom: number, bucket: number) {
-  return boom > 0.55 && bucket < -0.25;
+  return boom > 0.35 && bucket <= 0.85;
 }
 
 export function canDumpBucket(bucket: number) {

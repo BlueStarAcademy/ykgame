@@ -1,10 +1,12 @@
 "use client";
 
 import type { DigFeedback } from "./bucket";
+import { getLoadUnits } from "./equipment";
 
 interface DigHintPanelProps {
   feedback: DigFeedback;
   bucketLoad: number;
+  maxLoadUnits: number;
   boom: number;
   show: boolean;
 }
@@ -19,6 +21,7 @@ function boomHint(boom: number, tipOnGround: boolean) {
 interface DigHintContentProps {
   feedback: DigFeedback;
   bucketLoad: number;
+  maxLoadUnits: number;
   boom: number;
   compact?: boolean;
 }
@@ -26,6 +29,7 @@ interface DigHintContentProps {
 export function DigHintContent({
   feedback,
   bucketLoad,
+  maxLoadUnits,
   boom,
   compact = false,
 }: DigHintContentProps) {
@@ -69,17 +73,21 @@ export function DigHintContent({
           </li>
         ))}
       </ul>
-      {compact ? null : <BoomLoadGauge bucketLoad={bucketLoad} />}
+      {compact ? null : <BoomLoadGauge bucketLoad={bucketLoad} maxLoadUnits={maxLoadUnits} />}
     </div>
   );
 }
 
 export function BoomLoadGauge({
   bucketLoad,
+  maxLoadUnits,
 }: {
   bucketLoad: number;
+  maxLoadUnits: number;
 }) {
-  const loadPct = Math.round(bucketLoad * 100);
+  const loadPct =
+    bucketLoad <= 0 ? 0 : Math.max(1, Math.min(100, Math.round(bucketLoad * 100)));
+  const loadUnits = getLoadUnits(bucketLoad, maxLoadUnits);
 
   return (
     <div>
@@ -91,18 +99,25 @@ export function BoomLoadGauge({
             style={{ width: `${loadPct}%` }}
           />
         </div>
-        <span className="w-8 text-right text-[9px] text-white/65">{loadPct}%</span>
+        <span className="w-[4.5rem] text-right text-[9px] text-white/80">
+          {loadUnits} / {maxLoadUnits}
+        </span>
       </div>
     </div>
   );
 }
 
-export function DigHintPanel({ feedback, bucketLoad, boom, show }: DigHintPanelProps) {
+export function DigHintPanel({ feedback, bucketLoad, maxLoadUnits, boom, show }: DigHintPanelProps) {
   if (!show) return null;
 
   return (
     <div className="absolute left-2 bottom-[43%] z-20 max-w-[10.5rem] rounded-lg shadow-lg backdrop-blur-sm">
-      <DigHintContent feedback={feedback} bucketLoad={bucketLoad} boom={boom} />
+      <DigHintContent
+        feedback={feedback}
+        bucketLoad={bucketLoad}
+        maxLoadUnits={maxLoadUnits}
+        boom={boom}
+      />
     </div>
   );
 }

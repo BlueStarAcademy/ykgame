@@ -9,6 +9,7 @@ interface ControlsGuidePanelProps {
   onClose: () => void;
   digFeedback: DigFeedback;
   bucketLoad: number;
+  maxLoadUnits: number;
   boom: number;
 }
 
@@ -17,6 +18,7 @@ export function ControlsGuidePanel({
   onClose,
   digFeedback,
   bucketLoad,
+  maxLoadUnits,
   boom,
 }: ControlsGuidePanelProps) {
   if (!open) return null;
@@ -61,6 +63,7 @@ export function ControlsGuidePanel({
           <DigHintContent
             feedback={digFeedback}
             bucketLoad={bucketLoad}
+            maxLoadUnits={maxLoadUnits}
             boom={boom}
             compact
           />

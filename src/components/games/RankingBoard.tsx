@@ -58,70 +58,99 @@ export function RankingBoard({
 
   if (!open) return null;
 
+  const headerColor = game?.headerColor ?? "#1565C0";
+  const brandColor = game?.color ?? headerColor;
+
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 sm:items-center"
+      className="ranking-modal-overlay fixed inset-0 z-[220] flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
+        className="ranking-modal-panel w-full max-w-md overflow-hidden"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ranking-modal-title"
       >
         <div
-          className="flex items-center justify-between px-5 py-4 text-white"
-          style={{ backgroundColor: game?.headerColor ?? "#1565C0" }}
+          className="ranking-modal-header relative overflow-hidden px-5 py-4 text-white"
+          style={{
+            background: `linear-gradient(135deg, ${brandColor} 0%, ${headerColor} 55%, #0f172a 100%)`,
+          }}
         >
-          <div>
-            <h3 className="text-lg font-bold">{game?.brandEn} 랭킹</h3>
-            <p className="text-xs opacity-90">
-              {monthKey ? `${monthKey} 월간 순위` : "이번 달 순위"}
-            </p>
+          <div className="pointer-events-none absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/15 blur-2xl" />
+          <div className="relative flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-white/70">
+                Leaderboard
+              </p>
+              <h3 id="ranking-modal-title" className="mt-0.5 text-lg font-black">
+                {game?.brandEn} 랭킹
+              </h3>
+              <p className="mt-1 text-[11px] text-white/75">
+                {monthKey ? `${monthKey} 월간 순위` : "이번 달 순위"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-lg border border-white/20 bg-white/15 px-2.5 py-1 text-xs font-bold hover:bg-white/25"
+            >
+              닫기
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-full bg-white/20 px-3 py-1 text-sm hover:bg-white/30"
-          >
-            ✕
-          </button>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto p-4">
+        <div className="ranking-modal-body max-h-[min(58vh,28rem)] overflow-y-auto p-3">
           {loading ? (
-            <p className="py-8 text-center text-sm text-gray-400">불러오는 중...</p>
+            <p className="py-10 text-center text-sm text-slate-400">불러오는 중...</p>
           ) : rankings.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-400">
+            <p className="py-10 text-center text-sm text-slate-400">
               아직 랭킹 기록이 없습니다.
             </p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-1.5">
               {rankings.map((r) => {
                 const isMe = highlightNickname && r.nickname === highlightNickname;
+                const isTop3 = r.rank <= 3;
                 return (
                   <li
                     key={`${r.rank}-${r.nickname}`}
-                    className={`flex items-center justify-between rounded-xl px-4 py-3 ${
-                      isMe ? "bg-blue-50 ring-2 ring-blue-300" : "bg-gray-50"
+                    className={`ranking-modal-row flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 ${
+                      isMe ? "ranking-modal-row-me" : isTop3 ? "ranking-modal-row-top" : ""
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="w-8 text-center text-lg font-bold text-gray-700">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${
+                          isTop3
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
                         {medal(r.rank)}
                       </span>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-800">
                           {r.nickname}
-                          {isMe && (
-                            <span className="ml-1 text-xs text-blue-600">(나)</span>
-                          )}
+                          {isMe ? (
+                            <span className="ml-1 text-[10px] font-bold text-blue-600">나</span>
+                          ) : null}
                         </p>
-                        <p className="text-xs text-gray-500">
-                          {"★".repeat(r.stars)}
-                          {"☆".repeat(3 - r.stars)} · ⏱ {formatTime(r.playTime)}
+                        <p className="mt-0.5 text-[10px] text-slate-500">
+                          <span className="text-amber-500">
+                            {"★".repeat(r.stars)}
+                            {"☆".repeat(3 - r.stars)}
+                          </span>
+                          <span className="mx-1 text-slate-300">·</span>
+                          ⏱ {formatTime(r.playTime)}
                         </p>
                       </div>
                     </div>
-                    <span className="text-lg font-bold text-gray-800">
-                      {r.score}점
+                    <span className="shrink-0 text-sm font-black text-slate-900">
+                      {r.score.toLocaleString()}
+                      <span className="ml-0.5 text-[10px] font-semibold text-slate-400">점</span>
                     </span>
                   </li>
                 );

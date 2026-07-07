@@ -68,7 +68,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     instruction: "우 조이스틱 좌 — 버킷 말기",
     highlight: "right",
     allowed: { leftX: false, leftY: false, rightX: true, rightY: false, travel: false },
-    bucketMax: -0.7,
+    bucketMax: -0.025,
   },
   {
     id: "dig",

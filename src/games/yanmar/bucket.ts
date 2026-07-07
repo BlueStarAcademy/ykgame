@@ -5,6 +5,8 @@ const ARM_LEN = 2.5;
 const BUCKET_LEN = 1.2;
 const BOOM_PIVOT_Y = 1.0;
 const BOOM_OFFSET = 0.8;
+const VISUAL_ARM_ROTATION_SCALE = 1.18;
+const VISUAL_BUCKET_ROTATION_SCALE = 1.02;
 
 export interface BucketTip {
   x: number;
@@ -12,24 +14,65 @@ export interface BucketTip {
   z: number;
 }
 
-export function getBucketTipWorld(sim: ExcavatorSimState): BucketTip {
-  const angle = sim.heading + sim.swing;
-  const reach =
-    Math.sin(sim.boom) * BOOM_LEN +
-    Math.sin(sim.boom + sim.arm) * ARM_LEN +
-    Math.sin(sim.boom + sim.arm + sim.bucket) * BUCKET_LEN;
-
+function bucketPointWorld(sim: ExcavatorSimState, boomSwing: number, localX: number, localY: number): BucketTip {
+  const facing = sim.heading + sim.swing + boomSwing * 0.38;
+  const boomEndX = Math.sin(sim.boom) * BOOM_LEN;
+  const boomEndY = Math.cos(sim.boom) * BOOM_LEN;
+  const visualArmAngle = sim.boom - sim.arm * VISUAL_ARM_ROTATION_SCALE;
+  const visualBucketAngle = visualArmAngle - sim.bucket * VISUAL_BUCKET_ROTATION_SCALE;
+  const armEndX = boomEndX + Math.sin(visualArmAngle) * ARM_LEN;
+  const armEndY = boomEndY + Math.cos(visualArmAngle) * ARM_LEN;
+  const bucketAngle = visualBucketAngle;
+  const reach = armEndX + Math.sin(bucketAngle) * localX - Math.cos(bucketAngle) * localY;
   const height =
     BOOM_PIVOT_Y +
-    Math.cos(sim.boom) * BOOM_LEN +
-    Math.cos(sim.boom + sim.arm) * ARM_LEN +
-    Math.cos(sim.boom + sim.arm + sim.bucket) * BUCKET_LEN;
+    armEndY +
+    Math.cos(bucketAngle) * localX +
+    Math.sin(bucketAngle) * localY;
 
   return {
-    x: sim.posX + Math.sin(angle) * BOOM_OFFSET + Math.cos(angle) * reach,
+    x: sim.posX + Math.sin(facing) * BOOM_OFFSET + Math.cos(facing) * reach,
     y: height,
-    z: sim.posZ + Math.cos(angle) * BOOM_OFFSET - Math.sin(angle) * reach,
+    z: sim.posZ + Math.cos(facing) * BOOM_OFFSET - Math.sin(facing) * reach,
   };
+}
+
+export function getBucketTipWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {
+  return bucketPointWorld(sim, boomSwing, -BUCKET_LEN, 0);
+}
+
+function lowestBucketPoint(
+  sim: ExcavatorSimState,
+  boomSwing: number,
+  samples: readonly (readonly [number, number])[],
+) {
+  let lowest = bucketPointWorld(sim, boomSwing, samples[0][0], samples[0][1]);
+  for (const [localX, localY] of samples.slice(1)) {
+    const point = bucketPointWorld(sim, boomSwing, localX, localY);
+    if (point.y < lowest.y) lowest = point;
+  }
+  return lowest;
+}
+
+export function getBucketScraperContactWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {
+  return lowestBucketPoint(sim, boomSwing, [
+    [-1.18, -0.54],
+    [-0.96, -0.58],
+    [-0.82, -0.6],
+  ]);
+}
+
+export function getBucketBodyContactWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {
+  return lowestBucketPoint(sim, boomSwing, [
+    [-0.68, -0.56],
+    [-0.36, -0.48],
+    [-0.08, -0.24],
+    [0.08, -0.1],
+  ]);
+}
+
+export function getBucketGroundContactWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {
+  return getBucketScraperContactWorld(sim, boomSwing);
 }
 
 export interface DigFeedback {

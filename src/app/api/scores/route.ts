@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { gameId, progress, playTime, timeLeft } = body;
+  const { gameId, progress, playTime, timeLeft, arcadeScore, mode } = body;
 
   const game = getGameById(gameId);
   if (!game) {
@@ -26,8 +26,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Game not available" }, { status: 403 });
   }
 
-  const stars = calculateStars(progress);
-  const score = calculateScore(progress, timeLeft ?? 0);
+  const isYanmarArcade =
+    gameId === "yanmar" &&
+    mode === "game" &&
+    typeof arcadeScore === "number" &&
+    arcadeScore >= 0;
+  if (gameId === "yanmar" && mode !== "game") {
+    return NextResponse.json(
+      { error: "Yanmar practice results are not saved" },
+      { status: 400 },
+    );
+  }
+  const stars = isYanmarArcade ? 0 : calculateStars(progress);
+  const score = isYanmarArcade
+    ? Math.round(arcadeScore)
+    : calculateScore(progress, timeLeft ?? 0);
   const monthKey = getMonthKey();
 
   const result = await prisma.$transaction(async (tx) => {

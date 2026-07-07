@@ -29,10 +29,10 @@ export const GAMES: GameConfig[] = [
     number: 1,
     brandKo: "얀마",
     brandEn: "YANMAR",
-    mission: "굴삭기로 흙을 퍼서 옮기기",
+    mission: "굴착·하역 아케이드 챌린지",
     description:
-      "1인칭 운전실 시점에서 실제 조이스틱 조작법으로 굴착기를 운전하세요. 흙을 파서 덤프 존에 하역하면 점수를 획득합니다.",
-    duration: 90,
+      "1인칭 운전실에서 듀얼 조이스틱으로 SV08-1을 조종하세요. 주황 굴착 구역에서 흙을 채취해 초록 하역 구역에 투하하면 점수와 스타·쿠폰 보상을 획득합니다. 장비강화로 적재량·크리티컬을 높여보세요.",
+    duration: 0,
     color: "#E53935",
     headerColor: "#C62828",
     controlType: "excavator",

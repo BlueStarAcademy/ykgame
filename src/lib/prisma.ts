@@ -26,12 +26,18 @@ function createPrismaClient(connectionString: string) {
   return new PrismaClient({ adapter });
 }
 
+function isStalePrismaClient(client: PrismaClient): boolean {
+  const delegate = (client as PrismaClient & { userMail?: unknown }).userMail;
+  return delegate == null;
+}
+
 function getPrismaClient(): PrismaClient {
   const connectionString = getDatabaseUrl({ required: true });
 
   if (
     globalForPrisma.prisma &&
-    globalForPrisma.dbUrl === connectionString
+    globalForPrisma.dbUrl === connectionString &&
+    !isStalePrismaClient(globalForPrisma.prisma)
   ) {
     return globalForPrisma.prisma;
   }

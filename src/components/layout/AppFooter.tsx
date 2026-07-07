@@ -1,8 +1,8 @@
 const FEATURES = [
-  { icon: "🏆", title: "간단한 조작", desc: "누구나 쉽게!" },
-  { icon: "🎮", title: "짧은 미션", desc: "1~2분 완료!" },
-  { icon: "💎", title: "보상 & 수집", desc: "별 모으기!" },
-  { icon: "📊", title: "기록 & 랭킹", desc: "점수 도전!" },
+  { icon: "🕹️", title: "실감 조작", desc: "듀얼 조이스틱" },
+  { icon: "⛏️", title: "굴착·하역", desc: "아케이드 점수" },
+  { icon: "⭐", title: "보상 수집", desc: "스타·쿠폰" },
+  { icon: "📊", title: "기록 도전", desc: "랭킹 경쟁" },
 ];
 
 interface AppFooterProps {
@@ -32,7 +32,7 @@ export function AppFooter({ showFeatures = false }: AppFooterProps) {
       )}
       <div className="mx-auto flex h-9 max-w-lg items-center justify-center px-4">
         <p className="text-[10px] text-gray-400">
-          © YK건기 · 장비를 쉽고 재미있게 체험하는 미니게임
+          © YK건기 · 실감 조작으로 체험하는 장비 아케이드
         </p>
       </div>
     </footer>

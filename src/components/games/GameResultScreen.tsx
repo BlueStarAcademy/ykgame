@@ -30,7 +30,8 @@ function medal(rank: number) {
 
 export function GameResultScreen({ gameId, result, onRetry }: GameResultScreenProps) {
   const game = getGameById(gameId);
-  const stars = calculateStars(result.progress);
+  const isYanmarArcade = gameId === "yanmar" && typeof result.arcadeScore === "number";
+  const stars = isYanmarArcade ? 0 : calculateStars(result.progress);
   const { data: session, update } = useSession();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [myRank, setMyRank] = useState<number | null>(null);
@@ -38,7 +39,10 @@ export function GameResultScreen({ gameId, result, onRetry }: GameResultScreenPr
   const [showRanking, setShowRanking] = useState(false);
   const savedRef = useRef(false);
   const updateRef = useRef(update);
-  updateRef.current = update;
+
+  useEffect(() => {
+    updateRef.current = update;
+  }, [update]);
 
   useEffect(() => {
     if (savedRef.current) return;
@@ -54,6 +58,8 @@ export function GameResultScreen({ gameId, result, onRetry }: GameResultScreenPr
             progress: result.progress,
             playTime: result.playTime,
             timeLeft: result.timeLeft,
+            arcadeScore: result.arcadeScore,
+            mode: result.mode,
           }),
         });
         const saveData = await saveRes.json();
@@ -72,7 +78,14 @@ export function GameResultScreen({ gameId, result, onRetry }: GameResultScreenPr
       }
     }
     void saveAndLoad();
-  }, [gameId, result.progress, result.playTime, result.timeLeft]);
+  }, [
+    gameId,
+    result.arcadeScore,
+    result.mode,
+    result.progress,
+    result.playTime,
+    result.timeLeft,
+  ]);
 
   const nickname = session?.user?.nickname ?? "";
 
@@ -89,9 +102,12 @@ export function GameResultScreen({ gameId, result, onRetry }: GameResultScreenPr
             {"★".repeat(stars)}
             {"☆".repeat(3 - stars)}
           </p>
-          <p className="mt-2 text-2xl font-bold text-gray-800">{result.progress}%</p>
+          <p className="mt-2 text-2xl font-bold text-gray-800">
+            {isYanmarArcade ? `${result.arcadeScore?.toLocaleString()}점` : `${result.progress}%`}
+          </p>
           <p className="text-sm text-gray-500">
-            플레이 시간 {result.playTime}초 · 남은 시간 {result.timeLeft}초
+            플레이 시간 {result.playTime}초
+            {result.timeLeft > 0 ? ` · 남은 시간 ${result.timeLeft}초` : ""}
           </p>
           {saved && stars > 0 && (
             <p className="mt-2 text-sm text-green-600">⭐ {stars}별 획득!</p>

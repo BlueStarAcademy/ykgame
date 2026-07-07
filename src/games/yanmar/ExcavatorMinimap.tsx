@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { ExcavatorSimState } from "./ExcavatorScene";
 import type { TerrainData } from "./terrain";
-import { DIG_ZONE, DUMP_ZONE, getMapWorldBounds } from "./terrain";
+import { DUMP_ZONE, getActiveDigZones, getMapWorldBounds } from "./terrain";
 import type { TutorialStep } from "./tutorial";
 
 interface ExcavatorMinimapProps {
@@ -86,19 +86,24 @@ export function ExcavatorMinimap({
       }
 
       // 굴착 구역
-      const dig = worldToMinimap(DIG_ZONE.x, DIG_ZONE.z, bounds);
-      const digR = (DIG_ZONE.radius / (bounds.maxX - bounds.minX)) * inner;
-      ctx.fillStyle = "rgba(255,143,0,0.28)";
-      ctx.beginPath();
-      ctx.arc(dig.px, dig.py, Math.max(digR, 4), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#ffb300";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = "#fff3c4";
-      ctx.beginPath();
-      ctx.arc(dig.px, dig.py, 3, 0, Math.PI * 2);
-      ctx.fill();
+      const digZones = getActiveDigZones(terrain);
+      let firstDigLabel: { px: number; py: number; r: number } | null = null;
+      for (const zone of digZones) {
+        const dig = worldToMinimap(zone.x, zone.z, bounds);
+        const digR = (zone.radius / (bounds.maxX - bounds.minX)) * inner;
+        firstDigLabel ??= { px: dig.px, py: dig.py, r: digR };
+        ctx.fillStyle = "rgba(255,143,0,0.28)";
+        ctx.beginPath();
+        ctx.arc(dig.px, dig.py, Math.max(digR, 4), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#ffb300";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = "#fff3c4";
+        ctx.beginPath();
+        ctx.arc(dig.px, dig.py, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       // 덤프 구역
       const dump = worldToMinimap(DUMP_ZONE.x, DUMP_ZONE.z, bounds);
@@ -159,7 +164,13 @@ export function ExcavatorMinimap({
 
       ctx.fillStyle = "rgba(255,255,255,0.75)";
       ctx.font = "700 8px sans-serif";
-      ctx.fillText("DIG", Math.max(7, dig.px - 8), Math.max(11, dig.py - digR - 3));
+      if (firstDigLabel) {
+        ctx.fillText(
+          "DIG",
+          Math.max(7, firstDigLabel.px - 8),
+          Math.max(11, firstDigLabel.py - firstDigLabel.r - 3),
+        );
+      }
       ctx.fillText("DUMP", Math.min(SIZE - 28, dump.px - 12), Math.max(11, dump.py - dumpR - 3));
 
       raf = requestAnimationFrame(draw);

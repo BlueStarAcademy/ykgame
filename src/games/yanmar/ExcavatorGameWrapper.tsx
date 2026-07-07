@@ -1,8 +1,9 @@
 "use client";
 
-/* eslint-disable react-hooks/immutability */
+/* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/preserve-manual-memoization, react-hooks/set-state-in-effect */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import type { GameResult } from "@/games/shared/types";
 import { getMissionConfig } from "@/games/registry";
 import type { AuxiliaryControlState, ControlMask, ExcavatorControlState } from "./controls";
@@ -13,9 +14,9 @@ import {
   filterInput,
 } from "./controls";
 import { CockpitOverlay } from "./CockpitOverlay";
-import { TutorialIntro } from "./TutorialIntro";
 import {
   ExcavatorScene,
+  type DumpScorePopup,
   createInitialSim,
   createInitialTerrain,
   type ExcavatorSimState,
@@ -27,6 +28,15 @@ import { DumpHintPanel } from "./DumpHintPanel";
 import { ControlsGuidePanel } from "./ControlsGuidePanel";
 import { createDigFeedback, type DigFeedback } from "./bucket";
 import type { TerrainData } from "./terrain";
+import {
+  DEFAULT_YANMAR_EQUIPMENT_LEVELS,
+  YANMAR_EQUIPMENT_CONFIG,
+  calculateYanmarEquipmentStats,
+  getYanmarUpgradeCost,
+  type YanmarEquipmentLevels,
+  type YanmarEquipmentPart,
+  type YanmarEquipmentStats,
+} from "./equipment";
 import {
   createScoreState,
   getProgress,
@@ -47,6 +57,117 @@ import {
 interface ExcavatorGameWrapperProps {
   onEnd: (result: GameResult) => void;
   immersive?: boolean;
+  initialPlayMode?: "practice" | "game";
+}
+
+type DumpRewardApiEvent =
+  | {
+      kind: "coupon";
+      score: number;
+      critical: boolean;
+      couponType: "YK_PARTS_DISCOUNT" | "EQUIPMENT_RENTAL_DISCOUNT";
+      discountPct: number;
+    }
+  | {
+      kind: "stars";
+      score: number;
+      critical: boolean;
+      stars: number;
+    };
+
+function EquipmentUpgradeModal({
+  open,
+  mode,
+  levels,
+  currency,
+  previewStars,
+  upgradingPart,
+  onClose,
+  onUpgrade,
+}: {
+  open: boolean;
+  mode: GameMode;
+  levels: YanmarEquipmentLevels;
+  currency: number;
+  previewStars: number;
+  upgradingPart: YanmarEquipmentPart | null;
+  onClose: () => void;
+  onUpgrade: (part: YanmarEquipmentPart) => void;
+}) {
+  if (!open) return null;
+
+  const previewMode = mode !== "game";
+  const balance = previewMode ? previewStars : currency;
+
+  return (
+    <div className="absolute inset-0 z-[80] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between bg-gradient-to-br from-slate-800 to-slate-950 px-4 py-3 text-white">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-200">
+              Yanmar Parts
+            </p>
+            <h2 className="text-base font-black">장비강화</h2>
+            <p className="mt-0.5 text-[10px] text-white/65">
+              {previewMode ? "튜토리얼 임시 강화" : "본게임 실제 강화"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-white/15 px-2.5 py-1 text-xs font-bold hover:bg-white/25"
+          >
+            닫기
+          </button>
+        </div>
+        <div className="space-y-2 p-3">
+          <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+            {previewMode ? "체험 스타" : "보유 스타"} ⭐ {balance.toLocaleString()}
+          </div>
+          {(Object.keys(YANMAR_EQUIPMENT_CONFIG) as YanmarEquipmentPart[]).map((part) => {
+            const config = YANMAR_EQUIPMENT_CONFIG[part];
+            const level = levels[part];
+            const nextLevel = level + 1;
+            const cost = getYanmarUpgradeCost(part, nextLevel);
+            const maxed = level >= config.maxLevel;
+            const disabled =
+              upgradingPart === part || maxed || (!previewMode && balance < cost);
+            return (
+              <div key={part} className="rounded-xl border border-gray-200 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-black text-gray-900">
+                      {config.label} 강화 +{level}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-gray-500">
+                      {config.description} · 최대 +{config.maxLevel}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onUpgrade(part)}
+                    disabled={disabled}
+                    className="rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:bg-gray-300"
+                  >
+                    {maxed
+                      ? "최대"
+                      : upgradingPart === part
+                        ? "강화중"
+                        : previewMode
+                          ? "체험 강화"
+                          : `${cost} 스타`}
+                  </button>
+                </div>
+                {!previewMode && !maxed && balance < cost ? (
+                  <p className="mt-1 text-[10px] text-red-500">스타가 부족합니다.</p>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function formatTime(seconds: number) {
@@ -59,33 +180,6 @@ function resetSim(sim: ExcavatorSimState, vel: HydraulicVelocity) {
   const init = createInitialSim();
   Object.assign(sim, init);
   Object.assign(vel, createHydraulicVelocity());
-}
-
-function GameStartModal({
-  duration,
-  onStart,
-}: {
-  duration: number;
-  onStart: () => void;
-}) {
-  return (
-    <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-xs rounded-2xl bg-white p-5 text-center shadow-2xl">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-red-600">Game Mode</p>
-        <h2 className="mt-1 text-lg font-black text-gray-900">굴착 미션 시작</h2>
-        <p className="mt-2 text-xs leading-relaxed text-gray-600">
-          제한시간 {duration}초 동안 흙을 굴착해 초록 하역 구역에 비우면 점수가 올라갑니다.
-        </p>
-        <button
-          type="button"
-          onClick={onStart}
-          className="mt-4 w-full rounded-xl bg-red-600 py-3 text-sm font-bold text-white shadow-lg hover:bg-red-500"
-        >
-          시작하기
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function TutorialSelectModal({
@@ -158,8 +252,14 @@ function TutorialSelectModal({
   );
 }
 
-export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGameWrapperProps) {
+export function ExcavatorGameWrapper({
+  onEnd,
+  immersive = false,
+  initialPlayMode,
+}: ExcavatorGameWrapperProps) {
   const config = getMissionConfig("yanmar");
+  const { update } = useSession();
+  const defaultEquipmentStats = calculateYanmarEquipmentStats(DEFAULT_YANMAR_EQUIPMENT_LEVELS);
   const [mode, setMode] = useState<GameMode>("intro");
   const [tutorialIndex, setTutorialIndex] = useState(0);
   const [input, setInput] = useState<ExcavatorControlState>({
@@ -176,11 +276,22 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     bucketLoad: 0,
     goalDist: 0,
     boom: 0.45,
+    score: 0,
   });
+  const [scorePopups, setScorePopups] = useState<DumpScorePopup[]>([]);
+  const [equipmentLevels, setEquipmentLevels] = useState<YanmarEquipmentLevels>(
+    DEFAULT_YANMAR_EQUIPMENT_LEVELS,
+  );
+  const [equipmentStats, setEquipmentStats] =
+    useState<YanmarEquipmentStats>(defaultEquipmentStats);
+  const [currency, setCurrency] = useState(0);
+  const [previewStars, setPreviewStars] = useState(0);
   const [stepCompleteFlash, setStepCompleteFlash] = useState(false);
   const [showControlsGuide, setShowControlsGuide] = useState(false);
   const [showTutorialMenu, setShowTutorialMenu] = useState(false);
   const [showTouchZones, setShowTouchZones] = useState(false);
+  const [showEquipmentUpgrade, setShowEquipmentUpgrade] = useState(false);
+  const [upgradingPart, setUpgradingPart] = useState<YanmarEquipmentPart | null>(null);
   const endedRef = useRef(false);
   const elapsedRef = useRef(0);
   const tutorialDumpRef = useRef(0);
@@ -190,10 +301,15 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
   const [digFeedback, setDigFeedback] = useState<DigFeedback>(createDigFeedback());
   const digHudTickRef = useRef(0);
   const lastHudProgressRef = useRef(-1);
+  const arcadeScoreRef = useRef(0);
+  const scorePopupIdRef = useRef(0);
+  const equipmentStatsRef = useRef<YanmarEquipmentStats>(defaultEquipmentStats);
+  const updateSessionRef = useRef(update);
+  updateSessionRef.current = update;
 
   const syncDigHud = useCallback(() => {
     digHudTickRef.current += 1;
-    if (digHudTickRef.current % 6 !== 0) return;
+    if (digHudTickRef.current % 3 !== 0) return;
     const fb = digFeedbackRef.current;
     setDigFeedback((prev) =>
       prev.inDigZone === fb.inDigZone &&
@@ -206,8 +322,14 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     );
     setHud((h) => {
       const boom = simRef.current.boom;
-      if (Math.abs(h.boom - boom) < 0.01) return h;
-      return { ...h, boom };
+      const bucketLoad = simRef.current.bucketLoad;
+      if (
+        Math.abs(h.boom - boom) < 0.01 &&
+        Math.abs(h.bucketLoad - bucketLoad) < 0.005
+      ) {
+        return h;
+      }
+      return { ...h, boom, bucketLoad };
     });
   }, [setDigFeedback, setHud]);
 
@@ -248,6 +370,30 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
   }, [mode]);
 
   useEffect(() => {
+    equipmentStatsRef.current = equipmentStats;
+  }, [equipmentStats]);
+
+  const loadEquipment = useCallback(async () => {
+    try {
+      const res = await fetch("/api/equipment/yanmar");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.levels) setEquipmentLevels(data.levels);
+      if (data.stats) {
+        equipmentStatsRef.current = data.stats;
+        setEquipmentStats(data.stats);
+      }
+      if (typeof data.currency === "number") setCurrency(data.currency);
+    } catch {
+      // Equipment data is optional for unauthenticated previews.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadEquipment();
+  }, [loadEquipment]);
+
+  useEffect(() => {
     tutorialStepRef.current = tutorialStep;
     tutorialIndexRef.current = tutorialIndex;
   }, [tutorialIndex, tutorialStep]);
@@ -281,6 +427,8 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     endedRef.current = false;
     elapsedRef.current = 0;
     lastHudProgressRef.current = -1;
+    arcadeScoreRef.current = 0;
+    setPreviewStars(0);
     tutorialCompletingRef.current = false;
     const nextAuxiliary = createAuxiliaryControls();
     auxiliaryRef.current = nextAuxiliary;
@@ -290,11 +438,13 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
       right: { x: 0, y: 0 },
       travel: { left: 0, right: 0 },
     });
-    setHud({ progress: 0, timeLeft: config.duration, bucketLoad: 0, goalDist: 0, boom: 0.45 });
+    setScorePopups([]);
+    setHud({ progress: 0, timeLeft: config.duration, bucketLoad: 0, goalDist: 0, boom: 0.45, score: 0 });
   }, [config.duration, config.target, setAuxiliary, setHud, setInput]);
 
   const enterPracticeMode = useCallback(() => {
     resetYanmarSession();
+    terrainRef.current = createInitialTerrain(true);
     tutorialStepRef.current = null;
     setTutorialIndex(0);
     setShowTouchZones(true);
@@ -302,21 +452,32 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     setMode("practice");
   }, [resetYanmarSession, setMode, setShowTouchZones, setShowTutorialMenu, setTutorialIndex]);
 
-  const enterGameMode = useCallback(() => {
+  const startGameDirect = useCallback(() => {
     resetYanmarSession();
     tutorialStepRef.current = null;
     setShowTouchZones(false);
     setShowTutorialMenu(false);
-    setMode("gameReady");
-  }, [resetYanmarSession, setMode, setShowTouchZones, setShowTutorialMenu]);
-
-  const startGame = useCallback(() => {
     endedRef.current = false;
     elapsedRef.current = 0;
     scoreRef.current.timeLeft = config.duration;
     setHud((h) => ({ ...h, progress: 0, timeLeft: config.duration }));
     setMode("game");
-  }, [config.duration, setHud, setMode]);
+  }, [config.duration, resetYanmarSession, setHud, setMode, setShowTouchZones, setShowTutorialMenu]);
+
+  const initialPlayModeRef = useRef(initialPlayMode);
+  const hasBootstrappedRef = useRef(false);
+
+  useEffect(() => {
+    if (hasBootstrappedRef.current) return;
+    const bootMode = initialPlayModeRef.current;
+    if (!bootMode) return;
+    hasBootstrappedRef.current = true;
+    if (bootMode === "practice") {
+      enterPracticeMode();
+    } else {
+      startGameDirect();
+    }
+  }, [enterPracticeMode, startGameDirect]);
 
   const startTutorial = useCallback((index: number) => {
     resetYanmarSession();
@@ -338,7 +499,9 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     setMode("practice");
   }, [resetYanmarSession, setMode, setShowTouchZones, setShowTutorialMenu]);
 
-  const handleTutorialTick = useCallback(() => {
+  const handleSimTick = useCallback(() => {
+    syncDigHud();
+
     if (modeRef.current !== "tutorial") return;
     if (tutorialCompletingRef.current) return;
 
@@ -355,21 +518,10 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
         setMode("practice");
       }, 900);
     }
-    const load = simRef.current.bucketLoad;
-    setHud((h) => {
-      const goalDist =
-        step.waypoint != null
-          ? Math.round(waypointDistance(simRef.current, step.waypoint))
-          : h.goalDist;
-      if (
-        Math.abs(h.bucketLoad - load) < 0.02 &&
-        h.goalDist === goalDist
-      ) {
-        return h;
-      }
-      return { ...h, bucketLoad: load, goalDist };
-    });
-    syncDigHud();
+
+    if (step.waypoint == null) return;
+    const goalDist = Math.round(waypointDistance(simRef.current, step.waypoint));
+    setHud((h) => (h.goalDist === goalDist ? h : { ...h, goalDist }));
   }, [syncDigHud, setHud, setMode, setStepCompleteFlash]);
 
   const handleProgress = useCallback(
@@ -383,17 +535,138 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
         }));
       }
       if (!endedRef.current && dumped >= config.target) {
-        endedRef.current = true;
-        onEnd({
-          gameId: "yanmar",
-          progress: 100,
-          playTime: Math.round(elapsedRef.current),
-          timeLeft: Math.ceil(scoreRef.current.timeLeft),
-          completed: true,
-        });
+        setHud((h) => ({ ...h, progress: 100 }));
       }
     },
-    [config.target, onEnd, setHud],
+    [config.target, setHud],
+  );
+
+  const addDumpPopup = useCallback((popup: Omit<DumpScorePopup, "id">) => {
+    const id = ++scorePopupIdRef.current;
+    arcadeScoreRef.current += popup.score;
+    setHud((h) => ({ ...h, score: arcadeScoreRef.current }));
+    setScorePopups((items) => [...items.slice(-5), { id, ...popup }]);
+    window.setTimeout(() => {
+      setScorePopups((items) => items.filter((item) => item.id !== id));
+    }, 1100);
+    return id;
+  }, []);
+
+  const updateDumpPopup = useCallback(
+    (id: number, popup: Partial<Omit<DumpScorePopup, "id">>, scoreDelta = 0) => {
+      if (scoreDelta !== 0) {
+        arcadeScoreRef.current += scoreDelta;
+        setHud((h) => ({ ...h, score: arcadeScoreRef.current }));
+      }
+      setScorePopups((items) =>
+        items.map((item) => (item.id === id ? { ...item, ...popup } : item)),
+      );
+    },
+    [],
+  );
+
+  const handleDumpScore = useCallback((popup: Omit<DumpScorePopup, "id">) => {
+    if (modeRef.current !== "game") {
+      const stars = Math.floor(Math.random() * 3) + 1;
+      setPreviewStars((value) => value + stars);
+      addDumpPopup({ ...popup, rewardText: `체험 ⭐${stars}` });
+      return;
+    }
+
+    const popupId = addDumpPopup({ ...popup, rewardText: "보상 확인중" });
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/rewards/yanmar-dump", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chunkCount: 1 }),
+        });
+        if (!res.ok) throw new Error("Reward failed");
+        const data = await res.json();
+        const event = data.events?.[0] as DumpRewardApiEvent | undefined;
+        if (typeof data.currency === "number") {
+          setCurrency(data.currency);
+          await updateSessionRef.current({ user: { currency: data.currency } });
+        }
+        if (!event) {
+          updateDumpPopup(popupId, { rewardText: "보상 완료" });
+          return;
+        }
+        updateDumpPopup(popupId, {
+          score: event.score,
+          critical: event.critical,
+          rewardText:
+            event.kind === "coupon"
+              ? `쿠폰 ${event.discountPct}%`
+              : `⭐${event.stars}`,
+        }, event.score - popup.score);
+      } catch {
+        updateDumpPopup(popupId, { rewardText: "저장 실패" });
+      }
+    })();
+  }, [addDumpPopup, updateDumpPopup]);
+
+  const finishGame = useCallback(() => {
+    if (modeRef.current !== "game" || endedRef.current) return;
+    endedRef.current = true;
+    onEnd({
+      gameId: "yanmar",
+      progress: getProgress(scoreRef.current),
+      playTime: Math.round(elapsedRef.current),
+      timeLeft: 0,
+      completed: true,
+      arcadeScore: arcadeScoreRef.current,
+      mode: "game",
+    });
+  }, [onEnd]);
+
+  const handleEquipmentUpgrade = useCallback(
+    (part: YanmarEquipmentPart) => {
+      const previewMode = modeRef.current !== "game";
+      if (previewMode) {
+        setEquipmentLevels((current) => {
+          const maxLevel = YANMAR_EQUIPMENT_CONFIG[part].maxLevel;
+          const next = {
+            ...current,
+            [part]: Math.min(maxLevel, current[part] + 1),
+          };
+          const nextStats = calculateYanmarEquipmentStats(next);
+          equipmentStatsRef.current = nextStats;
+          setEquipmentStats(nextStats);
+          return next;
+        });
+        setPreviewStars((value) =>
+          Math.max(0, value - getYanmarUpgradeCost(part, equipmentLevels[part] + 1)),
+        );
+        return;
+      }
+
+      setUpgradingPart(part);
+      void (async () => {
+        try {
+          const res = await fetch("/api/equipment/yanmar/upgrade", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ part }),
+          });
+          const data = await res.json();
+          if (!res.ok) return;
+          if (data.levels) setEquipmentLevels(data.levels);
+          if (data.stats) {
+            equipmentStatsRef.current = data.stats;
+            setEquipmentStats(data.stats);
+          }
+          if (typeof data.currency === "number") {
+            setCurrency(data.currency);
+            await updateSessionRef.current({ user: { currency: data.currency } });
+          }
+        } finally {
+          setUpgradingPart(null);
+        }
+      })();
+    },
+    [equipmentLevels],
   );
 
   useEffect(() => {
@@ -409,13 +682,12 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
       tickTimer(scoreRef.current, dt);
       setHud((h) => ({
         ...h,
-        timeLeft: scoreRef.current.timeLeft,
-        bucketLoad: simRef.current.bucketLoad,
+        timeLeft: config.duration > 0 ? scoreRef.current.timeLeft : elapsedRef.current,
         progress: getProgress(scoreRef.current),
       }));
       syncDigHud();
 
-      if (isTimeUp(scoreRef.current) && !isComplete(scoreRef.current)) {
+      if (config.duration > 0 && isTimeUp(scoreRef.current) && !isComplete(scoreRef.current)) {
         endedRef.current = true;
         onEnd({
           gameId: "yanmar",
@@ -423,6 +695,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           playTime: Math.round(elapsedRef.current),
           timeLeft: 0,
           completed: false,
+          mode: "game",
         });
         return;
       }
@@ -430,7 +703,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [mode, onEnd, syncDigHud]);
+  }, [config.duration, mode, onEnd, syncDigHud]);
 
   useEffect(() => {
     if (tutorialStep?.id !== "dig") return;
@@ -438,7 +711,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     sim.bucketLoad = 0;
     tutorialDumpRef.current = 0;
     if (sim.boom < 0.7) sim.boom = 0.75;
-    if (sim.bucket > -0.5) sim.bucket = -0.75;
+    if (sim.bucket > -0.04) sim.bucket = -0.05;
     setHud((h) => ({ ...h, bucketLoad: 0, boom: sim.boom }));
   }, [tutorialIndex, tutorialStep?.id]);
 
@@ -510,6 +783,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           onClose={() => setShowControlsGuide(false)}
           digFeedback={digFeedback}
           bucketLoad={hud.bucketLoad}
+          maxLoadUnits={equipmentStats.maxLoadUnits}
           boom={hud.boom}
         />
         <TutorialSelectModal
@@ -519,10 +793,16 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           onSelect={startTutorial}
           onFreePlay={startFreePractice}
         />
-
-        {mode === "gameReady" && (
-          <GameStartModal duration={config.duration} onStart={startGame} />
-        )}
+        <EquipmentUpgradeModal
+          open={showEquipmentUpgrade}
+          mode={mode}
+          levels={equipmentLevels}
+          currency={currency}
+          previewStars={previewStars}
+          upgradingPart={upgradingPart}
+          onClose={() => setShowEquipmentUpgrade(false)}
+          onUpgrade={handleEquipmentUpgrade}
+        />
 
         {mode !== "intro" && mode !== "gameReady" && (
           <div className="absolute left-2 top-2 z-50 flex gap-1.5">
@@ -562,8 +842,15 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
               진행: {hud.progress}%
             </div>
             <div className="rounded-lg bg-black/60 px-3 py-1 text-sm font-bold text-white">
-              {formatTime(hud.timeLeft)}
+              {config.duration > 0 ? formatTime(hud.timeLeft) : `플레이 ${formatTime(hud.timeLeft)}`}
             </div>
+            <button
+              type="button"
+              onClick={finishGame}
+              className="rounded-lg bg-red-600 px-3 py-1 text-sm font-black text-white shadow-lg hover:bg-red-500"
+            >
+              저장 종료
+            </button>
           </div>
         )}
 
@@ -602,12 +889,24 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
 
         {mode !== "intro" && (
           <div
-            className="pointer-events-none absolute left-3 z-30 w-[min(13rem,46vw)] rounded-xl border border-white/10 bg-black/55 px-3 py-2 shadow-xl backdrop-blur-sm"
-            style={{
-              bottom: `calc(min(100vw, 32rem) * ${COCKPIT_LAYOUT.height / COCKPIT_LAYOUT.width} + 3.25rem)`,
-            }}
+            className="pointer-events-none absolute left-[5.8rem] right-[8rem] top-2 z-30 rounded-xl border border-white/10 bg-black/55 px-3 py-2 shadow-xl backdrop-blur-sm"
           >
-            <BoomLoadGauge bucketLoad={hud.bucketLoad} />
+            <div className="mb-1 flex items-center justify-between border-b border-white/10 pb-1">
+              <span className="text-[9px] font-bold text-yellow-200">점수</span>
+              <span className="text-[11px] font-black text-white">{hud.score.toLocaleString()}점</span>
+            </div>
+            <div className="mb-1 flex items-center justify-between text-[9px]">
+              <span className="font-bold text-amber-200">
+                {mode === "game" ? "스타" : "체험 스타"}
+              </span>
+              <span className="font-black text-amber-100">
+                ⭐ {(mode === "game" ? currency : previewStars).toLocaleString()}
+              </span>
+            </div>
+            <BoomLoadGauge
+              bucketLoad={hud.bucketLoad}
+              maxLoadUnits={equipmentStats.maxLoadUnits}
+            />
           </div>
         )}
 
@@ -631,7 +930,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
         )}
 
         {mode !== "intro" && (
-          <div className="absolute inset-0 z-0">
+          <div className="pointer-events-none absolute inset-0 z-0">
             <ExcavatorScene
               inputRef={inputRef}
               simRef={simRef}
@@ -639,13 +938,16 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
               terrainRef={terrainRef}
               scoreRef={scoreRef}
               modeRef={modeRef}
+              equipmentStatsRef={equipmentStatsRef}
               allowedRef={allowedRef}
               auxiliaryRef={auxiliaryRef}
               tutorialStepRef={tutorialStepRef}
               tutorialDumpRef={tutorialDumpRef}
               digFeedbackRef={digFeedbackRef}
               onProgress={handleProgress}
-              onTutorialTick={handleTutorialTick}
+              onDumpScore={handleDumpScore}
+              onSimTick={handleSimTick}
+              scorePopups={scorePopups}
             />
           </div>
         )}
@@ -693,8 +995,23 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           </button>
         )}
 
-        {mode === "intro" && (
-          <TutorialIntro onStartPractice={enterPracticeMode} onEnterGame={enterGameMode} />
+        {mode !== "intro" && mode !== "gameReady" && (
+          <button
+            type="button"
+            onClick={() => setShowEquipmentUpgrade(true)}
+            className="absolute bottom-3 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-amber-200/30 bg-amber-500/90 px-3 py-2 text-xs font-black text-white shadow-xl backdrop-blur-sm hover:bg-amber-400"
+          >
+            장비강화
+          </button>
+        )}
+
+        {mode === "intro" && initialPlayMode && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-gradient-to-b from-slate-900 to-slate-950">
+            <div className="text-center">
+              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-red-500" />
+              <p className="text-xs font-bold text-white/70">시뮬레이터 준비 중</p>
+            </div>
+          </div>
         )}
       </div>
       {!immersive && (

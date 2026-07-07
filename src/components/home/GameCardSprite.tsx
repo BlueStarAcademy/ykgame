@@ -3,7 +3,7 @@
 import type { GameId } from "@/lib/games";
 import { getSpriteSheetPath, SPRITE_FRAME_COUNT, SPRITE_FRAME_WIDTH } from "@/games/shared/equipmentArt";
 
-const YANMAR_CARD_IMAGE = "/images/yanmar/cockpit.svg";
+const YANMAR_CARD_IMAGE = "/images/yanmar/excavator-card.webp";
 
 interface GameCardSpriteProps {
   gameId: GameId;
@@ -21,8 +21,6 @@ export function GameCardSprite({ gameId, className = "" }: GameCardSpriteProps) 
             alt=""
             aria-hidden
             className="game-card-yanmar-image"
-            width={39}
-            height={48}
           />
         </div>
       </div>
