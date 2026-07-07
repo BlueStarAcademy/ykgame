@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 
 interface InventoryCoupon {
   id: string;
@@ -83,8 +84,8 @@ export function InventoryModal({ open, onClose }: InventoryModalProps) {
   const selectedCoupon = coupons.find((coupon) => coupon.id === selectedCouponId) ?? null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 p-4">
-      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <AppModalOverlay open={open} onClose={onClose}>
+      <div className="overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between bg-amber-500 px-4 py-3 text-white">
           <h2 className="text-base font-black">쿠폰함</h2>
           <button
@@ -138,6 +139,6 @@ export function InventoryModal({ open, onClose }: InventoryModalProps) {
           )}
         </div>
       </div>
-    </div>
+    </AppModalOverlay>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 
 interface UserMail {
   id: string;
@@ -93,8 +94,8 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 p-4">
-      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <AppModalOverlay open={open} onClose={onClose}>
+      <div className="overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between bg-sky-600 px-4 py-3 text-white">
           <h2 className="text-base font-black">우편함</h2>
           <button
@@ -187,7 +188,7 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
           )}
         </div>
       </div>
-    </div>
+    </AppModalOverlay>
   );
 }
 
