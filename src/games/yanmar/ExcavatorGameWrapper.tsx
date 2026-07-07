@@ -1,10 +1,17 @@
 "use client";
 
+/* eslint-disable react-hooks/immutability */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GameResult } from "@/games/shared/types";
 import { getMissionConfig } from "@/games/registry";
-import type { ControlMask, ExcavatorControlState } from "./controls";
-import { filterInput } from "./controls";
+import type { AuxiliaryControlState, ControlMask, ExcavatorControlState } from "./controls";
+import {
+  COCKPIT_LAYOUT,
+  LOCKED_CONTROLS,
+  createAuxiliaryControls,
+  filterInput,
+} from "./controls";
 import { CockpitOverlay } from "./CockpitOverlay";
 import { TutorialIntro } from "./TutorialIntro";
 import {
@@ -61,8 +68,11 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
   const [input, setInput] = useState<ExcavatorControlState>({
     left: { x: 0, y: 0 },
     right: { x: 0, y: 0 },
-    travel: 0,
+    travel: { left: 0, right: 0 },
   });
+  const [auxiliary, setAuxiliary] = useState<AuxiliaryControlState>(
+    createAuxiliaryControls,
+  );
   const [hud, setHud] = useState({
     progress: 0,
     timeLeft: config.duration,
@@ -100,13 +110,11 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
       if (Math.abs(h.boom - boom) < 0.01) return h;
       return { ...h, boom };
     });
-  }, []);
+  }, [setDigFeedback, setHud]);
 
   const inputRef = useRef(input);
-  inputRef.current = input;
 
   const modeRef = useRef<GameMode>(mode);
-  modeRef.current = mode;
 
   const simRef = useRef<ExcavatorSimState>(createInitialSim());
   const velRef = useRef<HydraulicVelocity>(createHydraulicVelocity());
@@ -119,14 +127,46 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     mode === "tutorial" ? TUTORIAL_STEPS[tutorialIndex] ?? null : null;
 
   const tutorialStepRef = useRef<TutorialStep | null>(tutorialStep);
-  tutorialStepRef.current = tutorialStep;
-  tutorialIndexRef.current = tutorialIndex;
 
-  const allowed: ControlMask =
+  const baseAllowed: ControlMask =
     mode === "game" ? ALL_CONTROLS : (tutorialStep?.allowed ?? ALL_CONTROLS);
+  const allowed: ControlMask = auxiliary.safetyLocked ? LOCKED_CONTROLS : baseAllowed;
 
   const allowedRef = useRef<ControlMask>(allowed);
-  allowedRef.current = allowed;
+
+  const auxiliaryRef = useRef<AuxiliaryControlState>(auxiliary);
+
+  useEffect(() => {
+    inputRef.current = input;
+  }, [input]);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+
+  useEffect(() => {
+    tutorialStepRef.current = tutorialStep;
+    tutorialIndexRef.current = tutorialIndex;
+  }, [tutorialIndex, tutorialStep]);
+
+  useEffect(() => {
+    allowedRef.current = allowed;
+  }, [allowed]);
+
+  useEffect(() => {
+    auxiliaryRef.current = auxiliary;
+  }, [auxiliary]);
+
+  const handleAuxiliaryChange = useCallback((next: AuxiliaryControlState) => {
+    setAuxiliary(next);
+    if (next.safetyLocked) {
+      setInput({
+        left: { x: 0, y: 0 },
+        right: { x: 0, y: 0 },
+        travel: { left: 0, right: 0 },
+      });
+    }
+  }, [setAuxiliary, setInput]);
 
   const startGame = useCallback(() => {
     resetSim(simRef.current, velRef.current);
@@ -136,9 +176,10 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     endedRef.current = false;
     elapsedRef.current = 0;
     lastHudProgressRef.current = -1;
+    setAuxiliary(createAuxiliaryControls());
     setHud({ progress: 0, timeLeft: config.duration, bucketLoad: 0, goalDist: 0, boom: 0.45 });
     setMode("game");
-  }, [config.duration, config.target]);
+  }, [config.duration, config.target, setAuxiliary, setHud, setMode]);
 
   const startTutorial = useCallback(() => {
     resetSim(simRef.current, velRef.current);
@@ -147,9 +188,10 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     tutorialCompletingRef.current = false;
     tutorialIndexRef.current = 0;
     tutorialStepRef.current = TUTORIAL_STEPS[0] ?? null;
+    setAuxiliary(createAuxiliaryControls());
     setTutorialIndex(0);
     setMode("tutorial");
-  }, []);
+  }, [setAuxiliary, setMode, setTutorialIndex]);
 
   const advanceTutorial = useCallback(() => {
     if (tutorialCompletingRef.current) return;
@@ -165,7 +207,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     window.setTimeout(() => {
       tutorialCompletingRef.current = false;
     }, 900);
-  }, []);
+  }, [setStepCompleteFlash, setTutorialIndex]);
 
   const handleTutorialTick = useCallback(() => {
     if (modeRef.current !== "tutorial") return;
@@ -197,7 +239,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
       return { ...h, bucketLoad: load, goalDist };
     });
     syncDigHud();
-  }, [advanceTutorial, startGame, syncDigHud]);
+  }, [advanceTutorial, startGame, syncDigHud, setHud]);
 
   const handleProgress = useCallback(
     (dumped: number, progress: number) => {
@@ -220,7 +262,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
         });
       }
     },
-    [config.target, onEnd],
+    [config.target, onEnd, setHud],
   );
 
   useEffect(() => {
@@ -284,13 +326,23 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     const updateKeys = () => {
       const left = { x: 0, y: 0 };
       const right = { x: 0, y: 0 };
-      let travel = 0;
+      const travel = { left: 0, right: 0 };
       if (keys.has("a") || keys.has("arrowleft")) left.x = -1;
       if (keys.has("d") || keys.has("arrowright")) left.x = 1;
       if (keys.has("q")) left.y = -1;
       if (keys.has("e")) left.y = 1;
-      if (keys.has("w") || keys.has("arrowup")) travel = 1;
-      if (keys.has("s") || keys.has("arrowdown")) travel = -1;
+      if (keys.has("w") || keys.has("arrowup")) {
+        travel.left = 1;
+        travel.right = 1;
+      }
+      if (keys.has("s") || keys.has("arrowdown")) {
+        travel.left = -1;
+        travel.right = -1;
+      }
+      if (keys.has("z")) travel.left = 1;
+      if (keys.has("x")) travel.right = 1;
+      if (keys.has("c")) travel.left = -1;
+      if (keys.has("v")) travel.right = -1;
       if (keys.has("j")) right.x = -1;
       if (keys.has("l")) right.x = 1;
       if (keys.has("i")) right.y = 1;
@@ -313,8 +365,6 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
     };
   }, []);
 
-  const cockpitBottom = immersive ? "bottom-[44%]" : "bottom-[46%]";
-
   return (
     <div
       className={`relative touch-manipulation ${immersive ? "h-full w-full" : "mx-auto w-full max-w-lg"}`}
@@ -325,13 +375,13 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
         }`}
       >
         {mode !== "intro" && (
-          <div className="absolute inset-x-0 top-2 z-30 flex justify-center px-2">
+          <div className="absolute inset-x-0 top-0 z-30 flex justify-center bg-gradient-to-b from-black/55 to-transparent px-2 py-2">
             <button
               type="button"
               onClick={() => setShowControlsGuide(true)}
               className="rounded-lg border border-white/20 bg-black/65 px-3 py-1 text-xs font-semibold text-white shadow-md backdrop-blur-sm hover:bg-black/80"
             >
-              기능
+              기능정보
             </button>
           </div>
         )}
@@ -342,7 +392,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
         />
 
         {mode === "game" && (
-          <div className="absolute left-0 right-0 top-0 z-20 flex justify-between p-2 pr-[6.5rem] pt-10">
+          <div className="absolute left-0 right-0 top-0 z-20 flex justify-between p-2 pr-[8rem] pt-10">
             <div className="rounded-lg bg-black/60 px-3 py-1 text-sm font-bold text-white">
               진행: {hud.progress}%
             </div>
@@ -354,7 +404,9 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
 
         {mode === "tutorial" && tutorialStep && (
           <div className="absolute right-2 z-20 rounded bg-black/40 px-1.5 py-0.5 text-[9px] text-white/70"
-            style={{ bottom: `calc(${((682 / 1024) * 100).toFixed(1)}% + 2.75rem)` }}
+            style={{
+              bottom: `calc(${((COCKPIT_LAYOUT.height / COCKPIT_LAYOUT.width) * 100).toFixed(1)}% + 2.75rem)`,
+            }}
           >
             {tutorialIndex + 1}/{TUTORIAL_STEPS.length}
           </div>
@@ -397,10 +449,10 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
             <div className="absolute left-2 top-[7.5rem] z-20 rounded-lg bg-black/50 px-2 py-1 text-xs text-white">
               적재 {Math.round(hud.bucketLoad * 100)}%
             </div>
-            <div className="absolute right-2 top-[6.5rem] z-20 rounded-lg bg-orange-600/80 px-2 py-1 text-[10px] text-white">
+            <div className="absolute right-2 top-[8.75rem] z-20 rounded-lg bg-orange-600/80 px-2 py-1 text-[10px] text-white">
               🟠 굴착
             </div>
-            <div className="absolute right-2 top-[8.25rem] z-20 rounded-lg bg-green-600/80 px-2 py-1 text-[10px] text-white">
+            <div className="absolute right-2 top-[10.5rem] z-20 rounded-lg bg-green-600/80 px-2 py-1 text-[10px] text-white">
               🟢 덤프
             </div>
           </>
@@ -415,7 +467,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
         )}
 
         {mode !== "intro" && (
-          <div className={`absolute inset-x-0 top-0 z-0 ${cockpitBottom}`}>
+          <div className="absolute inset-0 z-0">
             <ExcavatorScene
               inputRef={inputRef}
               simRef={simRef}
@@ -424,6 +476,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
               scoreRef={scoreRef}
               modeRef={modeRef}
               allowedRef={allowedRef}
+              auxiliaryRef={auxiliaryRef}
               tutorialStepRef={tutorialStepRef}
               tutorialDumpRef={tutorialDumpRef}
               digFeedbackRef={digFeedbackRef}
@@ -439,6 +492,8 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
             onInputChange={(next) =>
               setInput(filterInput(next, allowedRef.current))
             }
+            auxiliary={auxiliary}
+            onAuxiliaryChange={handleAuxiliaryChange}
             allowed={allowed}
             tutorialStep={tutorialStep}
             onSkipTutorial={mode === "tutorial" ? startGame : undefined}
@@ -449,7 +504,7 @@ export function ExcavatorGameWrapper({ onEnd, immersive = false }: ExcavatorGame
           <button
             type="button"
             onClick={startTutorial}
-            className="absolute bottom-[46%] right-3 z-20 rounded-lg bg-black/55 px-2.5 py-1 text-xs text-white backdrop-blur hover:bg-black/70"
+            className="absolute bottom-[57%] right-3 z-20 rounded-lg bg-black/55 px-2.5 py-1 text-xs text-white backdrop-blur hover:bg-black/70"
           >
             조작 연습
           </button>

@@ -13,8 +13,8 @@ interface ExcavatorMinimapProps {
   visible: boolean;
 }
 
-const SIZE = 88;
-const PAD = 6;
+const SIZE = 108;
+const PAD = 10;
 
 function worldToMinimap(
   x: number,
@@ -54,32 +54,64 @@ export function ExcavatorMinimap({
 
       ctx.clearRect(0, 0, SIZE, SIZE);
 
-      ctx.fillStyle = "rgba(0,0,0,0.65)";
+      const shell = ctx.createLinearGradient(0, 0, SIZE, SIZE);
+      shell.addColorStop(0, "#2b3038");
+      shell.addColorStop(0.46, "#101319");
+      shell.addColorStop(1, "#050609");
+      ctx.fillStyle = shell;
       ctx.beginPath();
-      ctx.roundRect(0, 0, SIZE, SIZE, 8);
+      ctx.roundRect(0, 0, SIZE, SIZE, 14);
       ctx.fill();
 
-      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.strokeStyle = "rgba(229,57,53,0.9)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.18)";
       ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(5, 5, SIZE - 10, SIZE - 10, 10);
       ctx.stroke();
 
       const inner = SIZE - PAD * 2;
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        const p = PAD + (inner / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(p, PAD);
+        ctx.lineTo(p, SIZE - PAD);
+        ctx.moveTo(PAD, p);
+        ctx.lineTo(SIZE - PAD, p);
+        ctx.stroke();
+      }
 
       // 굴착 구역
       const dig = worldToMinimap(DIG_ZONE.x, DIG_ZONE.z, bounds);
       const digR = (DIG_ZONE.radius / (bounds.maxX - bounds.minX)) * inner;
-      ctx.fillStyle = "rgba(255,152,0,0.35)";
+      ctx.fillStyle = "rgba(255,143,0,0.28)";
       ctx.beginPath();
       ctx.arc(dig.px, dig.py, Math.max(digR, 4), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#ffb300";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#fff3c4";
+      ctx.beginPath();
+      ctx.arc(dig.px, dig.py, 3, 0, Math.PI * 2);
       ctx.fill();
 
       // 덤프 구역
       const dump = worldToMinimap(DUMP_ZONE.x, DUMP_ZONE.z, bounds);
       const dumpR = (DUMP_ZONE.radius / (bounds.maxX - bounds.minX)) * inner;
-      ctx.fillStyle = "rgba(76,175,80,0.35)";
+      ctx.fillStyle = "rgba(76,175,80,0.25)";
       ctx.beginPath();
       ctx.arc(dump.px, dump.py, Math.max(dumpR, 3), 0, Math.PI * 2);
       ctx.fill();
+      ctx.strokeStyle = "#81c784";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#c8e6c9";
+      ctx.fillRect(dump.px - 3, dump.py - 3, 6, 6);
 
       // 목표 지점
       if (wp) {
@@ -87,10 +119,10 @@ export function ExcavatorMinimap({
         const pulse = 0.7 + Math.sin(Date.now() / 200) * 0.3;
         ctx.fillStyle = `rgba(41,182,246,${pulse})`;
         ctx.beginPath();
-        ctx.arc(goal.px, goal.py, 5, 0, Math.PI * 2);
+        ctx.arc(goal.px, goal.py, 6, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "#e1f5fe";
+        ctx.lineWidth = 2;
         ctx.stroke();
       }
 
@@ -110,6 +142,8 @@ export function ExcavatorMinimap({
       const by = py + dirY * (tipLen - baseLen);
       const nx = -dirY;
       const ny = dirX;
+      ctx.shadowColor = "rgba(239,83,80,0.75)";
+      ctx.shadowBlur = 8;
       ctx.fillStyle = "#ef5350";
       ctx.beginPath();
       ctx.moveTo(tx, ty);
@@ -117,10 +151,16 @@ export function ExcavatorMinimap({
       ctx.lineTo(bx - nx * halfW, by - ny * halfW);
       ctx.closePath();
       ctx.fill();
+      ctx.shadowBlur = 0;
       ctx.fillStyle = "rgba(255,255,255,0.85)";
       ctx.beginPath();
       ctx.arc(px, py, 1.5, 0, Math.PI * 2);
       ctx.fill();
+
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.font = "700 8px sans-serif";
+      ctx.fillText("DIG", Math.max(7, dig.px - 8), Math.max(11, dig.py - digR - 3));
+      ctx.fillText("DUMP", Math.min(SIZE - 28, dump.px - 12), Math.max(11, dump.py - dumpR - 3));
 
       raf = requestAnimationFrame(draw);
     };
@@ -132,12 +172,12 @@ export function ExcavatorMinimap({
   if (!visible) return null;
 
   return (
-    <div className="pointer-events-none absolute right-2 top-2 z-20">
+    <div className="pointer-events-none absolute right-2 top-2 z-20 rounded-2xl bg-black/35 p-1 shadow-[0_8px_20px_rgba(0,0,0,0.35)] backdrop-blur-sm">
       <canvas
         ref={canvasRef}
         width={SIZE}
         height={SIZE}
-        className="rounded-lg border border-white/20 shadow-lg"
+        className="rounded-2xl"
         aria-label="미니맵"
       />
     </div>

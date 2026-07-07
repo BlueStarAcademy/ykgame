@@ -48,7 +48,7 @@ export function DigHintPanel({ feedback, bucketLoad, boom, show }: DigHintPanelP
   );
 
   return (
-    <div className="absolute left-2 top-2 z-20 max-w-[11.5rem] rounded-lg bg-black/75 px-2.5 py-2 text-white backdrop-blur-sm">
+    <div className="absolute left-2 bottom-[58%] z-20 max-w-[10.5rem] rounded-lg bg-black/70 px-2 py-1.5 text-white shadow-lg backdrop-blur-sm">
       <p className="text-[10px] font-bold text-orange-300">굴착 방법</p>
       <p className="mt-0.5 text-[8px] text-white/50">
         우레버 앞=붐↓ · 뒤=붐↑ · 좌=버킷말기

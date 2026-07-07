@@ -1,9 +1,11 @@
 "use client";
 
+/* eslint-disable react-hooks/refs */
+
 import { useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { ExcavatorControlState, ControlMask } from "./controls";
+import type { AuxiliaryControlState, ExcavatorControlState, ControlMask } from "./controls";
 import {
   applyControls,
   canDumpBucket,
@@ -22,7 +24,6 @@ import {
   DUMP_ZONE,
 } from "./terrain";
 import {
-  createDigFeedback,
   getBucketTipWorld,
   type DigFeedback,
 } from "./bucket";
@@ -48,6 +49,7 @@ interface ExcavatorSceneProps {
   scoreRef: React.MutableRefObject<DiggingScoreState>;
   modeRef: React.RefObject<GameMode>;
   allowedRef: React.RefObject<ControlMask>;
+  auxiliaryRef: React.RefObject<AuxiliaryControlState>;
   tutorialStepRef: React.RefObject<TutorialStep | null>;
   tutorialDumpRef: React.MutableRefObject<number>;
   digFeedbackRef: React.MutableRefObject<DigFeedback>;
@@ -82,9 +84,9 @@ function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
     const colors = colorsRef.current;
     if (!geo || !colors) return;
     const pos = geo.attributes.position as THREE.BufferAttribute;
-    const c0 = new THREE.Color("#9a7b4f");
-    const cDug = new THREE.Color("#5c3d1e");
-    const cMound = new THREE.Color("#b8956a");
+    const c0 = new THREE.Color("#b78958");
+    const cDug = new THREE.Color("#5b351a");
+    const cMound = new THREE.Color("#d29b5b");
 
     for (let gz = 0; gz < t.gridSize; gz++) {
       for (let gx = 0; gx < t.gridSize; gx++) {
@@ -115,22 +117,26 @@ function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
         terrainRef.current.originZ + (terrainRef.current.gridSize * terrainRef.current.cellSize) / 2,
       ]}
     >
-      <meshStandardMaterial vertexColors roughness={0.92} metalness={0.02} />
+      <meshStandardMaterial vertexColors roughness={0.82} metalness={0.03} />
     </mesh>
   );
 }
 
 function ExcavatorArm({
   simRef,
+  auxiliaryRef,
 }: {
   simRef: React.MutableRefObject<ExcavatorSimState>;
+  auxiliaryRef: React.RefObject<AuxiliaryControlState>;
 }) {
   const groupRef = useRef<THREE.Group>(null);
+  const boomSwingRef = useRef<THREE.Group>(null);
   const boomRef = useRef<THREE.Group>(null);
   const armRef = useRef<THREE.Group>(null);
   const bucketRef = useRef<THREE.Group>(null);
   const dirtRef = useRef<THREE.Mesh>(null);
   const tipRef = useRef<THREE.Mesh>(null);
+  const bladeRef = useRef<THREE.Group>(null);
 
   const boomLen = 3;
   const armLen = 2.5;
@@ -142,9 +148,13 @@ function ExcavatorArm({
     if (!g) return;
     g.position.set(s.posX, 0, s.posZ);
     g.rotation.y = s.heading + s.swing;
-    if (boomRef.current) boomRef.current.rotation.z = s.boom;
-    if (armRef.current) armRef.current.rotation.z = s.arm;
-    if (bucketRef.current) bucketRef.current.rotation.z = s.bucket;
+    const aux = auxiliaryRef.current;
+    if (boomSwingRef.current) boomSwingRef.current.rotation.y = (aux?.boomSwing ?? 0) * 0.38;
+    // Match the visual pivots to bucket.ts: segment direction is (sin(theta), cos(theta)).
+    if (boomRef.current) boomRef.current.rotation.z = Math.PI / 2 - s.boom;
+    if (armRef.current) armRef.current.rotation.z = -s.arm;
+    if (bucketRef.current) bucketRef.current.rotation.z = -s.bucket;
+    if (bladeRef.current) bladeRef.current.position.y = 0.25 + (aux?.blade ?? 0) * 0.36;
     if (dirtRef.current) {
       const load = s.bucketLoad;
       dirtRef.current.visible = load > 0.03;
@@ -168,39 +178,76 @@ function ExcavatorArm({
       <group rotation={[0, -Math.PI / 2, 0]}>
       <mesh position={[0, 0.6, 0]}>
         <boxGeometry args={[2.2, 1.2, 1.8]} />
-        <meshStandardMaterial color="#E53935" />
+        <meshStandardMaterial color="#d92323" roughness={0.48} metalness={0.08} />
       </mesh>
       <mesh position={[0, 0.2, 0]}>
         <boxGeometry args={[2.4, 0.4, 2]} />
-        <meshStandardMaterial color="#333" />
+        <meshStandardMaterial color="#20242b" roughness={0.65} metalness={0.12} />
       </mesh>
 
-      <group ref={boomRef} position={[0.8, 1.0, 0]}>
-        <mesh position={[boomLen / 2, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-          <boxGeometry args={[boomLen, 0.25, 0.25]} />
-          <meshStandardMaterial color="#FFD54F" />
+      <group ref={bladeRef} position={[-0.75, 0.25, 0]}>
+        <mesh position={[-0.25, 0, 0]} rotation={[0, 0, 0]}>
+          <boxGeometry args={[0.32, 0.8, 2.65]} />
+          <meshStandardMaterial color="#37424d" roughness={0.42} metalness={0.32} />
         </mesh>
+        <mesh position={[-0.46, 0.08, 0]}>
+          <boxGeometry args={[0.16, 0.5, 2.35]} />
+          <meshStandardMaterial color="#d7dde2" roughness={0.36} metalness={0.45} />
+        </mesh>
+      </group>
 
-        <group ref={armRef} position={[boomLen, 0, 0]}>
-          <mesh position={[armLen / 2, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-            <boxGeometry args={[armLen, 0.2, 0.2]} />
-            <meshStandardMaterial color="#FFD54F" />
+      <group ref={boomSwingRef} position={[0.8, 1.0, 0]}>
+        <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.28, 0.28, 0.55, 24]} />
+          <meshStandardMaterial color="#2b3139" roughness={0.38} metalness={0.32} />
+        </mesh>
+        <group ref={boomRef}>
+          <mesh position={[boomLen / 2, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
+            <capsuleGeometry args={[0.16, boomLen, 8, 16]} />
+            <meshStandardMaterial color="#d92323" roughness={0.42} metalness={0.12} />
+          </mesh>
+          <mesh position={[boomLen / 2, 0.03, 0]} rotation={[0, 0, -Math.PI / 2]}>
+            <capsuleGeometry args={[0.07, boomLen * 0.86, 6, 12]} />
+            <meshStandardMaterial color="#f9c74f" roughness={0.35} metalness={0.16} />
           </mesh>
 
-          <group ref={bucketRef} position={[armLen, 0, 0]}>
-            <mesh position={[bucketLen / 2, -0.15, 0]} rotation={[0, 0, -Math.PI / 2]}>
-              <boxGeometry args={[bucketLen, 0.5, 0.8]} />
-              <meshStandardMaterial color="#777" metalness={0.3} roughness={0.6} />
+          <group ref={armRef} position={[boomLen, 0, 0]}>
+            <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.22, 0.22, 0.46, 20]} />
+              <meshStandardMaterial color="#303741" roughness={0.36} metalness={0.34} />
             </mesh>
-            <mesh
-              ref={dirtRef}
-              position={[bucketLen * 0.45, -0.05, 0]}
-              rotation={[0, 0, -Math.PI / 2]}
-              visible={false}
-            >
-              <boxGeometry args={[bucketLen * 0.55, 0.35, 0.55]} />
-              <meshStandardMaterial color="#6d4c2a" roughness={1} />
+            <mesh position={[armLen / 2, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
+              <capsuleGeometry args={[0.13, armLen, 8, 16]} />
+              <meshStandardMaterial color="#c61f1f" roughness={0.44} metalness={0.14} />
             </mesh>
+            <mesh position={[armLen / 2, 0.03, 0]} rotation={[0, 0, -Math.PI / 2]}>
+              <capsuleGeometry args={[0.055, armLen * 0.78, 6, 12]} />
+              <meshStandardMaterial color="#ffcf57" roughness={0.35} metalness={0.12} />
+            </mesh>
+
+            <group ref={bucketRef} position={[armLen, 0, 0]}>
+              <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.17, 0.17, 0.42, 18]} />
+                <meshStandardMaterial color="#38414a" roughness={0.36} metalness={0.38} />
+              </mesh>
+              <mesh position={[bucketLen / 2, -0.15, 0]} rotation={[0, 0, -Math.PI / 2]}>
+                <boxGeometry args={[bucketLen, 0.5, 0.8]} />
+                <meshStandardMaterial color="#59616b" metalness={0.38} roughness={0.48} />
+              </mesh>
+              <mesh position={[bucketLen * 0.92, -0.33, 0]} rotation={[0, 0, -Math.PI / 2]}>
+                <boxGeometry args={[0.12, 0.16, 0.92]} />
+                <meshStandardMaterial color="#e4e8eb" metalness={0.45} roughness={0.3} />
+              </mesh>
+              <mesh
+                ref={dirtRef}
+                position={[bucketLen * 0.45, -0.05, 0]}
+                rotation={[0, 0, -Math.PI / 2]}
+                visible={false}
+              >
+                <boxGeometry args={[bucketLen * 0.55, 0.35, 0.55]} />
+                <meshStandardMaterial color="#6d4c2a" roughness={1} />
+              </mesh>
+            </group>
           </group>
         </group>
       </group>
@@ -221,12 +268,15 @@ function FirstPersonCamera({
 }) {
   useFrame(({ camera }) => {
     const s = simRef.current;
-    const camX = s.posX - Math.sin(s.heading + s.swing) * 0.5;
-    const camZ = s.posZ - Math.cos(s.heading + s.swing) * 0.5;
-    camera.position.set(camX, 2.2, camZ);
-    const lookX = s.posX + Math.sin(s.heading + s.swing) * 5;
-    const lookZ = s.posZ + Math.cos(s.heading + s.swing) * 5;
-    camera.lookAt(lookX, 1.5, lookZ);
+    const facing = s.heading + s.swing;
+    const sideX = Math.cos(facing);
+    const sideZ = -Math.sin(facing);
+    const camX = s.posX - Math.sin(facing) * 2.1 + sideX * 1.15;
+    const camZ = s.posZ - Math.cos(facing) * 2.1 + sideZ * 1.15;
+    camera.position.set(camX, 3.15, camZ);
+    const lookX = s.posX + Math.sin(facing) * 5.6;
+    const lookZ = s.posZ + Math.cos(facing) * 5.6;
+    camera.lookAt(lookX, 1.15, lookZ);
   });
   return null;
 }
@@ -380,15 +430,129 @@ function ZoneMarkers() {
     <>
       <mesh position={[DIG_ZONE.x, 0.15, DIG_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[DIG_ZONE.radius, 48]} />
-        <meshBasicMaterial color="#ff9800" transparent opacity={0.12} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#ff8f00" transparent opacity={0.18} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[DIG_ZONE.x, 0.2, DIG_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[DIG_ZONE.radius - 0.4, DIG_ZONE.radius, 48]} />
-        <meshBasicMaterial color="#ff9800" transparent opacity={0.65} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#ffb300" transparent opacity={0.85} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[DIG_ZONE.x, 0.26, DIG_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[2.5, 3.2, 36]} />
+        <meshBasicMaterial color="#fff3c4" transparent opacity={0.7} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[DUMP_ZONE.x, 0.12, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[DUMP_ZONE.radius, 40]} />
+        <meshBasicMaterial color="#1b5e20" transparent opacity={0.16} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[DUMP_ZONE.x, 0.2, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[DUMP_ZONE.radius - 0.3, DUMP_ZONE.radius, 32]} />
-        <meshBasicMaterial color="#4caf50" transparent opacity={0.55} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#66bb6a" transparent opacity={0.82} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[DUMP_ZONE.x, 0.25, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <boxGeometry args={[4.2, 4.2, 0.08]} />
+        <meshBasicMaterial color="#a5d6a7" transparent opacity={0.55} />
+      </mesh>
+    </>
+  );
+}
+
+function SafetyCone({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, 0.1, z]}>
+      <mesh position={[0, 0.12, 0]}>
+        <cylinderGeometry args={[0.36, 0.46, 0.18, 12]} />
+        <meshStandardMaterial color="#15171d" roughness={0.7} />
+      </mesh>
+      <mesh position={[0, 0.58, 0]}>
+        <coneGeometry args={[0.32, 0.95, 16]} />
+        <meshStandardMaterial color="#ff5a1f" roughness={0.55} />
+      </mesh>
+      <mesh position={[0, 0.66, 0]}>
+        <cylinderGeometry args={[0.22, 0.27, 0.08, 16]} />
+        <meshStandardMaterial color="#fff3d0" roughness={0.45} />
+      </mesh>
+    </group>
+  );
+}
+
+function WorksiteSetDressing() {
+  const cones = [
+    [-35, -35],
+    [-15, -35],
+    [5, -35],
+    [25, -35],
+    [43, -25],
+    [43, -5],
+    [43, 15],
+    [-35, 34],
+    [-12, 34],
+    [10, 34],
+    [32, 28],
+  ] as const;
+
+  return (
+    <>
+      <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[63, 64, 4]} />
+        <meshBasicMaterial color="#e53935" transparent opacity={0.45} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 4]}>
+        <ringGeometry args={[59.5, 60, 4]} />
+        <meshBasicMaterial color="#20242b" transparent opacity={0.65} side={THREE.DoubleSide} />
+      </mesh>
+      {cones.map(([x, z]) => (
+        <SafetyCone key={`${x}:${z}`} x={x} z={z} />
+      ))}
+      <mesh position={[DUMP_ZONE.x + 8, 1.8, DUMP_ZONE.z - 7]} rotation={[0, -0.55, 0]}>
+        <boxGeometry args={[5.2, 2.2, 0.2]} />
+        <meshStandardMaterial color="#263238" roughness={0.4} />
+      </mesh>
+      <mesh position={[DUMP_ZONE.x + 8, 1.8, DUMP_ZONE.z - 7.12]} rotation={[0, -0.55, 0]}>
+        <boxGeometry args={[4.5, 1.5, 0.08]} />
+        <meshBasicMaterial color="#4caf50" transparent opacity={0.8} />
+      </mesh>
+    </>
+  );
+}
+
+function AuxiliarySceneEffects({
+  auxiliaryRef,
+}: {
+  auxiliaryRef: React.RefObject<AuxiliaryControlState>;
+}) {
+  const lightRef = useRef<THREE.SpotLight>(null);
+  const beaconRef = useRef<THREE.Mesh>(null);
+
+  useFrame((state) => {
+    const aux = auxiliaryRef.current;
+    if (!aux) return;
+    if (lightRef.current) {
+      lightRef.current.intensity = aux.workLight ? 2.8 : 0;
+    }
+    if (beaconRef.current) {
+      beaconRef.current.visible = aux.highSpeed || aux.safetyLocked;
+      beaconRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 8) * 0.12);
+      const mat = beaconRef.current.material;
+      if (mat instanceof THREE.MeshBasicMaterial) {
+        mat.color.set(aux.safetyLocked ? "#ff1744" : "#29b6f6");
+      }
+    }
+  });
+
+  return (
+    <>
+      <spotLight
+        ref={lightRef}
+        position={[0, 12, -18]}
+        angle={0.42}
+        penumbra={0.55}
+        distance={70}
+        intensity={0}
+        color="#fff4c0"
+      />
+      <mesh ref={beaconRef} position={[0, 5.2, -4]} visible={false}>
+        <sphereGeometry args={[0.45, 16, 16]} />
+        <meshBasicMaterial color="#29b6f6" transparent opacity={0.75} />
       </mesh>
     </>
   );
@@ -402,9 +566,11 @@ function SceneContent(props: ExcavatorSceneProps) {
       <ambientLight intensity={0.65} />
       <directionalLight position={[10, 20, 10]} intensity={1.2} castShadow={false} />
       <TerrainMesh terrainRef={props.terrainRef} />
+      <WorksiteSetDressing />
       <ZoneMarkers />
       <WaypointMarker tutorialStepRef={props.tutorialStepRef} />
-      <ExcavatorArm simRef={props.simRef} />
+      <AuxiliarySceneEffects auxiliaryRef={props.auxiliaryRef} />
+      <ExcavatorArm simRef={props.simRef} auxiliaryRef={props.auxiliaryRef} />
       <FirstPersonCamera simRef={props.simRef} />
       <SimLoop {...props} />
     </>
