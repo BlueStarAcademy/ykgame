@@ -293,11 +293,12 @@ function ExcavatorArm({
   const ykLogo = useMemo(() => createLabelTexture("YK건기"), []);
   const bucketSideShape = useMemo(() => {
     const shape = new THREE.Shape();
-    shape.moveTo(-0.38, 0.18);
-    shape.quadraticCurveTo(-0.02, 0.38, 0.36, 0.2);
-    shape.lineTo(0.86, -0.36);
-    shape.quadraticCurveTo(0.42, -0.66, -0.2, -0.38);
-    shape.quadraticCurveTo(-0.42, -0.18, -0.38, 0.18);
+    shape.moveTo(-0.44, 0.2);
+    shape.quadraticCurveTo(-0.18, 0.36, 0.3, 0.34);
+    shape.lineTo(0.86, 0.12);
+    shape.quadraticCurveTo(0.68, -0.22, 0.32, -0.5);
+    shape.quadraticCurveTo(-0.16, -0.64, -0.42, -0.26);
+    shape.quadraticCurveTo(-0.52, -0.02, -0.44, 0.2);
     return shape;
   }, []);
 
@@ -416,34 +417,41 @@ function ExcavatorArm({
                     />
                   </mesh>
                 ))}
-                {[
-                  { x: -0.12, y: 0.13, r: -0.52, w: 0.68, c: "#505b66" },
-                  { x: 0.08, y: -0.02, r: -0.32, w: 0.82, c: "#343d47" },
-                  { x: 0.28, y: -0.18, r: -0.12, w: 0.9, c: "#20272f" },
-                  { x: 0.48, y: -0.34, r: 0.08, w: 0.78, c: "#151a21" },
-                ].map((plate) => (
-                  <mesh key={`${plate.x}-${plate.y}`} position={[plate.x, plate.y, 0]} rotation={[0, 0, plate.r]}>
-                    <boxGeometry args={[plate.w, 0.12, 0.94]} />
-                    <meshStandardMaterial color={plate.c} metalness={0.48} roughness={0.42} />
-                  </mesh>
-                ))}
-                <mesh position={[-0.26, 0.18, 0]} rotation={[0, 0, -0.35]}>
-                  <boxGeometry args={[0.32, 0.18, 1.02]} />
-                  <meshStandardMaterial color="#66717c" metalness={0.38} roughness={0.46} />
+                <mesh position={[-0.34, -0.08, 0]} rotation={[0, 0, 0.18]}>
+                  <boxGeometry args={[0.34, 0.14, 1.02]} />
+                  <meshStandardMaterial color="#59636e" metalness={0.38} roughness={0.46} />
+                </mesh>
+                <mesh position={[0.14, -0.4, 0]} rotation={[0, 0, 0.08]}>
+                  <boxGeometry args={[0.82, 0.12, 0.86]} />
+                  <meshStandardMaterial color="#151a21" metalness={0.52} roughness={0.42} />
+                </mesh>
+                <mesh position={[0.58, 0.1, 0]} rotation={[0, 0, -0.26]}>
+                  <boxGeometry args={[0.36, 0.1, 0.86]} />
+                  <meshStandardMaterial color="#2d3540" metalness={0.48} roughness={0.45} />
+                </mesh>
+                <mesh position={[0.22, -0.08, 0]}>
+                  <boxGeometry args={[0.62, 0.05, 0.62]} />
+                  <meshStandardMaterial color="#080b0f" metalness={0.2} roughness={0.9} />
                 </mesh>
                 {[1, -1].map((side) => (
-                  <mesh key={side} position={[-0.22, 0.13, side * 0.535]} rotation={[Math.PI / 2, 0, 0]}>
-                    <cylinderGeometry args={[0.11, 0.11, 0.06, 18]} />
-                    <meshStandardMaterial color="#d5dbe1" metalness={0.62} roughness={0.24} />
-                  </mesh>
+                  <group key={side}>
+                    <mesh position={[-0.22, 0.13, side * 0.535]} rotation={[Math.PI / 2, 0, 0]}>
+                      <cylinderGeometry args={[0.11, 0.11, 0.06, 18]} />
+                      <meshStandardMaterial color="#d5dbe1" metalness={0.62} roughness={0.24} />
+                    </mesh>
+                    <mesh position={[0.24, -0.08, side * 0.43]} rotation={[0.08 * side, 0, -0.08]}>
+                      <boxGeometry args={[0.74, 0.08, 0.08]} />
+                      <meshStandardMaterial color="#4b5561" metalness={0.42} roughness={0.44} />
+                    </mesh>
+                  </group>
                 ))}
-                <mesh position={[0.78, -0.43, 0]} rotation={[0, 0, -0.18]}>
-                  <boxGeometry args={[0.2, 0.12, 1.1]} />
+                <mesh position={[0.82, 0.12, 0]} rotation={[0, 0, -0.18]}>
+                  <boxGeometry args={[0.2, 0.12, 1.08]} />
                   <meshStandardMaterial color="#cfd6dd" metalness={0.58} roughness={0.26} />
                 </mesh>
                 {[-0.44, -0.22, 0, 0.22, 0.44].map((z) => (
-                  <mesh key={z} position={[0.78, -0.42, z]} rotation={[0, 0, Math.PI + 0.72]}>
-                    <coneGeometry args={[0.105, 0.18, 4]} />
+                  <mesh key={z} position={[0.94, 0.18, z]} rotation={[0, 0, -Math.PI / 2]}>
+                    <coneGeometry args={[0.085, 0.18, 4]} />
                     <meshStandardMaterial color="#cfd6dd" metalness={0.58} roughness={0.24} />
                   </mesh>
                 ))}
