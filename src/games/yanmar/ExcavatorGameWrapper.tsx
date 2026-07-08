@@ -25,10 +25,7 @@ import {
   createInitialTerrain,
   type ExcavatorSimState,
 } from "./ExcavatorScene";
-import {
-  getViewportOrientation,
-  unlockOrientation,
-} from "@/lib/fullscreen";
+import { getViewportOrientation } from "@/lib/fullscreen";
 import { createHydraulicVelocity, type HydraulicVelocity } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
 import { DigPoseGraph } from "./DigHintPanel";
@@ -378,30 +375,16 @@ export function ExcavatorGameWrapper({
   const [resettingEquipment, setResettingEquipment] = useState(false);
   const [headerHudReady, setHeaderHudReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(1);
-  /** Mobile-first: portrait until client measures the real viewport. */
-  const [layoutMode, setLayoutMode] = useState<CockpitLayoutMode>("portrait");
-  const layoutPinnedRef = useRef(false);
+  /**
+   * Cockpit layout is chosen once from the current viewport, then only by the
+   * HUD toggle. Auto-following resize/orientation caused flip-flopping on
+   * mobile address-bar / fullscreen chrome changes.
+   */
+  const [layoutMode, setLayoutMode] = useState<CockpitLayoutMode>(() =>
+    typeof window === "undefined" ? "portrait" : getViewportOrientation(),
+  );
   const layoutPortrait = layoutMode === "portrait";
   const endedRef = useRef(false);
-
-  useEffect(() => {
-    // Drop any orientation lock left by older builds / fullscreen enter.
-    unlockOrientation();
-    const syncFromDevice = () => {
-      if (layoutPinnedRef.current) return;
-      setLayoutMode(getViewportOrientation());
-    };
-    syncFromDevice();
-    window.addEventListener("resize", syncFromDevice);
-    window.addEventListener("orientationchange", syncFromDevice);
-    const visual = window.visualViewport;
-    visual?.addEventListener("resize", syncFromDevice);
-    return () => {
-      window.removeEventListener("resize", syncFromDevice);
-      window.removeEventListener("orientationchange", syncFromDevice);
-      visual?.removeEventListener("resize", syncFromDevice);
-    };
-  }, []);
   const elapsedRef = useRef(0);
   const tutorialDumpRef = useRef(0);
   const tutorialCompletingRef = useRef(false);
@@ -1104,8 +1087,6 @@ export function ExcavatorGameWrapper({
             <button
               type="button"
               onClick={() => {
-                // UI layout only — never call Screen Orientation API (it can force landscape on Android).
-                layoutPinnedRef.current = true;
                 setLayoutMode((current) =>
                   current === "portrait" ? "landscape" : "portrait",
                 );

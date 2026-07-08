@@ -7,7 +7,6 @@ import {
   isStandalonePwa,
   requestFullscreen,
   shouldUseBrowserFullscreen,
-  unlockOrientation,
 } from "@/lib/fullscreen";
 
 interface UseGameFullscreenOptions {
@@ -22,8 +21,6 @@ export function useGameFullscreen({ active, containerRef }: UseGameFullscreenOpt
 
   const enter = useCallback(async () => {
     setImmersive(true);
-    // Clear stale orientation locks from previous sessions before measuring layout.
-    unlockOrientation();
 
     if (shouldUseBrowserFullscreen()) {
       const ok = await requestFullscreen(containerRef?.current ?? null);
@@ -36,7 +33,6 @@ export function useGameFullscreen({ active, containerRef }: UseGameFullscreenOpt
   const leave = useCallback(async () => {
     setImmersive(false);
     setApiFullscreen(false);
-    unlockOrientation();
     await exitFullscreen();
   }, []);
 

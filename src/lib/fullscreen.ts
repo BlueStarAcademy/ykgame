@@ -1,5 +1,8 @@
 /**
  * 브라우저 전체화면 API + iOS 홈화면 추가(PWA) 지원 유틸
+ *
+ * IMPORTANT: Do not call Screen Orientation lock/unlock from gameplay.
+ * Unlocking (or locking) mid-session makes phones snap-rotate unexpectedly.
  */
 
 export function isFullscreenSupported(): boolean {
@@ -28,16 +31,15 @@ export function isMobileDevice(): boolean {
   return navigator.maxTouchPoints > 1 && window.innerWidth < 1024;
 }
 
-/** Viewport aspect — preferred over `orientation` media query on mobile browsers. */
+/** One-shot viewport aspect for initial cockpit layout choice. */
 export function getViewportOrientation(): "portrait" | "landscape" {
   if (typeof window === "undefined") return "portrait";
   return window.innerWidth < window.innerHeight ? "portrait" : "landscape";
 }
 
 /**
- * Mobile / PWA: never use Fullscreen API.
- * Android fullscreen commonly forces landscape and breaks our layout sync.
- * Desktop can still request fullscreen for immersive play.
+ * Never use Fullscreen API on phones/PWAs.
+ * Android fullscreen often rotates the device and fights our UI layout.
  */
 export function shouldUseBrowserFullscreen(): boolean {
   if (isStandalonePwa()) return false;
@@ -69,15 +71,6 @@ export async function exitFullscreen(): Promise<void> {
     if (document.fullscreenElement) {
       await document.exitFullscreen();
     }
-  } catch {
-    // ignore
-  }
-}
-
-/** Clear any leftover orientation lock from older builds / fullscreen sessions. */
-export function unlockOrientation(): void {
-  try {
-    screen.orientation?.unlock?.();
   } catch {
     // ignore
   }
