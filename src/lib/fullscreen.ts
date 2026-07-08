@@ -66,6 +66,15 @@ export function lockLandscape(): void {
   void lockLandscapeAsync();
 }
 
+/** 게임 중 세로 우선 (지원 기기에서만 동작) */
+export async function lockPortraitAsync(): Promise<boolean> {
+  return lockOrientationAsync(["portrait-primary", "portrait", "natural"]);
+}
+
+export function lockPortrait(): void {
+  void lockPortraitAsync();
+}
+
 export async function requestFullscreen(el?: HTMLElement | null): Promise<boolean> {
   if (!shouldUseBrowserFullscreen()) return false;
 

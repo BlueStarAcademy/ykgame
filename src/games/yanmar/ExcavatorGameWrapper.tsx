@@ -16,7 +16,7 @@ import {
   filterInput,
   mergeControlInputs,
 } from "./controls";
-import { CockpitOverlay } from "./CockpitOverlay";
+import { CockpitOverlay, type CockpitLayoutMode } from "./CockpitOverlay";
 import {
   ExcavatorScene,
   type DumpScorePopup,
@@ -25,6 +25,11 @@ import {
   createInitialTerrain,
   type ExcavatorSimState,
 } from "./ExcavatorScene";
+import {
+  lockLandscape,
+  lockPortrait,
+  unlockOrientation,
+} from "@/lib/fullscreen";
 import { createHydraulicVelocity, type HydraulicVelocity } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
 import { DigPoseGraph } from "./DigHintPanel";
@@ -374,6 +379,13 @@ export function ExcavatorGameWrapper({
   const [resettingEquipment, setResettingEquipment] = useState(false);
   const [headerHudReady, setHeaderHudReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(1);
+  const [layoutMode, setLayoutMode] = useState<CockpitLayoutMode>(() => {
+    if (typeof window === "undefined") return "landscape";
+    return window.matchMedia("(orientation: portrait)").matches
+      ? "portrait"
+      : "landscape";
+  });
+  const layoutPortrait = layoutMode === "portrait";
   const endedRef = useRef(false);
   const elapsedRef = useRef(0);
   const tutorialDumpRef = useRef(0);
@@ -931,7 +943,8 @@ export function ExcavatorGameWrapper({
         immersive
           ? "flex h-full w-full items-center justify-center bg-slate-950"
           : "mx-auto w-full max-w-lg"
-      }`}
+      } ${layoutPortrait ? "yanmar-layout-portrait" : "yanmar-layout-landscape"}`}
+      data-yanmar-layout={layoutMode}
     >
       <div
         className={`relative w-full overflow-hidden bg-slate-300 ${
@@ -1060,7 +1073,7 @@ export function ExcavatorGameWrapper({
         )}
 
         {mode !== "intro" && mode !== "gameReady" && (
-          <div className="absolute right-2 top-2 z-30 flex w-[116px] justify-center">
+          <div className="absolute right-2 top-2 z-30 flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => setCameraMode((current) => ((current % 3) + 1) as CameraMode)}
@@ -1075,6 +1088,33 @@ export function ExcavatorGameWrapper({
                 <span className="absolute left-1 top-[-0.22rem] h-1 w-2 rounded-t-[0.18rem] border-x border-t border-white/55" />
               </span>
               <span>카메라{cameraMode}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLayoutMode((current) => {
+                  const next = current === "portrait" ? "landscape" : "portrait";
+                  unlockOrientation();
+                  if (next === "portrait") lockPortrait();
+                  else lockLandscape();
+                  return next;
+                });
+              }}
+              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-white/20 bg-black/70 shadow-lg backdrop-blur-sm hover:bg-black/85"
+              aria-label={
+                layoutPortrait ? "가로 레이아웃으로 전환" : "세로 레이아웃으로 전환"
+              }
+              title={layoutPortrait ? "가로 모드" : "세로 모드"}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/yanmar/orientation-toggle.png"
+                alt=""
+                width={18}
+                height={18}
+                className="pointer-events-none select-none opacity-95"
+                draggable={false}
+              />
             </button>
           </div>
         )}
@@ -1172,6 +1212,7 @@ export function ExcavatorGameWrapper({
               onSimTick={handleSimTick}
               scorePopups={scorePopups}
               cameraMode={cameraMode}
+              layoutPortrait={layoutPortrait}
             />
           </div>
         )}
@@ -1189,6 +1230,7 @@ export function ExcavatorGameWrapper({
             allowed={allowed}
             tutorialStep={tutorialStep}
             showTouchZones={showTouchZones}
+            layoutMode={layoutMode}
           />
         )}
 

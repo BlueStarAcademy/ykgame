@@ -2,7 +2,7 @@
 
 /* eslint-disable react-hooks/refs */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import type { AuxiliaryControlState, ExcavatorControlState, ControlMask } from "./controls";
@@ -73,6 +73,7 @@ interface ExcavatorSceneProps {
   onSimTick: () => void;
   scorePopups: DumpScorePopup[];
   cameraMode: CameraMode;
+  layoutPortrait: boolean;
 }
 
 export type CameraMode = 1 | 2 | 3;
@@ -905,22 +906,14 @@ function ExcavatorArm({
 function GameCamera({
   simRef,
   mode,
+  portrait,
 }: {
   simRef: React.MutableRefObject<ExcavatorSimState>;
   mode: CameraMode;
+  portrait: boolean;
 }) {
-  const portraitRef = useRef(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const query = window.matchMedia("(orientation: portrait)");
-    const update = () => {
-      portraitRef.current = query.matches;
-    };
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
+  const portraitRef = useRef(portrait);
+  portraitRef.current = portrait;
 
   useFrame(({ camera }) => {
     const s = simRef.current;
@@ -929,15 +922,15 @@ function GameCamera({
     const forwardZ = Math.cos(facing);
     const sideX = Math.cos(facing);
     const sideZ = -Math.sin(facing);
-    const portrait = portraitRef.current;
+    const isPortrait = portraitRef.current;
     const persp = camera as THREE.PerspectiveCamera;
 
     if (mode === 1) {
       // Portrait: taller FOV leaves boom floating mid-frame — drop look/camera so arm fills toward the bottom.
-      const camY = portrait ? 1.42 : 1.92;
-      const lookY = portrait ? 0.28 : 1.04;
-      const back = portrait ? 1.72 : 1.95;
-      const fov = portrait ? 70 : 58;
+      const camY = isPortrait ? 1.42 : 1.92;
+      const lookY = isPortrait ? 0.28 : 1.04;
+      const back = isPortrait ? 1.72 : 1.95;
+      const fov = isPortrait ? 70 : 58;
       if (Math.abs(persp.fov - fov) > 0.01) {
         persp.fov = fov;
         persp.updateProjectionMatrix();
@@ -959,12 +952,12 @@ function GameCamera({
     if (mode === 2) {
       camera.position.set(
         s.posX - forwardX * 7.2 + sideX * 3.4,
-        portrait ? 4.35 : 4.9,
+        isPortrait ? 4.35 : 4.9,
         s.posZ - forwardZ * 7.2 + sideZ * 3.4,
       );
       camera.lookAt(
         s.posX + forwardX * 3.25 - sideX * 0.5,
-        portrait ? 1.55 : 2.05,
+        isPortrait ? 1.55 : 2.05,
         s.posZ + forwardZ * 3.25 - sideZ * 0.5,
       );
       return;
@@ -972,12 +965,12 @@ function GameCamera({
 
     camera.position.set(
       s.posX - forwardX * 14.5 + sideX * 7.8,
-      portrait ? 7.4 : 8.2,
+      isPortrait ? 7.4 : 8.2,
       s.posZ - forwardZ * 14.5 + sideZ * 7.8,
     );
     camera.lookAt(
       s.posX + forwardX * 4.4 - sideX * 0.8,
-      portrait ? 1.55 : 2.0,
+      isPortrait ? 1.55 : 2.0,
       s.posZ + forwardZ * 4.4 - sideZ * 0.8,
     );
   });
@@ -1485,7 +1478,11 @@ function SceneContent(props: ExcavatorSceneProps) {
         inputRef={props.inputRef}
         showBody={props.cameraMode !== 1}
       />
-      <GameCamera simRef={props.simRef} mode={props.cameraMode} />
+      <GameCamera
+        simRef={props.simRef}
+        mode={props.cameraMode}
+        portrait={props.layoutPortrait}
+      />
       <SimLoop {...props} />
     </>
   );

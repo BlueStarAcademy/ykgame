@@ -11,6 +11,8 @@ import type {
 import { COCKPIT_LAYOUT } from "./controls";
 import type { TutorialStep } from "./tutorial";
 
+export type CockpitLayoutMode = "portrait" | "landscape";
+
 interface CockpitOverlayProps {
   input: ExcavatorControlState;
   onInputChange: (
@@ -27,6 +29,7 @@ interface CockpitOverlayProps {
   allowed: ControlMask;
   tutorialStep: TutorialStep | null;
   showTouchZones: boolean;
+  layoutMode: CockpitLayoutMode;
 }
 
 interface JoystickLayout {
@@ -54,22 +57,14 @@ const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cx: 0.455, cy: 0.91 },
   travelRight: { ...COCKPIT_LAYOUT.travelRight, cx: 0.545, cy: 0.91 },
   travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cx: 0.5, cy: 0.91 },
-  hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.89, cy: 0.48 },
-  rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.89, cy: 0.29 },
-  horn: { ...COCKPIT_LAYOUT.horn, cx: 0.87, cy: 0.34 },
+  // Right column top→bottom: pedal → horn → hydraulic → stick (extra gap around horn)
+  hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.89, cy: 0.52 },
+  rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.89, cy: 0.18 },
+  horn: { ...COCKPIT_LAYOUT.horn, cx: 0.89, cy: 0.35 },
 };
 
-function useControlLayout() {
-  const [isPortrait, setIsPortrait] = useState(false);
-
-  useEffect(() => {
-    const query = window.matchMedia("(orientation: portrait)");
-    const update = () => setIsPortrait(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-
+function useControlLayout(layoutMode: CockpitLayoutMode) {
+  const isPortrait = layoutMode === "portrait";
   return {
     isPortrait,
     layout: isPortrait ? PORTRAIT_COCKPIT_LAYOUT : COCKPIT_LAYOUT,
@@ -146,6 +141,7 @@ function VisualLever({
   color = "dark",
   highlighted = false,
   variant,
+  compact = false,
 }: {
   cx: number;
   cy: number;
@@ -153,20 +149,34 @@ function VisualLever({
   color?: "dark" | "red" | "blue";
   highlighted?: boolean;
   variant?: "safety" | "hydraulic" | "travel";
+  /** Portrait side-panel levers: keep throw inside the square frame */
+  compact?: boolean;
 }) {
   const v = Math.max(-1, Math.min(1, value));
   const pullDepth = Math.max(0, -v);
   const pushDepth = Math.max(0, v);
-  const stickDrop = pullDepth * 0.42 - pushDepth * 0.12;
-  const bendX = v >= 0 ? v * -22 : v * -48;
+  const stickDrop = compact
+    ? pullDepth * 0.1 - pushDepth * 0.04
+    : pullDepth * 0.42 - pushDepth * 0.12;
+  const bendX = compact
+    ? v >= 0
+      ? v * -8
+      : v * -14
+    : v >= 0
+      ? v * -22
+      : v * -48;
   return (
     <div
       className={`yanmar-visual-part yanmar-visual-lever ${
         highlighted ? "yanmar-visual-highlight" : ""
       } ${variant === "safety" ? "yanmar-visual-lever-safety" : ""} ${
         variant === "hydraulic" ? "yanmar-visual-lever-hydraulic" : ""
-      } ${variant === "travel" ? "yanmar-visual-lever-travel" : ""}`}
-      style={{ left: `${cx * 100}%`, top: `${cy * 100}%` }}
+      } ${variant === "travel" ? "yanmar-visual-lever-travel" : ""} ${
+        compact ? "yanmar-visual-lever-compact" : ""
+      }`}
+      style={
+        compact ? undefined : { left: `${cx * 100}%`, top: `${cy * 100}%` }
+      }
     >
       <div className="yanmar-lever-mount" />
       <div className="yanmar-lever-slot" />
@@ -221,26 +231,39 @@ function VisualPedal({
   value,
   layout,
   isPortrait = false,
+  nested = false,
 }: {
   value: number;
   layout: CockpitLayout;
   isPortrait?: boolean;
+  /** When true, fills parent panel well instead of absolute deck coords */
+  nested?: boolean;
 }) {
   const top = Math.max(0, value);
   const bottom = Math.max(0, -value);
   const pedal = layout.rightPedal;
-  const pressOffset = (top - bottom) * 0.22;
+  const pressOffset = (top - bottom) * (nested ? 0.1 : 0.22);
   return (
     <div
-      className="yanmar-visual-part yanmar-visual-pedal"
-      style={{
-        left: `${(pedal.cx + (isPortrait ? 0 : 0.03)) * 100}%`,
-        top: `${pedal.cy * 100}%`,
-      }}
+      className={`yanmar-visual-part yanmar-visual-pedal${
+        nested ? " yanmar-visual-pedal-nested" : ""
+      }`}
+      style={
+        nested
+          ? undefined
+          : {
+              left: `${(pedal.cx + (isPortrait ? 0 : 0.03)) * 100}%`,
+              top: `${pedal.cy * 100}%`,
+            }
+      }
     >
       <div
         className="yanmar-pedal-pad"
-        style={{ transform: `translate(-50%, ${pressOffset}rem)` }}
+        style={{
+          transform: nested
+            ? `translate(-50%, calc(-50% + ${pressOffset}rem))`
+            : `translate(-50%, ${pressOffset}rem)`,
+        }}
       />
     </div>
   );
@@ -284,15 +307,20 @@ function VisualPortraitSideButtons({
           top: `${layout.safetyLever.cy * 100}%`,
         }}
       >
-        <span className="yanmar-portrait-status-label">{auxiliary.safetyLocked ? "잠김" : "해제"}</span>
+        <div className="yanmar-portrait-3d-well">
+          <VisualLever
+            cx={layout.safetyLever.cx}
+            cy={layout.safetyLever.cy}
+            value={auxiliary.safetyLocked ? 1 : -0.25}
+            color="red"
+            variant="safety"
+            compact
+          />
+        </div>
+        <span className="yanmar-portrait-status-label">
+          {auxiliary.safetyLocked ? "잠김" : "해제"}
+        </span>
       </div>
-      <VisualLever
-        cx={layout.safetyLever.cx}
-        cy={layout.safetyLever.cy}
-        value={auxiliary.safetyLocked ? 1 : -0.25}
-        color="red"
-        variant="safety"
-      />
       <div
         className="yanmar-portrait-3d-button yanmar-portrait-3d-button-pedal"
         style={{
@@ -300,9 +328,15 @@ function VisualPortraitSideButtons({
           top: `${pedal.cy * 100}%`,
         }}
       >
-        <span>상 / 하</span>
+        <div className="yanmar-portrait-3d-well">
+          <VisualPedal
+            value={auxiliary.boomSwing}
+            layout={layout}
+            isPortrait
+            nested
+          />
+        </div>
       </div>
-      <VisualPedal value={auxiliary.boomSwing} layout={layout} isPortrait />
       <div
         className={`yanmar-portrait-3d-button yanmar-portrait-3d-button-hydraulic ${
           auxiliary.highSpeed ? "is-active" : ""
@@ -312,15 +346,20 @@ function VisualPortraitSideButtons({
           top: `${layout.hydraulicSpeed.cy * 100}%`,
         }}
       >
-        <span className="yanmar-portrait-status-label">{auxiliary.highSpeed ? "x2" : "x1"}</span>
+        <div className="yanmar-portrait-3d-well">
+          <VisualLever
+            cx={layout.hydraulicSpeed.cx}
+            cy={layout.hydraulicSpeed.cy}
+            value={auxiliary.highSpeed ? 1 : -1}
+            color="red"
+            variant="hydraulic"
+            compact
+          />
+        </div>
+        <span className="yanmar-portrait-status-label">
+          {auxiliary.highSpeed ? "x2" : "x1"}
+        </span>
       </div>
-      <VisualLever
-        cx={layout.hydraulicSpeed.cx}
-        cy={layout.hydraulicSpeed.cy}
-        value={auxiliary.highSpeed ? 1 : -1}
-        color="red"
-        variant="hydraulic"
-      />
     </>
   );
 }
@@ -843,13 +882,15 @@ function HornButton({
   isPortrait: boolean;
   showTouchZone: boolean;
 }) {
-  const cx = isPortrait ? Math.max(0.72, layout.right.cx - 0.15) : layout.right.cx;
-  const cy = isPortrait ? Math.max(0.52, layout.right.cy - 0.38) : Math.max(0.28, layout.right.cy - 0.49);
+  const cx = isPortrait ? layout.horn.cx : layout.right.cx;
+  const cy = isPortrait ? layout.horn.cy : Math.max(0.28, layout.right.cy - 0.49);
 
   return (
     <button
       type="button"
-      className="yanmar-horn-button absolute touch-none active:scale-95"
+      className={`yanmar-horn-button absolute touch-none active:scale-95${
+        isPortrait ? " yanmar-horn-button-portrait" : ""
+      }`}
       style={{
         left: `${cx * 100}%`,
         top: `${cy * 100}%`,
@@ -1032,13 +1073,14 @@ export function CockpitOverlay({
   allowed,
   tutorialStep,
   showTouchZones,
+  layoutMode,
 }: CockpitOverlayProps) {
   const highlightLeft =
     tutorialStep?.highlight === "left" || tutorialStep?.highlight === "both";
   const highlightRight =
     tutorialStep?.highlight === "right" || tutorialStep?.highlight === "both";
   const highlightTravel = tutorialStep?.highlight === "travel";
-  const { layout, isPortrait } = useControlLayout();
+  const { layout, isPortrait } = useControlLayout(layoutMode);
 
   return (
     <>
