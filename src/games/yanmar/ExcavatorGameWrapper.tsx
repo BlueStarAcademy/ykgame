@@ -2,7 +2,13 @@
 
 /* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/preserve-manual-memoization, react-hooks/set-state-in-effect */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
 import { GAME_IMMERSIVE_HEADER_RIGHT_ID } from "@/components/games/GameImmersiveOverlay";
@@ -65,6 +71,7 @@ import {
 
 interface ExcavatorGameWrapperProps {
   onEnd: (result: GameResult) => void;
+  exitSignal?: number;
   immersive?: boolean;
   initialPlayMode?: "practice" | "game";
   onShowRanking?: () => void;
@@ -316,6 +323,7 @@ function RewardPopupOverlay({ popups }: { popups: DumpScorePopup[] }) {
 
 export function ExcavatorGameWrapper({
   onEnd,
+  exitSignal = 0,
   immersive = false,
   initialPlayMode,
   onShowRanking,
@@ -384,6 +392,17 @@ export function ExcavatorGameWrapper({
     getDefaultCockpitLayoutMode,
   );
   const layoutPortrait = layoutMode === "portrait";
+  const gameFrameStyle: CSSProperties | undefined = immersive
+    ? layoutPortrait
+      ? {
+          width: "min(100vw, calc(100dvh * 9 / 16))",
+          height: "min(100dvh, calc(100vw * 16 / 9))",
+        }
+      : {
+          width: "min(100vw, calc(100dvh * 16 / 9))",
+          height: "min(100dvh, calc(100vw * 9 / 16))",
+        }
+    : undefined;
   const endedRef = useRef(false);
   const elapsedRef = useRef(0);
   const tutorialDumpRef = useRef(0);
@@ -394,6 +413,8 @@ export function ExcavatorGameWrapper({
   const digHudTickRef = useRef(0);
   const lastHudProgressRef = useRef(-1);
   const arcadeScoreRef = useRef(0);
+  const rewardStarsRef = useRef(0);
+  const lastExitSignalRef = useRef(exitSignal);
   const scorePopupIdRef = useRef(0);
   const equipmentStatsRef = useRef<YanmarEquipmentStats>(defaultEquipmentStats);
   const updateSessionRef = useRef(update);
@@ -553,6 +574,7 @@ export function ExcavatorGameWrapper({
     elapsedRef.current = 0;
     lastHudProgressRef.current = -1;
     arcadeScoreRef.current = 0;
+    rewardStarsRef.current = 0;
     setPreviewStars(0);
     tutorialCompletingRef.current = false;
     const nextAuxiliary = createAuxiliaryControls();
@@ -592,6 +614,35 @@ export function ExcavatorGameWrapper({
     setHud((h) => ({ ...h, progress: 0, timeLeft: config.duration }));
     setMode("game");
   }, [config.duration, resetYanmarSession, setHud, setMode, setShowTouchZones, setShowTutorialMenu]);
+
+  const finishCurrentRun = useCallback(() => {
+    if (endedRef.current) return;
+    endedRef.current = true;
+    clearAllInput();
+
+    const currentMode = modeRef.current;
+    const score = scoreRef.current;
+    onEnd({
+      gameId: "yanmar",
+      progress: getProgress(score),
+      playTime: Math.max(1, Math.round(elapsedRef.current)),
+      timeLeft: config.duration > 0 ? Math.ceil(score.timeLeft) : 0,
+      completed: isComplete(score),
+      arcadeScore: arcadeScoreRef.current,
+      rewardStars: rewardStarsRef.current,
+      mode:
+        currentMode === "game" || currentMode === "tutorial"
+          ? currentMode
+          : "practice",
+    });
+  }, [clearAllInput, config.duration, onEnd]);
+
+  useEffect(() => {
+    if (exitSignal === lastExitSignalRef.current) return;
+    lastExitSignalRef.current = exitSignal;
+    if (exitSignal <= 0) return;
+    finishCurrentRun();
+  }, [exitSignal, finishCurrentRun]);
 
   const initialPlayModeRef = useRef(initialPlayMode);
   const hasBootstrappedRef = useRef(false);
@@ -720,14 +771,21 @@ export function ExcavatorGameWrapper({
           updateDumpPopup(popupId, { rewardText: "보상 완료" });
           return;
         }
-        updateDumpPopup(popupId, {
-          score: event.score,
-          critical: event.critical,
-          rewardText:
-            event.kind === "coupon"
-              ? `쿠폰 ${event.discountPct}%`
-              : `⭐${event.stars}`,
-        }, event.score - popup.score);
+        if (event.kind === "stars") {
+          rewardStarsRef.current += event.stars;
+        }
+        updateDumpPopup(
+          popupId,
+          {
+            score: event.score,
+            critical: event.critical,
+            rewardText:
+              event.kind === "coupon"
+                ? `쿠폰 ${event.discountPct}%`
+                : `⭐${event.stars}`,
+          },
+          event.score - popup.score,
+        );
       } catch {
         updateDumpPopup(popupId, { rewardText: "저장 실패" });
       }
@@ -851,6 +909,8 @@ export function ExcavatorGameWrapper({
           playTime: Math.round(elapsedRef.current),
           timeLeft: 0,
           completed: false,
+          arcadeScore: arcadeScoreRef.current,
+          rewardStars: rewardStarsRef.current,
           mode: "game",
         });
         return;
@@ -943,16 +1003,13 @@ export function ExcavatorGameWrapper({
     >
       <div
         className={`relative w-full overflow-hidden bg-slate-300 ${
-          immersive ? "shadow-2xl shadow-black/50" : "aspect-video rounded-b-xl shadow-lg"
-        }`}
-        style={
           immersive
-            ? {
-                width: "100%",
-                height: "100%",
-              }
-            : undefined
-        }
+            ? "shadow-2xl shadow-black/50"
+            : layoutPortrait
+              ? "h-[520px] rounded-b-xl shadow-lg"
+              : "aspect-video rounded-b-xl shadow-lg"
+        }`}
+        style={gameFrameStyle}
       >
         <ControlsGuidePanel
           open={showControlsGuide}

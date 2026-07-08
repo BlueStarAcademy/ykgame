@@ -256,6 +256,7 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
   const [phase, setPhase] = useState<GamePhase>("lobby");
   const [playMode, setPlayMode] = useState<PlayMode | null>(null);
   const [result, setResult] = useState<GameResult | null>(null);
+  const [yanmarExitSignal, setYanmarExitSignal] = useState(0);
   const [myStats, setMyStats] = useState<MyStats>({
     rank: null,
     bestScore: 0,
@@ -277,20 +278,27 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
 
   const handleStartPractice = () => {
     setPlayMode("practice");
+    setYanmarExitSignal(0);
     setPhase("playing");
   };
 
   const handleStartGame = () => {
     setPlayMode("game");
+    setYanmarExitSignal(0);
     setPhase("playing");
   };
 
   const handleStart = () => {
     setPlayMode(null);
+    setYanmarExitSignal(0);
     setPhase("playing");
   };
 
   const handleExitGame = () => {
+    if (gameId === "yanmar") {
+      setYanmarExitSignal((value) => value + 1);
+      return;
+    }
     setPlayMode(null);
     setPhase("lobby");
   };
@@ -360,6 +368,7 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
           <PhaserGameWrapper
             gameId={gameId}
             onEnd={handleGameEnd}
+            exitSignal={yanmarExitSignal}
             immersive
             initialPlayMode={playMode ?? undefined}
             onShowRanking={() => setShowRanking(true)}

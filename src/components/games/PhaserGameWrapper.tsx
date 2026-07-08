@@ -10,6 +10,7 @@ import { ExcavatorGameWrapper } from "@/games/yanmar/ExcavatorGameWrapper";
 interface PhaserGameWrapperProps {
   gameId: GameId;
   onEnd: (result: GameResult) => void;
+  exitSignal?: number;
   immersive?: boolean;
   initialPlayMode?: "practice" | "game";
   onShowRanking?: () => void;
@@ -99,6 +100,7 @@ function PhaserMissionGame({ gameId, onEnd, immersive = false }: PhaserGameWrapp
 export function PhaserGameWrapper({
   gameId,
   onEnd,
+  exitSignal = 0,
   immersive = false,
   initialPlayMode,
   onShowRanking,
@@ -109,6 +111,7 @@ export function PhaserGameWrapper({
     return (
       <ExcavatorGameWrapper
         onEnd={onEnd}
+        exitSignal={exitSignal}
         immersive={immersive}
         initialPlayMode={initialPlayMode}
         onShowRanking={onShowRanking}

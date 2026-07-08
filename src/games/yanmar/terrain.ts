@@ -139,6 +139,14 @@ export function sampleHeight(terrain: TerrainData, wx: number, wz: number): numb
 /** 굴착·덤프 구역 (확장 맵 기준) */
 export const DIG_ZONE = { x: 4, z: 18, radius: 12 };
 export const DUMP_ZONE = { x: 32, z: -12, radius: 8 };
+export const DUMP_TRUCK_BED = {
+  x: DUMP_ZONE.x + 1.6,
+  z: DUMP_ZONE.z - 0.8,
+  width: 7.2,
+  depth: 5.4,
+  rotation: -0.36,
+  margin: 1.6,
+};
 
 function distance(ax: number, az: number, bx: number, bz: number) {
   return Math.sqrt((ax - bx) ** 2 + (az - bz) ** 2);
@@ -242,6 +250,19 @@ export function isInDumpZone(wx: number, wz: number): boolean {
   const dx = wx - DUMP_ZONE.x;
   const dz = wz - DUMP_ZONE.z;
   return Math.sqrt(dx * dx + dz * dz) < DUMP_ZONE.radius;
+}
+
+export function isInDumpTruckBed(wx: number, wz: number): boolean {
+  const cos = Math.cos(-DUMP_TRUCK_BED.rotation);
+  const sin = Math.sin(-DUMP_TRUCK_BED.rotation);
+  const dx = wx - DUMP_TRUCK_BED.x;
+  const dz = wz - DUMP_TRUCK_BED.z;
+  const localX = dx * cos - dz * sin;
+  const localZ = dx * sin + dz * cos;
+  return (
+    Math.abs(localX) <= DUMP_TRUCK_BED.width / 2 + DUMP_TRUCK_BED.margin &&
+    Math.abs(localZ) <= DUMP_TRUCK_BED.depth / 2 + DUMP_TRUCK_BED.margin
+  );
 }
 
 export function isInDigZone(wx: number, wz: number, terrain?: TerrainData): boolean {

@@ -57,10 +57,10 @@ const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cx: 0.455, cy: 0.91 },
   travelRight: { ...COCKPIT_LAYOUT.travelRight, cx: 0.545, cy: 0.91 },
   travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cx: 0.5, cy: 0.91 },
-  // Right column top→bottom: pedal → horn → hydraulic → stick (extra gap around horn)
-  hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.89, cy: 0.52 },
+  // Right column top→bottom: pedal → hydraulic → horn → stick.
+  hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.89, cy: 0.35 },
   rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.89, cy: 0.18 },
-  horn: { ...COCKPIT_LAYOUT.horn, cx: 0.89, cy: 0.35 },
+  horn: { ...COCKPIT_LAYOUT.horn, cx: 0.89, cy: 0.52 },
 };
 
 function useControlLayout(layoutMode: CockpitLayoutMode) {

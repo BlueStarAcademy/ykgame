@@ -4,6 +4,7 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
+import { Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { AuxiliaryControlState, ExcavatorControlState, ControlMask } from "./controls";
 import {
@@ -19,10 +20,14 @@ import {
   getActiveDigZones,
   isInDigZone,
   isInDumpZone,
+  isInDumpTruckBed,
+  getMapWorldBounds,
   sampleHeight,
   updateDigZoneRespawns,
   type TerrainData,
+  DIG_ZONE,
   DUMP_ZONE,
+  DUMP_TRUCK_BED,
 } from "./terrain";
 import {
   getBucketBodyContactWorld,
@@ -566,9 +571,43 @@ function CabWindowMaterial() {
   );
 }
 
-function TankTrack({ side }: { side: 1 | -1 }) {
+function TankTrack({
+  side,
+  velRef,
+}: {
+  side: 1 | -1;
+  velRef: React.MutableRefObject<HydraulicVelocity>;
+}) {
   const rollers = [-1.62, -1.08, -0.54, 0, 0.54, 1.08, 1.62];
-  const treadPads = Array.from({ length: 16 }, (_, index) => -1.88 + index * 0.25);
+  const lowerPads = Array.from({ length: 18 }, (_, index) => index);
+  const upperPads = Array.from({ length: 15 }, (_, index) => index);
+  const lowerPadRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const upperPadRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const wheelRefs = useRef<(THREE.Group | null)[]>([]);
+  const trackOffsetRef = useRef(0);
+
+  useFrame((_, delta) => {
+    const trackSpeed = velRef.current.travel + velRef.current.trackTurn * side * 0.58;
+    if (Math.abs(trackSpeed) < 0.01) return;
+
+    trackOffsetRef.current += trackSpeed * delta * 0.62;
+    const wrap = (value: number, min: number, max: number) => {
+      const span = max - min;
+      return ((((value - min) % span) + span) % span) + min;
+    };
+
+    lowerPadRefs.current.forEach((pad, index) => {
+      if (!pad) return;
+      pad.position.x = wrap(-2.02 + index * 0.24 - trackOffsetRef.current, -2.08, 2.08);
+    });
+    upperPadRefs.current.forEach((pad, index) => {
+      if (!pad) return;
+      pad.position.x = wrap(-1.8 + index * 0.26 + trackOffsetRef.current, -1.92, 1.92);
+    });
+    wheelRefs.current.forEach((wheel) => {
+      if (wheel) wheel.rotation.z -= trackSpeed * delta * 2.4;
+    });
+  });
 
   return (
     <group position={[0, 0, side * 0.82]}>
@@ -586,32 +625,62 @@ function TankTrack({ side }: { side: 1 | -1 }) {
       </mesh>
 
       {[-1.88, 1.88].map((x) => (
-        <mesh key={`sprocket-${x}`} position={[x, 0.03, side * 0.025]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.32, 0.32, 0.11, 28]} />
-          <meshStandardMaterial color="#0a0f12" roughness={0.48} metalness={0.34} />
-        </mesh>
+        <group
+          key={`sprocket-${x}`}
+          ref={(node) => {
+            wheelRefs.current[x < 0 ? 0 : 1] = node;
+          }}
+          position={[x, 0.03, side * 0.025]}
+        >
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.34, 0.34, 0.11, 32]} />
+            <meshStandardMaterial color="#1f2b33" roughness={0.36} metalness={0.46} />
+          </mesh>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.2, 0.2, 0.13, 18]} />
+            <meshStandardMaterial color="#c2cbd1" roughness={0.22} metalness={0.6} />
+          </mesh>
+        </group>
       ))}
-      {rollers.map((x) => (
-        <group key={x} position={[x, -0.06, side * 0.04]}>
+      {rollers.map((x, index) => (
+        <group
+          key={x}
+          ref={(node) => {
+            wheelRefs.current[index + 2] = node;
+          }}
+          position={[x, -0.06, side * 0.04]}
+        >
           <mesh rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.19, 0.19, 0.12, 24]} />
-            <meshStandardMaterial color="#182229" roughness={0.42} metalness={0.36} />
+            <meshStandardMaterial color="#26343c" roughness={0.36} metalness={0.44} />
           </mesh>
           <mesh rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.105, 0.105, 0.135, 20]} />
-            <meshStandardMaterial color="#55636c" roughness={0.28} metalness={0.52} />
+            <meshStandardMaterial color="#e3e8eb" roughness={0.2} metalness={0.66} />
           </mesh>
         </group>
       ))}
 
-      {treadPads.map((x, index) => (
-        <mesh key={`lower-pad-${index}`} position={[x, -0.37, side * 0.02]}>
+      {lowerPads.map((index) => (
+        <mesh
+          key={`lower-pad-${index}`}
+          ref={(node) => {
+            lowerPadRefs.current[index] = node;
+          }}
+          position={[-2.02 + index * 0.24, -0.37, side * 0.02]}
+        >
           <boxGeometry args={[0.16, 0.08, 0.66]} />
           <meshStandardMaterial color="#0b1115" roughness={0.66} metalness={0.22} />
         </mesh>
       ))}
-      {treadPads.slice(1, -1).map((x, index) => (
-        <mesh key={`upper-pad-${index}`} position={[x, 0.34, side * 0.02]}>
+      {upperPads.map((index) => (
+        <mesh
+          key={`upper-pad-${index}`}
+          ref={(node) => {
+            upperPadRefs.current[index] = node;
+          }}
+          position={[-1.8 + index * 0.26, 0.34, side * 0.02]}
+        >
           <boxGeometry args={[0.15, 0.06, 0.62]} />
           <meshStandardMaterial color="#1b2730" roughness={0.52} metalness={0.26} />
         </mesh>
@@ -637,27 +706,31 @@ function TankTrack({ side }: { side: 1 | -1 }) {
   );
 }
 
-function ExcavatorBodyAssembly() {
+function ExcavatorBodyAssembly({
+  velRef,
+}: {
+  velRef: React.MutableRefObject<HydraulicVelocity>;
+}) {
   return (
     <group>
       <group position={[-0.72, 0.24, 0]}>
         {[-1, 1].map((side) => (
-          <TankTrack key={side} side={side as 1 | -1} />
+          <TankTrack key={side} side={side as 1 | -1} velRef={velRef} />
         ))}
         <mesh position={[0.05, 0.47, 0]}>
           <boxGeometry args={[3.92, 0.22, 1.72]} />
-          <meshStandardMaterial color="#18242b" roughness={0.46} metalness={0.22} />
+          <meshStandardMaterial color="#2a353d" roughness={0.42} metalness={0.3} />
         </mesh>
         <mesh position={[0.05, 0.61, 0]}>
           <boxGeometry args={[3.54, 0.08, 1.42]} />
-          <meshStandardMaterial color="#53616c" roughness={0.28} metalness={0.38} />
+          <meshStandardMaterial color="#dfe6ea" roughness={0.24} metalness={0.34} />
         </mesh>
       </group>
 
       <group position={[-0.52, 0.76, 0]}>
         <mesh position={[-0.18, 0, 0]}>
           <boxGeometry args={[2.75, 0.4, 1.74]} />
-          <meshStandardMaterial color="#111a20" roughness={0.54} metalness={0.16} />
+          <meshStandardMaterial color="#f2f4f3" roughness={0.34} metalness={0.18} />
         </mesh>
         <mesh position={[0.78, 0.03, 0]}>
           <boxGeometry args={[0.86, 0.42, 1.54]} />
@@ -673,14 +746,22 @@ function ExcavatorBodyAssembly() {
         </mesh>
         <mesh position={[-1.12, 0.08, 0]}>
           <boxGeometry args={[0.58, 0.48, 1.62]} />
-          <meshStandardMaterial color="#202a31" roughness={0.52} metalness={0.18} />
+          <meshStandardMaterial color="#cfd8dd" roughness={0.32} metalness={0.28} />
+        </mesh>
+        <mesh position={[-0.18, 0.24, -0.9]}>
+          <boxGeometry args={[1.72, 0.08, 0.08]} />
+          <meshStandardMaterial color="#d92323" roughness={0.24} metalness={0.18} />
+        </mesh>
+        <mesh position={[-0.18, -0.24, -0.9]}>
+          <boxGeometry args={[1.48, 0.055, 0.08]} />
+          <meshStandardMaterial color="#363f47" roughness={0.34} metalness={0.28} />
         </mesh>
       </group>
 
       <group position={[-1.28, 1.45, -0.36]}>
         <mesh position={[0, 0.06, 0]}>
           <boxGeometry args={[1.28, 1.64, 1.08]} />
-          <meshStandardMaterial color="#111a20" roughness={0.36} metalness={0.26} />
+          <meshStandardMaterial color="#f3f5f3" roughness={0.3} metalness={0.2} />
         </mesh>
         <mesh position={[0, 0.06, -0.61]}>
           <boxGeometry args={[1.08, 1.44, 0.04]} />
@@ -708,7 +789,7 @@ function ExcavatorBodyAssembly() {
         </mesh>
         <mesh position={[0, 0.98, 0]}>
           <boxGeometry args={[1.42, 0.18, 1.18]} />
-          <meshStandardMaterial color="#0e151a" roughness={0.5} metalness={0.2} />
+          <meshStandardMaterial color="#d82020" roughness={0.34} metalness={0.2} />
         </mesh>
         <mesh position={[-0.62, -0.58, -0.6]}>
           <boxGeometry args={[0.24, 0.42, 0.06]} />
@@ -727,7 +808,7 @@ function ExcavatorBodyAssembly() {
       <group position={[0.45, 0.98, 0]}>
         <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.74, 0.88, 1.45, 40]} />
-          <meshStandardMaterial color="#101820" roughness={0.38} metalness={0.42} />
+          <meshStandardMaterial color="#333e46" roughness={0.34} metalness={0.44} />
         </mesh>
         <mesh position={[0.18, 0.36, 0]}>
           <boxGeometry args={[0.92, 0.7, 1.0]} />
@@ -735,7 +816,7 @@ function ExcavatorBodyAssembly() {
         </mesh>
         <mesh position={[0.48, 0.68, 0]}>
           <boxGeometry args={[0.36, 1.1, 0.62]} />
-          <meshStandardMaterial color="#242c36" roughness={0.42} metalness={0.28} />
+          <meshStandardMaterial color="#f1f3f2" roughness={0.32} metalness={0.22} />
         </mesh>
         <mesh position={[0.78, 0.46, 0]}>
           <boxGeometry args={[0.62, 0.5, 0.74]} />
@@ -763,11 +844,13 @@ function ExcavatorBodyAssembly() {
 
 function ExcavatorArm({
   simRef,
+  velRef,
   auxiliaryRef,
   inputRef,
   showBody,
 }: {
   simRef: React.MutableRefObject<ExcavatorSimState>;
+  velRef: React.MutableRefObject<HydraulicVelocity>;
   auxiliaryRef: React.RefObject<AuxiliaryControlState>;
   inputRef: React.RefObject<ExcavatorControlState>;
   showBody: boolean;
@@ -790,7 +873,7 @@ function ExcavatorArm({
   const boomLen = 3;
   const armLen = 2.5;
   const bucketLen = 1.2;
-  const armRootY = showBody ? 1.0 : 0.12;
+  const armRootY = showBody ? 1.0 : 0.92;
 
   useFrame(() => {
     const g = groupRef.current;
@@ -839,7 +922,7 @@ function ExcavatorArm({
       {/* 모델 전방(+X)을 주행·시선 방향(+Z)과 일치 */}
       <group rotation={[0, -Math.PI / 2, 0]}>
         <group visible={showBody}>
-          <ExcavatorBodyAssembly />
+          <ExcavatorBodyAssembly velRef={velRef} />
         </group>
         <group ref={bladeRef} visible={showBody} position={[-0.75, 0.25, 0]} />
 
@@ -925,11 +1008,10 @@ function GameCamera({
     const isPortrait = portraitRef.current;
     const persp = camera as THREE.PerspectiveCamera;
 
-    if (mode === 1) {
-      // Portrait cam1: keep boom root filling the lower frame (not floating mid-screen / distant).
-      // Wide FOV was making the arm look far away — stay near landscape FOV and pull in.
-      const camY = isPortrait ? 1.58 : 1.92;
-      const lookY = isPortrait ? -0.08 : 1.04;
+    if (mode === 3) {
+      // First-person view: keep the boom base just below the frame, not sunk into the ground.
+      const camY = isPortrait ? 1.72 : 1.92;
+      const lookY = isPortrait ? 0.72 : 1.04;
       const back = isPortrait ? 1.28 : 1.95;
       const lookAhead = isPortrait ? 4.35 : 5.35;
       const side = isPortrait ? 0.42 : 0.58;
@@ -952,7 +1034,7 @@ function GameCamera({
       persp.updateProjectionMatrix();
     }
 
-    if (mode === 2) {
+    if (mode === 1) {
       camera.position.set(
         s.posX - forwardX * 7.2 + sideX * 3.4,
         isPortrait ? 4.35 : 4.9,
@@ -982,6 +1064,8 @@ function GameCamera({
 
 // Use the visible bucket shell's lowest sampled point, not the old mathematical tip.
 const MIN_BUCKET_GROUND_CLEARANCE = -1.05;
+const EXCAVATOR_MAP_WALL_MARGIN = 4.6;
+
 function bucketClearance(sim: ExcavatorSimState, terrain: TerrainData, boomSwing: number) {
   const tip = getBucketBodyContactWorld(sim, boomSwing);
   const groundH = sampleHeight(terrain, tip.x, tip.z);
@@ -999,6 +1083,24 @@ function constrainBucketGroundContact(
   boomSwing: number,
 ) {
   return bucketClearance(sim, terrain, boomSwing);
+}
+
+function constrainExcavatorToMap(sim: ExcavatorSimState, terrain: TerrainData) {
+  const bounds = getMapWorldBounds(terrain);
+  const nextX = clampControl(
+    sim.posX,
+    bounds.minX + EXCAVATOR_MAP_WALL_MARGIN,
+    bounds.maxX - EXCAVATOR_MAP_WALL_MARGIN,
+  );
+  const nextZ = clampControl(
+    sim.posZ,
+    bounds.minZ + EXCAVATOR_MAP_WALL_MARGIN,
+    bounds.maxZ - EXCAVATOR_MAP_WALL_MARGIN,
+  );
+  const blocked = nextX !== sim.posX || nextZ !== sim.posZ;
+  sim.posX = nextX;
+  sim.posZ = nextZ;
+  return blocked;
 }
 
 function SimLoop({
@@ -1054,6 +1156,9 @@ function SimLoop({
       hydraulicSpeedScale,
       equipmentStatsRef.current.travelSpeedMultiplier,
     );
+    if (constrainExcavatorToMap(sim, terrainRef.current)) {
+      velRef.current.travel = 0;
+    }
 
     let { clearance } = constrainBucketGroundContact(
       sim,
@@ -1082,12 +1187,15 @@ function SimLoop({
     const activeDigZones = getActiveDigZones(terrainRef.current);
     const scraperInDigZone = isInDigZone(scraper.x, scraper.z, terrainRef.current);
     const tipInDigZone = isInDigZone(bucketTip.x, bucketTip.z, terrainRef.current);
+    const scraperInTruckBed = isInDumpTruckBed(scraper.x, scraper.z);
+    const tipInTruckBed = isInDumpTruckBed(bucketTip.x, bucketTip.z);
     const bodyNearDigZone =
       activeDigZones.some(
         (zone) => Math.hypot(sim.posX - zone.x, sim.posZ - zone.z) < zone.radius + 9,
       );
     const inZone = scraperInDigZone || tipInDigZone || bodyNearDigZone;
     const inDump = isInDumpZone(scraper.x, scraper.z) || isInDumpZone(bucketTip.x, bucketTip.z);
+    const inTruckDumpTarget = inDump && (scraperInTruckBed || tipInTruckBed);
     const bucketInWorkRange = scraperDepthBelow > -1.4 && scraperDepthBelow < 2.6;
     const tipOnGround = scraperDepthBelow > -1.2 && scraperDepthBelow < 2.6;
     const curled = isBucketCurled(sim.boom, sim.bucket);
@@ -1189,14 +1297,14 @@ function SimLoop({
     const bucketDumpOpen = sim.bucket > 1.35;
     const bucketFullyOpen = sim.bucket > 2.15;
     if (sim.bucketLoad > 0 && bucketDumpOpen) {
-      const spillRate = inDump ? 1.5 : bucketFullyOpen ? 2.2 : 0.75;
+      const spillRate = inTruckDumpTarget ? 1.65 : bucketFullyOpen ? 2.2 : 0.75;
       const remainingLoad = sim.bucketLoad;
       const dumpAmount =
         remainingLoad < 0.025
           ? remainingLoad
           : Math.min(remainingLoad, remainingLoad * spillRate * dt);
       sim.bucketLoad = Math.max(0, sim.bucketLoad - dumpAmount);
-      if (inDump) {
+      if (inTruckDumpTarget) {
         if (isGame) {
           scoreRef.current.dumped += dumpAmount;
           const progress = Math.min(
@@ -1217,8 +1325,8 @@ function SimLoop({
         while (dumpScoreRemainderRef.current >= chunkRatio) {
           dumpScoreRemainderRef.current -= chunkRatio;
           const critical = Math.random() < stats.criticalChance;
-          const dropX = isInDumpZone(bucketTip.x, bucketTip.z) ? bucketTip.x : scraper.x;
-          const dropZ = isInDumpZone(bucketTip.x, bucketTip.z) ? bucketTip.z : scraper.z;
+          const dropX = tipInTruckBed ? bucketTip.x : scraper.x;
+          const dropZ = tipInTruckBed ? bucketTip.z : scraper.z;
           const dropY = sampleHeight(terrainRef.current, dropX, dropZ) + 0.9;
           onDumpScore({
             score: Math.round(
@@ -1314,13 +1422,29 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
             <meshBasicMaterial color="#ff8f00" transparent opacity={0.18} side={THREE.DoubleSide} />
           </mesh>
           <mesh position={[zone.x, 0.2, zone.z]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[zone.radius - 0.4, zone.radius, 48]} />
-            <meshBasicMaterial color="#ffb300" transparent opacity={0.85} side={THREE.DoubleSide} />
+            <ringGeometry args={[zone.radius - 0.22, zone.radius + 0.18, 64]} />
+            <meshBasicMaterial color="#ffb300" transparent opacity={0.92} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh position={[zone.x, 0.24, zone.z]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[zone.radius - 1.0, zone.radius - 0.72, 64]} />
+            <meshBasicMaterial color="#fff2a8" transparent opacity={0.58} side={THREE.DoubleSide} />
           </mesh>
           <mesh position={[zone.x, 0.26, zone.z]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[2.5, 3.2, 36]} />
             <meshBasicMaterial color="#fff3c4" transparent opacity={0.7} side={THREE.DoubleSide} />
           </mesh>
+          <Text
+            position={[zone.x, 0.34, zone.z - zone.radius - 1.25]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            fontSize={1.9}
+            color="#fff7c7"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.08}
+            outlineColor="#6d3e00"
+          >
+            DIG
+          </Text>
         </group>
       ))}
       <mesh position={[DUMP_ZONE.x, 0.12, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -1328,14 +1452,139 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
         <meshBasicMaterial color="#1b5e20" transparent opacity={0.16} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[DUMP_ZONE.x, 0.2, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[DUMP_ZONE.radius - 0.3, DUMP_ZONE.radius, 32]} />
-        <meshBasicMaterial color="#66bb6a" transparent opacity={0.82} side={THREE.DoubleSide} />
+        <ringGeometry args={[DUMP_ZONE.radius - 0.22, DUMP_ZONE.radius + 0.18, 48]} />
+        <meshBasicMaterial color="#66bb6a" transparent opacity={0.9} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[DUMP_ZONE.x, 0.24, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[DUMP_ZONE.radius - 0.9, DUMP_ZONE.radius - 0.62, 48]} />
+        <meshBasicMaterial color="#d5ffd9" transparent opacity={0.52} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[DUMP_ZONE.x, 0.25, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
         <boxGeometry args={[4.2, 4.2, 0.08]} />
         <meshBasicMaterial color="#a5d6a7" transparent opacity={0.55} />
       </mesh>
+      <mesh
+        position={[DUMP_TRUCK_BED.x, 0.28, DUMP_TRUCK_BED.z]}
+        rotation={[-Math.PI / 2, 0, DUMP_TRUCK_BED.rotation]}
+      >
+        <boxGeometry args={[DUMP_TRUCK_BED.width, DUMP_TRUCK_BED.depth, 0.08]} />
+        <meshBasicMaterial color="#b8ffba" transparent opacity={0.24} />
+      </mesh>
+      <Text
+        position={[DUMP_ZONE.x, 0.34, DUMP_ZONE.z - DUMP_ZONE.radius - 1.2]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={1.65}
+        color="#d7ffd9"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.08}
+        outlineColor="#0c3d16"
+      >
+        DUMP
+      </Text>
     </>
+  );
+}
+
+interface NavigationTarget {
+  label: "DIG" | "DUMP";
+  x: number;
+  z: number;
+  color: string;
+  outline: string;
+  distance: number;
+}
+
+function NavigationGuide({
+  simRef,
+  terrainRef,
+}: {
+  simRef: React.MutableRefObject<ExcavatorSimState>;
+  terrainRef: React.MutableRefObject<TerrainData>;
+}) {
+  const [target, setTarget] = useState<NavigationTarget | null>(null);
+  const updateRef = useRef(0);
+
+  useFrame((state) => {
+    if (state.clock.elapsedTime - updateRef.current < 0.12) return;
+    updateRef.current = state.clock.elapsedTime;
+
+    const sim = simRef.current;
+    const zones = getActiveDigZones(terrainRef.current);
+    const nearestDig =
+      zones
+        .map((zone) => ({
+          zone,
+          distance: Math.hypot(zone.x - sim.posX, zone.z - sim.posZ),
+        }))
+        .sort((a, b) => a.distance - b.distance)[0]?.zone ?? DIG_ZONE;
+    const inDig = zones.some(
+      (zone) => Math.hypot(zone.x - sim.posX, zone.z - sim.posZ) < zone.radius,
+    );
+    const inDump = isInDumpZone(sim.posX, sim.posZ);
+    const next =
+      inDig || (!inDump && sim.bucketLoad > 0.08)
+        ? {
+            label: "DUMP" as const,
+            x: DUMP_ZONE.x,
+            z: DUMP_ZONE.z,
+            color: "#8cff91",
+            outline: "#0f421b",
+          }
+        : {
+            label: "DIG" as const,
+            x: nearestDig.x,
+            z: nearestDig.z,
+            color: "#ffd25a",
+            outline: "#603a00",
+          };
+
+    const distance = Math.max(0, Math.hypot(next.x - sim.posX, next.z - sim.posZ));
+    setTarget((current) =>
+      current?.label === next.label &&
+      Math.abs(current.x - next.x) < 0.1 &&
+      Math.abs(current.z - next.z) < 0.1 &&
+      Math.abs(current.distance - distance) < 0.5
+        ? current
+        : { ...next, distance },
+    );
+  });
+
+  if (!target) return null;
+
+  const sim = simRef.current;
+  const dx = target.x - sim.posX;
+  const dz = target.z - sim.posZ;
+  const length = Math.max(0.001, Math.hypot(dx, dz));
+  const guideDistance = Math.min(8, Math.max(4.2, length * 0.28));
+  const x = sim.posX + (dx / length) * guideDistance;
+  const z = sim.posZ + (dz / length) * guideDistance;
+  const angle = Math.atan2(dx, dz);
+  const meterText = `${target.label} ${Math.round(target.distance)}m`;
+
+  return (
+    <group position={[x, 0.55, z]} rotation={[0, angle, 0]}>
+      <mesh position={[0, 0.02, 0.15]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.1, 0.1, 2.25, 12]} />
+        <meshBasicMaterial color={target.color} transparent opacity={0.78} />
+      </mesh>
+      <mesh position={[0, 0.02, 1.55]} rotation={[Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.42, 0.92, 24]} />
+        <meshBasicMaterial color={target.color} transparent opacity={0.92} />
+      </mesh>
+      <Text
+        position={[0, 0.08, -1.15]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={0.82}
+        color={target.color}
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.045}
+        outlineColor={target.outline}
+      >
+        {meterText}
+      </Text>
+    </group>
   );
 }
 
@@ -1354,6 +1603,77 @@ function SafetyCone({ x, z }: { x: number; z: number }) {
         <cylinderGeometry args={[0.22, 0.27, 0.08, 16]} />
         <meshStandardMaterial color="#fff3d0" roughness={0.45} />
       </mesh>
+    </group>
+  );
+}
+
+function DumpTruck() {
+  const wheelXs = [-2.65, -1.65, 1.85, 2.85];
+
+  return (
+    <group position={[DUMP_TRUCK_BED.x, 0.55, DUMP_TRUCK_BED.z]} rotation={[0, DUMP_TRUCK_BED.rotation, 0]}>
+      <group position={[0.3, 0.78, 0]}>
+        <mesh position={[-0.65, 0.55, 0]}>
+          <boxGeometry args={[5.2, 1.35, 3.0]} />
+          <meshStandardMaterial color="#f2d45c" roughness={0.42} metalness={0.18} />
+        </mesh>
+        <mesh position={[-0.65, 1.34, 0]}>
+          <boxGeometry args={[5.36, 0.22, 3.16]} />
+          <meshStandardMaterial color="#6b7178" roughness={0.28} metalness={0.48} />
+        </mesh>
+        <mesh position={[-0.65, 0.85, 1.58]}>
+          <boxGeometry args={[5.36, 1.18, 0.18]} />
+          <meshStandardMaterial color="#b88f2b" roughness={0.42} metalness={0.2} />
+        </mesh>
+        <mesh position={[-0.65, 0.85, -1.58]}>
+          <boxGeometry args={[5.36, 1.18, 0.18]} />
+          <meshStandardMaterial color="#b88f2b" roughness={0.42} metalness={0.2} />
+        </mesh>
+        <mesh position={[-3.38, 0.88, 0]}>
+          <boxGeometry args={[0.22, 1.24, 3.16]} />
+          <meshStandardMaterial color="#b88f2b" roughness={0.44} metalness={0.22} />
+        </mesh>
+        <mesh position={[2.02, 0.5, 0]}>
+          <boxGeometry args={[1.45, 1.6, 2.55]} />
+          <meshStandardMaterial color="#e53935" roughness={0.34} metalness={0.22} />
+        </mesh>
+        <mesh position={[2.32, 1.15, -1.32]}>
+          <boxGeometry args={[0.82, 0.64, 0.08]} />
+          <CabWindowMaterial />
+        </mesh>
+        <mesh position={[2.82, 0.06, 0]}>
+          <boxGeometry args={[1.72, 0.32, 2.76]} />
+          <meshStandardMaterial color="#303a42" roughness={0.44} metalness={0.38} />
+        </mesh>
+      </group>
+
+      {wheelXs.map((x) =>
+        [-1.62, 1.62].map((z) => (
+          <group key={`${x}:${z}`} position={[x, 0.38, z]}>
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.48, 0.48, 0.34, 32]} />
+              <meshStandardMaterial color="#11161b" roughness={0.58} metalness={0.2} />
+            </mesh>
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.25, 0.25, 0.38, 24]} />
+              <meshStandardMaterial color="#cbd2d6" roughness={0.24} metalness={0.62} />
+            </mesh>
+          </group>
+        )),
+      )}
+
+      <Text
+        position={[0.05, 2.65, -1.88]}
+        rotation={[0, 0, 0]}
+        fontSize={0.72}
+        color="#ffffff"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.035}
+        outlineColor="#8a1010"
+      >
+        DUMP HERE
+      </Text>
     </group>
   );
 }
@@ -1386,14 +1706,7 @@ function WorksiteSetDressing() {
       {cones.map(([x, z]) => (
         <SafetyCone key={`${x}:${z}`} x={x} z={z} />
       ))}
-      <mesh position={[DUMP_ZONE.x + 8, 1.8, DUMP_ZONE.z - 7]} rotation={[0, -0.55, 0]}>
-        <boxGeometry args={[5.2, 2.2, 0.2]} />
-        <meshStandardMaterial color="#263238" roughness={0.4} />
-      </mesh>
-      <mesh position={[DUMP_ZONE.x + 8, 1.8, DUMP_ZONE.z - 7.12]} rotation={[0, -0.55, 0]}>
-        <boxGeometry args={[4.5, 1.5, 0.08]} />
-        <meshBasicMaterial color="#4caf50" transparent opacity={0.8} />
-      </mesh>
+      <DumpTruck />
     </>
   );
 }
@@ -1473,13 +1786,15 @@ function SceneContent(props: ExcavatorSceneProps) {
       <TerrainMesh terrainRef={props.terrainRef} />
       <WorksiteSetDressing />
       <ZoneMarkers terrainRef={props.terrainRef} />
+      <NavigationGuide simRef={props.simRef} terrainRef={props.terrainRef} />
       <WaypointMarker tutorialStepRef={props.tutorialStepRef} />
       <AuxiliarySceneEffects auxiliaryRef={props.auxiliaryRef} />
       <ExcavatorArm
         simRef={props.simRef}
+        velRef={props.velRef}
         auxiliaryRef={props.auxiliaryRef}
         inputRef={props.inputRef}
-        showBody={props.cameraMode !== 1}
+        showBody={props.cameraMode !== 3}
       />
       <GameCamera
         simRef={props.simRef}

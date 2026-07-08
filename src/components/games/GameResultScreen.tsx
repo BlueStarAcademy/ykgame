@@ -30,6 +30,7 @@ function medal(rank: number) {
 
 export function GameResultScreen({ gameId, result, onRetry }: GameResultScreenProps) {
   const game = getGameById(gameId);
+  const isYanmar = gameId === "yanmar";
   const isYanmarArcade = gameId === "yanmar" && typeof result.arcadeScore === "number";
   const stars = isYanmarArcade ? 0 : calculateStars(result.progress);
   const { data: session, update } = useSession();
@@ -50,6 +51,10 @@ export function GameResultScreen({ gameId, result, onRetry }: GameResultScreenPr
 
     async function saveAndLoad() {
       try {
+        if (gameId === "yanmar" && result.mode !== "game") {
+          setSaved(true);
+          return;
+        }
         const saveRes = await fetch("/api/scores", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -88,12 +93,18 @@ export function GameResultScreen({ gameId, result, onRetry }: GameResultScreenPr
   ]);
 
   const nickname = session?.user?.nickname ?? "";
+  const title = isYanmar
+    ? "운행 결과"
+    : result.completed
+      ? "미션 완료!"
+      : "시간 종료";
+  const homeLabel = isYanmar ? "확인 후 나가기" : "홈으로";
 
   return (
     <>
       <div className="mx-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg">
         <h2 className="text-center text-xl font-bold" style={{ color: game?.color }}>
-          {result.completed ? "미션 완료!" : "시간 종료"}
+          {title}
         </h2>
         <p className="mt-1 text-center text-sm text-gray-500">{game?.brandEn}</p>
 
@@ -112,8 +123,16 @@ export function GameResultScreen({ gameId, result, onRetry }: GameResultScreenPr
           {saved && stars > 0 && (
             <p className="mt-2 text-sm text-green-600">⭐ {stars}별 획득!</p>
           )}
+          {isYanmar && typeof result.rewardStars === "number" && result.rewardStars > 0 && (
+            <p className="mt-2 text-sm text-green-600">
+              이번 운행 보상 스타 +{result.rewardStars.toLocaleString()}
+            </p>
+          )}
           {saved && myRank && (
             <p className="mt-1 text-sm text-blue-600">이번 달 순위 #{myRank}</p>
+          )}
+          {isYanmar && result.mode !== "game" && (
+            <p className="mt-2 text-xs text-gray-400">연습 운행 결과는 랭킹에 저장되지 않습니다.</p>
           )}
         </div>
 
@@ -164,7 +183,7 @@ export function GameResultScreen({ gameId, result, onRetry }: GameResultScreenPr
             className="flex-1 rounded-lg py-3 text-center font-medium text-white hover:opacity-90"
             style={{ backgroundColor: game?.color }}
           >
-            홈으로
+            {homeLabel}
           </Link>
         </div>
         {!saved && (
