@@ -37,7 +37,14 @@ interface JoystickLayout {
 }
 
 const PEDAL_SWING_SPEED_PER_SECOND = 0.85;
-type CockpitLayout = typeof COCKPIT_LAYOUT;
+
+/** `as const` layout literals widened so portrait offsets type-check. */
+type WidenNumbers<T> = T extends number
+  ? number
+  : T extends object
+    ? { -readonly [K in keyof T]: WidenNumbers<T[K]> }
+    : T;
+type CockpitLayout = WidenNumbers<typeof COCKPIT_LAYOUT>;
 
 const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   ...COCKPIT_LAYOUT,
