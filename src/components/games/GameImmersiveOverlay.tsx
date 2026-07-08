@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useGameFullscreen } from "@/hooks/useGameFullscreen";
+import { enablePwaMode } from "@/lib/pwa-mode";
 
 export const GAME_IMMERSIVE_HEADER_RIGHT_ID = "game-immersive-header-right";
 
@@ -37,6 +38,8 @@ export function GameImmersiveOverlay({
 
   useEffect(() => {
     if (active) {
+      enablePwaMode();
+      document.documentElement.classList.add("pwa-mode");
       enter();
     } else {
       leave();

@@ -14,6 +14,7 @@ export const metadata: Metadata = {
   },
   other: {
     "mobile-web-app-capable": "yes",
+    "screen-orientation": "any",
   },
   icons: {
     icon: "/icons/icon-192.png",

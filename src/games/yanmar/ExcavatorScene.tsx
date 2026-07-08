@@ -2,7 +2,7 @@
 
 /* eslint-disable react-hooks/refs */
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import type { AuxiliaryControlState, ExcavatorControlState, ControlMask } from "./controls";
@@ -909,6 +909,19 @@ function GameCamera({
   simRef: React.MutableRefObject<ExcavatorSimState>;
   mode: CameraMode;
 }) {
+  const portraitRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const query = window.matchMedia("(orientation: portrait)");
+    const update = () => {
+      portraitRef.current = query.matches;
+    };
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
   useFrame(({ camera }) => {
     const s = simRef.current;
     const facing = s.heading + s.swing;
@@ -916,26 +929,42 @@ function GameCamera({
     const forwardZ = Math.cos(facing);
     const sideX = Math.cos(facing);
     const sideZ = -Math.sin(facing);
+    const portrait = portraitRef.current;
+    const persp = camera as THREE.PerspectiveCamera;
 
     if (mode === 1) {
-      const camX = s.posX - forwardX * 1.95 + sideX * 0.58;
-      const camZ = s.posZ - forwardZ * 1.95 + sideZ * 0.58;
-      camera.position.set(camX, 1.92, camZ);
+      // Portrait: taller FOV leaves boom floating mid-frame — drop look/camera so arm fills toward the bottom.
+      const camY = portrait ? 1.42 : 1.92;
+      const lookY = portrait ? 0.28 : 1.04;
+      const back = portrait ? 1.72 : 1.95;
+      const fov = portrait ? 70 : 58;
+      if (Math.abs(persp.fov - fov) > 0.01) {
+        persp.fov = fov;
+        persp.updateProjectionMatrix();
+      }
+      const camX = s.posX - forwardX * back + sideX * 0.58;
+      const camZ = s.posZ - forwardZ * back + sideZ * 0.58;
+      camera.position.set(camX, camY, camZ);
       const lookX = s.posX + forwardX * 5.35 - sideX * 0.22;
       const lookZ = s.posZ + forwardZ * 5.35 - sideZ * 0.22;
-      camera.lookAt(lookX, 1.04, lookZ);
+      camera.lookAt(lookX, lookY, lookZ);
       return;
+    }
+
+    if (Math.abs(persp.fov - 58) > 0.01) {
+      persp.fov = 58;
+      persp.updateProjectionMatrix();
     }
 
     if (mode === 2) {
       camera.position.set(
         s.posX - forwardX * 7.2 + sideX * 3.4,
-        4.9,
+        portrait ? 4.35 : 4.9,
         s.posZ - forwardZ * 7.2 + sideZ * 3.4,
       );
       camera.lookAt(
         s.posX + forwardX * 3.25 - sideX * 0.5,
-        2.05,
+        portrait ? 1.55 : 2.05,
         s.posZ + forwardZ * 3.25 - sideZ * 0.5,
       );
       return;
@@ -943,12 +972,12 @@ function GameCamera({
 
     camera.position.set(
       s.posX - forwardX * 14.5 + sideX * 7.8,
-      8.2,
+      portrait ? 7.4 : 8.2,
       s.posZ - forwardZ * 14.5 + sideZ * 7.8,
     );
     camera.lookAt(
       s.posX + forwardX * 4.4 - sideX * 0.8,
-      2.0,
+      portrait ? 1.55 : 2.0,
       s.posZ + forwardZ * 4.4 - sideZ * 0.8,
     );
   });
@@ -1434,12 +1463,12 @@ function SceneContent(props: ExcavatorSceneProps) {
   return (
     <>
       <color attach="background" args={["#9fd2f2"]} />
-      <fog attach="fog" args={["#b8dcf1", 70, 240]} />
-      <hemisphereLight args={["#e8f7ff", "#c58b54", 0.68]} />
-      <ambientLight intensity={0.42} />
+      <fog attach="fog" args={["#b8dcf1", 90, 260]} />
+      <hemisphereLight args={["#e8f7ff", "#c58b54", 0.72]} />
+      <ambientLight intensity={0.5} />
       <directionalLight
         position={[22, 34, -28]}
-        intensity={2.05}
+        intensity={2.25}
         color="#fff2c1"
         castShadow={false}
       />
@@ -1465,8 +1494,13 @@ function SceneContent(props: ExcavatorSceneProps) {
 export function ExcavatorScene(props: ExcavatorSceneProps) {
   return (
     <Canvas
-      gl={{ antialias: false, powerPreference: "high-performance" }}
-      dpr={[1, 1.5]}
+      gl={{
+        antialias: true,
+        powerPreference: "high-performance",
+        alpha: false,
+        stencil: false,
+      }}
+      dpr={[1, 2]}
       camera={{ fov: 58, near: 0.1, far: 180 }}
       style={{ width: "100%", height: "100%" }}
     >
