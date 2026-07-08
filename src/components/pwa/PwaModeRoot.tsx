@@ -3,12 +3,24 @@
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { activatePwaFromSearchParams, isPwaMode } from "@/lib/pwa-mode";
-import { isStandalonePwa } from "@/lib/fullscreen";
+import { isStandalonePwa, unlockOrientation } from "@/lib/fullscreen";
 
 function PwaModeRootInner({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    // Older builds locked landscape on game enter. Clear once per tab session.
+    const key = "ykgame_orientation_unlocked_v1";
+    try {
+      if (sessionStorage.getItem(key) === "1") return;
+      unlockOrientation();
+      sessionStorage.setItem(key, "1");
+    } catch {
+      unlockOrientation();
+    }
+  }, []);
 
   useEffect(() => {
     const fromUrl = activatePwaFromSearchParams(searchParams);

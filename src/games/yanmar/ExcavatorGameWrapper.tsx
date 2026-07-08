@@ -25,7 +25,7 @@ import {
   createInitialTerrain,
   type ExcavatorSimState,
 } from "./ExcavatorScene";
-import { getViewportOrientation } from "@/lib/fullscreen";
+import { getDefaultCockpitLayoutMode } from "@/lib/fullscreen";
 import { createHydraulicVelocity, type HydraulicVelocity } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
 import { DigPoseGraph } from "./DigHintPanel";
@@ -376,12 +376,12 @@ export function ExcavatorGameWrapper({
   const [headerHudReady, setHeaderHudReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(1);
   /**
-   * Cockpit layout is chosen once from the current viewport, then only by the
-   * HUD toggle. Auto-following resize/orientation caused flip-flopping on
-   * mobile address-bar / fullscreen chrome changes.
+   * Always start portrait. In-game HUD toggle only changes CSS layout —
+   * it must never call Screen Orientation / Fullscreen APIs (they force
+   * landscape on many Android PWAs).
    */
-  const [layoutMode, setLayoutMode] = useState<CockpitLayoutMode>(() =>
-    typeof window === "undefined" ? "portrait" : getViewportOrientation(),
+  const [layoutMode, setLayoutMode] = useState<CockpitLayoutMode>(
+    getDefaultCockpitLayoutMode,
   );
   const layoutPortrait = layoutMode === "portrait";
   const endedRef = useRef(false);

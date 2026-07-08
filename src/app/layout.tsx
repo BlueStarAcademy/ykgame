@@ -6,7 +6,8 @@ export const metadata: Metadata = {
   title: "YK건기 중장비 체험",
   description:
     "YK건기 중장비를 게임으로 직접 체험하세요. 얀마 굴착기 1인칭 시뮬레이터와 8종 브랜드 미니게임.",
-  manifest: "/manifest.webmanifest",
+  // v2 filename busts cached manifests that still forced landscape from older builds
+  manifest: "/manifest-v2.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -14,7 +15,9 @@ export const metadata: Metadata = {
   },
   other: {
     "mobile-web-app-capable": "yes",
-    "screen-orientation": "any",
+    "apple-mobile-web-app-orientations": "portrait",
+    "screen-orientation": "portrait",
+    "x5-orientation": "portrait",
   },
   icons: {
     icon: "/icons/icon-192.png",
