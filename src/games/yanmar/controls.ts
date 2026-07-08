@@ -1,24 +1,26 @@
 /** 얀마 SV08-1 조작 매핑 — YK건기 조작 도면 기준 */
 
 export const YANMAR_ASSETS = {
-  cockpit: "/images/yanmar/cockpit-game-controls-overlay.png",
+  cockpit: "/images/yanmar/cockpit-game-controls-cutout.png",
   cockpitFallback: "/images/yanmar/cockpit.svg",
   controlsGuide: "/images/yanmar/controls-guide.webp",
+  safetyLever: "/images/yanmar/safety-lever.png",
 } as const;
 
 export const COCKPIT_LAYOUT = {
   width: 1024,
   height: 576,
-  left: { cx: 0.218, cy: 0.105, radius: 0.085, travel: 0.05 },
-  right: { cx: 0.808, cy: 0.105, radius: 0.085, travel: 0.05 },
-  travelLeft: { cx: 0.485, cy: 0.205, radius: 0.043, travel: 0.068 },
-  travelRight: { cx: 0.528, cy: 0.205, radius: 0.043, travel: 0.068 },
-  travelBoth: { cx: 0.5065, cy: 0.205, radius: 0.052, travel: 0.068 },
+  left: { cx: 0.182, cy: 0.172, radius: 0.085, travel: 0.05 },
+  right: { cx: 0.823, cy: 0.172, radius: 0.085, travel: 0.05 },
+  travelLeft: { cx: 0.471, cy: 0.246, radius: 0.043, travel: 0.062 },
+  travelRight: { cx: 0.520, cy: 0.246, radius: 0.043, travel: 0.062 },
+  travelBoth: { cx: 0.4955, cy: 0.246, radius: 0.052, travel: 0.062 },
   boomSwing: { cx: 0.395, cy: 0.25, radius: 0.04, travel: 0.045 },
   blade: { cx: 0.625, cy: 0.25, radius: 0.04, travel: 0.045 },
   throttle: { cx: 0.415, cy: 0.18, radius: 0.038, travel: 0.04 },
-  hydraulicSpeed: { cx: 0.685, cy: -0.025, radius: 0.038, travel: 0.04 },
-  rightPedal: { cx: 0.66, cy: 0.365, width: 0.07, height: 0.19 },
+  hydraulicSpeed: { cx: 0.695, cy: 0.21, radius: 0.038, travel: 0.04 },
+  safetyLever: { cx: 0.307, cy: 0.355, radius: 0.038, travel: 0.04 },
+  rightPedal: { cx: 0.653, cy: 0.48, width: 0.06, height: 0.15 },
   horn: { cx: 0.831, cy: 0.047, radius: 0.014 },
 } as const;
 
@@ -148,11 +150,36 @@ export function createHydraulicVelocity(): HydraulicVelocity {
 }
 
 function approach(current: number, target: number, accel: number, damp: number, dt: number) {
-  if (Math.abs(target) > 0.05) {
+  if (Math.abs(target) > 0.02) {
     const delta = target - current;
     return current + delta * Math.min(1, accel * dt);
   }
   return current * Math.exp(-damp * dt);
+}
+
+function pickStrongerAxis(a: number, b: number) {
+  return Math.abs(a) >= Math.abs(b) ? a : b;
+}
+
+/** 터치·키보드 입력을 축별로 병합 (큰 입력값 우선) */
+export function mergeControlInputs(
+  touch: ExcavatorControlState,
+  keyboard: ExcavatorControlState,
+): ExcavatorControlState {
+  return {
+    left: {
+      x: pickStrongerAxis(touch.left.x, keyboard.left.x),
+      y: pickStrongerAxis(touch.left.y, keyboard.left.y),
+    },
+    right: {
+      x: pickStrongerAxis(touch.right.x, keyboard.right.x),
+      y: pickStrongerAxis(touch.right.y, keyboard.right.y),
+    },
+    travel: {
+      left: pickStrongerAxis(touch.travel.left, keyboard.travel.left),
+      right: pickStrongerAxis(touch.travel.right, keyboard.travel.right),
+    },
+  };
 }
 
 export function applyControls(
@@ -225,18 +252,24 @@ export function applyControls(
   state.swing += vel.swing * dt;
   state.heading += vel.trackTurn * dt;
 
-  state.arm += vel.arm * dt;
-  state.arm = clamp(state.arm, JOINT_LIMITS.arm.min, JOINT_LIMITS.arm.max);
+  const nextArm = state.arm + vel.arm * dt;
+  if (nextArm < JOINT_LIMITS.arm.min) vel.arm = Math.max(0, vel.arm);
+  if (nextArm > JOINT_LIMITS.arm.max) vel.arm = Math.min(0, vel.arm);
+  state.arm = clamp(nextArm, JOINT_LIMITS.arm.min, JOINT_LIMITS.arm.max);
 
   const move = vel.travel * dt;
   state.posX += Math.sin(state.heading + state.swing) * move;
   state.posZ += Math.cos(state.heading + state.swing) * move;
 
-  state.boom += vel.boom * dt;
-  state.boom = clamp(state.boom, JOINT_LIMITS.boom.min, JOINT_LIMITS.boom.max);
+  const nextBoom = state.boom + vel.boom * dt;
+  if (nextBoom < JOINT_LIMITS.boom.min) vel.boom = Math.max(0, vel.boom);
+  if (nextBoom > JOINT_LIMITS.boom.max) vel.boom = Math.min(0, vel.boom);
+  state.boom = clamp(nextBoom, JOINT_LIMITS.boom.min, JOINT_LIMITS.boom.max);
 
-  state.bucket += vel.bucket * dt;
-  state.bucket = clamp(state.bucket, JOINT_LIMITS.bucket.min, JOINT_LIMITS.bucket.max);
+  const nextBucket = state.bucket + vel.bucket * dt;
+  if (nextBucket < JOINT_LIMITS.bucket.min) vel.bucket = Math.max(0, vel.bucket);
+  if (nextBucket > JOINT_LIMITS.bucket.max) vel.bucket = Math.min(0, vel.bucket);
+  state.bucket = clamp(nextBucket, JOINT_LIMITS.bucket.min, JOINT_LIMITS.bucket.max);
 }
 
 function clamp(v: number, min: number, max: number) {
@@ -244,7 +277,7 @@ function clamp(v: number, min: number, max: number) {
 }
 
 export function canLoadBucket(boom: number, bucket: number) {
-  return boom > 0.35 && bucket <= 0.85;
+  return boom > 0.2 && bucket <= 1.1;
 }
 
 export function canDumpBucket(bucket: number) {

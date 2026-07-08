@@ -12,6 +12,7 @@ import {
   LOCKED_CONTROLS,
   createAuxiliaryControls,
   filterInput,
+  mergeControlInputs,
 } from "./controls";
 import { CockpitOverlay } from "./CockpitOverlay";
 import {
@@ -23,15 +24,17 @@ import {
 } from "./ExcavatorScene";
 import { createHydraulicVelocity, type HydraulicVelocity } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
-import { BoomLoadGauge } from "./DigHintPanel";
+import { DigPoseGraph } from "./DigHintPanel";
 import { DumpHintPanel } from "./DumpHintPanel";
 import { ControlsGuidePanel } from "./ControlsGuidePanel";
+import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
 import { createDigFeedback, type DigFeedback } from "./bucket";
 import type { TerrainData } from "./terrain";
 import {
   DEFAULT_YANMAR_EQUIPMENT_LEVELS,
   YANMAR_EQUIPMENT_CONFIG,
   calculateYanmarEquipmentStats,
+  getLoadUnits,
   getYanmarUpgradeCost,
   type YanmarEquipmentLevels,
   type YanmarEquipmentPart,
@@ -58,6 +61,9 @@ interface ExcavatorGameWrapperProps {
   onEnd: (result: GameResult) => void;
   immersive?: boolean;
   initialPlayMode?: "practice" | "game";
+  onShowRanking?: () => void;
+  myRank?: number | null;
+  bestScore?: number;
 }
 
 type DumpRewardApiEvent =
@@ -170,12 +176,6 @@ function EquipmentUpgradeModal({
   );
 }
 
-function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
 function resetSim(sim: ExcavatorSimState, vel: HydraulicVelocity) {
   const init = createInitialSim();
   Object.assign(sim, init);
@@ -256,6 +256,9 @@ export function ExcavatorGameWrapper({
   onEnd,
   immersive = false,
   initialPlayMode,
+  onShowRanking,
+  myRank = null,
+  bestScore = 0,
 }: ExcavatorGameWrapperProps) {
   const config = getMissionConfig("yanmar");
   const { update } = useSession();
@@ -263,6 +266,16 @@ export function ExcavatorGameWrapper({
   const [mode, setMode] = useState<GameMode>("intro");
   const [tutorialIndex, setTutorialIndex] = useState(0);
   const [input, setInput] = useState<ExcavatorControlState>({
+    left: { x: 0, y: 0 },
+    right: { x: 0, y: 0 },
+    travel: { left: 0, right: 0 },
+  });
+  const touchInputRef = useRef<ExcavatorControlState>({
+    left: { x: 0, y: 0 },
+    right: { x: 0, y: 0 },
+    travel: { left: 0, right: 0 },
+  });
+  const keyboardInputRef = useRef<ExcavatorControlState>({
     left: { x: 0, y: 0 },
     right: { x: 0, y: 0 },
     travel: { left: 0, right: 0 },
@@ -276,6 +289,8 @@ export function ExcavatorGameWrapper({
     bucketLoad: 0,
     goalDist: 0,
     boom: 0.45,
+    arm: -0.95,
+    bucket: -0.12,
     score: 0,
   });
   const [scorePopups, setScorePopups] = useState<DumpScorePopup[]>([]);
@@ -288,6 +303,9 @@ export function ExcavatorGameWrapper({
   const [previewStars, setPreviewStars] = useState(0);
   const [stepCompleteFlash, setStepCompleteFlash] = useState(false);
   const [showControlsGuide, setShowControlsGuide] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showMinimap, setShowMinimap] = useState(true);
+  const [showDigPoseGraph, setShowDigPoseGraph] = useState(true);
   const [showTutorialMenu, setShowTutorialMenu] = useState(false);
   const [showTouchZones, setShowTouchZones] = useState(false);
   const [showEquipmentUpgrade, setShowEquipmentUpgrade] = useState(false);
@@ -316,22 +334,54 @@ export function ExcavatorGameWrapper({
       prev.inDumpZone === fb.inDumpZone &&
       prev.tipOnGround === fb.tipOnGround &&
       prev.bucketCurled === fb.bucketCurled &&
-      prev.digging === fb.digging
+      prev.canLoad === fb.canLoad &&
+      prev.digging === fb.digging &&
+      Math.abs(prev.groundDepth - fb.groundDepth) < 0.05 &&
+      prev.bucketOpenReady === fb.bucketOpenReady &&
+      prev.insertedDeepEnough === fb.insertedDeepEnough &&
+      prev.bucketCurlReady === fb.bucketCurlReady &&
+      prev.armPulling === fb.armPulling &&
+      prev.optimalDigPose === fb.optimalDigPose &&
+      Math.abs(prev.digPoseScore - fb.digPoseScore) < 0.01
         ? prev
         : { ...fb },
     );
     setHud((h) => {
       const boom = simRef.current.boom;
+      const arm = simRef.current.arm;
+      const bucket = simRef.current.bucket;
       const bucketLoad = simRef.current.bucketLoad;
       if (
         Math.abs(h.boom - boom) < 0.01 &&
+        Math.abs(h.arm - arm) < 0.01 &&
+        Math.abs(h.bucket - bucket) < 0.01 &&
         Math.abs(h.bucketLoad - bucketLoad) < 0.005
       ) {
         return h;
       }
-      return { ...h, boom, bucketLoad };
+      return { ...h, boom, arm, bucket, bucketLoad };
     });
   }, [setDigFeedback, setHud]);
+
+  const syncMergedInput = useCallback(() => {
+    setInput(
+      filterInput(
+        mergeControlInputs(touchInputRef.current, keyboardInputRef.current),
+        allowedRef.current,
+      ),
+    );
+  }, []);
+
+  const clearAllInput = useCallback(() => {
+    const zero = {
+      left: { x: 0, y: 0 },
+      right: { x: 0, y: 0 },
+      travel: { left: 0, right: 0 },
+    };
+    touchInputRef.current = zero;
+    keyboardInputRef.current = zero;
+    setInput(zero);
+  }, []);
 
   const inputRef = useRef(input);
 
@@ -400,7 +450,8 @@ export function ExcavatorGameWrapper({
 
   useEffect(() => {
     allowedRef.current = allowed;
-  }, [allowed]);
+    syncMergedInput();
+  }, [allowed, syncMergedInput]);
 
   useEffect(() => {
     auxiliaryRef.current = auxiliary;
@@ -411,13 +462,9 @@ export function ExcavatorGameWrapper({
     auxiliaryRef.current = resolved;
     setAuxiliary(resolved);
     if (resolved.safetyLocked) {
-      setInput({
-        left: { x: 0, y: 0 },
-        right: { x: 0, y: 0 },
-        travel: { left: 0, right: 0 },
-      });
+      clearAllInput();
     }
-  }, [setAuxiliary, setInput]);
+  }, [clearAllInput, setAuxiliary]);
 
   const resetYanmarSession = useCallback(() => {
     resetSim(simRef.current, velRef.current);
@@ -433,14 +480,19 @@ export function ExcavatorGameWrapper({
     const nextAuxiliary = createAuxiliaryControls();
     auxiliaryRef.current = nextAuxiliary;
     setAuxiliary(nextAuxiliary);
-    setInput({
-      left: { x: 0, y: 0 },
-      right: { x: 0, y: 0 },
-      travel: { left: 0, right: 0 },
-    });
+    clearAllInput();
     setScorePopups([]);
-    setHud({ progress: 0, timeLeft: config.duration, bucketLoad: 0, goalDist: 0, boom: 0.45, score: 0 });
-  }, [config.duration, config.target, setAuxiliary, setHud, setInput]);
+    setHud({
+      progress: 0,
+      timeLeft: config.duration,
+      bucketLoad: 0,
+      goalDist: 0,
+      boom: 0.45,
+      arm: -0.95,
+      bucket: -0.12,
+      score: 0,
+    });
+  }, [clearAllInput, config.duration, config.target, setAuxiliary, setHud]);
 
   const enterPracticeMode = useCallback(() => {
     resetYanmarSession();
@@ -607,20 +659,6 @@ export function ExcavatorGameWrapper({
     })();
   }, [addDumpPopup, updateDumpPopup]);
 
-  const finishGame = useCallback(() => {
-    if (modeRef.current !== "game" || endedRef.current) return;
-    endedRef.current = true;
-    onEnd({
-      gameId: "yanmar",
-      progress: getProgress(scoreRef.current),
-      playTime: Math.round(elapsedRef.current),
-      timeLeft: 0,
-      completed: true,
-      arcadeScore: arcadeScoreRef.current,
-      mode: "game",
-    });
-  }, [onEnd]);
-
   const handleEquipmentUpgrade = useCallback(
     (part: YanmarEquipmentPart) => {
       const previewMode = modeRef.current !== "game";
@@ -711,8 +749,14 @@ export function ExcavatorGameWrapper({
     sim.bucketLoad = 0;
     tutorialDumpRef.current = 0;
     if (sim.boom < 0.7) sim.boom = 0.75;
-    if (sim.bucket > -0.04) sim.bucket = -0.05;
-    setHud((h) => ({ ...h, bucketLoad: 0, boom: sim.boom }));
+    sim.bucket = 0.85;
+    setHud((h) => ({
+      ...h,
+      bucketLoad: 0,
+      boom: sim.boom,
+      arm: sim.arm,
+      bucket: sim.bucket,
+    }));
   }, [tutorialIndex, tutorialStep?.id]);
 
   useEffect(() => {
@@ -751,7 +795,8 @@ export function ExcavatorGameWrapper({
       if (keys.has("l")) right.x = 1;
       if (keys.has("i")) right.y = 1;
       if (keys.has("k")) right.y = -1;
-      setInput(filterInput({ left, right, travel }, allowedRef.current));
+      keyboardInputRef.current = { left, right, travel };
+      syncMergedInput();
     };
     const down = (e: KeyboardEvent) => {
       keys.add(e.key.toLowerCase());
@@ -767,7 +812,7 @@ export function ExcavatorGameWrapper({
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, []);
+  }, [syncMergedInput]);
 
   return (
     <div
@@ -805,7 +850,7 @@ export function ExcavatorGameWrapper({
         />
 
         {mode !== "intro" && mode !== "gameReady" && (
-          <div className="absolute left-2 top-2 z-50 flex gap-1.5">
+          <div className="absolute left-2 top-2 z-50 flex flex-col items-start gap-1.5">
             {(mode === "practice" || mode === "tutorial") && (
               <button
                 type="button"
@@ -815,11 +860,18 @@ export function ExcavatorGameWrapper({
                 튜토리얼
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setShowEquipmentUpgrade(true)}
+              className="rounded-lg border border-amber-200/30 bg-amber-500/90 px-2.5 py-1.5 text-[11px] font-black text-white shadow-lg backdrop-blur-sm hover:bg-amber-400"
+            >
+              장비강화
+            </button>
           </div>
         )}
 
         {mode === "tutorial" && tutorialStep && (
-          <div className="absolute left-2 top-12 z-40 w-[8.75rem] rounded-xl border border-amber-300/20 bg-black/75 p-2 text-white shadow-xl backdrop-blur-sm">
+          <div className="absolute left-2 top-[5.25rem] z-40 w-[8.75rem] rounded-xl border border-amber-300/20 bg-black/75 p-2 text-white shadow-xl backdrop-blur-sm">
             <div className="min-w-0">
               <p className="text-[10px] font-bold text-amber-300">{tutorialStep.title}</p>
               <p className="mt-0.5 text-[10px] leading-tight text-white/85">
@@ -836,24 +888,6 @@ export function ExcavatorGameWrapper({
           </div>
         )}
 
-        {mode === "game" && (
-          <div className="absolute left-0 right-0 top-0 z-20 flex justify-between p-2 pr-[8rem] pt-10">
-            <div className="rounded-lg bg-black/60 px-3 py-1 text-sm font-bold text-white">
-              진행: {hud.progress}%
-            </div>
-            <div className="rounded-lg bg-black/60 px-3 py-1 text-sm font-bold text-white">
-              {config.duration > 0 ? formatTime(hud.timeLeft) : `플레이 ${formatTime(hud.timeLeft)}`}
-            </div>
-            <button
-              type="button"
-              onClick={finishGame}
-              className="rounded-lg bg-red-600 px-3 py-1 text-sm font-black text-white shadow-lg hover:bg-red-500"
-            >
-              저장 종료
-            </button>
-          </div>
-        )}
-
         {mode === "tutorial" && tutorialStep && (
           <div className="absolute right-2 z-20 rounded bg-black/40 px-1.5 py-0.5 text-[9px] text-white/70"
             style={{
@@ -864,7 +898,7 @@ export function ExcavatorGameWrapper({
           </div>
         )}
 
-        {mode !== "intro" && (
+        {mode !== "intro" && showMinimap && (
           <ExcavatorMinimap
             simRef={simRef}
             terrainRef={terrainRef}
@@ -882,40 +916,87 @@ export function ExcavatorGameWrapper({
         ) : null}
 
         {mode === "tutorial" && tutorialStep?.waypoint && (
-          <div className="absolute left-2 top-[5.25rem] z-20 rounded-lg bg-sky-600/85 px-2 py-1 text-[10px] font-semibold text-white">
+          <div className="absolute left-2 top-[12.25rem] z-20 rounded-lg bg-sky-600/85 px-2 py-1 text-[10px] font-semibold text-white">
             목표까지 {hud.goalDist}m
           </div>
         )}
 
         {mode !== "intro" && (
-          <div
-            className="pointer-events-none absolute left-[5.8rem] right-[8rem] top-2 z-30 rounded-xl border border-white/10 bg-black/55 px-3 py-2 shadow-xl backdrop-blur-sm"
-          >
-            <div className="mb-1 flex items-center justify-between border-b border-white/10 pb-1">
-              <span className="text-[9px] font-bold text-yellow-200">점수</span>
-              <span className="text-[11px] font-black text-white">{hud.score.toLocaleString()}점</span>
+          <div className="pointer-events-none absolute left-[5.8rem] right-[8rem] top-2 z-30 flex flex-col gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className="rounded-xl border border-yellow-200/25 bg-gradient-to-br from-yellow-500/35 to-black/75 px-2.5 py-1.5 text-center shadow-xl backdrop-blur-sm">
+                <p className="text-[9px] font-black text-yellow-200">점수</p>
+                <p className="mt-0.5 truncate text-[13px] font-black text-white">
+                  {hud.score.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-xl border border-amber-200/25 bg-gradient-to-br from-amber-500/35 to-black/75 px-2.5 py-1.5 text-center shadow-xl backdrop-blur-sm">
+                <p className="text-[9px] font-black text-amber-200">
+                  {mode === "game" ? "스타" : "체험 스타"}
+                </p>
+                <p className="mt-0.5 truncate text-[13px] font-black text-amber-50">
+                  ⭐ {(mode === "game" ? currency : previewStars).toLocaleString()}
+                </p>
+              </div>
             </div>
-            <div className="mb-1 flex items-center justify-between text-[9px]">
-              <span className="font-bold text-amber-200">
-                {mode === "game" ? "스타" : "체험 스타"}
-              </span>
-              <span className="font-black text-amber-100">
-                ⭐ {(mode === "game" ? currency : previewStars).toLocaleString()}
-              </span>
+            <div className="rounded-xl border border-orange-200/25 bg-gradient-to-br from-orange-500/35 to-black/75 px-2.5 py-1.5 shadow-xl backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-[9px] font-black text-orange-200">적재량</span>
+                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/15">
+                  <div
+                    className="h-full rounded-full bg-orange-300 transition-all duration-150"
+                    style={{ width: `${Math.max(0, Math.min(100, hud.bucketLoad * 100))}%` }}
+                  />
+                </div>
+                <span className="shrink-0 text-[10px] font-black text-orange-50">
+                  {getLoadUnits(hud.bucketLoad, equipmentStats.maxLoadUnits)}
+                  <span className="text-[8px] font-bold text-orange-100/70">
+                    /{equipmentStats.maxLoadUnits}
+                  </span>
+                </span>
+                <span className="shrink-0 text-[9px] font-bold text-orange-100/80">
+                  {Math.round(hud.bucketLoad * 100)}%
+                </span>
+              </div>
             </div>
-            <BoomLoadGauge
-              bucketLoad={hud.bucketLoad}
-              maxLoadUnits={equipmentStats.maxLoadUnits}
+          </div>
+        )}
+
+        {mode !== "intro" && showDigPoseGraph && (
+          <div className="pointer-events-none absolute right-2 top-[8rem] z-20 w-[116px] rounded-xl border border-white/10 bg-black/55 px-2 py-1.5 text-white shadow-xl backdrop-blur-sm">
+            <DigPoseGraph
+              boom={hud.boom}
+              arm={hud.arm}
+              bucket={hud.bucket}
+              feedback={digFeedback}
             />
           </div>
         )}
 
+        <YanmarGameSettingsMenu
+          immersive={immersive}
+          show={mode !== "intro"}
+          open={showSettingsMenu}
+          onOpenChange={setShowSettingsMenu}
+          showMinimap={showMinimap}
+          onToggleMinimap={() => setShowMinimap((v) => !v)}
+          showDigPose={showDigPoseGraph}
+          onToggleDigPose={() => setShowDigPoseGraph((v) => !v)}
+          showTouchZones={showTouchZones}
+          onToggleTouchZones={() => setShowTouchZones((v) => !v)}
+          touchZonesAvailable={mode !== "gameReady"}
+          onOpenControlsGuide={() => setShowControlsGuide(true)}
+          onShowRanking={onShowRanking}
+          myRank={myRank}
+          bestScore={bestScore}
+        />
+
         {mode === "game" && (
           <>
-            <div className="absolute right-2 top-[8.75rem] z-20 rounded-lg bg-orange-600/80 px-2 py-1 text-[10px] text-white">
+            <div className="absolute right-2 top-[17rem] z-20 rounded-lg bg-orange-600/80 px-2 py-1 text-[10px] text-white">
               🟠 굴착
             </div>
-            <div className="absolute right-2 top-[10.5rem] z-20 rounded-lg bg-green-600/80 px-2 py-1 text-[10px] text-white">
+            <div className="absolute right-2 top-[18.75rem] z-20 rounded-lg bg-green-600/80 px-2 py-1 text-[10px] text-white">
               🟢 덤프
             </div>
           </>
@@ -955,54 +1036,17 @@ export function ExcavatorGameWrapper({
         {mode !== "intro" && (
           <CockpitOverlay
             input={input}
-            onInputChange={(next) =>
-              setInput((current) =>
-                filterInput(
-                  typeof next === "function" ? next(current) : next,
-                  allowedRef.current,
-                ),
-              )
-            }
+            onInputChange={(next) => {
+              touchInputRef.current =
+                typeof next === "function" ? next(touchInputRef.current) : next;
+              syncMergedInput();
+            }}
             auxiliary={auxiliary}
             onAuxiliaryChange={handleAuxiliaryChange}
             allowed={allowed}
             tutorialStep={tutorialStep}
             showTouchZones={showTouchZones}
           />
-        )}
-
-        {mode !== "intro" && mode !== "gameReady" && (
-          <button
-            type="button"
-            onClick={() => setShowTouchZones((show) => !show)}
-            className={`absolute bottom-3 left-3 z-50 rounded-xl border px-3 py-2 text-xs font-semibold shadow-xl backdrop-blur-sm ${
-              showTouchZones
-                ? "border-white/20 bg-black/70 text-sky-300 hover:bg-black/85"
-                : "border-white/20 bg-black/70 text-white/65 hover:bg-black/85"
-            }`}
-          >
-            터치범위 {showTouchZones ? "ON" : "OFF"}
-          </button>
-        )}
-
-        {mode !== "intro" && (
-          <button
-            type="button"
-            onClick={() => setShowControlsGuide(true)}
-            className="absolute bottom-3 right-3 z-50 rounded-xl border border-white/20 bg-black/70 px-3 py-2 text-xs font-semibold text-white shadow-xl backdrop-blur-sm hover:bg-black/85"
-          >
-            기능정보
-          </button>
-        )}
-
-        {mode !== "intro" && mode !== "gameReady" && (
-          <button
-            type="button"
-            onClick={() => setShowEquipmentUpgrade(true)}
-            className="absolute bottom-3 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-amber-200/30 bg-amber-500/90 px-3 py-2 text-xs font-black text-white shadow-xl backdrop-blur-sm hover:bg-amber-400"
-          >
-            장비강화
-          </button>
         )}
 
         {mode === "intro" && initialPlayMode && (

@@ -469,7 +469,7 @@ function FirstPersonCamera({
 }
 
 // Use the visible bucket shell's lowest sampled point, not the old mathematical tip.
-const MIN_BUCKET_GROUND_CLEARANCE = -0.82;
+const MIN_BUCKET_GROUND_CLEARANCE = -1.05;
 function bucketClearance(sim: ExcavatorSimState, terrain: TerrainData, boomSwing: number) {
   const tip = getBucketBodyContactWorld(sim, boomSwing);
   const groundH = sampleHeight(terrain, tip.x, tip.z);
@@ -542,9 +542,10 @@ function SimLoop({
       sim.boom = beforeGroundContact.boom;
       sim.arm = beforeGroundContact.arm;
       sim.bucket = beforeGroundContact.bucket;
-      velRef.current.boom = 0;
-      velRef.current.arm = 0;
-      velRef.current.bucket = 0;
+      // 땅 쪽으로 밀어넣는 속도만 정지 — 들어올리기·말기 방향 조작은 유지
+      if (velRef.current.boom > 0) velRef.current.boom = 0;
+      if (velRef.current.arm > 0) velRef.current.arm = 0;
+      if (velRef.current.bucket > 0) velRef.current.bucket = 0;
       ({ clearance } = constrainBucketGroundContact(
         sim,
         terrainRef.current,
@@ -565,9 +566,26 @@ function SimLoop({
       );
     const inZone = scraperInDigZone || tipInDigZone || bodyNearDigZone;
     const inDump = isInDumpZone(scraper.x, scraper.z) || isInDumpZone(bucketTip.x, bucketTip.z);
-    const bucketInWorkRange = scraperDepthBelow > -1.1 && scraperDepthBelow < 2.25;
-    const tipOnGround = scraperDepthBelow > -0.9 && scraperDepthBelow < 2.25;
+    const bucketInWorkRange = scraperDepthBelow > -1.4 && scraperDepthBelow < 2.6;
+    const tipOnGround = scraperDepthBelow > -1.2 && scraperDepthBelow < 2.6;
     const curled = isBucketCurled(sim.boom, sim.bucket);
+    const bucketOpenReady = sim.bucket >= 0.35 && sim.bucket <= 1.55;
+    const insertedDeepEnough = scraperDepthBelow >= 0.35 && scraperDepthBelow <= 2.35;
+    const bucketCurlReady =
+      sim.bucket <= 0.75 || filtered.right.x < -0.15 || velRef.current.bucket < -0.04;
+    const armPulling = filtered.left.y > 0.15 || velRef.current.arm < -0.04;
+    const naturalDigPose =
+      inZone &&
+      bucketInWorkRange &&
+      bucketOpenReady &&
+      insertedDeepEnough &&
+      bucketCurlReady &&
+      armPulling;
+    const digPoseScore =
+      (bucketOpenReady ? 1 : 0) +
+      (insertedDeepEnough ? 1 : 0) +
+      (bucketCurlReady ? 1 : 0) +
+      (armPulling ? 1 : 0);
     const canLoad = curled && bucketInWorkRange;
 
     fb.inDigZone = inZone;
@@ -577,12 +595,18 @@ function SimLoop({
     fb.canLoad = canLoad;
     fb.groundDepth = scraperDepthBelow;
     fb.digging = false;
+    fb.bucketOpenReady = bucketOpenReady;
+    fb.insertedDeepEnough = insertedDeepEnough;
+    fb.bucketCurlReady = bucketCurlReady;
+    fb.armPulling = armPulling;
+    fb.optimalDigPose = naturalDigPose;
+    fb.digPoseScore = digPoseScore / 4;
 
     const isGame = modeRef.current === "game";
 
     const isTutorial = modeRef.current === "tutorial";
-    const digRate = isTutorial ? 6.5 : 4.5;
-    const loadRate = isTutorial ? 3.5 : 2.4;
+    const digRate = isTutorial ? 7.5 : 5.5;
+    const loadRate = isTutorial ? 4.2 : 3.0;
 
     if (inZone && bucketInWorkRange && sim.bucketLoad < 1) {
       const scrape = Math.max(0.24, scraperDepthBelow + 0.68);
@@ -591,18 +615,32 @@ function SimLoop({
       const scrapeMotion =
         Math.abs(velRef.current.arm) * 0.8 +
         Math.abs(velRef.current.travel) * 0.22 +
-        Math.abs(velRef.current.bucket) * 0.35;
-      const activelyScraping = scrapeMotion > 0.06;
+        Math.abs(velRef.current.bucket) * 0.35 +
+        Math.abs(velRef.current.boom) * 0.25;
+      const inputMotion =
+        Math.abs(filtered.left.y) * 0.75 +
+        Math.abs(filtered.right.y) * 0.3 +
+        Math.abs(filtered.right.x) * 0.3;
+      const activelyScraping = scrapeMotion > 0.025 || inputMotion > 0.1 || naturalDigPose;
+      const naturalLoadReady = naturalDigPose;
       const dug =
-        canLoad && tipOnGround && activelyScraping
-          ? digAt(terrainRef.current, digX, digZ, 3.2, scrape * dt * digRate)
+        naturalLoadReady && activelyScraping
+          ? digAt(
+              terrainRef.current,
+              digX,
+              digZ,
+              naturalDigPose ? 3.8 : 3.2,
+              scrape * dt * digRate * (naturalDigPose ? 1.25 : 1),
+            )
           : 0;
-      fb.digging = dug > 0.002 || (canLoad && tipOnGround && activelyScraping);
+      fb.digging = dug > 0.002 || (naturalLoadReady && activelyScraping);
 
-      if (canLoad && tipOnGround && activelyScraping) {
-        const scrapeLoad = scrapeMotion * (isTutorial ? 0.1 : 0.075) * dt;
-        const minimumLoad = (isTutorial ? 0.18 : 0.12) * dt;
-        const maxLoadDelta = (isTutorial ? 0.32 : 0.24) * dt;
+      if (naturalLoadReady && activelyScraping) {
+        const poseBonus = 0.65 + fb.digPoseScore * 0.7;
+        const scrapeLoad =
+          (scrapeMotion + inputMotion * 0.18) * (isTutorial ? 0.14 : 0.1) * dt;
+        const minimumLoad = (isTutorial ? 0.28 : 0.2) * poseBonus * dt;
+        const maxLoadDelta = (isTutorial ? 0.42 : 0.32) * poseBonus * dt;
         const loadDelta = Math.min(
           Math.max(dug * loadRate * 0.28 + scrapeLoad, minimumLoad),
           maxLoadDelta,

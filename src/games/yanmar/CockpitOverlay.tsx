@@ -237,8 +237,8 @@ function GameJoystick({
         style={{
           left: `${layout.cx * 100}%`,
           top: `calc(${layout.cy * 100}% + ${visualY}%)`,
-          width: "10.2%",
-          height: "30.5%",
+          width: "10.4%",
+          height: "31.5%",
           transform: `translate(calc(-50% + ${visualX}%), -50%) rotateX(${leanY}deg) rotateZ(${leanX}deg)`,
           transformOrigin: "50% 92%",
           transition: active ? "none" : "left 120ms ease, top 120ms ease, transform 120ms ease",
@@ -317,11 +317,11 @@ function TravelLever({
     pointer.onRelease();
   };
 
-  const hitboxCenterOffset = side === "left" ? "-6.4%" : "6.4%";
-  const hitboxWidth = "12.8%";
-  const hitboxTopOffset = "-8%";
+  const hitboxCenterOffset = side === "left" ? "-4.8%" : "4.8%";
+  const hitboxWidth = "9.8%";
+  const hitboxTopOffset = "-4%";
   const hitboxHeight = "32%";
-  const knobY = -value * layout.travel * 145;
+  const knobY = -value * layout.travel * 118;
 
   return (
     <>
@@ -371,15 +371,15 @@ function TravelLever({
         style={{
           left: `${layout.cx * 100}%`,
           top: `calc(${layout.cy * 100}% + ${knobY}%)`,
-          width: "4.4%",
-          height: "16%",
-          transform: `translate(-50%, -50%) rotateX(${value * 12}deg)`,
-          transformOrigin: "50% 90%",
+          width: "3.8%",
+          height: "11.5%",
+          transform: `translate(-50%, -50%) rotateX(${value * 10}deg)`,
+          transformOrigin: "50% 88%",
           transition: active ? "none" : "top 120ms ease, transform 120ms ease",
         }}
       >
-        <div className="absolute bottom-0 left-1/2 h-[72%] w-[32%] -translate-x-1/2 rounded-full bg-gradient-to-b from-[#15191f] to-[#050608] shadow-[0_7px_9px_rgba(0,0,0,0.45)]" />
-        <div className="absolute left-1/2 top-0 h-[42%] w-full -translate-x-1/2 rounded-[28%] border-2 border-black/70 bg-gradient-to-br from-[#565f6d] to-[#171b22] shadow-[inset_4px_5px_5px_rgba(255,255,255,0.15),0_5px_8px_rgba(0,0,0,0.45)]" />
+        <div className="absolute bottom-0 left-1/2 h-[68%] w-[28%] -translate-x-1/2 rounded-full bg-gradient-to-b from-[#15191f] to-[#050608] shadow-[0_5px_8px_rgba(0,0,0,0.45)]" />
+        <div className="absolute left-1/2 top-0 h-[48%] w-full -translate-x-1/2 rounded-[18%] border-2 border-black/70 bg-gradient-to-br from-[#565f6d] to-[#171b22] shadow-[inset_3px_4px_4px_rgba(255,255,255,0.15),0_4px_7px_rgba(0,0,0,0.45)]" />
       </div>
     </>
   );
@@ -443,9 +443,9 @@ function DualTravelCenter({
       className={`absolute z-30 touch-none rounded-xl ${!enabled ? "pointer-events-none" : ""}`}
       style={{
         left: `${layout.cx * 100}%`,
-        top: `calc(${layout.cy * 100}% - 8%)`,
-        width: "10.2%",
-        height: "31%",
+        top: `calc(${layout.cy * 100}% - 4%)`,
+        width: "9.8%",
+        height: "32%",
         transform: "translate(-50%, -50%)",
       }}
       onPointerDown={handleStart}
@@ -472,44 +472,6 @@ function DualTravelCenter({
   );
 }
 
-interface ToggleButtonProps {
-  label: string;
-  active: boolean;
-  cx: number;
-  cy: number;
-  color: "blue" | "amber" | "red";
-  onToggle: () => void;
-}
-
-function ToggleButton({ label, active, cx, cy, color, onToggle }: ToggleButtonProps) {
-  const activeColors = {
-    blue: "from-sky-200 to-blue-600 shadow-sky-400/70",
-    amber: "from-amber-200 to-orange-600 shadow-orange-400/70",
-    red: "from-red-300 to-red-700 shadow-red-400/70",
-  }[color];
-
-  return (
-    <button
-      type="button"
-      className={`absolute z-40 rounded-md border border-black/70 bg-gradient-to-br text-[0px] shadow-lg active:scale-95 ${
-        active ? activeColors : "from-[#353b43] to-[#11151b]"
-      }`}
-      style={{
-        left: `${cx * 100}%`,
-        top: `${cy * 100}%`,
-        width: "4.4%",
-        height: "4.6%",
-        transform: "translate(-50%, -50%)",
-      }}
-      onClick={onToggle}
-      aria-pressed={active}
-      aria-label={label}
-    >
-      <span className="sr-only">{label}</span>
-    </button>
-  );
-}
-
 function SpeedModeLever({
   active,
   cx,
@@ -530,8 +492,8 @@ function SpeedModeLever({
       style={{
         left: `${cx * 100}%`,
         top: `${cy * 100}%`,
-        width: "7.2%",
-        height: "26%",
+        width: "8.2%",
+        height: "24%",
         transform: "translate(-50%, -50%)",
       }}
       onClick={onToggle}
@@ -541,9 +503,9 @@ function SpeedModeLever({
       {showTouchZone && (
         <span className="pointer-events-none absolute inset-[-8%] rounded-full border border-sky-200/32 bg-sky-400/[0.01] shadow-[inset_0_0_12px_rgba(255,255,255,0.01)]" />
       )}
-      <span className="pointer-events-none absolute inset-x-[10%] top-[2%] h-[96%] rounded-full bg-gradient-to-b from-black via-black/95 to-[#11151b]/90 shadow-[0_0_14px_rgba(0,0,0,0.8)]" />
+      <span className="pointer-events-none absolute bottom-[4%] left-[22%] h-[82%] w-[13%] -translate-x-1/2 rounded-full border border-white/10 bg-gradient-to-b from-[#2b323b] via-[#0c0f14] to-black shadow-[0_8px_13px_rgba(0,0,0,0.72)]" />
       <span
-        className={`pointer-events-none absolute left-1/2 -top-[10%] z-20 -translate-x-1/2 rounded-full border px-1.5 py-0.5 text-[9px] font-black shadow-lg ${
+        className={`pointer-events-none absolute right-[2%] top-[10%] z-20 rounded-full border px-1.5 py-0.5 text-[8px] font-black shadow-lg ${
           active
             ? "border-sky-200/70 bg-sky-500 text-white"
             : "border-white/25 bg-black/70 text-white/85"
@@ -551,11 +513,60 @@ function SpeedModeLever({
       >
         {active ? "x2" : "x1"}
       </span>
-      <span className="pointer-events-none absolute bottom-[8%] left-1/2 z-10 h-[64%] w-[16%] -translate-x-1/2 rounded-full bg-gradient-to-b from-[#232a32] to-[#07090d] shadow-[0_5px_9px_rgba(0,0,0,0.55)]" />
       <span
-        className={`pointer-events-none absolute left-1/2 z-10 h-[25%] w-[54%] -translate-x-1/2 rounded-full border border-black/70 bg-gradient-to-br from-[#68727e] via-[#252b33] to-[#080a0f] shadow-lg transition-[top,transform] duration-150 ${
-          active ? "top-[18%]" : "top-[34%]"
+        className={`pointer-events-none absolute left-[22%] z-10 h-[22%] w-[42%] -translate-x-1/2 rounded-full border border-black/70 bg-gradient-to-br from-[#737e8b] via-[#252b33] to-[#080a0f] shadow-[inset_4px_5px_6px_rgba(255,255,255,0.18),0_6px_12px_rgba(0,0,0,0.58)] transition-[top,transform] duration-150 ${
+          active ? "top-[16%] -rotate-3" : "top-[42%] rotate-3"
         }`}
+      />
+    </button>
+  );
+}
+
+function SafetyLever({
+  active,
+  cx,
+  cy,
+  showTouchZone,
+  onToggle,
+}: {
+  active: boolean;
+  cx: number;
+  cy: number;
+  showTouchZone: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="absolute z-50 touch-none active:scale-[0.98]"
+      style={{
+        left: `${cx * 100}%`,
+        top: `${cy * 100}%`,
+        width: "5.4%",
+        height: "29%",
+        transform: "translate(-50%, -50%)",
+        perspective: "140px",
+      }}
+      onClick={onToggle}
+      aria-pressed={active}
+      aria-label={active ? "안전레버 잠김" : "안전레버 해제"}
+    >
+      {showTouchZone && (
+        <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-red-200/35 bg-red-400/[0.01] shadow-[inset_0_0_14px_rgba(255,255,255,0.01)]" />
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={YANMAR_ASSETS.safetyLever}
+        alt=""
+        className="pointer-events-none h-full w-full object-contain object-bottom drop-shadow-[0_4px_8px_rgba(0,0,0,0.55)] transition-transform duration-200 ease-out"
+        style={{
+          transform: active
+            ? "translateY(22%) rotateX(32deg)"
+            : "translateY(-8%) rotateX(-12deg)",
+          transformOrigin: "50% 92%",
+        }}
+        draggable={false}
+        aria-hidden
       />
     </button>
   );
@@ -671,12 +682,15 @@ function PedalSwingControl({
       {showTouchZone && (
         <div className="pointer-events-none absolute inset-0 rounded-lg border border-amber-200/32 bg-amber-400/[0.01] shadow-[inset_0_0_12px_rgba(255,255,255,0.01)]" />
       )}
+      <div className="pointer-events-none absolute inset-0 rounded-xl border border-black/70 bg-gradient-to-b from-[#303742] via-[#151a21] to-[#050607] shadow-[inset_4px_5px_8px_rgba(255,255,255,0.12),0_8px_13px_rgba(0,0,0,0.58)]" />
+      <div className="pointer-events-none absolute left-[16%] right-[16%] top-[12%] h-[3px] rounded-full bg-white/18" />
+      <div className="pointer-events-none absolute left-[16%] right-[16%] bottom-[12%] h-[3px] rounded-full bg-black/45" />
       <button
         type="button"
-        className={`absolute inset-x-0 top-0 h-1/2 rounded-t-lg border border-white/10 transition-[box-shadow,background-color] duration-300 ease-out ${
+        className={`absolute inset-x-[8%] top-[7%] h-[43%] rounded-t-lg border border-white/10 transition-[box-shadow,background-color,transform] duration-300 ease-out ${
           activeValue > 0.02
-            ? "bg-black/25 shadow-[inset_0_7px_12px_rgba(0,0,0,0.58)]"
-            : "bg-black/5"
+            ? "bg-black/25 shadow-[inset_0_8px_14px_rgba(0,0,0,0.62)]"
+            : "bg-white/[0.03] shadow-[inset_0_2px_5px_rgba(255,255,255,0.08)]"
         }`}
         style={{
           transform: `translateY(${topPressAmount * 0.35}rem) scale(${1 - topPressAmount * 0.03})`,
@@ -691,10 +705,10 @@ function PedalSwingControl({
       />
       <button
         type="button"
-        className={`absolute inset-x-0 bottom-0 h-1/2 rounded-b-lg border border-white/10 transition-[box-shadow,background-color] duration-300 ease-out ${
+        className={`absolute inset-x-[8%] bottom-[7%] h-[43%] rounded-b-lg border border-white/10 transition-[box-shadow,background-color,transform] duration-300 ease-out ${
           activeValue < -0.02
-            ? "bg-black/25 shadow-[inset_0_-7px_12px_rgba(0,0,0,0.58)]"
-            : "bg-black/5"
+            ? "bg-black/25 shadow-[inset_0_-8px_14px_rgba(0,0,0,0.62)]"
+            : "bg-white/[0.03] shadow-[inset_0_-2px_5px_rgba(255,255,255,0.05)]"
         }`}
         style={{
           transform: `translateY(${-bottomPressAmount * 0.35}rem) scale(${1 - bottomPressAmount * 0.03})`,
@@ -795,12 +809,11 @@ export function CockpitOverlay({
               onAuxiliaryChange((current) => ({ ...current, highSpeed: !current.highSpeed }))
             }
           />
-          <ToggleButton
-            label="잠"
-            color="red"
-            cx={0.345}
-            cy={0.18}
+          <SafetyLever
+            cx={COCKPIT_LAYOUT.safetyLever.cx}
+            cy={COCKPIT_LAYOUT.safetyLever.cy}
             active={auxiliary.safetyLocked}
+            showTouchZone={showTouchZones}
             onToggle={() =>
               onAuxiliaryChange({
                 ...auxiliary,

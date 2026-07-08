@@ -12,6 +12,9 @@ interface PhaserGameWrapperProps {
   onEnd: (result: GameResult) => void;
   immersive?: boolean;
   initialPlayMode?: "practice" | "game";
+  onShowRanking?: () => void;
+  myRank?: number | null;
+  bestScore?: number;
 }
 
 function PhaserMissionGame({ gameId, onEnd, immersive = false }: PhaserGameWrapperProps) {
@@ -98,6 +101,9 @@ export function PhaserGameWrapper({
   onEnd,
   immersive = false,
   initialPlayMode,
+  onShowRanking,
+  myRank = null,
+  bestScore = 0,
 }: PhaserGameWrapperProps) {
   if (gameId === "yanmar") {
     return (
@@ -105,6 +111,9 @@ export function PhaserGameWrapper({
         onEnd={onEnd}
         immersive={immersive}
         initialPlayMode={initialPlayMode}
+        onShowRanking={onShowRanking}
+        myRank={myRank}
+        bestScore={bestScore}
       />
     );
   }

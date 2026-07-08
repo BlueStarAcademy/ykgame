@@ -8,6 +8,8 @@ interface DigHintPanelProps {
   bucketLoad: number;
   maxLoadUnits: number;
   boom: number;
+  arm?: number;
+  bucket?: number;
   show: boolean;
 }
 
@@ -23,6 +25,8 @@ interface DigHintContentProps {
   bucketLoad: number;
   maxLoadUnits: number;
   boom: number;
+  arm?: number;
+  bucket?: number;
   compact?: boolean;
 }
 
@@ -31,6 +35,8 @@ export function DigHintContent({
   bucketLoad,
   maxLoadUnits,
   boom,
+  arm,
+  bucket,
   compact = false,
 }: DigHintContentProps) {
   const steps = [
@@ -39,12 +45,24 @@ export function DigHintContent({
       label: feedback.inDigZone ? "주황 굴착 구역 안" : "주행·스윙으로 주황 구역 이동",
     },
     {
-      ok: feedback.tipOnGround,
-      label: boomHint(boom, feedback.tipOnGround),
+      ok: feedback.bucketOpenReady,
+      label: feedback.bucketOpenReady
+        ? "버킷 반쯤 열림"
+        : "우조이스틱 오른쪽 — 버킷을 절반 이하로 열기",
     },
     {
-      ok: feedback.bucketCurled,
-      label: feedback.bucketCurled ? "버킷 말기 완료" : "우조버 왼쪽 — 버킷 말기",
+      ok: feedback.insertedDeepEnough,
+      label: feedback.insertedDeepEnough
+        ? "흙더미에 깊이 들어감"
+        : boomHint(boom, feedback.tipOnGround),
+    },
+    {
+      ok: feedback.bucketCurlReady,
+      label: feedback.bucketCurlReady ? "버킷 30도 말기" : "우조이스틱 왼쪽 — 버킷을 안으로 말기",
+    },
+    {
+      ok: feedback.armPulling,
+      label: feedback.armPulling ? "암 당김 중" : "좌조이스틱 앞 — 암을 안쪽으로 당기기",
     },
     {
       ok: bucketLoad >= 0.35,
@@ -52,8 +70,8 @@ export function DigHintContent({
         bucketLoad >= 0.35
           ? "흙 적재 완료!"
           : feedback.digging
-            ? "좌레버 뒤로 — 암을 뻗으며 퍼올리기"
-            : "버킷 말고 암을 뻗어 흙 퍼올리기",
+            ? "바닥을 긁으며 퍼올리는 중"
+            : "색상 그래프를 초록 구간에 맞추기",
     },
   ];
 
@@ -74,6 +92,9 @@ export function DigHintContent({
         ))}
       </ul>
       {compact ? null : <BoomLoadGauge bucketLoad={bucketLoad} maxLoadUnits={maxLoadUnits} />}
+      {compact || arm == null || bucket == null ? null : (
+        <DigPoseGraph boom={boom} arm={arm} bucket={bucket} feedback={feedback} />
+      )}
     </div>
   );
 }
@@ -107,7 +128,131 @@ export function BoomLoadGauge({
   );
 }
 
-export function DigHintPanel({ feedback, bucketLoad, maxLoadUnits, boom, show }: DigHintPanelProps) {
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
+}
+
+function toPct(value: number, min: number, max: number) {
+  return clamp(((value - min) / (max - min)) * 100, 0, 100);
+}
+
+function graphColor(ok: boolean, near: boolean) {
+  if (ok) return "bg-emerald-400";
+  if (near) return "bg-amber-300";
+  return "bg-white/45";
+}
+
+function GraphRow({
+  label,
+  value,
+  min,
+  max,
+  optimalMin,
+  optimalMax,
+  ok,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  optimalMin: number;
+  optimalMax: number;
+  ok: boolean;
+}) {
+  const current = toPct(value, min, max);
+  const start = toPct(optimalMin, min, max);
+  const end = toPct(optimalMax, min, max);
+  const near =
+    value >= optimalMin - (max - min) * 0.12 &&
+    value <= optimalMax + (max - min) * 0.12;
+  const markerColor = graphColor(ok, near);
+
+  return (
+    <div className="grid grid-cols-[2rem_1fr] items-center gap-1">
+      <span className="text-[8px] font-bold text-white/70">{label}</span>
+      <div className="relative h-2 rounded-full bg-white/15">
+        <div
+          className="absolute top-0 h-full rounded-full bg-emerald-400/35"
+          style={{ left: `${start}%`, width: `${Math.max(4, end - start)}%` }}
+        />
+        <div
+          className={`absolute top-1/2 h-3 w-1 -translate-y-1/2 rounded-full ${markerColor}`}
+          style={{ left: `calc(${current}% - 2px)` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function DigPoseGraph({
+  boom,
+  arm,
+  bucket,
+  feedback,
+}: {
+  boom: number;
+  arm: number;
+  bucket: number;
+  feedback: DigFeedback;
+}) {
+  const scorePct = Math.round(feedback.digPoseScore * 100);
+
+  return (
+    <div className="mt-2 border-t border-white/10 pt-1.5">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[8px] font-bold text-orange-200">적재 자세</span>
+        <span
+          className={
+            feedback.optimalDigPose
+              ? "text-[8px] font-bold text-emerald-300"
+              : "text-[8px] font-bold text-white/55"
+          }
+        >
+          {feedback.optimalDigPose ? "최적" : `${scorePct}%`}
+        </span>
+      </div>
+      <div className="space-y-1">
+        <GraphRow
+          label="버킷"
+          value={bucket}
+          min={-0.05}
+          max={3.6}
+          optimalMin={0.35}
+          optimalMax={1.1}
+          ok={feedback.bucketOpenReady && feedback.bucketCurlReady}
+        />
+        <GraphRow
+          label="붐"
+          value={boom}
+          min={0.06}
+          max={1.45}
+          optimalMin={0.65}
+          optimalMax={1.2}
+          ok={feedback.insertedDeepEnough}
+        />
+        <GraphRow
+          label="암"
+          value={arm}
+          min={-2.05}
+          max={0.55}
+          optimalMin={-1.75}
+          optimalMax={-0.55}
+          ok={feedback.armPulling}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function DigHintPanel({
+  feedback,
+  bucketLoad,
+  maxLoadUnits,
+  boom,
+  arm,
+  bucket,
+  show,
+}: DigHintPanelProps) {
   if (!show) return null;
 
   return (
@@ -117,6 +262,8 @@ export function DigHintPanel({ feedback, bucketLoad, maxLoadUnits, boom, show }:
         bucketLoad={bucketLoad}
         maxLoadUnits={maxLoadUnits}
         boom={boom}
+        arm={arm}
+        bucket={bucket}
       />
     </div>
   );

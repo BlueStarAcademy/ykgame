@@ -73,7 +73,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "dig",
     title: "6. 굴착",
-    instruction: "주황 구역에서 붐을 내리고 버킷을 좌측으로 말아 적재 35% 이상",
+    instruction: "버킷을 반쯤 열고 흙더미에 깊이 넣은 뒤, 버킷을 30도쯤 말며 암을 안쪽으로 당겨 적재 35% 이상",
     highlight: "both",
     allowed: { ...ALL_CONTROLS },
     loadMin: 0.35,

@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useGameFullscreen } from "@/hooks/useGameFullscreen";
 
+export const GAME_IMMERSIVE_HEADER_RIGHT_ID = "game-immersive-header-right";
+
 interface GameImmersiveOverlayProps {
   active: boolean;
   headerColor: string;
@@ -12,6 +14,8 @@ interface GameImmersiveOverlayProps {
   onShowRanking: () => void;
   myRank: number | null;
   bestScore: number;
+  hideHeaderStats?: boolean;
+  hideRankingButton?: boolean;
   children: React.ReactNode;
 }
 
@@ -23,6 +27,8 @@ export function GameImmersiveOverlay({
   onShowRanking,
   myRank,
   bestScore,
+  hideHeaderStats = false,
+  hideRankingButton = false,
   children,
 }: GameImmersiveOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -80,9 +86,12 @@ export function GameImmersiveOverlay({
           <span className="text-xs font-medium opacity-90">{brandKo}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] opacity-80">
-            {myRank ? `#${myRank}` : "-"} · {bestScore > 0 ? `${bestScore}점` : "0점"}
-          </span>
+          <div id={GAME_IMMERSIVE_HEADER_RIGHT_ID} className="flex items-center" />
+          {!hideHeaderStats && (
+            <span className="text-[10px] opacity-80">
+              {myRank ? `#${myRank}` : "-"} · {bestScore > 0 ? `${bestScore}점` : "0점"}
+            </span>
+          )}
           {canFullscreen && !apiFullscreen && !isStandalone && (
             <button
               type="button"
@@ -92,13 +101,15 @@ export function GameImmersiveOverlay({
               ⛶ 전체화면
             </button>
           )}
-          <button
-            type="button"
-            onClick={onShowRanking}
-            className="rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
-          >
-            📊
-          </button>
+          {!hideRankingButton && (
+            <button
+              type="button"
+              onClick={onShowRanking}
+              className="rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
+            >
+              📊
+            </button>
+          )}
         </div>
       </div>
       <div className="relative min-h-0 flex-1">{children}</div>

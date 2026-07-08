@@ -83,6 +83,12 @@ export interface DigFeedback {
   canLoad: boolean;
   digging: boolean;
   groundDepth: number;
+  bucketOpenReady: boolean;
+  insertedDeepEnough: boolean;
+  bucketCurlReady: boolean;
+  armPulling: boolean;
+  optimalDigPose: boolean;
+  digPoseScore: number;
 }
 
 export function createDigFeedback(): DigFeedback {
@@ -94,5 +100,11 @@ export function createDigFeedback(): DigFeedback {
     canLoad: false,
     digging: false,
     groundDepth: 0,
+    bucketOpenReady: false,
+    insertedDeepEnough: false,
+    bucketCurlReady: false,
+    armPulling: false,
+    optimalDigPose: false,
+    digPoseScore: 0,
   };
 }

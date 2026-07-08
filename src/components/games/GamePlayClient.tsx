@@ -354,12 +354,17 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
           onShowRanking={() => setShowRanking(true)}
           myRank={myStats.rank}
           bestScore={myStats.bestScore}
+          hideHeaderStats={gameId === "yanmar"}
+          hideRankingButton={gameId === "yanmar"}
         >
           <PhaserGameWrapper
             gameId={gameId}
             onEnd={handleGameEnd}
             immersive
             initialPlayMode={playMode ?? undefined}
+            onShowRanking={() => setShowRanking(true)}
+            myRank={myStats.rank}
+            bestScore={myStats.bestScore}
           />
         </GameImmersiveOverlay>
       )}
