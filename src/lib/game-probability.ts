@@ -1,7 +1,7 @@
 import {
   YANMAR_EQUIPMENT_CONFIG,
   YANMAR_REWARD_CONFIG,
-  YANMAR_UPGRADE_COST_CONFIG,
+  YANMAR_EQUIPMENT_RESET_REFUND_RATE,
   formatYanmarUpgradeCostSequence,
   type YanmarEquipmentPart,
 } from "@/games/yanmar/equipment";
@@ -85,24 +85,20 @@ export function getGameProbabilityReport() {
           items: [
             {
               label: "암 / 붐",
-              value: "10스타부터 2배 증가",
+              value: "고정 비용표",
               detail: formatYanmarUpgradeCostSequence("ARM", YANMAR_EQUIPMENT_CONFIG.ARM.maxLevel),
             },
             {
               label: "버켓 / 엔진",
-              value: "20스타부터 2.5배 증가",
+              value: "고정 비용표",
               detail: formatYanmarUpgradeCostSequence(
                 "BUCKET",
                 YANMAR_EQUIPMENT_CONFIG.BUCKET.maxLevel,
               ),
             },
             {
-              label: "암·붐 기본 강화비",
-              value: `${YANMAR_UPGRADE_COST_CONFIG.ARM.baseCost} 스타`,
-            },
-            {
-              label: "버켓·엔진 기본 강화비",
-              value: `${YANMAR_UPGRADE_COST_CONFIG.BUCKET.baseCost} 스타`,
+              label: "강화 초기화",
+              value: `사용 스타의 ${Math.round(YANMAR_EQUIPMENT_RESET_REFUND_RATE * 100)}% 환급`,
             },
             { label: "기본 최대 적재량", value: `${YANMAR_REWARD_CONFIG.baseMaxLoadUnits}` },
           ],

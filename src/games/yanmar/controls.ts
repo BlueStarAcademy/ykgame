@@ -7,18 +7,18 @@ export const YANMAR_ASSETS = {
 export const COCKPIT_LAYOUT = {
   width: 1024,
   height: 576,
-  left: { cx: 0.182, cy: 0.218, radius: 0.085, travel: 0.05 },
-  right: { cx: 0.823, cy: 0.218, radius: 0.085, travel: 0.05 },
-  travelLeft: { cx: 0.471, cy: 0.246, radius: 0.043, travel: 0.062 },
-  travelRight: { cx: 0.520, cy: 0.246, radius: 0.043, travel: 0.062 },
-  travelBoth: { cx: 0.4955, cy: 0.246, radius: 0.052, travel: 0.062 },
-  boomSwing: { cx: 0.395, cy: 0.25, radius: 0.04, travel: 0.045 },
-  blade: { cx: 0.625, cy: 0.25, radius: 0.04, travel: 0.045 },
-  throttle: { cx: 0.415, cy: 0.18, radius: 0.038, travel: 0.04 },
-  hydraulicSpeed: { cx: 0.654, cy: 0.178, radius: 0.038, travel: 0.032 },
-  safetyLever: { cx: 0.303, cy: 0.378, radius: 0.038, travel: 0.055 },
-  rightPedal: { cx: 0.653, cy: 0.48, width: 0.06, height: 0.15 },
-  horn: { cx: 0.831, cy: 0.093, radius: 0.014 },
+  left: { cx: 0.095, cy: 0.76, radius: 0.085, travel: 0.05 },
+  right: { cx: 0.905, cy: 0.76, radius: 0.085, travel: 0.05 },
+  safetyLever: { cx: 0.245, cy: 0.77, radius: 0.038, travel: 0.055 },
+  travelLeft: { cx: 0.468, cy: 0.75, radius: 0.043, travel: 0.062 },
+  travelRight: { cx: 0.532, cy: 0.75, radius: 0.043, travel: 0.062 },
+  travelBoth: { cx: 0.5, cy: 0.75, radius: 0.052, travel: 0.062 },
+  hydraulicSpeed: { cx: 0.665, cy: 0.77, radius: 0.038, travel: 0.032 },
+  rightPedal: { cx: 0.735, cy: 0.68, width: 0.052, height: 0.62 },
+  boomSwing: { cx: 0.34, cy: 0.45, radius: 0.04, travel: 0.045 },
+  blade: { cx: 0.63, cy: 0.45, radius: 0.04, travel: 0.045 },
+  throttle: { cx: 0.39, cy: 0.45, radius: 0.038, travel: 0.04 },
+  horn: { cx: 0.905, cy: 0.2, radius: 0.014 },
 } as const;
 
 export interface JoystickInput {
@@ -211,8 +211,8 @@ export function applyControls(
     DAMPING.arm,
     dt,
   );
-  const leftTrack = travel.left;
-  const rightTrack = travel.right;
+  const leftTrack = travel.right;
+  const rightTrack = travel.left;
   const trackAverage = (leftTrack + rightTrack) / 2;
   const trackDelta = leftTrack - rightTrack;
 

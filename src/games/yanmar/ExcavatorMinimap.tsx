@@ -183,7 +183,7 @@ export function ExcavatorMinimap({
   if (!visible) return null;
 
   return (
-    <div className="pointer-events-none absolute right-2 top-2 z-20 rounded-2xl bg-black/35 p-1 shadow-[0_8px_20px_rgba(0,0,0,0.35)] backdrop-blur-sm">
+    <div className="pointer-events-none absolute right-2 top-11 z-20 rounded-2xl bg-black/35 p-1 shadow-[0_8px_20px_rgba(0,0,0,0.35)] backdrop-blur-sm">
       <canvas
         ref={canvasRef}
         width={SIZE}

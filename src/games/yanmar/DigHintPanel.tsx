@@ -170,13 +170,13 @@ function GraphRow({
   return (
     <div className="grid grid-cols-[2rem_1fr] items-center gap-1">
       <span className="text-[8px] font-bold text-white/70">{label}</span>
-      <div className="relative h-2 rounded-full bg-white/15">
+      <div className="relative h-1.5 rounded-full bg-white/15">
         <div
           className="absolute top-0 h-full rounded-full bg-emerald-400/35"
           style={{ left: `${start}%`, width: `${Math.max(4, end - start)}%` }}
         />
         <div
-          className={`absolute top-1/2 h-3 w-1 -translate-y-1/2 rounded-full ${markerColor}`}
+          className={`absolute top-1/2 h-2.5 w-1 -translate-y-1/2 rounded-full ${markerColor}`}
           style={{ left: `calc(${current}% - 2px)` }}
         />
       </div>
@@ -198,8 +198,8 @@ export function DigPoseGraph({
   const scorePct = Math.round(feedback.digPoseScore * 100);
 
   return (
-    <div className="mt-2 border-t border-white/10 pt-1.5">
-      <div className="mb-1 flex items-center justify-between">
+    <div className="border-t border-white/10 pt-0.5">
+      <div className="mb-0.5 flex items-center justify-between">
         <span className="text-[8px] font-bold text-orange-200">적재 자세</span>
         <span
           className={
@@ -211,7 +211,7 @@ export function DigPoseGraph({
           {feedback.optimalDigPose ? "최적" : `${scorePct}%`}
         </span>
       </div>
-      <div className="space-y-1">
+      <div className="space-y-px">
         <GraphRow
           label="버킷"
           value={bucket}

@@ -58,22 +58,38 @@ export const DEFAULT_YANMAR_EQUIPMENT_LEVELS: YanmarEquipmentLevels = {
   ENGINE: 0,
 };
 
-/** 암·붐: 10 → 2배 증가 / 버켓·엔진: 20 → 2.5배 증가 */
-export const YANMAR_UPGRADE_COST_CONFIG = {
-  ARM: { baseCost: 10, multiplier: 2 },
-  BOOM: { baseCost: 10, multiplier: 2 },
-  BUCKET: { baseCost: 20, multiplier: 2.5 },
-  ENGINE: { baseCost: 20, multiplier: 2.5 },
-} as const satisfies Record<
-  YanmarEquipmentPart,
-  { baseCost: number; multiplier: number }
->;
+export const YANMAR_UPGRADE_COSTS = {
+  ARM: [10, 25, 50, 75, 100, 150, 200, 300, 500, 1000],
+  BOOM: [10, 25, 50, 75, 100, 150, 200, 300, 500, 1000],
+  BUCKET: [20, 50, 100, 200, 500],
+  ENGINE: [20, 50, 100, 200, 500],
+} as const satisfies Record<YanmarEquipmentPart, readonly number[]>;
+
+export const YANMAR_EQUIPMENT_RESET_REFUND_RATE = 0.7;
 
 export function getYanmarUpgradeCost(part: YanmarEquipmentPart, nextLevel: number) {
   if (nextLevel < 1) return 0;
-  const { baseCost, multiplier } = YANMAR_UPGRADE_COST_CONFIG[part];
-  const cost = baseCost * multiplier ** (nextLevel - 1);
-  return part === "BUCKET" || part === "ENGINE" ? Math.round(cost) : cost;
+  return YANMAR_UPGRADE_COSTS[part][nextLevel - 1] ?? 0;
+}
+
+export function getYanmarSpentUpgradeCost(
+  levels: Partial<Record<YanmarEquipmentPart, number>>,
+) {
+  const safeLevels = clampYanmarEquipmentLevels(levels);
+  return (Object.keys(YANMAR_EQUIPMENT_CONFIG) as YanmarEquipmentPart[]).reduce(
+    (total, part) => {
+      const costs = YANMAR_UPGRADE_COSTS[part];
+      const level = safeLevels[part];
+      return total + costs.slice(0, level).reduce((sum, cost) => sum + cost, 0);
+    },
+    0,
+  );
+}
+
+export function getYanmarResetRefundStars(
+  levels: Partial<Record<YanmarEquipmentPart, number>>,
+) {
+  return Math.floor(getYanmarSpentUpgradeCost(levels) * YANMAR_EQUIPMENT_RESET_REFUND_RATE);
 }
 
 export function formatYanmarUpgradeCostSequence(part: YanmarEquipmentPart, maxLevel: number) {

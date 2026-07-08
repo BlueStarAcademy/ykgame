@@ -3,7 +3,6 @@
 /* eslint-disable react-hooks/refs */
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Html } from "@react-three/drei";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import type { AuxiliaryControlState, ExcavatorControlState, ControlMask } from "./controls";
@@ -73,7 +72,10 @@ interface ExcavatorSceneProps {
   onDumpScore: (popup: Omit<DumpScorePopup, "id">) => void;
   onSimTick: () => void;
   scorePopups: DumpScorePopup[];
+  cameraMode: CameraMode;
 }
+
+export type CameraMode = 1 | 2 | 3;
 
 function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<TerrainData> }) {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -179,8 +181,8 @@ function LinkPin({
 
 const YANMAR_LOGO_ASPECT = 512 / 62;
 const YK_LABEL_ASPECT = 512 / 160;
-const YANMAR_LOGO_WIDTH = 1.08;
-const YK_LOGO_WIDTH = 0.82;
+const YANMAR_LOGO_WIDTH = 1.24;
+const YK_LOGO_WIDTH = 0.96;
 
 function configureDecalTexture(texture: THREE.Texture, anisotropy = 16) {
   texture.generateMipmaps = false;
@@ -192,6 +194,10 @@ function configureDecalTexture(texture: THREE.Texture, anisotropy = 16) {
 
 function logoHeightForWidth(width: number, aspect: number) {
   return width / aspect;
+}
+
+function clampControl(value: number, min = -1, max = 1) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function HydraulicCylinder({
@@ -256,19 +262,23 @@ function RedLinkPanel({
         <group key={side} position={[0, 0, side * sideDepth]}>
           <mesh position={[length / 2, 0, 0]}>
             <boxGeometry args={[length, height, 0.08]} />
-            <meshStandardMaterial color="#d92121" roughness={0.42} metalness={0.12} />
+            <meshStandardMaterial color="#e11f1f" roughness={0.34} metalness={0.18} />
           </mesh>
-          <mesh position={[length / 2, height * 0.34, 0.046]}>
-            <boxGeometry args={[length * 0.82, height * 0.12, 0.025]} />
-            <meshStandardMaterial color="#ff5a44" roughness={0.38} metalness={0.12} />
+          <mesh position={[length / 2, height * 0.39, 0.052]}>
+            <boxGeometry args={[length * 0.86, height * 0.09, 0.022]} />
+            <meshStandardMaterial color="#ff7a5f" roughness={0.26} metalness={0.2} />
           </mesh>
-          <mesh position={[length / 2, -height * 0.36, 0.048]}>
-            <boxGeometry args={[length * 0.72, height * 0.1, 0.025]} />
-            <meshStandardMaterial color="#941515" roughness={0.48} metalness={0.08} />
+          <mesh position={[length / 2, -height * 0.4, 0.052]}>
+            <boxGeometry args={[length * 0.78, height * 0.12, 0.024]} />
+            <meshStandardMaterial color="#7d1111" roughness={0.5} metalness={0.08} />
           </mesh>
           <mesh position={[length * 0.18, height * 0.05, 0.052]} rotation={[0, 0, -0.34]}>
             <boxGeometry args={[length * 0.18 * rootReliefScale, height * 0.16 * rootReliefScale, 0.028]} />
             <meshStandardMaterial color="#11151a" roughness={0.65} metalness={0.1} />
+          </mesh>
+          <mesh position={[length * 0.52, 0, 0.058]}>
+            <boxGeometry args={[length * 0.72, 0.018, 0.018]} />
+            <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.18} />
           </mesh>
           {logo && logoX != null && (
             <mesh position={[logoX, 0.04, side * 0.056]} scale={[-1, 1, 1]}>
@@ -286,7 +296,7 @@ function RedLinkPanel({
       ))}
       <mesh position={[coreX, 0, 0]}>
         <boxGeometry args={[coreLength, height * 0.62, sideDepth * 1.45]} />
-        <meshStandardMaterial color="#b51a1a" roughness={0.5} metalness={0.08} />
+        <meshStandardMaterial color="#aa1515" roughness={0.44} metalness={0.14} />
       </mesh>
     </>
   );
@@ -324,12 +334,442 @@ function createLabelTexture(text: string) {
   return texture;
 }
 
+function CockpitJoystick({
+  side,
+  inputRef,
+}: {
+  side: "left" | "right";
+  inputRef: React.RefObject<ExcavatorControlState>;
+}) {
+  const stickRef = useRef<THREE.Group>(null);
+  const sideSign = side === "left" ? 1 : -1;
+
+  useFrame(() => {
+    const stick = stickRef.current;
+    const input = inputRef?.current?.[side];
+    if (!stick || !input) return;
+    stick.rotation.x = clampControl(input.y) * 0.26;
+    stick.rotation.z = clampControl(input.x) * sideSign * 0.22;
+  });
+
+  return (
+    <group position={[-0.44, 0.28, side === "left" ? 1.2 : -1.2]} scale={1.22}>
+      <mesh position={[0, 0.04, 0]}>
+        <cylinderGeometry args={[0.28, 0.36, 0.11, 28]} />
+        <meshStandardMaterial color="#11171e" roughness={0.54} metalness={0.12} />
+      </mesh>
+      {[0, 1, 2, 3].map((idx) => (
+        <mesh key={idx} position={[0, 0.12 + idx * 0.055, 0]}>
+          <cylinderGeometry args={[0.31 - idx * 0.04, 0.27 - idx * 0.035, 0.058, 28]} />
+          <meshStandardMaterial color={idx % 2 ? "#252c35" : "#0b0f14"} roughness={0.62} />
+        </mesh>
+      ))}
+      <group ref={stickRef} position={[0, 0.25, 0]}>
+        <mesh position={[0, 0.4, 0]}>
+          <capsuleGeometry args={[0.11, 0.58, 8, 18]} />
+          <meshStandardMaterial color="#232b35" roughness={0.42} metalness={0.18} />
+        </mesh>
+        <mesh position={[0, 0.78, 0]}>
+          <capsuleGeometry args={[0.18, 0.3, 8, 20]} />
+          <meshStandardMaterial color="#3f4854" roughness={0.38} metalness={0.16} />
+        </mesh>
+        {side === "right" ? (
+          <mesh position={[0.1, 0.92, 0.09]}>
+            <sphereGeometry args={[0.055, 16, 10]} />
+            <meshStandardMaterial color="#e5ded2" roughness={0.28} metalness={0.2} />
+          </mesh>
+        ) : null}
+      </group>
+    </group>
+  );
+}
+
+function CockpitTravelLever({
+  side,
+  inputRef,
+}: {
+  side: "left" | "right";
+  inputRef: React.RefObject<ExcavatorControlState>;
+}) {
+  const leverRef = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    const lever = leverRef.current;
+    const value = inputRef?.current?.travel[side] ?? 0;
+    if (!lever) return;
+    lever.rotation.z = clampControl(value) * 0.25;
+  });
+
+  return (
+    <group ref={leverRef} position={[0.18, 0.22, side === "left" ? 0.22 : -0.22]} scale={1.2}>
+      <mesh position={[0, 0.22, 0]}>
+        <capsuleGeometry args={[0.045, 0.5, 6, 12]} />
+        <meshStandardMaterial color="#151b23" roughness={0.34} metalness={0.35} />
+      </mesh>
+      <mesh position={[0, 0.56, 0]}>
+        <boxGeometry args={[0.2, 0.15, 0.17]} />
+        <meshStandardMaterial color="#343c47" roughness={0.34} metalness={0.22} />
+      </mesh>
+    </group>
+  );
+}
+
+function MachineCockpit({
+  inputRef,
+  auxiliaryRef,
+}: {
+  inputRef: React.RefObject<ExcavatorControlState>;
+  auxiliaryRef: React.RefObject<AuxiliaryControlState>;
+}) {
+  const safetyRef = useRef<THREE.Group>(null);
+  const hydraulicRef = useRef<THREE.Group>(null);
+  const pedalRef = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    const aux = auxiliaryRef.current;
+    if (safetyRef.current) safetyRef.current.rotation.z = aux?.safetyLocked ? -0.32 : 0.18;
+    if (hydraulicRef.current) hydraulicRef.current.rotation.z = aux?.highSpeed ? -0.22 : 0.16;
+    if (pedalRef.current) pedalRef.current.rotation.x = (aux?.boomSwing ?? 0) * 0.16;
+  });
+
+  return (
+    <group position={[-2.42, 0.82, 0]} rotation={[0, 0, -0.035]} scale={1.42}>
+      <mesh position={[-0.12, -0.12, 0]}>
+        <boxGeometry args={[1.92, 0.16, 3.42]} />
+        <meshStandardMaterial color="#d92323" roughness={0.44} metalness={0.1} />
+      </mesh>
+      <mesh position={[-0.02, 0.02, 0]}>
+        <boxGeometry args={[1.42, 0.14, 2.42]} />
+        <meshStandardMaterial color="#10161d" roughness={0.62} metalness={0.08} />
+      </mesh>
+      <mesh position={[-0.66, 0.08, 0]}>
+        <boxGeometry args={[0.88, 0.18, 1.42]} />
+        <meshStandardMaterial color="#9aa5af" roughness={0.48} metalness={0.12} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <group key={side} position={[-0.36, 0.24, side * 1.18]}>
+          <mesh position={[0, 0, 0]}>
+            <boxGeometry args={[0.84, 0.34, 0.72]} />
+            <meshStandardMaterial color="#909ba6" roughness={0.5} metalness={0.12} />
+          </mesh>
+          <mesh position={[-0.36, 0.26, side * 0.03]}>
+            <boxGeometry args={[0.52, 0.15, 0.62]} />
+            <meshStandardMaterial color="#222a33" roughness={0.56} metalness={0.12} />
+          </mesh>
+          <mesh position={[0.22, 0.09, side * -0.25]}>
+            <sphereGeometry args={[0.055, 16, 10]} />
+            <meshStandardMaterial color="#111820" roughness={0.35} metalness={0.35} />
+          </mesh>
+        </group>
+      ))}
+      <mesh position={[0.42, 0.34, 0]}>
+        <boxGeometry args={[0.55, 0.48, 1.34]} />
+        <meshStandardMaterial color="#d92323" roughness={0.42} metalness={0.1} />
+      </mesh>
+      <mesh position={[0.25, 0.2, 0]}>
+        <boxGeometry args={[0.16, 0.28, 1.08]} />
+        <meshStandardMaterial color="#111820" roughness={0.55} metalness={0.14} />
+      </mesh>
+      {[-0.32, -0.1, 0.12, 0.34].map((z, idx) => (
+        <mesh key={z} position={[0.12 + (idx % 2) * 0.1, 0.62, z]}>
+          <boxGeometry args={[0.13, 0.1, 0.13]} />
+          <meshStandardMaterial
+            color={idx === 0 ? "#45c331" : idx === 2 ? "#aeb8c4" : "#252d36"}
+            roughness={0.34}
+            metalness={0.18}
+          />
+        </mesh>
+      ))}
+      <CockpitJoystick side="left" inputRef={inputRef} />
+      <CockpitJoystick side="right" inputRef={inputRef} />
+      <CockpitTravelLever side="left" inputRef={inputRef} />
+      <CockpitTravelLever side="right" inputRef={inputRef} />
+      <group ref={safetyRef} position={[-0.08, 0.32, 0.72]} scale={1.18}>
+        <mesh position={[0, 0.2, 0]}>
+          <capsuleGeometry args={[0.035, 0.34, 6, 12]} />
+          <meshStandardMaterial color="#141a21" roughness={0.38} metalness={0.32} />
+        </mesh>
+        <mesh position={[0, 0.43, 0]}>
+          <capsuleGeometry args={[0.08, 0.13, 8, 16]} />
+          <meshStandardMaterial color="#ef3127" roughness={0.34} metalness={0.16} />
+        </mesh>
+      </group>
+      <group ref={hydraulicRef} position={[0.28, 0.38, -0.74]} scale={1.18}>
+        <mesh position={[0, 0.2, 0]}>
+          <capsuleGeometry args={[0.03, 0.34, 6, 12]} />
+          <meshStandardMaterial color="#141a21" roughness={0.38} metalness={0.32} />
+        </mesh>
+        <mesh position={[0, 0.43, 0]}>
+          <sphereGeometry args={[0.08, 18, 12]} />
+          <meshStandardMaterial color="#1f2730" roughness={0.36} metalness={0.26} />
+        </mesh>
+      </group>
+      <group ref={pedalRef} position={[-0.04, 0.06, -0.58]} scale={1.18}>
+        <mesh>
+          <boxGeometry args={[0.18, 0.08, 0.34]} />
+          <meshStandardMaterial color="#202832" roughness={0.5} metalness={0.18} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+function UpperStructureConnector() {
+  return (
+    <group>
+      <mesh position={[-0.72, 0.86, 0]}>
+        <boxGeometry args={[2.95, 0.34, 2.18]} />
+        <meshStandardMaterial color="#d92323" roughness={0.42} metalness={0.12} />
+      </mesh>
+      <mesh position={[-0.64, 1.04, 0]}>
+        <boxGeometry args={[2.48, 0.18, 1.58]} />
+        <meshStandardMaterial color="#1b222b" roughness={0.58} metalness={0.16} />
+      </mesh>
+      <mesh position={[0.22, 1.16, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.72, 0.82, 1.55, 40]} />
+        <meshStandardMaterial color="#111820" roughness={0.38} metalness={0.42} />
+      </mesh>
+      <mesh position={[0.5, 1.25, 0]}>
+        <boxGeometry args={[0.9, 0.42, 1.15]} />
+        <meshStandardMaterial color="#b91c1c" roughness={0.4} metalness={0.14} />
+      </mesh>
+      <mesh position={[0.75, 1.16, 0]}>
+        <boxGeometry args={[0.42, 0.78, 0.72]} />
+        <meshStandardMaterial color="#242c36" roughness={0.42} metalness={0.28} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <group key={side} position={[-0.54, 1.1, side * 0.86]}>
+          <mesh rotation={[0, 0, -0.12]}>
+            <boxGeometry args={[1.82, 0.22, 0.12]} />
+            <meshStandardMaterial color="#ef3b2f" roughness={0.36} metalness={0.12} />
+          </mesh>
+          <mesh position={[0.92, 0.08, 0]}>
+            <boxGeometry args={[0.36, 0.62, 0.16]} />
+            <meshStandardMaterial color="#2b3139" roughness={0.4} metalness={0.28} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function CabWindowMaterial() {
+  return (
+    <meshStandardMaterial
+      color="#122a31"
+      roughness={0.12}
+      metalness={0.14}
+      transparent
+      opacity={0.8}
+    />
+  );
+}
+
+function TankTrack({ side }: { side: 1 | -1 }) {
+  const rollers = [-1.62, -1.08, -0.54, 0, 0.54, 1.08, 1.62];
+  const treadPads = Array.from({ length: 16 }, (_, index) => -1.88 + index * 0.25);
+
+  return (
+    <group position={[0, 0, side * 0.82]}>
+      <mesh position={[0, 0.03, 0]}>
+        <boxGeometry args={[4.24, 0.54, 0.52]} />
+        <meshStandardMaterial color="#11191f" roughness={0.68} metalness={0.22} />
+      </mesh>
+      <mesh position={[0, 0.16, 0]}>
+        <boxGeometry args={[4.02, 0.32, 0.58]} />
+        <meshStandardMaterial color="#26333b" roughness={0.48} metalness={0.28} />
+      </mesh>
+      <mesh position={[0, -0.18, 0]}>
+        <boxGeometry args={[3.82, 0.2, 0.58]} />
+        <meshStandardMaterial color="#070b0e" roughness={0.74} metalness={0.16} />
+      </mesh>
+
+      {[-1.88, 1.88].map((x) => (
+        <mesh key={`sprocket-${x}`} position={[x, 0.03, side * 0.025]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.32, 0.32, 0.11, 28]} />
+          <meshStandardMaterial color="#0a0f12" roughness={0.48} metalness={0.34} />
+        </mesh>
+      ))}
+      {rollers.map((x) => (
+        <group key={x} position={[x, -0.06, side * 0.04]}>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.19, 0.19, 0.12, 24]} />
+            <meshStandardMaterial color="#182229" roughness={0.42} metalness={0.36} />
+          </mesh>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.105, 0.105, 0.135, 20]} />
+            <meshStandardMaterial color="#55636c" roughness={0.28} metalness={0.52} />
+          </mesh>
+        </group>
+      ))}
+
+      {treadPads.map((x, index) => (
+        <mesh key={`lower-pad-${index}`} position={[x, -0.37, side * 0.02]}>
+          <boxGeometry args={[0.16, 0.08, 0.66]} />
+          <meshStandardMaterial color="#0b1115" roughness={0.66} metalness={0.22} />
+        </mesh>
+      ))}
+      {treadPads.slice(1, -1).map((x, index) => (
+        <mesh key={`upper-pad-${index}`} position={[x, 0.34, side * 0.02]}>
+          <boxGeometry args={[0.15, 0.06, 0.62]} />
+          <meshStandardMaterial color="#1b2730" roughness={0.52} metalness={0.26} />
+        </mesh>
+      ))}
+      {[-1, 1].map((end) =>
+        [-0.18, 0.02, 0.22].map((y) => (
+          <mesh
+            key={`end-pad-${end}-${y}`}
+            position={[end * 2.02, y, side * 0.02]}
+            rotation={[0, 0, end * 0.22]}
+          >
+            <boxGeometry args={[0.12, 0.08, 0.64]} />
+            <meshStandardMaterial color="#0b1115" roughness={0.66} metalness={0.22} />
+          </mesh>
+        )),
+      )}
+
+      <mesh position={[0, 0.43, side * 0.04]}>
+        <boxGeometry args={[3.66, 0.055, 0.62]} />
+        <meshStandardMaterial color="#6f7c86" roughness={0.24} metalness={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
+function ExcavatorBodyAssembly() {
+  return (
+    <group>
+      <group position={[-0.72, 0.24, 0]}>
+        {[-1, 1].map((side) => (
+          <TankTrack key={side} side={side as 1 | -1} />
+        ))}
+        <mesh position={[0.05, 0.47, 0]}>
+          <boxGeometry args={[3.92, 0.22, 1.72]} />
+          <meshStandardMaterial color="#18242b" roughness={0.46} metalness={0.22} />
+        </mesh>
+        <mesh position={[0.05, 0.61, 0]}>
+          <boxGeometry args={[3.54, 0.08, 1.42]} />
+          <meshStandardMaterial color="#53616c" roughness={0.28} metalness={0.38} />
+        </mesh>
+      </group>
+
+      <group position={[-0.52, 0.76, 0]}>
+        <mesh position={[-0.18, 0, 0]}>
+          <boxGeometry args={[2.75, 0.4, 1.74]} />
+          <meshStandardMaterial color="#111a20" roughness={0.54} metalness={0.16} />
+        </mesh>
+        <mesh position={[0.78, 0.03, 0]}>
+          <boxGeometry args={[0.86, 0.42, 1.54]} />
+          <meshStandardMaterial color="#d92323" roughness={0.32} metalness={0.18} />
+        </mesh>
+        <mesh position={[0.78, 0.27, -0.68]}>
+          <boxGeometry args={[0.68, 0.055, 0.045]} />
+          <meshStandardMaterial color="#ff6b56" roughness={0.22} metalness={0.16} />
+        </mesh>
+        <mesh position={[0.78, -0.21, -0.68]}>
+          <boxGeometry args={[0.68, 0.045, 0.045]} />
+          <meshStandardMaterial color="#7c1111" roughness={0.5} metalness={0.08} />
+        </mesh>
+        <mesh position={[-1.12, 0.08, 0]}>
+          <boxGeometry args={[0.58, 0.48, 1.62]} />
+          <meshStandardMaterial color="#202a31" roughness={0.52} metalness={0.18} />
+        </mesh>
+      </group>
+
+      <group position={[-1.28, 1.45, -0.36]}>
+        <mesh position={[0, 0.06, 0]}>
+          <boxGeometry args={[1.28, 1.64, 1.08]} />
+          <meshStandardMaterial color="#111a20" roughness={0.36} metalness={0.26} />
+        </mesh>
+        <mesh position={[0, 0.06, -0.61]}>
+          <boxGeometry args={[1.08, 1.44, 0.04]} />
+          <meshStandardMaterial color="#0a1115" roughness={0.32} metalness={0.28} />
+        </mesh>
+        <mesh position={[0.02, 0.18, -0.57]}>
+          <boxGeometry args={[0.92, 1.28, 0.035]} />
+          <CabWindowMaterial />
+        </mesh>
+        <mesh position={[0.02, 0.18, -0.545]}>
+          <boxGeometry args={[0.82, 0.035, 0.025]} />
+          <meshStandardMaterial color="#b8c7cf" roughness={0.18} metalness={0.5} />
+        </mesh>
+        <mesh position={[0.02, 0.62, -0.545]}>
+          <boxGeometry args={[0.84, 0.035, 0.025]} />
+          <meshStandardMaterial color="#b8c7cf" roughness={0.18} metalness={0.5} />
+        </mesh>
+        <mesh position={[0.46, 0.18, -0.545]}>
+          <boxGeometry args={[0.035, 1.1, 0.025]} />
+          <meshStandardMaterial color="#b8c7cf" roughness={0.18} metalness={0.5} />
+        </mesh>
+        <mesh position={[0.66, 0.08, -0.06]} rotation={[0, -0.12, 0]}>
+          <boxGeometry args={[0.035, 1.18, 0.78]} />
+          <CabWindowMaterial />
+        </mesh>
+        <mesh position={[0, 0.98, 0]}>
+          <boxGeometry args={[1.42, 0.18, 1.18]} />
+          <meshStandardMaterial color="#0e151a" roughness={0.5} metalness={0.2} />
+        </mesh>
+        <mesh position={[-0.62, -0.58, -0.6]}>
+          <boxGeometry args={[0.24, 0.42, 0.06]} />
+          <meshStandardMaterial color="#d92323" roughness={0.34} metalness={0.14} />
+        </mesh>
+        <mesh position={[0.7, -0.12, -0.4]}>
+          <boxGeometry args={[0.08, 0.62, 0.08]} />
+          <meshStandardMaterial color="#0b1115" roughness={0.42} metalness={0.24} />
+        </mesh>
+        <mesh position={[-0.28, -0.28, -0.46]}>
+          <boxGeometry args={[0.36, 0.18, 0.28]} />
+          <meshStandardMaterial color="#2b343c" roughness={0.54} metalness={0.14} />
+        </mesh>
+      </group>
+
+      <group position={[0.45, 0.98, 0]}>
+        <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.74, 0.88, 1.45, 40]} />
+          <meshStandardMaterial color="#101820" roughness={0.38} metalness={0.42} />
+        </mesh>
+        <mesh position={[0.18, 0.36, 0]}>
+          <boxGeometry args={[0.92, 0.7, 1.0]} />
+          <meshStandardMaterial color="#d52222" roughness={0.3} metalness={0.18} />
+        </mesh>
+        <mesh position={[0.48, 0.68, 0]}>
+          <boxGeometry args={[0.36, 1.1, 0.62]} />
+          <meshStandardMaterial color="#242c36" roughness={0.42} metalness={0.28} />
+        </mesh>
+        <mesh position={[0.78, 0.46, 0]}>
+          <boxGeometry args={[0.62, 0.5, 0.74]} />
+          <meshStandardMaterial color="#ef3127" roughness={0.28} metalness={0.18} />
+        </mesh>
+        <mesh position={[0.96, 0.74, -0.34]}>
+          <boxGeometry args={[0.3, 0.05, 0.05]} />
+          <meshStandardMaterial color="#ff8a70" roughness={0.18} metalness={0.14} />
+        </mesh>
+      </group>
+
+      <group position={[1.16, 0.37, 0]}>
+        <mesh position={[0, 0, 0]}>
+          <boxGeometry args={[0.18, 0.48, 2.55]} />
+          <meshStandardMaterial color="#26343d" roughness={0.56} metalness={0.18} />
+        </mesh>
+        <mesh position={[0.22, -0.08, 0]} rotation={[0, 0, -0.08]}>
+          <boxGeometry args={[0.32, 0.96, 2.7]} />
+          <meshStandardMaterial color="#3b4852" roughness={0.58} metalness={0.16} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
 function ExcavatorArm({
   simRef,
   auxiliaryRef,
+  inputRef,
+  showBody,
 }: {
   simRef: React.MutableRefObject<ExcavatorSimState>;
   auxiliaryRef: React.RefObject<AuxiliaryControlState>;
+  inputRef: React.RefObject<ExcavatorControlState>;
+  showBody: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const boomSwingRef = useRef<THREE.Group>(null);
@@ -349,6 +789,7 @@ function ExcavatorArm({
   const boomLen = 3;
   const armLen = 2.5;
   const bucketLen = 1.2;
+  const armRootY = showBody ? 1.0 : 0.12;
 
   useFrame(() => {
     const g = groupRef.current;
@@ -388,7 +829,7 @@ function ExcavatorArm({
       const armEndY = boomEndY + Math.cos(visualArmAngle) * armLen;
       const tipX = armEndX - Math.sin(visualBucketAngle) * bucketLen;
       const tipY = armEndY - Math.cos(visualBucketAngle) * bucketLen;
-      tipRef.current.position.set(0.8 + tipX, 1.0 + tipY, 0);
+      tipRef.current.position.set(0.8 + tipX, armRootY + tipY, 0);
     }
   });
 
@@ -396,27 +837,12 @@ function ExcavatorArm({
     <group ref={groupRef}>
       {/* 모델 전방(+X)을 주행·시선 방향(+Z)과 일치 */}
       <group rotation={[0, -Math.PI / 2, 0]}>
-      <mesh position={[0, 0.6, 0]}>
-        <boxGeometry args={[2.2, 1.2, 1.8]} />
-        <meshStandardMaterial color="#d92323" roughness={0.48} metalness={0.08} />
-      </mesh>
-      <mesh position={[0, 0.2, 0]}>
-        <boxGeometry args={[2.4, 0.4, 2]} />
-        <meshStandardMaterial color="#20242b" roughness={0.65} metalness={0.12} />
-      </mesh>
+        <group visible={showBody}>
+          <ExcavatorBodyAssembly />
+        </group>
+        <group ref={bladeRef} visible={showBody} position={[-0.75, 0.25, 0]} />
 
-      <group ref={bladeRef} position={[-0.75, 0.25, 0]}>
-        <mesh position={[-0.25, 0, 0]} rotation={[0, 0, 0]}>
-          <boxGeometry args={[0.32, 0.8, 2.65]} />
-          <meshStandardMaterial color="#37424d" roughness={0.42} metalness={0.32} />
-        </mesh>
-        <mesh position={[-0.46, 0.08, 0]}>
-          <boxGeometry args={[0.16, 0.5, 2.35]} />
-          <meshStandardMaterial color="#d7dde2" roughness={0.36} metalness={0.45} />
-        </mesh>
-      </group>
-
-      <group ref={boomSwingRef} position={[0.8, 1.0, 0]}>
+        <group ref={boomSwingRef} position={[0.8, armRootY, 0]}>
         <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.28, 0.28, 0.55, 24]} />
           <meshStandardMaterial color="#2b3139" roughness={0.38} metalness={0.32} />
@@ -476,22 +902,55 @@ function ExcavatorArm({
   );
 }
 
-function FirstPersonCamera({
+function GameCamera({
   simRef,
+  mode,
 }: {
   simRef: React.MutableRefObject<ExcavatorSimState>;
+  mode: CameraMode;
 }) {
   useFrame(({ camera }) => {
     const s = simRef.current;
     const facing = s.heading + s.swing;
+    const forwardX = Math.sin(facing);
+    const forwardZ = Math.cos(facing);
     const sideX = Math.cos(facing);
     const sideZ = -Math.sin(facing);
-    const camX = s.posX - Math.sin(facing) * 2.1 + sideX * 1.15;
-    const camZ = s.posZ - Math.cos(facing) * 2.1 + sideZ * 1.15;
-    camera.position.set(camX, 3.15, camZ);
-    const lookX = s.posX + Math.sin(facing) * 5.6;
-    const lookZ = s.posZ + Math.cos(facing) * 5.6;
-    camera.lookAt(lookX, 1.15, lookZ);
+
+    if (mode === 1) {
+      const camX = s.posX - forwardX * 1.95 + sideX * 0.58;
+      const camZ = s.posZ - forwardZ * 1.95 + sideZ * 0.58;
+      camera.position.set(camX, 1.92, camZ);
+      const lookX = s.posX + forwardX * 5.35 - sideX * 0.22;
+      const lookZ = s.posZ + forwardZ * 5.35 - sideZ * 0.22;
+      camera.lookAt(lookX, 1.04, lookZ);
+      return;
+    }
+
+    if (mode === 2) {
+      camera.position.set(
+        s.posX - forwardX * 7.2 + sideX * 3.4,
+        4.9,
+        s.posZ - forwardZ * 7.2 + sideZ * 3.4,
+      );
+      camera.lookAt(
+        s.posX + forwardX * 3.25 - sideX * 0.5,
+        2.05,
+        s.posZ + forwardZ * 3.25 - sideZ * 0.5,
+      );
+      return;
+    }
+
+    camera.position.set(
+      s.posX - forwardX * 14.5 + sideX * 7.8,
+      8.2,
+      s.posZ - forwardZ * 14.5 + sideZ * 7.8,
+    );
+    camera.lookAt(
+      s.posX + forwardX * 4.4 - sideX * 0.8,
+      2.0,
+      s.posZ + forwardZ * 4.4 - sideZ * 0.8,
+    );
   });
   return null;
 }
@@ -542,10 +1001,21 @@ function SimLoop({
     const sim = simRef.current;
     const raw = inputRef.current;
     const allowed = allowedRef.current;
-    const filtered = filterInput(raw, allowed);
+    let filtered = filterInput(raw, allowed);
     const fb = digFeedbackRef.current;
 
-    const hydraulicSpeedScale = auxiliaryRef.current?.highSpeed ? 1 : 0.5;
+    const hydraulicSpeedScale = auxiliaryRef.current?.highSpeed ? 0.5 : 0.25;
+    const boomSwing = auxiliaryRef.current?.boomSwing ?? 0;
+    const beforeControlClearance = bucketClearance(sim, terrainRef.current, boomSwing).clearance;
+    const bucketAnchoredToGround = beforeControlClearance < 0.18;
+    if (bucketAnchoredToGround) {
+      filtered = {
+        ...filtered,
+        travel: { left: 0, right: 0 },
+      };
+      velRef.current.travel = 0;
+      velRef.current.trackTurn = 0;
+    }
     const beforeGroundContact = {
       boom: sim.boom,
       arm: sim.arm,
@@ -560,7 +1030,6 @@ function SimLoop({
       equipmentStatsRef.current.travelSpeedMultiplier,
     );
 
-    const boomSwing = auxiliaryRef.current?.boomSwing ?? 0;
     let { clearance } = constrainBucketGroundContact(
       sim,
       terrainRef.current,
@@ -597,11 +1066,11 @@ function SimLoop({
     const bucketInWorkRange = scraperDepthBelow > -1.4 && scraperDepthBelow < 2.6;
     const tipOnGround = scraperDepthBelow > -1.2 && scraperDepthBelow < 2.6;
     const curled = isBucketCurled(sim.boom, sim.bucket);
-    const bucketOpenReady = sim.bucket >= 0.35 && sim.bucket <= 1.55;
-    const insertedDeepEnough = scraperDepthBelow >= 0.35 && scraperDepthBelow <= 2.35;
+    const bucketOpenReady = sim.bucket >= -0.05 && sim.bucket <= 1.85;
+    const insertedDeepEnough = scraperDepthBelow >= -0.15 && scraperDepthBelow <= 2.75;
     const bucketCurlReady =
-      sim.bucket <= 0.75 || filtered.right.x < -0.15 || velRef.current.bucket < -0.04;
-    const armPulling = filtered.left.y > 0.15 || velRef.current.arm < -0.04;
+      sim.bucket <= 1.05 || filtered.right.x < -0.08 || velRef.current.bucket < -0.025;
+    const armPulling = filtered.left.y > 0.05 || velRef.current.arm < -0.025;
     const naturalDigPose =
       inZone &&
       bucketInWorkRange &&
@@ -614,7 +1083,8 @@ function SimLoop({
       (insertedDeepEnough ? 1 : 0) +
       (bucketCurlReady ? 1 : 0) +
       (armPulling ? 1 : 0);
-    const canLoad = curled && bucketInWorkRange;
+    const poseReadiness = digPoseScore / 4;
+    const canLoad = bucketInWorkRange && poseReadiness >= 0.5;
 
     fb.inDigZone = inZone;
     fb.inDumpZone = inDump;
@@ -628,16 +1098,16 @@ function SimLoop({
     fb.bucketCurlReady = bucketCurlReady;
     fb.armPulling = armPulling;
     fb.optimalDigPose = naturalDigPose;
-    fb.digPoseScore = digPoseScore / 4;
+    fb.digPoseScore = poseReadiness;
 
     const isGame = modeRef.current === "game";
 
     const isTutorial = modeRef.current === "tutorial";
-    const digRate = isTutorial ? 7.5 : 5.5;
-    const loadRate = isTutorial ? 4.2 : 3.0;
+    const digRate = isTutorial ? 9.5 : 7.2;
+    const loadRate = isTutorial ? 7.0 : 5.4;
 
     if (inZone && bucketInWorkRange && sim.bucketLoad < 1) {
-      const scrape = Math.max(0.24, scraperDepthBelow + 0.68);
+      const scrape = Math.max(0.38, scraperDepthBelow + 0.9);
       const digX = scraperInDigZone ? scraper.x : tipInDigZone ? bucketTip.x : scraper.x;
       const digZ = scraperInDigZone ? scraper.z : tipInDigZone ? bucketTip.z : scraper.z;
       const scrapeMotion =
@@ -649,28 +1119,28 @@ function SimLoop({
         Math.abs(filtered.left.y) * 0.75 +
         Math.abs(filtered.right.y) * 0.3 +
         Math.abs(filtered.right.x) * 0.3;
-      const activelyScraping = scrapeMotion > 0.025 || inputMotion > 0.1 || naturalDigPose;
-      const naturalLoadReady = naturalDigPose;
+      const activelyScraping = scrapeMotion > 0.015 || inputMotion > 0.05 || naturalDigPose;
+      const naturalLoadReady = inZone && bucketInWorkRange && poseReadiness >= 0.5;
       const dug =
         naturalLoadReady && activelyScraping
           ? digAt(
               terrainRef.current,
               digX,
               digZ,
-              naturalDigPose ? 3.8 : 3.2,
-              scrape * dt * digRate * (naturalDigPose ? 1.25 : 1),
+              naturalDigPose ? 4.4 : 3.7,
+              scrape * dt * digRate * (naturalDigPose ? 1.35 : 1.08),
             )
           : 0;
       fb.digging = dug > 0.002 || (naturalLoadReady && activelyScraping);
 
       if (naturalLoadReady && activelyScraping) {
-        const poseBonus = 0.65 + fb.digPoseScore * 0.7;
+        const poseBonus = 0.85 + fb.digPoseScore * 0.9;
         const scrapeLoad =
-          (scrapeMotion + inputMotion * 0.18) * (isTutorial ? 0.14 : 0.1) * dt;
-        const minimumLoad = (isTutorial ? 0.28 : 0.2) * poseBonus * dt;
-        const maxLoadDelta = (isTutorial ? 0.42 : 0.32) * poseBonus * dt;
+          (scrapeMotion + inputMotion * 0.24) * (isTutorial ? 0.22 : 0.17) * dt;
+        const minimumLoad = (isTutorial ? 0.75 : 0.52) * poseBonus * dt;
+        const maxLoadDelta = (isTutorial ? 0.92 : 0.72) * poseBonus * dt;
         const loadDelta = Math.min(
-          Math.max(dug * loadRate * 0.28 + scrapeLoad, minimumLoad),
+          Math.max(dug * loadRate * 0.45 + scrapeLoad, minimumLoad),
           maxLoadDelta,
         );
         sim.bucketLoad = Math.min(
@@ -953,63 +1423,11 @@ function SunnySky() {
 }
 
 function AuxiliarySceneEffects({
-  auxiliaryRef,
+  auxiliaryRef: _auxiliaryRef,
 }: {
   auxiliaryRef: React.RefObject<AuxiliaryControlState>;
 }) {
-  const beaconRef = useRef<THREE.Mesh>(null);
-
-  useFrame((state) => {
-    const aux = auxiliaryRef.current;
-    if (!aux) return;
-    if (beaconRef.current) {
-      beaconRef.current.visible = aux.highSpeed || aux.safetyLocked;
-      beaconRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 8) * 0.12);
-      const mat = beaconRef.current.material;
-      if (mat instanceof THREE.MeshBasicMaterial) {
-        mat.color.set(aux.safetyLocked ? "#ff1744" : "#29b6f6");
-      }
-    }
-  });
-
-  return (
-    <>
-      <mesh ref={beaconRef} position={[0, 5.2, -4]} visible={false}>
-        <sphereGeometry args={[0.45, 16, 16]} />
-        <meshBasicMaterial color="#29b6f6" transparent opacity={0.75} />
-      </mesh>
-    </>
-  );
-}
-
-function ScorePopupLayer({ popups }: { popups: DumpScorePopup[] }) {
-  return (
-    <>
-      {popups.map((popup) => (
-        <Html
-          key={popup.id}
-          position={[popup.x, popup.y, popup.z]}
-          center
-          distanceFactor={18}
-          zIndexRange={[80, 40]}
-          style={{ pointerEvents: "none" }}
-        >
-          <div
-            className={`yanmar-score-pop rounded-xl border px-2.5 py-1.5 text-center text-xs font-black shadow-lg ${
-              popup.critical
-                ? "border-yellow-200 bg-yellow-400 text-black"
-                : "border-white/30 bg-black/75 text-white"
-            }`}
-          >
-            <div>{popup.critical ? "CRITICAL " : "+"}{popup.score}</div>
-            {popup.rewardText ? (
-              <div className="mt-0.5 text-[10px] font-bold">{popup.rewardText}</div>
-            ) : null}
-          </div>
-        </Html>
-      ))}
-    </>
-  );
+  return null;
 }
 
 function SceneContent(props: ExcavatorSceneProps) {
@@ -1017,24 +1435,28 @@ function SceneContent(props: ExcavatorSceneProps) {
     <>
       <color attach="background" args={["#9fd2f2"]} />
       <fog attach="fog" args={["#b8dcf1", 70, 240]} />
-      <hemisphereLight args={["#dff5ff", "#d6ad73", 0.75]} />
-      <ambientLight intensity={0.5} />
+      <hemisphereLight args={["#e8f7ff", "#c58b54", 0.68]} />
+      <ambientLight intensity={0.42} />
       <directionalLight
         position={[22, 34, -28]}
-        intensity={1.75}
+        intensity={2.05}
         color="#fff2c1"
         castShadow={false}
       />
-      <pointLight position={[34, 31, -56]} intensity={0.45} color="#ffe28a" distance={95} />
+      <pointLight position={[34, 31, -56]} intensity={0.58} color="#ffe28a" distance={95} />
       <SunnySky />
       <TerrainMesh terrainRef={props.terrainRef} />
       <WorksiteSetDressing />
       <ZoneMarkers terrainRef={props.terrainRef} />
       <WaypointMarker tutorialStepRef={props.tutorialStepRef} />
       <AuxiliarySceneEffects auxiliaryRef={props.auxiliaryRef} />
-      <ScorePopupLayer popups={props.scorePopups} />
-      <ExcavatorArm simRef={props.simRef} auxiliaryRef={props.auxiliaryRef} />
-      <FirstPersonCamera simRef={props.simRef} />
+      <ExcavatorArm
+        simRef={props.simRef}
+        auxiliaryRef={props.auxiliaryRef}
+        inputRef={props.inputRef}
+        showBody={props.cameraMode !== 1}
+      />
+      <GameCamera simRef={props.simRef} mode={props.cameraMode} />
       <SimLoop {...props} />
     </>
   );
@@ -1045,6 +1467,7 @@ export function ExcavatorScene(props: ExcavatorSceneProps) {
     <Canvas
       gl={{ antialias: false, powerPreference: "high-performance" }}
       dpr={[1, 1.5]}
+      camera={{ fov: 58, near: 0.1, far: 180 }}
       style={{ width: "100%", height: "100%" }}
     >
       <SceneContent {...props} />

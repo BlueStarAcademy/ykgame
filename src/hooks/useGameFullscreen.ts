@@ -2,12 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  enablePersistentPortraitLock,
   exitFullscreen,
   isFullscreenSupported,
-  isMobileDevice,
   isStandalonePwa,
-  lockPortrait,
   requestFullscreen,
   shouldUseBrowserFullscreen,
   unlockOrientation,
@@ -25,7 +22,6 @@ export function useGameFullscreen({ active, containerRef }: UseGameFullscreenOpt
 
   const enter = useCallback(async () => {
     setImmersive(true);
-    lockPortrait();
 
     if (shouldUseBrowserFullscreen()) {
       const ok = await requestFullscreen(containerRef?.current ?? null);
@@ -38,11 +34,7 @@ export function useGameFullscreen({ active, containerRef }: UseGameFullscreenOpt
   const leave = useCallback(async () => {
     setImmersive(false);
     setApiFullscreen(false);
-    if (!isMobileDevice()) {
-      unlockOrientation();
-    } else {
-      lockPortrait();
-    }
+    unlockOrientation();
     await exitFullscreen();
   }, []);
 
@@ -52,11 +44,6 @@ export function useGameFullscreen({ active, containerRef }: UseGameFullscreenOpt
       return;
     }
   }, [active, leave]);
-
-  useEffect(() => {
-    if (!active) return;
-    return enablePersistentPortraitLock();
-  }, [active]);
 
   useEffect(() => {
     if (!shouldUseBrowserFullscreen()) return;
