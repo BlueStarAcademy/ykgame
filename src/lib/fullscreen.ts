@@ -28,58 +28,21 @@ export function isMobileDevice(): boolean {
   return navigator.maxTouchPoints > 1 && window.innerWidth < 1024;
 }
 
-/** Viewport aspect beats `orientation` media query on some mobile browsers. */
+/** Viewport aspect — preferred over `orientation` media query on mobile browsers. */
 export function getViewportOrientation(): "portrait" | "landscape" {
   if (typeof window === "undefined") return "portrait";
   return window.innerWidth < window.innerHeight ? "portrait" : "landscape";
 }
 
 /**
- * 게임 몰입 모드에서는 모바일도 Fullscreen API 사용 (크롬 UI 숨김).
- * 이미 설치된 standalone PWA는 CSS 풀스크린만 사용.
- * 방향 lock은 호출하지 않음 — 유저 선택/기기 방향에 맡김.
+ * Mobile / PWA: never use Fullscreen API.
+ * Android fullscreen commonly forces landscape and breaks our layout sync.
+ * Desktop can still request fullscreen for immersive play.
  */
 export function shouldUseBrowserFullscreen(): boolean {
   if (isStandalonePwa()) return false;
+  if (isMobileDevice()) return false;
   return isFullscreenSupported();
-}
-
-type OrientationLock = ScreenOrientation & {
-  lock?: (orientation: string) => Promise<void>;
-};
-
-async function lockOrientationAsync(modes: string[]): Promise<boolean> {
-  if (typeof screen === "undefined") return false;
-  const orientation = screen.orientation as OrientationLock;
-  if (!orientation.lock) return false;
-
-  for (const mode of modes) {
-    try {
-      await orientation.lock(mode);
-      return true;
-    } catch {
-      // try next mode
-    }
-  }
-  return false;
-}
-
-/** 게임 중 가로 우선 (지원 기기에서만 동작, iOS는 보통 무시) */
-export async function lockLandscapeAsync(): Promise<boolean> {
-  return lockOrientationAsync(["landscape-primary", "landscape", "any"]);
-}
-
-export function lockLandscape(): void {
-  void lockLandscapeAsync();
-}
-
-/** 게임 중 세로 우선 (지원 기기에서만 동작) */
-export async function lockPortraitAsync(): Promise<boolean> {
-  return lockOrientationAsync(["portrait-primary", "portrait", "natural"]);
-}
-
-export function lockPortrait(): void {
-  void lockPortraitAsync();
 }
 
 export async function requestFullscreen(el?: HTMLElement | null): Promise<boolean> {
@@ -102,7 +65,6 @@ export async function requestFullscreen(el?: HTMLElement | null): Promise<boolea
 }
 
 export async function exitFullscreen(): Promise<void> {
-  if (!shouldUseBrowserFullscreen()) return;
   try {
     if (document.fullscreenElement) {
       await document.exitFullscreen();
@@ -112,6 +74,7 @@ export async function exitFullscreen(): Promise<void> {
   }
 }
 
+/** Clear any leftover orientation lock from older builds / fullscreen sessions. */
 export function unlockOrientation(): void {
   try {
     screen.orientation?.unlock?.();

@@ -22,12 +22,13 @@ export function useGameFullscreen({ active, containerRef }: UseGameFullscreenOpt
 
   const enter = useCallback(async () => {
     setImmersive(true);
+    // Clear stale orientation locks from previous sessions before measuring layout.
+    unlockOrientation();
 
     if (shouldUseBrowserFullscreen()) {
       const ok = await requestFullscreen(containerRef?.current ?? null);
       setApiFullscreen(ok);
     } else {
-      // standalone PWA / mobile: CSS immersive only — keep current device orientation
       setApiFullscreen(false);
     }
   }, [containerRef]);

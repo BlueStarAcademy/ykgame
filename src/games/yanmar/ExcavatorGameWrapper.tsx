@@ -27,8 +27,6 @@ import {
 } from "./ExcavatorScene";
 import {
   getViewportOrientation,
-  lockLandscape,
-  lockPortrait,
   unlockOrientation,
 } from "@/lib/fullscreen";
 import { createHydraulicVelocity, type HydraulicVelocity } from "./controls";
@@ -387,6 +385,8 @@ export function ExcavatorGameWrapper({
   const endedRef = useRef(false);
 
   useEffect(() => {
+    // Drop any orientation lock left by older builds / fullscreen enter.
+    unlockOrientation();
     const syncFromDevice = () => {
       if (layoutPinnedRef.current) return;
       setLayoutMode(getViewportOrientation());
@@ -394,9 +394,12 @@ export function ExcavatorGameWrapper({
     syncFromDevice();
     window.addEventListener("resize", syncFromDevice);
     window.addEventListener("orientationchange", syncFromDevice);
+    const visual = window.visualViewport;
+    visual?.addEventListener("resize", syncFromDevice);
     return () => {
       window.removeEventListener("resize", syncFromDevice);
       window.removeEventListener("orientationchange", syncFromDevice);
+      visual?.removeEventListener("resize", syncFromDevice);
     };
   }, []);
   const elapsedRef = useRef(0);
@@ -1101,14 +1104,11 @@ export function ExcavatorGameWrapper({
             <button
               type="button"
               onClick={() => {
+                // UI layout only — never call Screen Orientation API (it can force landscape on Android).
                 layoutPinnedRef.current = true;
-                setLayoutMode((current) => {
-                  const next = current === "portrait" ? "landscape" : "portrait";
-                  unlockOrientation();
-                  if (next === "portrait") lockPortrait();
-                  else lockLandscape();
-                  return next;
-                });
+                setLayoutMode((current) =>
+                  current === "portrait" ? "landscape" : "portrait",
+                );
               }}
               className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-white/20 bg-black/70 shadow-lg backdrop-blur-sm hover:bg-black/85"
               aria-label={
