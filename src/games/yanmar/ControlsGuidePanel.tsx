@@ -48,7 +48,7 @@ export function ControlsGuidePanel({
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={YANMAR_ASSETS.controlsGuide}

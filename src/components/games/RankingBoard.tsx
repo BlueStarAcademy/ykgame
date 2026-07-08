@@ -63,18 +63,18 @@ export function RankingBoard({
 
   return (
     <div
-      className="ranking-modal-overlay fixed inset-0 z-[220] flex items-center justify-center p-4"
+      className="ranking-modal-overlay fixed inset-0 z-[220] flex items-start justify-center overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch] [touch-action:pan-y] sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="ranking-modal-panel w-full max-w-md overflow-hidden"
+        className="ranking-modal-panel my-auto flex max-h-[min(92dvh,40rem)] w-full max-w-md flex-col overflow-hidden landscape:max-h-[min(94dvh,24rem)]"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ranking-modal-title"
       >
         <div
-          className="ranking-modal-header relative overflow-hidden px-5 py-4 text-white"
+          className="ranking-modal-header relative shrink-0 overflow-hidden px-5 py-4 text-white"
           style={{
             background: `linear-gradient(135deg, ${brandColor} 0%, ${headerColor} 55%, #0f172a 100%)`,
           }}
@@ -102,7 +102,7 @@ export function RankingBoard({
           </div>
         </div>
 
-        <div className="ranking-modal-body max-h-[min(58vh,28rem)] overflow-y-auto p-3">
+        <div className="ranking-modal-body min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
           {loading ? (
             <p className="py-10 text-center text-sm text-slate-400">불러오는 중...</p>
           ) : rankings.length === 0 ? (

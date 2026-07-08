@@ -26,6 +26,7 @@ import {
   type ExcavatorSimState,
 } from "./ExcavatorScene";
 import {
+  getViewportOrientation,
   lockLandscape,
   lockPortrait,
   unlockOrientation,
@@ -124,9 +125,9 @@ function EquipmentUpgradeModal({
   const resetRefundStars = getYanmarResetRefundStars(levels);
 
   return (
-    <div className="absolute inset-0 z-[80] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between bg-gradient-to-br from-slate-800 to-slate-950 px-4 py-3 text-white">
+    <div className="absolute inset-0 z-[80] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm landscape:items-start landscape:overflow-y-auto landscape:py-2">
+      <div className="flex max-h-[min(92dvh,40rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-2xl landscape:max-h-[min(94dvh,22rem)]">
+        <div className="flex shrink-0 items-center justify-between bg-gradient-to-br from-slate-800 to-slate-950 px-4 py-3 text-white">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-amber-200">
               Yanmar Parts
@@ -144,7 +145,7 @@ function EquipmentUpgradeModal({
             닫기
           </button>
         </div>
-        <div className="space-y-2 p-3">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
           <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
             {previewMode ? "체험 스타" : "보유 스타"} ⭐ {balance.toLocaleString()}
           </div>
@@ -239,14 +240,14 @@ function TutorialSelectModal({
   if (!open) return null;
 
   return (
-    <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="bg-gradient-to-br from-red-600 to-red-800 px-4 py-3 text-white">
+    <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm landscape:items-start landscape:overflow-y-auto landscape:py-2">
+      <div className="flex max-h-[min(92dvh,40rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-2xl landscape:max-h-[min(94dvh,22rem)]">
+        <div className="shrink-0 bg-gradient-to-br from-red-600 to-red-800 px-4 py-3 text-white">
           <p className="text-[10px] font-semibold uppercase tracking-widest opacity-80">Practice</p>
           <h2 className="mt-1 text-base font-black">튜토리얼 선택</h2>
           <p className="mt-1 text-[11px] opacity-85">원하는 조작만 골라서 연습할 수 있습니다.</p>
         </div>
-        <div className="max-h-[60vh] space-y-2 overflow-y-auto p-3">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
           <button
             type="button"
             onClick={onFreePlay}
@@ -279,7 +280,7 @@ function TutorialSelectModal({
             </button>
           ))}
         </div>
-        <div className="border-t border-gray-100 p-3">
+        <div className="shrink-0 border-t border-gray-100 p-3">
           <button
             type="button"
             onClick={onClose}
@@ -379,14 +380,25 @@ export function ExcavatorGameWrapper({
   const [resettingEquipment, setResettingEquipment] = useState(false);
   const [headerHudReady, setHeaderHudReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(1);
-  const [layoutMode, setLayoutMode] = useState<CockpitLayoutMode>(() => {
-    if (typeof window === "undefined") return "landscape";
-    return window.matchMedia("(orientation: portrait)").matches
-      ? "portrait"
-      : "landscape";
-  });
+  /** Mobile-first: portrait until client measures the real viewport. */
+  const [layoutMode, setLayoutMode] = useState<CockpitLayoutMode>("portrait");
+  const layoutPinnedRef = useRef(false);
   const layoutPortrait = layoutMode === "portrait";
   const endedRef = useRef(false);
+
+  useEffect(() => {
+    const syncFromDevice = () => {
+      if (layoutPinnedRef.current) return;
+      setLayoutMode(getViewportOrientation());
+    };
+    syncFromDevice();
+    window.addEventListener("resize", syncFromDevice);
+    window.addEventListener("orientationchange", syncFromDevice);
+    return () => {
+      window.removeEventListener("resize", syncFromDevice);
+      window.removeEventListener("orientationchange", syncFromDevice);
+    };
+  }, []);
   const elapsedRef = useRef(0);
   const tutorialDumpRef = useRef(0);
   const tutorialCompletingRef = useRef(false);
@@ -579,10 +591,9 @@ export function ExcavatorGameWrapper({
     terrainRef.current = createInitialTerrain(true);
     tutorialStepRef.current = null;
     setTutorialIndex(0);
-    setShowTouchZones(true);
     setShowTutorialMenu(true);
     setMode("practice");
-  }, [resetYanmarSession, setMode, setShowTouchZones, setShowTutorialMenu, setTutorialIndex]);
+  }, [resetYanmarSession, setMode, setShowTutorialMenu, setTutorialIndex]);
 
   const startGameDirect = useCallback(() => {
     resetYanmarSession();
@@ -619,17 +630,15 @@ export function ExcavatorGameWrapper({
     tutorialStepRef.current = step;
     setTutorialIndex(index);
     setShowTutorialMenu(false);
-    setShowTouchZones(true);
     setMode("tutorial");
-  }, [resetYanmarSession, setMode, setShowTouchZones, setShowTutorialMenu, setTutorialIndex]);
+  }, [resetYanmarSession, setMode, setShowTutorialMenu, setTutorialIndex]);
 
   const startFreePractice = useCallback(() => {
     resetYanmarSession();
     tutorialStepRef.current = null;
     setShowTutorialMenu(false);
-    setShowTouchZones(true);
     setMode("practice");
-  }, [resetYanmarSession, setMode, setShowTouchZones, setShowTutorialMenu]);
+  }, [resetYanmarSession, setMode, setShowTutorialMenu]);
 
   const handleSimTick = useCallback(() => {
     syncDigHud();
@@ -1092,6 +1101,7 @@ export function ExcavatorGameWrapper({
             <button
               type="button"
               onClick={() => {
+                layoutPinnedRef.current = true;
                 setLayoutMode((current) => {
                   const next = current === "portrait" ? "landscape" : "portrait";
                   unlockOrientation();

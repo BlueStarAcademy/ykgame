@@ -103,7 +103,7 @@ export function InventoryModal({ open, onClose }: InventoryModalProps) {
             <p className="py-8 text-center text-xs text-gray-400">보유 쿠폰이 없습니다.</p>
           ) : (
             <>
-              <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+              <div className="max-h-44 space-y-2 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] [touch-action:pan-y] landscape:max-h-28">
                 {coupons.map((coupon) => {
                   const selected = coupon.id === selectedCouponId;
                   return (

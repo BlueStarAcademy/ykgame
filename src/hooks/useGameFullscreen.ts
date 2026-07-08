@@ -5,7 +5,6 @@ import {
   exitFullscreen,
   isFullscreenSupported,
   isStandalonePwa,
-  lockLandscape,
   requestFullscreen,
   shouldUseBrowserFullscreen,
   unlockOrientation,
@@ -27,13 +26,8 @@ export function useGameFullscreen({ active, containerRef }: UseGameFullscreenOpt
     if (shouldUseBrowserFullscreen()) {
       const ok = await requestFullscreen(containerRef?.current ?? null);
       setApiFullscreen(ok);
-      if (!ok) {
-        // Fullscreen 거부/미지원이어도 가로 회전 시도 (Android Chrome 등)
-        lockLandscape();
-      }
     } else {
-      // standalone PWA: 전체화면 API 없이 가로만 요청
-      lockLandscape();
+      // standalone PWA / mobile: CSS immersive only — keep current device orientation
       setApiFullscreen(false);
     }
   }, [containerRef]);

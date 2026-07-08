@@ -926,20 +926,23 @@ function GameCamera({
     const persp = camera as THREE.PerspectiveCamera;
 
     if (mode === 1) {
-      // Portrait: taller FOV leaves boom floating mid-frame — drop look/camera so arm fills toward the bottom.
-      const camY = isPortrait ? 1.42 : 1.92;
-      const lookY = isPortrait ? 0.28 : 1.04;
-      const back = isPortrait ? 1.72 : 1.95;
-      const fov = isPortrait ? 70 : 58;
+      // Portrait cam1: keep boom root filling the lower frame (not floating mid-screen / distant).
+      // Wide FOV was making the arm look far away — stay near landscape FOV and pull in.
+      const camY = isPortrait ? 1.58 : 1.92;
+      const lookY = isPortrait ? -0.08 : 1.04;
+      const back = isPortrait ? 1.28 : 1.95;
+      const lookAhead = isPortrait ? 4.35 : 5.35;
+      const side = isPortrait ? 0.42 : 0.58;
+      const fov = isPortrait ? 56 : 58;
       if (Math.abs(persp.fov - fov) > 0.01) {
         persp.fov = fov;
         persp.updateProjectionMatrix();
       }
-      const camX = s.posX - forwardX * back + sideX * 0.58;
-      const camZ = s.posZ - forwardZ * back + sideZ * 0.58;
+      const camX = s.posX - forwardX * back + sideX * side;
+      const camZ = s.posZ - forwardZ * back + sideZ * side;
       camera.position.set(camX, camY, camZ);
-      const lookX = s.posX + forwardX * 5.35 - sideX * 0.22;
-      const lookZ = s.posZ + forwardZ * 5.35 - sideZ * 0.22;
+      const lookX = s.posX + forwardX * lookAhead - sideX * 0.22;
+      const lookZ = s.posZ + forwardZ * lookAhead - sideZ * 0.22;
       camera.lookAt(lookX, lookY, lookZ);
       return;
     }

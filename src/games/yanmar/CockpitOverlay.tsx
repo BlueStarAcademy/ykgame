@@ -91,7 +91,6 @@ function VisualJoystick({
   const stickDrop = pullDepth * 0.42 - pushDepth * 0.22;
   const bootDrop = pullDepth * 0.18 - pushDepth * 0.12;
   const bootScaleY = 1 - pullDepth * 0.08 + pushDepth * 0.08;
-  const bendX = visualY >= 0 ? visualY * 16 : visualY * 36;
   return (
     <div
       className={`yanmar-visual-part yanmar-visual-joystick yanmar-visual-joystick-${side} ${
@@ -107,7 +106,7 @@ function VisualJoystick({
         <div
           className="yanmar-realstick-boot"
           style={{
-            transform: `translate(-50%, ${bootDrop}rem) perspective(8rem) rotateX(${bendX * 0.22}deg) rotateZ(${-visualX * 4}deg) scaleY(${bootScaleY})`,
+            transform: `translate3d(-50%, ${bootDrop}rem, 0) rotate(${-visualX * 3.5}deg) scaleY(${bootScaleY})`,
           }}
         >
           <span />
@@ -118,7 +117,7 @@ function VisualJoystick({
         <div
           className="yanmar-realstick-upper"
           style={{
-            transform: `translate(-50%, ${stickDrop}rem) perspective(8rem) rotateX(${bendX}deg) rotateZ(${-visualX * 14}deg)`,
+            transform: `translate3d(-50%, ${stickDrop}rem, 0) rotate(${-visualX * 12}deg) skewX(${visualY * -2}deg)`,
           }}
         >
           <span className="yanmar-realstick-stem" />

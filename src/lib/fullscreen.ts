@@ -28,9 +28,16 @@ export function isMobileDevice(): boolean {
   return navigator.maxTouchPoints > 1 && window.innerWidth < 1024;
 }
 
+/** Viewport aspect beats `orientation` media query on some mobile browsers. */
+export function getViewportOrientation(): "portrait" | "landscape" {
+  if (typeof window === "undefined") return "portrait";
+  return window.innerWidth < window.innerHeight ? "portrait" : "landscape";
+}
+
 /**
- * 게임 몰입 모드에서는 모바일도 Fullscreen API 사용 (Android 가로 전환·크롬 UI 숨김).
+ * 게임 몰입 모드에서는 모바일도 Fullscreen API 사용 (크롬 UI 숨김).
  * 이미 설치된 standalone PWA는 CSS 풀스크린만 사용.
+ * 방향 lock은 호출하지 않음 — 유저 선택/기기 방향에 맡김.
  */
 export function shouldUseBrowserFullscreen(): boolean {
   if (isStandalonePwa()) return false;
@@ -86,7 +93,6 @@ export async function requestFullscreen(el?: HTMLElement | null): Promise<boolea
         .webkitRequestFullscreen?.bind(target);
     if (req) {
       await req();
-      await lockLandscapeAsync();
       return true;
     }
   } catch {

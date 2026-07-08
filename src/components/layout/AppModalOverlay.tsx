@@ -33,11 +33,11 @@ export function AppModalOverlay({ open, onClose, children }: AppModalOverlayProp
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[320] flex items-center justify-center overflow-y-auto bg-black/55 p-4"
+      className="fixed inset-0 z-[320] flex items-start justify-center overflow-y-auto overscroll-contain bg-black/55 p-3 [-webkit-overflow-scrolling:touch] [touch-action:pan-y] sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="my-auto w-full max-w-sm"
+        className="my-auto max-h-[min(92dvh,40rem)] w-full max-w-sm overflow-y-auto overscroll-contain rounded-2xl [-webkit-overflow-scrolling:touch] [touch-action:pan-y] landscape:max-h-[min(94dvh,24rem)]"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

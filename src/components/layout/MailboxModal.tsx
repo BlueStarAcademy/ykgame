@@ -114,7 +114,7 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
             <p className="py-8 text-center text-xs text-gray-400">받은 우편이 없습니다.</p>
           ) : (
             <>
-              <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
+              <div className="max-h-40 space-y-2 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] [touch-action:pan-y] landscape:max-h-24">
                 {mails.map((mail) => {
                   const selected = mail.id === selectedMailId;
                   const unclaimed = !mail.claimedAt && hasAttachment(mail);
