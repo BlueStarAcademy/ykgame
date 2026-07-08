@@ -819,7 +819,7 @@ export function ExcavatorGameWrapper({
       className={`relative touch-manipulation ${immersive ? "h-full w-full" : "mx-auto w-full max-w-lg"}`}
     >
       <div
-        className={`relative w-full overflow-hidden bg-black ${
+        className={`relative w-full overflow-hidden bg-slate-300 ${
           immersive ? "h-full" : "h-[520px] rounded-b-xl shadow-lg"
         }`}
       >

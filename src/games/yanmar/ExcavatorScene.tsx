@@ -2,7 +2,7 @@
 
 /* eslint-disable react-hooks/refs */
 
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Html } from "@react-three/drei";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
@@ -177,6 +177,23 @@ function LinkPin({
   );
 }
 
+const YANMAR_LOGO_ASPECT = 512 / 62;
+const YK_LABEL_ASPECT = 512 / 160;
+const YANMAR_LOGO_WIDTH = 1.08;
+const YK_LOGO_WIDTH = 0.82;
+
+function configureDecalTexture(texture: THREE.Texture, anisotropy = 16) {
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.anisotropy = anisotropy;
+  texture.colorSpace = THREE.SRGBColorSpace;
+}
+
+function logoHeightForWidth(width: number, aspect: number) {
+  return width / aspect;
+}
+
 function HydraulicCylinder({
   x,
   y,
@@ -259,6 +276,7 @@ function RedLinkPanel({
               <meshBasicMaterial
                 map={logo}
                 transparent
+                toneMapped={false}
                 depthWrite={false}
                 side={THREE.DoubleSide}
               />
@@ -277,17 +295,22 @@ function RedLinkPanel({
 function createLabelTexture(text: string) {
   if (typeof document === "undefined") return null;
 
+  const scale = 4;
+  const baseWidth = 512;
+  const baseHeight = 160;
   const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 160;
+  canvas.width = baseWidth * scale;
+  canvas.height = baseHeight * scale;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = "900 76px Arial, sans-serif";
+  ctx.scale(scale, scale);
+  ctx.clearRect(0, 0, baseWidth, baseHeight);
+  ctx.font = '900 76px "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.lineWidth = 10;
+  ctx.lineJoin = "round";
   ctx.strokeStyle = "rgba(255,255,255,0.96)";
   ctx.strokeText(text, 256, 80);
   ctx.fillStyle = "#0b6edc";
@@ -297,6 +320,7 @@ function createLabelTexture(text: string) {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
+  configureDecalTexture(texture);
   return texture;
 }
 
@@ -317,6 +341,10 @@ function ExcavatorArm({
   const bladeRef = useRef<THREE.Group>(null);
   const yanmarLogo = useLoader(THREE.TextureLoader, "/images/yanmar/yanmar-logo-white.png");
   const ykLogo = useMemo(() => createLabelTexture("YK건기"), []);
+
+  useLayoutEffect(() => {
+    configureDecalTexture(yanmarLogo);
+  }, [yanmarLogo]);
 
   const boomLen = 3;
   const armLen = 2.5;
@@ -399,8 +427,8 @@ function ExcavatorArm({
             height={0.42}
             sideDepth={0.155}
             logo={ykLogo ?? undefined}
-            logoWidth={0.82}
-            logoHeight={0.28}
+            logoWidth={YK_LOGO_WIDTH}
+            logoHeight={logoHeightForWidth(YK_LOGO_WIDTH, YK_LABEL_ASPECT)}
             logoX={boomLen * 0.48}
             coreStartRatio={0.24}
             rootReliefScale={1.55}
@@ -420,8 +448,8 @@ function ExcavatorArm({
               height={0.36}
               sideDepth={0.135}
               logo={yanmarLogo}
-              logoWidth={1.08}
-              logoHeight={0.24}
+              logoWidth={YANMAR_LOGO_WIDTH}
+              logoHeight={logoHeightForWidth(YANMAR_LOGO_WIDTH, YANMAR_LOGO_ASPECT)}
               logoX={armLen * 0.52}
             />
             <LinkPin x={0} y={0} radius={0.18} width={0.52} />

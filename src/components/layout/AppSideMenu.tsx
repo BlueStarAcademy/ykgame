@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { createPortal } from "react-dom";
 
 interface AppSideMenuProps {
   open: boolean;
@@ -90,11 +89,7 @@ export function AppSideMenu({
     action();
   }
 
-  if (typeof document === "undefined") {
-    return null;
-  }
-
-  return createPortal(
+  return (
     <div
       className={`fixed inset-0 z-[300] transition-opacity duration-300 ${
         open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
@@ -167,7 +162,6 @@ export function AppSideMenu({
           />
         </div>
       </aside>
-    </div>,
-    document.body,
+    </div>
   );
 }

@@ -2,13 +2,14 @@
 
 /* eslint-disable react-hooks/immutability */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type {
   AuxiliaryControlState,
   ControlMask,
   ExcavatorControlState,
 } from "./controls";
-import { COCKPIT_LAYOUT, YANMAR_ASSETS } from "./controls";
+import { CockpitControlDeck } from "./CockpitControlDeck";
+import { COCKPIT_LAYOUT } from "./controls";
 import type { TutorialStep } from "./tutorial";
 
 interface CockpitOverlayProps {
@@ -41,8 +42,6 @@ interface HornLayout {
   cy: number;
   radius: number;
 }
-
-type AxisValue = { x: number; y: number };
 
 const PEDAL_SWING_SPEED_PER_SECOND = 0.85;
 
@@ -107,7 +106,6 @@ function usePointerRelease(onRelease: () => void) {
 interface GameJoystickProps {
   side: "left" | "right";
   layout: JoystickLayout;
-  value: AxisValue;
   enabled: { x: boolean; y: boolean };
   highlighted: boolean;
   showTouchZone: boolean;
@@ -118,7 +116,6 @@ interface GameJoystickProps {
 function GameJoystick({
   side,
   layout,
-  value,
   enabled,
   highlighted,
   showTouchZone,
@@ -126,7 +123,6 @@ function GameJoystick({
   hornLayout,
 }: GameJoystickProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(false);
   const pointer = usePointerRelease(() => onChange(0, 0));
   const tapStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
@@ -155,7 +151,6 @@ function GameJoystick({
     if (!enabled.x && !enabled.y) return;
     e.preventDefault();
     pointer.dragging.current = true;
-    setActive(true);
     pointer.pointerIdRef.current = e.pointerId;
     tapStartRef.current = { x: e.clientX, y: e.clientY, time: performance.now() };
     zoneRef.current?.setPointerCapture(e.pointerId);
@@ -180,14 +175,9 @@ function GameJoystick({
     }
     tapStartRef.current = null;
     pointer.releaseCapture(zoneRef.current);
-    setActive(false);
     pointer.onRelease();
   };
 
-  const visualX = value.x * layout.travel * 48;
-  const visualY = -value.y * layout.travel * 42;
-  const leanX = value.x * 16;
-  const leanY = value.y * 11;
   const isDisabled = !enabled.x && !enabled.y;
 
   return (
@@ -210,7 +200,6 @@ function GameJoystick({
           pointer.dragging.current = false;
           pointer.pointerIdRef.current = null;
           tapStartRef.current = null;
-          setActive(false);
           onChange(0, 0);
         }}
         aria-label={side === "left" ? "좌 조이스틱" : "우 조이스틱"}
@@ -219,9 +208,9 @@ function GameJoystick({
           <div
             className={`pointer-events-none absolute inset-0 rounded-2xl border ${
               side === "left"
-                ? "border-red-200/35 bg-red-400/[0.01]"
-                : "border-sky-200/35 bg-sky-400/[0.01]"
-            } shadow-[inset_0_0_18px_rgba(255,255,255,0.01)] backdrop-blur-[1px]`}
+                ? "border-red-200/40 bg-transparent"
+                : "border-sky-200/40 bg-transparent"
+            } shadow-[inset_0_0_18px_rgba(255,255,255,0.01)]`}
           />
         )}
         {highlighted && (
@@ -232,27 +221,6 @@ function GameJoystick({
         )}
       </div>
 
-      <div
-        className="pointer-events-none absolute z-[55]"
-        style={{
-          left: `${layout.cx * 100}%`,
-          top: `calc(${layout.cy * 100}% + ${visualY}%)`,
-          width: "10.4%",
-          height: "31.5%",
-          transform: `translate(calc(-50% + ${visualX}%), -50%) rotateX(${leanY}deg) rotateZ(${leanX}deg)`,
-          transformOrigin: "50% 92%",
-          transition: active ? "none" : "left 120ms ease, top 120ms ease, transform 120ms ease",
-        }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`/images/yanmar/main-joystick-${side}.png`}
-          alt=""
-          className="h-full w-full object-contain drop-shadow-[0_6px_8px_rgba(0,0,0,0.45)]"
-          draggable={false}
-          aria-hidden
-        />
-      </div>
     </>
   );
 }
@@ -260,7 +228,6 @@ function GameJoystick({
 interface TravelLeverProps {
   side: "left" | "right";
   layout: JoystickLayout;
-  value: number;
   enabled: boolean;
   highlighted: boolean;
   showTouchZone: boolean;
@@ -270,14 +237,12 @@ interface TravelLeverProps {
 function TravelLever({
   side,
   layout,
-  value,
   enabled,
   highlighted,
   showTouchZone,
   onChange,
 }: TravelLeverProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(false);
   const pointer = usePointerRelease(() => onChange(0));
 
   const updateFromEvent = useCallback(
@@ -299,7 +264,6 @@ function TravelLever({
     if (!enabled) return;
     e.preventDefault();
     pointer.dragging.current = true;
-    setActive(true);
     pointer.pointerIdRef.current = e.pointerId;
     zoneRef.current?.setPointerCapture(e.pointerId);
     updateFromEvent(e.clientY);
@@ -313,7 +277,6 @@ function TravelLever({
   const handleEnd = (e: React.PointerEvent) => {
     if (pointer.pointerIdRef.current !== e.pointerId) return;
     pointer.releaseCapture(zoneRef.current);
-    setActive(false);
     pointer.onRelease();
   };
 
@@ -321,7 +284,6 @@ function TravelLever({
   const hitboxWidth = "9.8%";
   const hitboxTopOffset = "-4%";
   const hitboxHeight = "32%";
-  const knobY = -value * layout.travel * 118;
 
   return (
     <>
@@ -342,7 +304,6 @@ function TravelLever({
         onLostPointerCapture={() => {
           pointer.dragging.current = false;
           pointer.pointerIdRef.current = null;
-          setActive(false);
           onChange(0);
         }}
         aria-label="주행 레버"
@@ -352,9 +313,9 @@ function TravelLever({
             <div
               className={`pointer-events-none absolute inset-0 rounded-xl border ${
                 side === "left"
-                  ? "border-sky-200/35 bg-sky-400/[0.01]"
-                  : "border-violet-200/35 bg-violet-400/[0.01]"
-              } shadow-[inset_0_0_14px_rgba(255,255,255,0.01)] backdrop-blur-[1px]`}
+                  ? "border-sky-200/40 bg-transparent"
+                  : "border-violet-200/40 bg-transparent"
+              } shadow-[inset_0_0_14px_rgba(255,255,255,0.01)]`}
             />
             <div className="pointer-events-none absolute left-1/2 top-1/2 h-[76%] w-[18%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/25 bg-white/[0.008]" />
           </>
@@ -363,23 +324,8 @@ function TravelLever({
           <div className="absolute inset-[-8%] rounded-xl border-2 border-amber-300/95 bg-amber-300/10" />
         )}
         {!enabled && (
-          <div className="absolute inset-0 rounded-xl bg-black/25 backdrop-blur-[1px]" />
+          <div className="absolute inset-0 rounded-xl bg-black/20" />
         )}
-      </div>
-      <div
-        className="pointer-events-none absolute z-[25]"
-        style={{
-          left: `${layout.cx * 100}%`,
-          top: `calc(${layout.cy * 100}% + ${knobY}%)`,
-          width: "3.8%",
-          height: "11.5%",
-          transform: `translate(-50%, -50%) rotateX(${value * 10}deg)`,
-          transformOrigin: "50% 88%",
-          transition: active ? "none" : "top 120ms ease, transform 120ms ease",
-        }}
-      >
-        <div className="absolute bottom-0 left-1/2 h-[68%] w-[28%] -translate-x-1/2 rounded-full bg-gradient-to-b from-[#15191f] to-[#050608] shadow-[0_5px_8px_rgba(0,0,0,0.45)]" />
-        <div className="absolute left-1/2 top-0 h-[48%] w-full -translate-x-1/2 rounded-[18%] border-2 border-black/70 bg-gradient-to-br from-[#565f6d] to-[#171b22] shadow-[inset_3px_4px_4px_rgba(255,255,255,0.15),0_4px_7px_rgba(0,0,0,0.45)]" />
       </div>
     </>
   );
@@ -461,7 +407,7 @@ function DualTravelCenter({
     >
       {showTouchZone && (
         <>
-          <div className="pointer-events-none absolute inset-0 rounded-xl border border-emerald-200/32 bg-emerald-400/[0.01] shadow-[inset_0_0_14px_rgba(255,255,255,0.01)] backdrop-blur-[1px]" />
+          <div className="pointer-events-none absolute inset-0 rounded-xl border border-emerald-200/32 bg-transparent shadow-[inset_0_0_14px_rgba(255,255,255,0.01)]" />
           <div className="pointer-events-none absolute left-1/2 top-1/2 h-[74%] w-[20%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/25 bg-white/[0.008]" />
         </>
       )}
@@ -488,12 +434,12 @@ function SpeedModeLever({
   return (
     <button
       type="button"
-      className="absolute z-40 touch-none rounded-full active:scale-95"
+      className="absolute z-40 touch-none active:scale-[0.98]"
       style={{
         left: `${cx * 100}%`,
         top: `${cy * 100}%`,
-        width: "8.2%",
-        height: "24%",
+        width: "4.2%",
+        height: "10.2%",
         transform: "translate(-50%, -50%)",
       }}
       onClick={onToggle}
@@ -501,23 +447,8 @@ function SpeedModeLever({
       aria-label={active ? "유압 속도 x2" : "유압 속도 x1"}
     >
       {showTouchZone && (
-        <span className="pointer-events-none absolute inset-[-8%] rounded-full border border-sky-200/32 bg-sky-400/[0.01] shadow-[inset_0_0_12px_rgba(255,255,255,0.01)]" />
+        <span className="pointer-events-none absolute inset-[-20%] rounded-full border border-sky-200/40 bg-transparent shadow-[inset_0_0_12px_rgba(255,255,255,0.01)]" />
       )}
-      <span className="pointer-events-none absolute bottom-[4%] left-[22%] h-[82%] w-[13%] -translate-x-1/2 rounded-full border border-white/10 bg-gradient-to-b from-[#2b323b] via-[#0c0f14] to-black shadow-[0_8px_13px_rgba(0,0,0,0.72)]" />
-      <span
-        className={`pointer-events-none absolute right-[2%] top-[10%] z-20 rounded-full border px-1.5 py-0.5 text-[8px] font-black shadow-lg ${
-          active
-            ? "border-sky-200/70 bg-sky-500 text-white"
-            : "border-white/25 bg-black/70 text-white/85"
-        }`}
-      >
-        {active ? "x2" : "x1"}
-      </span>
-      <span
-        className={`pointer-events-none absolute left-[22%] z-10 h-[22%] w-[42%] -translate-x-1/2 rounded-full border border-black/70 bg-gradient-to-br from-[#737e8b] via-[#252b33] to-[#080a0f] shadow-[inset_4px_5px_6px_rgba(255,255,255,0.18),0_6px_12px_rgba(0,0,0,0.58)] transition-[top,transform] duration-150 ${
-          active ? "top-[16%] -rotate-3" : "top-[42%] rotate-3"
-        }`}
-      />
     </button>
   );
 }
@@ -542,32 +473,17 @@ function SafetyLever({
       style={{
         left: `${cx * 100}%`,
         top: `${cy * 100}%`,
-        width: "5.4%",
-        height: "29%",
+        width: "6.2%",
+        height: "18.8%",
         transform: "translate(-50%, -50%)",
-        perspective: "140px",
       }}
       onClick={onToggle}
       aria-pressed={active}
       aria-label={active ? "안전레버 잠김" : "안전레버 해제"}
     >
       {showTouchZone && (
-        <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-red-200/35 bg-red-400/[0.01] shadow-[inset_0_0_14px_rgba(255,255,255,0.01)]" />
+        <span className="pointer-events-none absolute inset-[-10%] rounded-xl border border-red-200/40 bg-transparent shadow-[inset_0_0_14px_rgba(255,255,255,0.01)]" />
       )}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={YANMAR_ASSETS.safetyLever}
-        alt=""
-        className="pointer-events-none h-full w-full object-contain object-bottom drop-shadow-[0_4px_8px_rgba(0,0,0,0.55)] transition-transform duration-200 ease-out"
-        style={{
-          transform: active
-            ? "translateY(22%) rotateX(32deg)"
-            : "translateY(-8%) rotateX(-12deg)",
-          transformOrigin: "50% 92%",
-        }}
-        draggable={false}
-        aria-hidden
-      />
     </button>
   );
 }
@@ -664,7 +580,6 @@ function PedalSwingControl({
 
   const topPressAmount = Math.max(0, activeValue);
   const bottomPressAmount = Math.max(0, -activeValue);
-
   return (
     <div
       className="absolute z-40 select-none"
@@ -680,18 +595,11 @@ function PedalSwingControl({
       aria-label="우측 페달 붐 스윙"
     >
       {showTouchZone && (
-        <div className="pointer-events-none absolute inset-0 rounded-lg border border-amber-200/32 bg-amber-400/[0.01] shadow-[inset_0_0_12px_rgba(255,255,255,0.01)]" />
+        <div className="pointer-events-none absolute inset-0 rounded-lg border border-amber-200/40 bg-transparent shadow-[inset_0_0_12px_rgba(255,255,255,0.01)]" />
       )}
-      <div className="pointer-events-none absolute inset-0 rounded-xl border border-black/70 bg-gradient-to-b from-[#303742] via-[#151a21] to-[#050607] shadow-[inset_4px_5px_8px_rgba(255,255,255,0.12),0_8px_13px_rgba(0,0,0,0.58)]" />
-      <div className="pointer-events-none absolute left-[16%] right-[16%] top-[12%] h-[3px] rounded-full bg-white/18" />
-      <div className="pointer-events-none absolute left-[16%] right-[16%] bottom-[12%] h-[3px] rounded-full bg-black/45" />
       <button
         type="button"
-        className={`absolute inset-x-[8%] top-[7%] h-[43%] rounded-t-lg border border-white/10 transition-[box-shadow,background-color,transform] duration-300 ease-out ${
-          activeValue > 0.02
-            ? "bg-black/25 shadow-[inset_0_8px_14px_rgba(0,0,0,0.62)]"
-            : "bg-white/[0.03] shadow-[inset_0_2px_5px_rgba(255,255,255,0.08)]"
-        }`}
+        className="absolute inset-x-[8%] top-[7%] h-[43%] rounded-t-lg bg-transparent transition-transform duration-300 ease-out"
         style={{
           transform: `translateY(${topPressAmount * 0.35}rem) scale(${1 - topPressAmount * 0.03})`,
         }}
@@ -705,11 +613,7 @@ function PedalSwingControl({
       />
       <button
         type="button"
-        className={`absolute inset-x-[8%] bottom-[7%] h-[43%] rounded-b-lg border border-white/10 transition-[box-shadow,background-color,transform] duration-300 ease-out ${
-          activeValue < -0.02
-            ? "bg-black/25 shadow-[inset_0_-8px_14px_rgba(0,0,0,0.62)]"
-            : "bg-white/[0.03] shadow-[inset_0_-2px_5px_rgba(255,255,255,0.05)]"
-        }`}
+        className="absolute inset-x-[8%] bottom-[7%] h-[43%] rounded-b-lg bg-transparent transition-transform duration-300 ease-out"
         style={{
           transform: `translateY(${-bottomPressAmount * 0.35}rem) scale(${1 - bottomPressAmount * 0.03})`,
         }}
@@ -743,22 +647,13 @@ export function CockpitOverlay({
 
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={YANMAR_ASSETS.cockpit}
-          alt="얀마 게임형 굴착기 조작 패널"
-          className="mx-auto block w-full max-w-lg select-none drop-shadow-[0_-10px_24px_rgba(0,0,0,0.45)]"
-          draggable={false}
-        />
-      </div>
+      <CockpitControlDeck input={input} auxiliary={auxiliary} />
 
       <div className="absolute inset-x-0 bottom-0 z-20 mx-auto w-full max-w-lg touch-none">
         <div className="relative w-full" style={{ paddingBottom: `${aspect}%` }}>
           <TravelLever
             side="left"
             layout={COCKPIT_LAYOUT.travelLeft}
-            value={input.travel.left}
             enabled={allowed.travel && !auxiliary.safetyLocked}
             highlighted={highlightTravel}
             showTouchZone={showTouchZones}
@@ -772,7 +667,6 @@ export function CockpitOverlay({
           <TravelLever
             side="right"
             layout={COCKPIT_LAYOUT.travelRight}
-            value={input.travel.right}
             enabled={allowed.travel && !auxiliary.safetyLocked}
             highlighted={highlightTravel}
             showTouchZone={showTouchZones}
@@ -824,7 +718,6 @@ export function CockpitOverlay({
           <GameJoystick
             side="left"
             layout={COCKPIT_LAYOUT.left}
-            value={input.left}
             enabled={{
               x: allowed.leftX && !auxiliary.safetyLocked,
               y: allowed.leftY && !auxiliary.safetyLocked,
@@ -838,7 +731,6 @@ export function CockpitOverlay({
           <GameJoystick
             side="right"
             layout={COCKPIT_LAYOUT.right}
-            value={input.right}
             enabled={{
               x: allowed.rightX && !auxiliary.safetyLocked,
               y: allowed.rightY && !auxiliary.safetyLocked,
@@ -850,7 +742,7 @@ export function CockpitOverlay({
             }
             hornLayout={COCKPIT_LAYOUT.horn}
           />
-          <div className="pointer-events-none absolute bottom-[5%] left-1/2 z-30 flex -translate-x-1/2 gap-1 rounded-full bg-black/60 px-2 py-1 text-[8px] font-bold text-white shadow-lg backdrop-blur-sm">
+          <div className="pointer-events-none absolute bottom-[5%] left-1/2 z-30 flex -translate-x-1/2 gap-1 rounded-full bg-black/60 px-2 py-1 text-[8px] font-bold text-white shadow-lg">
             <span className={auxiliary.safetyLocked ? "text-red-300" : "text-emerald-300"}>
               {auxiliary.safetyLocked ? "안전레버 잠김" : "조작 가능"}
             </span>
