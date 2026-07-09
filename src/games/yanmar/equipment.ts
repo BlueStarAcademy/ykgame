@@ -44,7 +44,7 @@ export const YANMAR_EQUIPMENT_CONFIG = {
     description: "이동속도 +10%",
   },
   TRUCK_CAPACITY: {
-    label: "[덤프트럭] 하역량 증가",
+    label: "[덤프트럭] 내구력 강화",
     maxLevel: 10,
     capacityPerLevel: 500,
     description: "최대 하역량 +500",
@@ -117,6 +117,28 @@ export function getYanmarResetRefundStars(
   levels: Partial<Record<YanmarEquipmentPart, number>>,
 ) {
   return Math.floor(getYanmarSpentUpgradeCost(levels) * YANMAR_EQUIPMENT_RESET_REFUND_RATE);
+}
+
+export function getYanmarPartSpentUpgradeCost(
+  part: YanmarEquipmentPart,
+  level: number,
+) {
+  const safeLevel = Math.max(
+    0,
+    Math.min(YANMAR_EQUIPMENT_CONFIG[part].maxLevel, Math.floor(level)),
+  );
+  return YANMAR_UPGRADE_COSTS[part]
+    .slice(0, safeLevel)
+    .reduce((sum, cost) => sum + cost, 0);
+}
+
+export function getYanmarPartResetRefundStars(
+  part: YanmarEquipmentPart,
+  level: number,
+) {
+  return Math.floor(
+    getYanmarPartSpentUpgradeCost(part, level) * YANMAR_EQUIPMENT_RESET_REFUND_RATE,
+  );
 }
 
 export function formatYanmarUpgradeCostSequence(part: YanmarEquipmentPart, maxLevel: number) {
@@ -215,6 +237,103 @@ export function getYanmarTruckCooldownSec(speedLevel = 0) {
     30,
     YANMAR_REWARD_CONFIG.baseTruckCooldownSec * factor ** level,
   );
+}
+
+/** 장비강화 UI — 부위별 스탯 라벨 */
+export function getYanmarUpgradePartStatLabel(part: YanmarEquipmentPart): string {
+  switch (part) {
+    case "BOOM":
+      return "크리점수";
+    case "ARM":
+      return "크리확률";
+    case "BUCKET":
+      return "적재량";
+    case "ENGINE":
+      return "이동속도";
+    case "TRUCK_CAPACITY":
+      return "하역량";
+    case "TRUCK_SPEED":
+      return "트럭복귀";
+    default:
+      return "";
+  }
+}
+
+/** 장비강화 UI — 부위별 현재 스탯 한 줄 표기 */
+export function getYanmarUpgradePartStatText(
+  part: YanmarEquipmentPart,
+  level = 0,
+): string {
+  const config = YANMAR_EQUIPMENT_CONFIG[part];
+  const safeLevel = Math.max(0, Math.min(config.maxLevel, Math.floor(level)));
+  const label = getYanmarUpgradePartStatLabel(part);
+
+  switch (part) {
+    case "BOOM":
+      return `${label}${Math.round(
+        safeLevel * YANMAR_EQUIPMENT_CONFIG.BOOM.effectPerLevel * 100,
+      )}%`;
+    case "ARM":
+      return `${label}${Math.round(
+        (YANMAR_REWARD_CONFIG.baseCriticalChance +
+          safeLevel * YANMAR_EQUIPMENT_CONFIG.ARM.effectPerLevel) *
+          100,
+      )}%`;
+    case "BUCKET":
+      return `${label}${
+        YANMAR_REWARD_CONFIG.baseMaxLoadUnits +
+        safeLevel * YANMAR_EQUIPMENT_CONFIG.BUCKET.effectPerLevel
+      }`;
+    case "ENGINE":
+      return `${label}${Math.round(
+        safeLevel * YANMAR_EQUIPMENT_CONFIG.ENGINE.effectPerLevel * 100,
+      )}%`;
+    case "TRUCK_CAPACITY":
+      return `${label}${getYanmarTruckCapacityUnits(safeLevel)}`;
+    case "TRUCK_SPEED":
+      return `${label}${Math.round(getYanmarTruckCooldownSec(safeLevel))}초`;
+    default:
+      return "";
+  }
+}
+
+export function getYanmarUpgradePartStatValue(
+  part: YanmarEquipmentPart,
+  level = 0,
+): string {
+  const text = getYanmarUpgradePartStatText(part, level);
+  const label = getYanmarUpgradePartStatLabel(part);
+  return text.startsWith(label) ? text.slice(label.length) : text;
+}
+
+/** 1회 강화 시 증가량 — `(+200)` 형태 */
+export function getYanmarUpgradePartGainText(
+  part: YanmarEquipmentPart,
+  level = 0,
+): string {
+  const config = YANMAR_EQUIPMENT_CONFIG[part];
+  const safeLevel = Math.max(0, Math.min(config.maxLevel - 1, Math.floor(level)));
+
+  switch (part) {
+    case "BOOM":
+      return `(+${Math.round(YANMAR_EQUIPMENT_CONFIG.BOOM.effectPerLevel * 100)}%)`;
+    case "ARM":
+      return `(+${Math.round(YANMAR_EQUIPMENT_CONFIG.ARM.effectPerLevel * 100)}%)`;
+    case "BUCKET":
+      return `(+${YANMAR_EQUIPMENT_CONFIG.BUCKET.effectPerLevel})`;
+    case "ENGINE":
+      return `(+${Math.round(YANMAR_EQUIPMENT_CONFIG.ENGINE.effectPerLevel * 100)}%)`;
+    case "TRUCK_CAPACITY":
+      return `(+${YANMAR_EQUIPMENT_CONFIG.TRUCK_CAPACITY.capacityPerLevel})`;
+    case "TRUCK_SPEED": {
+      const saved = Math.round(
+        getYanmarTruckCooldownSec(safeLevel) - getYanmarTruckCooldownSec(safeLevel + 1),
+      );
+      return `(+${saved}초)`;
+    }
+    default:
+      return "";
+  }
 }
 
 export function getLoadUnits(bucketLoadRatio: number, maxLoadUnits: number) {

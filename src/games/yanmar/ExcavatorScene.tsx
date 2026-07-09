@@ -45,7 +45,7 @@ import {
   type ScatterRock,
 } from "./terrainScatter";
 import { MapSiteDecor } from "./mapDecor";
-import type { CameraMode, DumpScorePopup, ExcavatorSimState } from "./types";
+import type { CameraMode, DumpScorePopup, ExcavatorSimState, AutoPoseState } from "./types";
 import {
   createSimLoopRuntime,
   tickExcavatorSim,
@@ -64,6 +64,7 @@ interface ExcavatorSceneProps {
   equipmentStatsRef: React.RefObject<YanmarEquipmentStats>;
   allowedRef: React.RefObject<ControlMask>;
   auxiliaryRef: React.RefObject<AuxiliaryControlState>;
+  autoPoseRef: React.RefObject<AutoPoseState>;
   tutorialStepRef: React.RefObject<TutorialStep | null>;
   tutorialDumpRef: React.MutableRefObject<number>;
   digFeedbackRef: React.MutableRefObject<DigFeedback>;
@@ -72,7 +73,6 @@ interface ExcavatorSceneProps {
   onProgress: (dumped: number, progress: number) => void;
   onDumpScore: (popup: Omit<DumpScorePopup, "id">) => void;
   onSimTick: () => void;
-  scorePopups: DumpScorePopup[];
   cameraMode: CameraMode;
 }
 
@@ -138,6 +138,8 @@ function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
           0,
           1 - Math.hypot(wx + 18, wz + 22) / 42,
         ) * (h < 0.8 ? 1 : 0.35);
+        const truckLaneBlend =
+          h >= 0.685 && h <= 0.735 && wx > 24 && wx < 76 && wz > -18 && wz < 8 ? 0.42 : 0;
 
         const col = cGround.clone();
         if (dug > 0.04) {
@@ -150,6 +152,9 @@ function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
         }
         if (roadBlend > 0.08) {
           col.lerp(cGravel, Math.min(0.55, roadBlend));
+        }
+        if (truckLaneBlend > 0) {
+          col.lerp(cGravel, truckLaneBlend);
         }
 
         if (slope > 0.12) {
@@ -1643,6 +1648,7 @@ function SimLoop({
   equipmentStatsRef,
   allowedRef,
   auxiliaryRef,
+  autoPoseRef,
   tutorialDumpRef,
   digFeedbackRef,
   dumpTruckStateRef,
@@ -1667,6 +1673,7 @@ function SimLoop({
       stats: equipmentStatsRef.current,
       allowed: allowedRef.current,
       auxiliary: auxiliaryRef.current,
+      autoPose: autoPoseRef.current,
       rawInput: inputRef.current,
       tutorialDump: tutorialDumpRef,
       digFeedback: digFeedbackRef.current,
@@ -2062,29 +2069,26 @@ function DumpTruck({
   const bodyRef = useRef<THREE.Group>(null);
   const fillMeshRef = useRef<THREE.Mesh>(null);
   const exhaustRef = useRef<THREE.Mesh>(null);
-  const wheelRefs = useRef<(THREE.Mesh | null)[]>([]);
-  const prevOffsetRef = useRef(0);
-  const wheelXs = [-2.65, -1.65, 1.85, 2.85];
-  let wheelIndex = 0;
+  const wheelRefs = useRef<(THREE.Group | null)[]>([]);
+  const prevPoseRef = useRef({ x: 0, z: 0 });
+  const wheelPositions = [
+    { x: -2.7, z: -1.46 },
+    { x: -1.75, z: -1.46 },
+    { x: 2.45, z: -1.46 },
+    { x: -2.7, z: 1.46 },
+    { x: -1.75, z: 1.46 },
+    { x: 2.45, z: 1.46 },
+  ];
 
-  useFrame((_, dt) => {
+  useFrame(() => {
     const group = groupRef.current;
     const body = bodyRef.current;
     if (!group || !body) return;
     const state = stateRef.current;
     const pose = getDumpTruckPose(state);
     const motion = getDumpTruckMotionProgress(state);
-    const cos = Math.cos(DUMP_TRUCK_BED.rotation);
-    const sin = Math.sin(DUMP_TRUCK_BED.rotation);
-    const offsetX = pose.groupX - DUMP_TRUCK_BED.x;
-    const offsetZ = pose.groupZ - DUMP_TRUCK_BED.z;
-    const localOffsetX = offsetX * cos - offsetZ * sin;
-    const localOffsetZ = offsetX * sin + offsetZ * cos;
-    group.position.set(
-      DUMP_TRUCK_BED.x + localOffsetX,
-      0.55,
-      DUMP_TRUCK_BED.z + localOffsetZ,
-    );
+    group.position.set(pose.groupX, 0.55, pose.groupZ);
+    group.rotation.y = DUMP_TRUCK_BED.rotation + pose.rotationYOffset;
     group.visible = isDumpTruckVisible(state);
 
     body.position.y = 0.78;
@@ -2105,23 +2109,30 @@ function DumpTruck({
       const ramp = Math.min(1, motion.t * 2.4);
       body.position.y = 0.78 + Math.sin(state.phaseElapsed * 28) * 0.022 * ramp;
       body.rotation.z = Math.sin(state.phaseElapsed * 19) * 0.012 * ramp;
-    } else if (motion.kind === "arriving" && motion.t > 0.78) {
-      const parkT = (motion.t - 0.78) / 0.22;
+    } else if (
+      motion.kind === "arriving" &&
+      motion.sub === "park"
+    ) {
+      const parkT = (motion.t - 0.86) / 0.14;
       const settle = Math.sin(parkT * Math.PI) * (1 - parkT);
       body.rotation.y = settle * 0.018;
       body.position.y = 0.78 - settle * 0.012;
     }
 
-    const offsetDelta = state.offsetLocalX - prevOffsetRef.current;
-    prevOffsetRef.current = state.offsetLocalX;
+    const travelDelta = Math.hypot(
+      pose.groupX - prevPoseRef.current.x,
+      pose.groupZ - prevPoseRef.current.z,
+    );
+    prevPoseRef.current.x = pose.groupX;
+    prevPoseRef.current.z = pose.groupZ;
     const wheelSpin =
       motion.kind === "departing" || motion.kind === "arriving"
-        ? offsetDelta * 0.38
+        ? travelDelta * 0.42
         : motion.kind === "engineStart"
           ? Math.sin(state.phaseElapsed * 16) * 0.004
           : 0;
     for (const wheel of wheelRefs.current) {
-      if (wheel) wheel.rotation.x -= wheelSpin;
+      if (wheel) wheel.rotation.z -= wheelSpin;
     }
 
     const fillMesh = fillMeshRef.current;
@@ -2138,98 +2149,172 @@ function DumpTruck({
   });
 
   return (
-    <group ref={groupRef} rotation={[0, DUMP_TRUCK_BED.rotation, 0]}>
+    <group ref={groupRef}>
       <group ref={bodyRef} position={[0.3, 0.78, 0]}>
-        <mesh position={[-0.65, 0.18, 0]}>
-          <boxGeometry args={[5.2, 0.24, 2.86]} />
-          <meshStandardMaterial color="#b88f2b" roughness={0.48} metalness={0.2} />
-        </mesh>
-        <mesh position={[-0.65, 0.33, 0]}>
-          <boxGeometry args={[4.85, 0.06, 2.44]} />
-          <meshStandardMaterial color="#2f3338" roughness={0.62} metalness={0.16} />
+        <RoundedBox args={[5.45, 0.32, 2.72]} radius={0.08} smoothness={6} position={[-0.65, 0.05, 0]}>
+          <meshStandardMaterial color="#171c22" roughness={0.38} metalness={0.48} />
+        </RoundedBox>
+        <mesh position={[-0.65, 0.25, 0]}>
+          <boxGeometry args={[4.96, 0.18, 2.42]} />
+          <meshStandardMaterial color="#353c44" roughness={0.42} metalness={0.42} />
         </mesh>
         <mesh ref={fillMeshRef} visible={false} position={[-0.65, 0.42, 0]}>
           <boxGeometry args={[4.2, 0.12, 2.05]} />
           <meshStandardMaterial color="#6d4c2c" roughness={0.88} metalness={0.04} />
         </mesh>
+        <mesh position={[-0.65, 0.92, 0]}>
+          <boxGeometry args={[4.62, 1.05, 2.18]} />
+          <meshStandardMaterial color="#8f1215" roughness={0.42} metalness={0.24} />
+        </mesh>
         {[-1, 1].map((side) => (
-          <mesh key={`bed-top-rail-${side}`} position={[-0.65, 1.52, side * 1.58]}>
-            <boxGeometry args={[5.36, 0.22, 0.18]} />
-            <meshStandardMaterial color="#6b7178" roughness={0.28} metalness={0.48} />
-          </mesh>
+          <group key={`bed-side-${side}`}>
+            <mesh position={[-0.65, 0.92, side * 1.46]}>
+              <boxGeometry args={[5.36, 1.18, 0.2]} />
+              <meshStandardMaterial color="#d9272b" roughness={0.3} metalness={0.3} />
+            </mesh>
+            <mesh position={[-0.65, 1.58, side * 1.46]}>
+              <boxGeometry args={[5.5, 0.22, 0.24]} />
+              <meshStandardMaterial color="#ef3438" roughness={0.25} metalness={0.34} />
+            </mesh>
+            <mesh position={[-0.65, 0.3, side * 1.5]}>
+              <boxGeometry args={[5.4, 0.16, 0.24]} />
+              <meshStandardMaterial color="#611013" roughness={0.34} metalness={0.3} />
+            </mesh>
+            {[-2.75, -1.8, -0.85, 0.1, 1.05, 1.75].map((x) => (
+              <mesh key={`rib-${side}-${x}`} position={[x, 0.92, side * 1.58]}>
+                <boxGeometry args={[0.14, 1.12, 0.16]} />
+                <meshStandardMaterial color="#a8171b" roughness={0.32} metalness={0.3} />
+              </mesh>
+            ))}
+          </group>
         ))}
-        <mesh position={[-3.38, 1.52, 0]}>
-          <boxGeometry args={[0.22, 0.22, 3.16]} />
-          <meshStandardMaterial color="#6b7178" roughness={0.28} metalness={0.48} />
+        <mesh position={[-3.38, 1.58, 0]}>
+          <boxGeometry args={[0.24, 0.22, 3.12]} />
+          <meshStandardMaterial color="#ef3438" roughness={0.25} metalness={0.34} />
         </mesh>
-        <mesh position={[1.92, 1.52, 0]}>
-          <boxGeometry args={[0.22, 0.22, 3.16]} />
-          <meshStandardMaterial color="#6b7178" roughness={0.28} metalness={0.48} />
-        </mesh>
-        <mesh position={[-0.65, 0.85, 1.58]}>
-          <boxGeometry args={[5.36, 1.18, 0.18]} />
-          <meshStandardMaterial color="#b88f2b" roughness={0.42} metalness={0.2} />
-        </mesh>
-        <mesh position={[-0.65, 0.85, -1.58]}>
-          <boxGeometry args={[5.36, 1.18, 0.18]} />
-          <meshStandardMaterial color="#b88f2b" roughness={0.42} metalness={0.2} />
+        <mesh position={[1.92, 1.58, 0]}>
+          <boxGeometry args={[0.24, 0.22, 3.12]} />
+          <meshStandardMaterial color="#ef3438" roughness={0.25} metalness={0.34} />
         </mesh>
         <mesh position={[-3.38, 0.88, 0]}>
-          <boxGeometry args={[0.22, 1.24, 3.16]} />
-          <meshStandardMaterial color="#b88f2b" roughness={0.44} metalness={0.22} />
+          <boxGeometry args={[0.22, 1.24, 3.08]} />
+          <meshStandardMaterial color="#b51c20" roughness={0.34} metalness={0.28} />
         </mesh>
         <mesh position={[1.92, 0.88, 0]}>
-          <boxGeometry args={[0.22, 1.24, 3.16]} />
-          <meshStandardMaterial color="#b88f2b" roughness={0.44} metalness={0.22} />
+          <boxGeometry args={[0.22, 1.24, 3.08]} />
+          <meshStandardMaterial color="#b51c20" roughness={0.34} metalness={0.28} />
         </mesh>
-        <mesh position={[2.02, 0.5, 0]}>
-          <boxGeometry args={[1.45, 1.6, 2.55]} />
-          <meshStandardMaterial color="#e53935" roughness={0.34} metalness={0.22} />
-        </mesh>
-        <mesh position={[2.32, 1.15, -1.32]}>
-          <boxGeometry args={[0.82, 0.64, 0.08]} />
+        <RoundedBox args={[1.72, 1.62, 2.44]} radius={0.16} smoothness={8} position={[2.28, 0.64, 0]}>
+          <meshStandardMaterial color="#df2428" roughness={0.28} metalness={0.3} />
+        </RoundedBox>
+        <RoundedBox args={[1.84, 0.22, 2.58]} radius={0.08} smoothness={6} position={[2.26, 1.5, 0]}>
+          <meshStandardMaterial color="#272d34" roughness={0.3} metalness={0.48} />
+        </RoundedBox>
+        <mesh position={[2.58, 1.38, -0.52]} rotation={[0, -0.12, 0]}>
+          <boxGeometry args={[0.08, 0.58, 0.82]} />
           <CabWindowMaterial />
         </mesh>
-        <mesh position={[2.82, 0.06, 0]}>
-          <boxGeometry args={[1.72, 0.32, 2.76]} />
-          <meshStandardMaterial color="#303a42" roughness={0.44} metalness={0.38} />
+        <mesh position={[2.25, 1.2, -1.22]}>
+          <boxGeometry args={[0.9, 0.58, 0.08]} />
+          <CabWindowMaterial />
         </mesh>
-        <mesh ref={exhaustRef} position={[2.42, 1.72, 0]}>
-          <cylinderGeometry args={[0.08, 0.1, 0.22, 16]} />
+        <mesh position={[2.25, 1.2, 1.22]}>
+          <boxGeometry args={[0.9, 0.58, 0.08]} />
+          <CabWindowMaterial />
+        </mesh>
+        <mesh position={[3.16, 0.83, 0]}>
+          <boxGeometry args={[0.1, 0.72, 1.24]} />
+          <meshStandardMaterial color="#14191f" roughness={0.32} metalness={0.5} />
+        </mesh>
+        {[-0.38, 0, 0.38].map((z) => (
+          <mesh key={`grille-${z}`} position={[3.23, 0.83, z]}>
+            <boxGeometry args={[0.06, 0.08, 0.28]} />
+            <meshStandardMaterial color="#3c444d" roughness={0.28} metalness={0.58} />
+          </mesh>
+        ))}
+        {[-0.82, 0.82].map((z) => (
+          <group key={`headlight-${z}`}>
+            <RoundedBox args={[0.13, 0.28, 0.42]} radius={0.04} smoothness={4} position={[3.2, 0.36, z]}>
+              <meshStandardMaterial color="#dbe7ed" emissive="#d8f3ff" emissiveIntensity={0.32} roughness={0.14} metalness={0.46} />
+            </RoundedBox>
+            <mesh position={[2.55, 1.15, z > 0 ? 1.43 : -1.43]}>
+              <boxGeometry args={[0.12, 0.42, 0.12]} />
+              <meshStandardMaterial color="#232a31" roughness={0.34} metalness={0.48} />
+            </mesh>
+            <RoundedBox args={[0.22, 0.36, 0.12]} radius={0.04} smoothness={4} position={[2.55, 1.34, z > 0 ? 1.5 : -1.5]}>
+              <meshStandardMaterial color="#11171c" roughness={0.22} metalness={0.5} />
+            </RoundedBox>
+          </group>
+        ))}
+        <RoundedBox args={[0.28, 0.36, 2.74]} radius={0.06} smoothness={6} position={[3.18, 0.06, 0]}>
+          <meshStandardMaterial color="#20262d" roughness={0.38} metalness={0.52} />
+        </RoundedBox>
+        <mesh position={[2.86, 0.05, 0]}>
+          <boxGeometry args={[1.85, 0.34, 2.68]} />
+          <meshStandardMaterial color="#252c33" roughness={0.38} metalness={0.46} />
+        </mesh>
+        {[-1, 1].map((side) => (
+          <group key={`bed-hydraulic-${side}`}>
+            <mesh position={[1.55, 0.72, side * 1.18]} rotation={[0, 0, -0.45]}>
+              <cylinderGeometry args={[0.1, 0.12, 1.55, 16]} />
+              <meshStandardMaterial color="#242a30" roughness={0.28} metalness={0.58} />
+            </mesh>
+            <mesh position={[1.24, 1.05, side * 1.18]} rotation={[0, 0, -0.45]}>
+              <cylinderGeometry args={[0.055, 0.055, 1.12, 14]} />
+              <meshStandardMaterial color="#aeb7bd" roughness={0.18} metalness={0.78} />
+            </mesh>
+          </group>
+        ))}
+        <mesh ref={exhaustRef} position={[2.97, 1.52, 1.05]}>
+          <cylinderGeometry args={[0.08, 0.1, 0.72, 16]} />
           <meshStandardMaterial color="#f59e0b" emissive="#fbbf24" emissiveIntensity={0.12} />
         </mesh>
-        <mesh position={[2.02, 0.18, 1.42]}>
-          <boxGeometry args={[1.55, 0.22, 0.12]} />
+        <mesh position={[2.16, 0.14, 1.38]}>
+          <boxGeometry args={[1.64, 0.2, 0.12]} />
+          <meshStandardMaterial color="#4b5563" roughness={0.38} metalness={0.42} />
+        </mesh>
+        <mesh position={[2.16, 0.14, -1.38]}>
+          <boxGeometry args={[1.64, 0.2, 0.12]} />
           <meshStandardMaterial color="#4b5563" roughness={0.38} metalness={0.42} />
         </mesh>
       </group>
 
-      {wheelXs.map((x) =>
-        [-1.62, 1.62].map((z) => {
-          const wheelSlot = wheelIndex++;
-          return (
-          <group key={`${x}:${z}`} position={[x, 0.38, z]}>
-            <mesh
-              ref={(node) => {
-                wheelRefs.current[wheelSlot] = node;
-              }}
-              rotation={[Math.PI / 2, 0, 0]}
-            >
-              <cylinderGeometry args={[0.48, 0.48, 0.34, 32]} />
-              <meshStandardMaterial color="#11161b" roughness={0.58} metalness={0.2} />
-            </mesh>
-            <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.25, 0.25, 0.38, 24]} />
-              <meshStandardMaterial color="#cbd2d6" roughness={0.24} metalness={0.62} />
-            </mesh>
-            <mesh position={[0, -0.42, z > 0 ? 0.18 : -0.18]} rotation={[0.2, 0, 0]}>
-              <boxGeometry args={[0.42, 0.32, 0.04]} />
-              <meshStandardMaterial color="#1f2937" roughness={0.72} />
-            </mesh>
+      {wheelPositions.map(({ x, z }, index) => (
+        <group
+          key={`${x}:${z}`}
+          position={[x, 0.4, z]}
+        >
+          <group
+            ref={(node) => {
+              wheelRefs.current[index] = node;
+            }}
+          >
+            <group rotation={[Math.PI / 2, 0, 0]}>
+              <mesh scale={[1, z > 0 ? 1 : -1, 1]}>
+                <cylinderGeometry args={[0.5, 0.5, 0.36, 36]} />
+                <meshStandardMaterial color="#11161b" roughness={0.58} metalness={0.2} />
+              </mesh>
+              <mesh>
+                <cylinderGeometry args={[0.28, 0.28, 0.4, 24]} />
+                <meshStandardMaterial color="#aeb7bd" roughness={0.22} metalness={0.7} />
+              </mesh>
+              <mesh>
+                <cylinderGeometry args={[0.12, 0.12, 0.43, 16]} />
+                <meshStandardMaterial color="#252c32" roughness={0.3} metalness={0.6} />
+              </mesh>
+            </group>
+            {[0, Math.PI / 4, Math.PI / 2, (Math.PI * 3) / 4].map((rotation) => (
+              <mesh key={`lug-${rotation}`} rotation={[0, 0, rotation]}>
+                <boxGeometry args={[0.08, 0.78, 0.03]} />
+                <meshStandardMaterial color="#2b333a" roughness={0.62} metalness={0.18} />
+              </mesh>
+            ))}
           </group>
-          );
-        }),
-      )}
+          <RoundedBox args={[0.92, 0.2, 0.5]} radius={0.08} smoothness={6} position={[0, 0.42, z > 0 ? -0.08 : 0.08]}>
+            <meshStandardMaterial color="#202a32" roughness={0.56} metalness={0.22} />
+          </RoundedBox>
+        </group>
+      ))}
 
       <Text
         position={[0.05, 2.65, -1.88]}
@@ -2348,7 +2433,7 @@ function SceneContent(props: ExcavatorSceneProps) {
   return (
     <>
       <color attach="background" args={["#9fd2f2"]} />
-      <fog attach="fog" args={["#b8dcf1", 90, 260]} />
+      <fog attach="fog" args={["#b8dcf1", 110, 320]} />
       <hemisphereLight args={["#e8f7ff", "#c58b54", 0.78]} />
       <ambientLight intensity={0.48} />
       <directionalLight

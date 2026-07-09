@@ -1,5 +1,7 @@
 /** 얀마 SV08-1 조작 매핑 — YK건기 조작 도면 기준 */
 
+import type { AutoPoseState, SavedArmPose } from "./types";
+
 export const YANMAR_ASSETS = {
   controlsGuide: "/images/yanmar/controls-guide.webp",
 } as const;
@@ -298,6 +300,155 @@ export function canLoadBucket(boom: number, bucket: number) {
 
 export function canDumpBucket(bucket: number) {
   return bucket > 0.25;
+}
+
+export const AUTO_ARM_POSE_ARRIVE_EPS = 0.012;
+
+export function createAutoPoseState(): AutoPoseState {
+  return { saved: null, executing: false };
+}
+
+function autoStickToward(current: number, goal: number) {
+  const delta = goal - current;
+  if (Math.abs(delta) <= AUTO_ARM_POSE_ARRIVE_EPS) return 0;
+  return Math.sign(delta);
+}
+
+function isAutoPoseJointSettled(current: number, goal: number) {
+  return Math.abs(current - goal) <= AUTO_ARM_POSE_ARRIVE_EPS;
+}
+
+/** 적재 자세 그래프와 같이 암 → 붐 → 버킷 순으로 한 축씩만 이동한다. */
+export function getActiveAutoPoseJoint(
+  sim: { boom: number; arm: number; bucket: number },
+  saved: SavedArmPose,
+): "arm" | "boom" | "bucket" | null {
+  if (!isAutoPoseJointSettled(sim.arm, saved.arm)) return "arm";
+  if (!isAutoPoseJointSettled(sim.boom, saved.boom)) return "boom";
+  if (!isAutoPoseJointSettled(sim.bucket, saved.bucket)) return "bucket";
+  return null;
+}
+
+/** 저장 자세까지 수동 조이스틱과 동일한 축 입력을 합성한다. */
+export function buildAutoArmControlInput(
+  sim: { boom: number; arm: number; bucket: number },
+  saved: SavedArmPose,
+): Pick<ExcavatorControlState, "left" | "right"> {
+  const idle = {
+    left: { x: 0, y: 0 },
+    right: { x: 0, y: 0 },
+  } as const;
+
+  switch (getActiveAutoPoseJoint(sim, saved)) {
+    case "arm":
+      return {
+        ...idle,
+        left: { x: 0, y: -autoStickToward(sim.arm, saved.arm) },
+      };
+    case "boom":
+      return {
+        ...idle,
+        right: { x: 0, y: autoStickToward(sim.boom, saved.boom) },
+      };
+    case "bucket":
+      return {
+        ...idle,
+        right: { x: autoStickToward(sim.bucket, saved.bucket), y: 0 },
+      };
+    default:
+      return idle;
+  }
+}
+
+/** 자동 실행 중 굴착 구역에서 순차 이동·저장 자세 도달 시 흙 적재를 허용한다. */
+export function isAutoPoseDigLoadingActive(
+  sim: { boom: number; arm: number; bucket: number },
+  saved: SavedArmPose,
+  env: {
+    inZone: boolean;
+    bucketInWorkRange: boolean;
+    scrapeMotion: number;
+  },
+): boolean {
+  if (!env.inZone || !env.bucketInWorkRange || env.scrapeMotion < 0.01) {
+    return false;
+  }
+
+  const activeJoint = getActiveAutoPoseJoint(sim, saved);
+  if (activeJoint !== null) return true;
+
+  return (
+    isAutoPoseJointSettled(sim.arm, saved.arm) &&
+    isAutoPoseJointSettled(sim.boom, saved.boom) &&
+    isAutoPoseJointSettled(sim.bucket, saved.bucket)
+  );
+}
+
+export function getAutoDigPoseReadiness(
+  sim: { boom: number; arm: number; bucket: number },
+  saved: SavedArmPose,
+  insertedDeepEnough: boolean,
+  bucketOpenReady: boolean,
+): number {
+  const activeJoint = getActiveAutoPoseJoint(sim, saved);
+  let score = 0;
+  if (bucketOpenReady) score += 1;
+  if (insertedDeepEnough) score += 1;
+  if (activeJoint === "bucket" || isAutoPoseJointSettled(sim.bucket, saved.bucket)) {
+    score += 1;
+  }
+  if (activeJoint === "arm" || isAutoPoseJointSettled(sim.arm, saved.arm)) {
+    score += 1;
+  }
+  return score / 4;
+}
+
+export function finishAutoArmPoseIfComplete(
+  sim: { boom: number; arm: number; bucket: number },
+  vel: HydraulicVelocity,
+  autoPose: AutoPoseState,
+) {
+  if (!autoPose.executing || !autoPose.saved) return;
+
+  const target = autoPose.saved;
+  const settled = (["arm", "boom", "bucket"] as const).every((key) =>
+    isAutoPoseJointSettled(sim[key], target[key]),
+  );
+  if (!settled) return;
+
+  sim.boom = target.boom;
+  sim.arm = target.arm;
+  sim.bucket = target.bucket;
+  vel.boom = 0;
+  vel.arm = 0;
+  vel.bucket = 0;
+  autoPose.executing = false;
+}
+
+const MANUAL_INPUT_THRESHOLD = 0.08;
+
+export function hasManualControlInput(
+  input: ExcavatorControlState,
+  allowed: ControlMask,
+  auxiliary?: AuxiliaryControlState,
+) {
+  if (allowed.leftX && Math.abs(input.left.x) > MANUAL_INPUT_THRESHOLD) return true;
+  if (allowed.leftY && Math.abs(input.left.y) > MANUAL_INPUT_THRESHOLD) return true;
+  if (allowed.rightX && Math.abs(input.right.x) > MANUAL_INPUT_THRESHOLD) return true;
+  if (allowed.rightY && Math.abs(input.right.y) > MANUAL_INPUT_THRESHOLD) return true;
+  if (
+    allowed.travel &&
+    (Math.abs(input.travel.left) > MANUAL_INPUT_THRESHOLD ||
+      Math.abs(input.travel.right) > MANUAL_INPUT_THRESHOLD)
+  ) {
+    return true;
+  }
+  if (auxiliary && Math.abs(auxiliary.boomSwing) > MANUAL_INPUT_THRESHOLD) return true;
+  return false;
+}
+
+export function cancelAutoArmPose(autoPose: AutoPoseState) {
+  autoPose.executing = false;
 }
 
 export const ALL_CONTROLS: ControlMask = {

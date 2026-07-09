@@ -1,3 +1,5 @@
+import { getDumpTruckLaneSegment } from "./dumpTruckLane";
+
 function terrainSeed(wx: number, wz: number) {
   return Math.abs(Math.sin(wx * 0.31 + wz * 0.47) * 43758.5453) % 1;
 }
@@ -79,6 +81,31 @@ export function computeBaseTerrainHeight(
     if (dist < zone.radius) {
       return 0.84 + computeMoundHeight(dist, zone.radius, wx, wz) + seed * 0.08;
     }
+  }
+
+  return h;
+}
+
+/** 트럭 주차·퇴장로 — 도로 메시(≈0.71)와 맞춘 평탱 지반 */
+export function applyTruckDeparturePad(
+  wx: number,
+  wz: number,
+  h: number,
+  truck: { groupX: number; groupZ: number; rotation: number },
+) {
+  const { startX, startZ, endX, endZ } = getDumpTruckLaneSegment();
+  const target = 0.71;
+
+  const padDist = Math.hypot(wx - truck.groupX, wz - truck.groupZ);
+  if (padDist < 6.4) {
+    const blend = 1 - padDist / 6.4;
+    h = h + (target - h) * blend * 0.94;
+  }
+
+  const laneDist = distanceToSegment(wx, wz, startX, startZ, endX, endZ);
+  if (laneDist < 3) {
+    const blend = 1 - laneDist / 3;
+    h = h + (target - h) * blend * 0.96;
   }
 
   return h;

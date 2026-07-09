@@ -9,6 +9,7 @@ import {
   createPaintedMetalTexture,
 } from "./proceduralTextures";
 import { DIG_ZONE, DUMP_TRUCK, DUMP_ZONE, getActiveDigZones, sampleHeight, type TerrainData } from "./terrain";
+import { getDumpTruckLaneSegment, DUMP_TRUCK_LANE_LENGTH } from "./dumpTruckLane";
 
 function RoadMesh({
   from,
@@ -43,16 +44,9 @@ function TruckDepartureLane({
   compactTexture: THREE.Texture;
   gravelTexture: THREE.Texture;
 }) {
-  const cos = Math.cos(DUMP_TRUCK.rotation);
-  const sin = Math.sin(DUMP_TRUCK.rotation);
-  const dirX = cos;
-  const dirZ = -sin;
-  const laneLength = 44;
+  const { startX, startZ, endX, endZ, dirX, dirZ } = getDumpTruckLaneSegment();
+  const laneLength = DUMP_TRUCK_LANE_LENGTH;
   const laneWidth = 4.6;
-  const startX = DUMP_TRUCK.groupX - dirX * 2.2;
-  const startZ = DUMP_TRUCK.groupZ - dirZ * 2.2;
-  const endX = startX + dirX * laneLength;
-  const endZ = startZ + dirZ * laneLength;
   const cx = (startX + endX) / 2;
   const cz = (startZ + endZ) / 2;
   const angle = Math.atan2(endX - startX, endZ - startZ);
@@ -221,16 +215,18 @@ function DigMoundCollars({
 
 function SiteBarrierRow({ texture }: { texture: THREE.Texture }) {
   const posts: [number, number][] = [
-    [-30, -28],
-    [-8, -32],
-    [14, -30],
-    [36, -22],
-    [40, 0],
-    [38, 22],
-    [12, 34],
-    [-14, 36],
-    [-32, 26],
-    [-36, 4],
+    [-38, -32],
+    [-12, -36],
+    [16, -32],
+    [42, -24],
+    [58, -12],
+    [68, 8],
+    [58, 26],
+    [34, 38],
+    [4, 42],
+    [-24, 38],
+    [-42, 24],
+    [-46, 0],
   ];
 
   return (

@@ -1,34 +1,15 @@
 import { GameCard } from "@/components/home/GameCard";
-import { HomeProfilePanel } from "@/components/home/HomeProfilePanel";
 import { AppShell } from "@/components/layout/AppShell";
 import { GAMES } from "@/lib/games";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getUserGameStats } from "@/lib/rankings";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-export default async function HomePage() {
+export default async function RideHomePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
   if (!session.user.nickname) redirect("/nickname");
-
-  const scores = await prisma.gameScore.findMany({
-    where: { userId: session.user.id },
-    orderBy: { score: "desc" },
-  });
-
-  const bestByGame = new Map<string, { score: number; stars: number; playTime: number }>();
-  for (const s of scores) {
-    const existing = bestByGame.get(s.gameId);
-    if (!existing || s.score > existing.score) {
-      bestByGame.set(s.gameId, {
-        score: s.score,
-        stars: s.stars,
-        playTime: s.playTime,
-      });
-    }
-  }
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -37,20 +18,6 @@ export default async function HomePage() {
 
   const nickname = user?.nickname ?? session.user.nickname ?? "";
   const currency = user?.currency ?? 0;
-
-  const gameStatsList = await Promise.all(
-    GAMES.map(async (game) => {
-      const stats = await getUserGameStats(game.id, session.user.id);
-      return { gameId: game.id, ...stats };
-    }),
-  );
-  const rankByGame = new Map(gameStatsList.map((stats) => [stats.gameId, stats.rank]));
-  const yanmarStats =
-    gameStatsList.find((stats) => stats.gameId === "yanmar") ?? {
-      rank: null,
-      bestScore: 0,
-      bestStars: 0,
-    };
 
   return (
     <AppShell
@@ -65,14 +32,18 @@ export default async function HomePage() {
           className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-500 transition hover:text-red-600"
         >
           <span aria-hidden>←</span>
-          이전 페이지로 돌아가기
+          체험존으로 돌아가기
         </Link>
 
-        <HomeProfilePanel
-          nickname={nickname}
-          cumulativeScore={yanmarStats.bestScore}
-          rank={yanmarStats.rank}
-        />
+        <div className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3 shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-red-500">
+            Ride Experience
+          </p>
+          <h1 className="mt-1 text-base font-black text-slate-900">탑승 체험</h1>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+            장비를 선택해 운전실에서 실제 조작감을 체험해보세요.
+          </p>
+        </div>
       </div>
 
       <div className="mt-3 flex min-h-0 flex-1 flex-col">
@@ -81,12 +52,7 @@ export default async function HomePage() {
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="grid grid-cols-2 gap-4 pb-2">
             {GAMES.map((game) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                progress={bestByGame.get(game.id)}
-                rank={rankByGame.get(game.id) ?? null}
-              />
+              <GameCard key={game.id} game={game} playMode="ride" />
             ))}
           </div>
         </div>

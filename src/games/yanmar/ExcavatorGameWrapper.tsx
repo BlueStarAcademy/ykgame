@@ -22,6 +22,8 @@ import {
   createAuxiliaryControls,
   filterInput,
   mergeControlInputs,
+  cancelAutoArmPose,
+  hasManualControlInput,
 } from "./controls";
 import { CockpitOverlay } from "./CockpitOverlay";
 import {
@@ -29,9 +31,9 @@ import {
   createInitialSim,
   createInitialTerrain,
 } from "./ExcavatorScene";
-import type { CameraMode, DumpScorePopup, ExcavatorSimState } from "./types";
+import type { CameraMode, CouponDiscoveryState, DumpScorePopup, DumpScorePanelState, ExcavatorSimState, AutoPoseState } from "./types";
 import { EquipmentUpgradePanel } from "./EquipmentUpgradePanel";
-import { createHydraulicVelocity, type HydraulicVelocity } from "./controls";
+import { createHydraulicVelocity, createAutoPoseState, type HydraulicVelocity } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
 import { DigPoseGraph } from "./DigHintPanel";
 import { DumpHintPanel } from "./DumpHintPanel";
@@ -42,9 +44,12 @@ import {
   createDumpTruckState,
   formatDumpTruckReturnTime,
   getDumpTruckPose,
-  resetDumpTruckState,
   type DumpTruckPose,
 } from "./dumpTruckState";
+import {
+  loadDumpTruckCooldown,
+  saveDumpTruckCooldown,
+} from "./dumpTruckPersistence";
 import type { TerrainData } from "./terrain";
 import {
   DEFAULT_YANMAR_EQUIPMENT_LEVELS,
@@ -52,7 +57,7 @@ import {
   YANMAR_EQUIPMENT_CONFIG,
   calculateYanmarEquipmentStats,
   getLoadUnits,
-  getYanmarResetRefundStars,
+  getYanmarPartResetRefundStars,
   getYanmarUpgradeCost,
   type YanmarEquipmentLevels,
   type YanmarEquipmentPart,
@@ -74,6 +79,10 @@ import {
   type GameMode,
   type TutorialStep,
 } from "./tutorial";
+import {
+  getYanmarCouponImage,
+  getYanmarCouponLabel,
+} from "./rewardVisualConfig";
 
 interface ExcavatorGameWrapperProps {
   onEnd: (result: GameResult) => void;
@@ -177,27 +186,88 @@ function TutorialSelectModal({
   );
 }
 
-function RewardPopupOverlay({ popups }: { popups: DumpScorePopup[] }) {
-  if (popups.length === 0) return null;
+const DUMP_SCORE_PANEL_DURATION_MS = 9500;
+const COUPON_DISCOVERY_DURATION_MS = 8200;
+
+function appendRewardText(previous: string, next: string) {
+  if (!next) return previous;
+  if (!previous) return next;
+  return `${previous} · ${next}`;
+}
+
+function formatDumpScorePanelReward(panel: DumpScorePanelState) {
+  const starSummary =
+    panel.earnedStars > 0 ? `⭐ ${panel.earnedStars.toLocaleString()}` : "";
+  if (panel.pendingRewards > 0) {
+    if (starSummary && panel.rewardText) {
+      return `${starSummary} · ${panel.rewardText} · 보상 확인중`;
+    }
+    if (starSummary) return `${starSummary} · 보상 확인중`;
+    if (panel.rewardText) return `${panel.rewardText} · 보상 확인중`;
+    return "보상 확인중";
+  }
+  if (starSummary && panel.rewardText) {
+    return `${starSummary} · ${panel.rewardText}`;
+  }
+  return starSummary || panel.rewardText;
+}
+
+function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
+  if (!panel) return null;
+
+  const rewardText = formatDumpScorePanelReward(panel);
 
   return (
-    <div className="pointer-events-none absolute left-1/2 top-[4.25rem] z-50 flex w-[16rem] -translate-x-1/2 flex-col-reverse items-center gap-2">
-      {popups.map((popup, index) => (
+    <div className="pointer-events-none absolute left-1/2 top-[4.25rem] z-50 w-[16rem] -translate-x-1/2">
+      <div
+        className={`yanmar-score-panel rounded-xl border px-4 py-2.5 text-center font-black shadow-xl backdrop-blur-md ${
+          panel.critical
+            ? "border-yellow-200/70 bg-black/80 text-yellow-300"
+            : "border-white/25 bg-black/78 text-slate-300"
+        }`}
+      >
         <div
-          key={popup.id}
-          className={`yanmar-score-pop rounded-xl border px-3.5 py-2 text-center font-black shadow-xl backdrop-blur-md ${
-            popup.critical
-              ? "border-yellow-200/70 bg-black/80 text-yellow-300"
-              : "border-white/25 bg-black/78 text-slate-300"
-          }`}
-          style={{ animationDelay: `${index * 180}ms` }}
+          key={panel.pulseKey}
+          className={`yanmar-score-panel-value ${panel.critical ? "text-sm" : "text-xs"}`}
         >
-          <span className={popup.critical ? "text-sm" : "text-xs"}>+{popup.score}</span>
-          {popup.rewardText ? (
-            <span className="ml-2 text-[10px] font-bold text-white/90">{popup.rewardText}</span>
-          ) : null}
+          +{panel.totalScore}
         </div>
-      ))}
+        {rewardText ? (
+          <div className="yanmar-score-panel-reward mt-1 text-[10px] font-bold text-white/90">
+            {rewardText}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CouponDiscoveryOverlay({ discovery }: { discovery: CouponDiscoveryState | null }) {
+  if (!discovery) return null;
+
+  const label = getYanmarCouponLabel(discovery.couponType);
+
+  return (
+    <div
+      key={discovery.pulseKey}
+      className="pointer-events-none absolute inset-x-0 top-[5.5rem] z-[58] flex justify-center px-3"
+    >
+      <div className="yanmar-coupon-discovery w-[min(18rem,92%)] rounded-2xl border-2 border-yellow-200/80 bg-gradient-to-b from-amber-500/95 via-orange-500/95 to-red-600/95 px-4 py-3 text-center text-white shadow-[0_0_32px_rgba(251,191,36,0.45)] backdrop-blur-md">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={getYanmarCouponImage(discovery.couponType)}
+          alt=""
+          width={120}
+          height={72}
+          className="mx-auto h-[4.5rem] w-auto drop-shadow-lg"
+          draggable={false}
+          aria-hidden
+        />
+        <p className="mt-2 text-sm font-black tracking-tight text-yellow-50">축하합니다!</p>
+        <p className="mt-1 text-[11px] font-bold leading-snug text-white">
+          {label} {discovery.discountPct}% 할인 쿠폰을 발견했습니다!!
+        </p>
+      </div>
     </div>
   );
 }
@@ -213,7 +283,7 @@ export function ExcavatorGameWrapper({
   bestScore = 0,
 }: ExcavatorGameWrapperProps) {
   const config = getMissionConfig("yanmar");
-  const { update } = useSession();
+  const { data: session, status: sessionStatus, update } = useSession();
   const defaultEquipmentStats = calculateYanmarEquipmentStats(DEFAULT_YANMAR_EQUIPMENT_LEVELS);
   const [mode, setMode] = useState<GameMode>("intro");
   const [tutorialIndex, setTutorialIndex] = useState(0);
@@ -235,6 +305,8 @@ export function ExcavatorGameWrapper({
   const [auxiliary, setAuxiliary] = useState<AuxiliaryControlState>(
     createAuxiliaryControls,
   );
+  const autoPoseRef = useRef<AutoPoseState>(createAutoPoseState());
+  const [autoPose, setAutoPose] = useState<AutoPoseState>(autoPoseRef.current);
   const [hud, setHud] = useState({
     progress: 0,
     timeLeft: config.duration,
@@ -246,7 +318,8 @@ export function ExcavatorGameWrapper({
     score: 0,
     dumpedUnits: 0,
   });
-  const [scorePopups, setScorePopups] = useState<DumpScorePopup[]>([]);
+  const [dumpScorePanel, setDumpScorePanel] = useState<DumpScorePanelState | null>(null);
+  const [couponDiscovery, setCouponDiscovery] = useState<CouponDiscoveryState | null>(null);
   const [equipmentLevels, setEquipmentLevels] = useState<YanmarEquipmentLevels>(
     DEFAULT_YANMAR_EQUIPMENT_LEVELS,
   );
@@ -287,11 +360,56 @@ export function ExcavatorGameWrapper({
   const lastHudProgressRef = useRef(-1);
   const arcadeScoreRef = useRef(0);
   const rewardStarsRef = useRef(0);
+  const currencyRef = useRef(0);
   const processedExitSignalRef = useRef(0);
-  const scorePopupIdRef = useRef(0);
+  const dumpScorePanelRef = useRef<DumpScorePanelState | null>(null);
+  const dumpScoreHideTimerRef = useRef<number | null>(null);
+  const couponDiscoveryRef = useRef<CouponDiscoveryState | null>(null);
+  const couponDiscoveryHideTimerRef = useRef<number | null>(null);
   const equipmentStatsRef = useRef<YanmarEquipmentStats>(defaultEquipmentStats);
+  const dumpTruckUserIdRef = useRef<string | null>(null);
+  const dumpTruckLastSavedAtRef = useRef(0);
   const updateSessionRef = useRef(update);
   updateSessionRef.current = update;
+
+  const persistDumpTruckCooldown = useCallback((force = false) => {
+    const userId = dumpTruckUserIdRef.current;
+    if (!userId) return;
+
+    const now = Date.now();
+    if (!force && now - dumpTruckLastSavedAtRef.current < 1000) return;
+    dumpTruckLastSavedAtRef.current = now;
+    saveDumpTruckCooldown(
+      userId,
+      dumpTruckStateRef.current,
+      equipmentStatsRef.current.truckCooldownSec,
+      now,
+    );
+  }, []);
+
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    dumpTruckUserIdRef.current = userId;
+    const restored = loadDumpTruckCooldown(userId);
+    if (restored) {
+      Object.assign(dumpTruckStateRef.current, restored);
+      dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
+    }
+
+    return () => {
+      persistDumpTruckCooldown(true);
+      dumpTruckUserIdRef.current = null;
+    };
+  }, [persistDumpTruckCooldown, session?.user?.id, sessionStatus]);
+
+  useEffect(() => {
+    const saveBeforeLeaving = () => persistDumpTruckCooldown(true);
+    window.addEventListener("pagehide", saveBeforeLeaving);
+    return () => window.removeEventListener("pagehide", saveBeforeLeaving);
+  }, [persistDumpTruckCooldown]);
 
   const syncDigHud = useCallback(() => {
     digHudTickRef.current += 1;
@@ -336,6 +454,9 @@ export function ExcavatorGameWrapper({
       }
       return { ...h, boom, arm, bucket, bucketLoad };
     });
+    setAutoPose((prev) =>
+      prev.executing === autoPoseRef.current.executing ? prev : { ...autoPoseRef.current },
+    );
   }, [setDigFeedback, setHud]);
 
   const syncMergedInput = useCallback(() => {
@@ -408,7 +529,13 @@ export function ExcavatorGameWrapper({
         equipmentStatsRef.current = data.stats;
         setEquipmentStats(data.stats);
       }
-      if (typeof data.currency === "number") setCurrency(data.currency);
+      if (typeof data.currency === "number") {
+        currencyRef.current = data.currency;
+        setCurrency(data.currency);
+        if (modeRef.current !== "game") {
+          setPreviewStars(data.currency);
+        }
+      }
     } catch {
       // Equipment data is optional for unauthenticated previews.
     }
@@ -429,6 +556,10 @@ export function ExcavatorGameWrapper({
   }, [tutorialIndex, tutorialStep]);
 
   useEffect(() => {
+    currencyRef.current = currency;
+  }, [currency]);
+
+  useEffect(() => {
     allowedRef.current = allowed;
     syncMergedInput();
   }, [allowed, syncMergedInput]);
@@ -439,6 +570,19 @@ export function ExcavatorGameWrapper({
 
   const handleAuxiliaryChange = useCallback((next: AuxiliaryControlState | ((current: AuxiliaryControlState) => AuxiliaryControlState)) => {
     const resolved = typeof next === "function" ? next(auxiliaryRef.current) : next;
+    if (autoPoseRef.current.executing) {
+      const prev = auxiliaryRef.current;
+      if (
+        prev.boomSwing !== resolved.boomSwing ||
+        prev.highSpeed !== resolved.highSpeed ||
+        prev.safetyLocked !== resolved.safetyLocked ||
+        prev.blade !== resolved.blade ||
+        prev.throttle !== resolved.throttle
+      ) {
+        cancelAutoArmPose(autoPoseRef.current);
+        setAutoPose({ ...autoPoseRef.current });
+      }
+    }
     auxiliaryRef.current = resolved;
     setAuxiliary(resolved);
     if (resolved.safetyLocked) {
@@ -446,25 +590,53 @@ export function ExcavatorGameWrapper({
     }
   }, [clearAllInput, setAuxiliary]);
 
+  const handleSavePose = useCallback(() => {
+    const sim = simRef.current;
+    autoPoseRef.current.saved = {
+      boom: sim.boom,
+      arm: sim.arm,
+      bucket: sim.bucket,
+    };
+    setAutoPose({ ...autoPoseRef.current });
+  }, []);
+
+  const handleExecutePose = useCallback(() => {
+    if (!autoPoseRef.current.saved) return;
+    autoPoseRef.current.executing = true;
+    setAutoPose({ ...autoPoseRef.current });
+  }, []);
+
   const resetYanmarSession = useCallback(() => {
     resetSim(simRef.current, velRef.current);
     terrainRef.current = createInitialTerrain();
     scoreRef.current = createScoreState(config.target, config.duration);
     tutorialDumpRef.current = 0;
-    resetDumpTruckState(dumpTruckStateRef.current);
     dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
     endedRef.current = false;
     elapsedRef.current = 0;
     lastHudProgressRef.current = -1;
     arcadeScoreRef.current = 0;
     rewardStarsRef.current = 0;
-    setPreviewStars(0);
+    setPreviewStars(currencyRef.current);
     tutorialCompletingRef.current = false;
     const nextAuxiliary = createAuxiliaryControls();
     auxiliaryRef.current = nextAuxiliary;
     setAuxiliary(nextAuxiliary);
+    autoPoseRef.current = createAutoPoseState();
+    setAutoPose(autoPoseRef.current);
     clearAllInput();
-    setScorePopups([]);
+    if (dumpScoreHideTimerRef.current != null) {
+      window.clearTimeout(dumpScoreHideTimerRef.current);
+      dumpScoreHideTimerRef.current = null;
+    }
+    if (couponDiscoveryHideTimerRef.current != null) {
+      window.clearTimeout(couponDiscoveryHideTimerRef.current);
+      couponDiscoveryHideTimerRef.current = null;
+    }
+    dumpScorePanelRef.current = null;
+    couponDiscoveryRef.current = null;
+    setDumpScorePanel(null);
+    setCouponDiscovery(null);
     setHud({
       progress: 0,
       timeLeft: config.duration,
@@ -513,6 +685,7 @@ export function ExcavatorGameWrapper({
     if (endedRef.current) return;
     endedRef.current = true;
     clearAllInput();
+    persistDumpTruckCooldown(true);
 
     const currentMode = modeRef.current;
     const score = scoreRef.current;
@@ -532,7 +705,13 @@ export function ExcavatorGameWrapper({
             ? "ride"
             : "practice",
     });
-  }, [clearAllInput, config.duration, equipmentStats.maxLoadUnits, onEnd]);
+  }, [
+    clearAllInput,
+    config.duration,
+    equipmentStats.maxLoadUnits,
+    onEnd,
+    persistDumpTruckCooldown,
+  ]);
 
   useEffect(() => {
     if (exitSignal <= processedExitSignalRef.current) return;
@@ -582,6 +761,7 @@ export function ExcavatorGameWrapper({
 
   const handleSimTick = useCallback(() => {
     syncDigHud();
+    persistDumpTruckCooldown();
 
     if (modeRef.current !== "tutorial") return;
     if (tutorialCompletingRef.current) return;
@@ -603,7 +783,13 @@ export function ExcavatorGameWrapper({
     if (step.waypoint == null) return;
     const goalDist = Math.round(waypointDistance(simRef.current, step.waypoint));
     setHud((h) => (h.goalDist === goalDist ? h : { ...h, goalDist }));
-  }, [syncDigHud, setHud, setMode, setStepCompleteFlash]);
+  }, [
+    persistDumpTruckCooldown,
+    syncDigHud,
+    setHud,
+    setMode,
+    setStepCompleteFlash,
+  ]);
 
   const handleProgress = useCallback(
     (dumped: number, progress: number) => {
@@ -628,28 +814,93 @@ export function ExcavatorGameWrapper({
     [config.target, equipmentStats.maxLoadUnits, hud.dumpedUnits, setHud],
   );
 
-  const addDumpPopup = useCallback((popup: Omit<DumpScorePopup, "id">) => {
-    const id = ++scorePopupIdRef.current;
-    arcadeScoreRef.current += popup.score;
-    setHud((h) => ({ ...h, score: arcadeScoreRef.current }));
-    setScorePopups((items) => [...items.slice(-4), { id, ...popup }]);
-    window.setTimeout(() => {
-      setScorePopups((items) => items.filter((item) => item.id !== id));
-    }, 9500);
-    return id;
+  const scheduleHideDumpScorePanel = useCallback(() => {
+    if (dumpScoreHideTimerRef.current != null) {
+      window.clearTimeout(dumpScoreHideTimerRef.current);
+    }
+    dumpScoreHideTimerRef.current = window.setTimeout(() => {
+      dumpScoreHideTimerRef.current = null;
+      dumpScorePanelRef.current = null;
+      setDumpScorePanel(null);
+    }, DUMP_SCORE_PANEL_DURATION_MS);
   }, []);
 
-  const updateDumpPopup = useCallback(
-    (id: number, popup: Partial<Omit<DumpScorePopup, "id">>, scoreDelta = 0) => {
+  const scheduleHideCouponDiscovery = useCallback(() => {
+    if (couponDiscoveryHideTimerRef.current != null) {
+      window.clearTimeout(couponDiscoveryHideTimerRef.current);
+    }
+    couponDiscoveryHideTimerRef.current = window.setTimeout(() => {
+      couponDiscoveryHideTimerRef.current = null;
+      couponDiscoveryRef.current = null;
+      setCouponDiscovery(null);
+    }, COUPON_DISCOVERY_DURATION_MS);
+  }, []);
+
+  const showCouponDiscovery = useCallback(
+    (couponType: CouponDiscoveryState["couponType"], discountPct: number) => {
+      const next: CouponDiscoveryState = {
+        couponType,
+        discountPct,
+        pulseKey: (couponDiscoveryRef.current?.pulseKey ?? 0) + 1,
+      };
+      couponDiscoveryRef.current = next;
+      setCouponDiscovery(next);
+      scheduleHideCouponDiscovery();
+    },
+    [scheduleHideCouponDiscovery],
+  );
+
+  const accumulateDumpScore = useCallback(
+    (score: number, critical: boolean, rewardText = "") => {
+      arcadeScoreRef.current += score;
+      setHud((h) => ({ ...h, score: arcadeScoreRef.current }));
+
+      const previous = dumpScorePanelRef.current;
+      const next: DumpScorePanelState = {
+        totalScore: (previous?.totalScore ?? 0) + score,
+        critical: (previous?.critical ?? false) || critical,
+        rewardText: appendRewardText(previous?.rewardText ?? "", rewardText),
+        earnedStars: previous?.earnedStars ?? 0,
+        pendingRewards: previous?.pendingRewards ?? 0,
+        pulseKey: (previous?.pulseKey ?? 0) + 1,
+      };
+      dumpScorePanelRef.current = next;
+      setDumpScorePanel(next);
+      scheduleHideDumpScorePanel();
+    },
+    [scheduleHideDumpScorePanel],
+  );
+
+  const adjustDumpScorePanel = useCallback(
+    (
+      scoreDelta: number,
+      patch: Partial<Pick<DumpScorePanelState, "rewardText" | "critical" | "earnedStars">> = {},
+      decrementPending = true,
+    ) => {
+      const previous = dumpScorePanelRef.current;
+      if (!previous) return;
+
       if (scoreDelta !== 0) {
         arcadeScoreRef.current += scoreDelta;
         setHud((h) => ({ ...h, score: arcadeScoreRef.current }));
       }
-      setScorePopups((items) =>
-        items.map((item) => (item.id === id ? { ...item, ...popup } : item)),
-      );
+
+      const next: DumpScorePanelState = {
+        ...previous,
+        totalScore: previous.totalScore + scoreDelta,
+        critical: patch.critical ?? previous.critical,
+        rewardText: patch.rewardText ?? previous.rewardText,
+        earnedStars: patch.earnedStars ?? previous.earnedStars,
+        pendingRewards: decrementPending
+          ? Math.max(0, previous.pendingRewards - 1)
+          : previous.pendingRewards,
+        pulseKey: previous.pulseKey + (scoreDelta !== 0 ? 1 : 0),
+      };
+      dumpScorePanelRef.current = next;
+      setDumpScorePanel(next);
+      scheduleHideDumpScorePanel();
     },
-    [],
+    [scheduleHideDumpScorePanel],
   );
 
   const handleDumpScore = useCallback((popup: Omit<DumpScorePopup, "id">) => {
@@ -657,11 +908,24 @@ export function ExcavatorGameWrapper({
     if (modeRef.current !== "game") {
       const stars = Math.floor(Math.random() * 3) + 1;
       setPreviewStars((value) => value + stars);
-      addDumpPopup({ ...popup, rewardText: `체험 ⭐${stars}` });
+      accumulateDumpScore(popup.score, popup.critical);
+      const panel = dumpScorePanelRef.current;
+      if (panel) {
+        const next = { ...panel, earnedStars: panel.earnedStars + stars };
+        dumpScorePanelRef.current = next;
+        setDumpScorePanel(next);
+        scheduleHideDumpScorePanel();
+      }
       return;
     }
 
-    const popupId = addDumpPopup({ ...popup, rewardText: "보상 확인중" });
+    accumulateDumpScore(popup.score, popup.critical);
+    const panel = dumpScorePanelRef.current;
+    if (panel) {
+      panel.pendingRewards += 1;
+      dumpScorePanelRef.current = { ...panel };
+      setDumpScorePanel({ ...panel });
+    }
 
     void (async () => {
       try {
@@ -674,33 +938,35 @@ export function ExcavatorGameWrapper({
         const data = await res.json();
         const event = data.events?.[0] as DumpRewardApiEvent | undefined;
         if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
           setCurrency(data.currency);
           await updateSessionRef.current({ user: { currency: data.currency } });
         }
         if (!event) {
-          updateDumpPopup(popupId, { rewardText: "보상 완료" });
+          adjustDumpScorePanel(0, {
+            rewardText: appendRewardText(dumpScorePanelRef.current?.rewardText ?? "", "보상 완료"),
+          });
           return;
         }
         if (event.kind === "stars") {
           rewardStarsRef.current += event.stars;
+          adjustDumpScorePanel(event.score - popup.score, {
+            critical: event.critical || dumpScorePanelRef.current?.critical,
+            earnedStars: rewardStarsRef.current,
+          });
+          return;
         }
-        updateDumpPopup(
-          popupId,
-          {
-            score: event.score,
-            critical: event.critical,
-            rewardText:
-              event.kind === "coupon"
-                ? `쿠폰 ${event.discountPct}%`
-                : `⭐${event.stars}`,
-          },
-          event.score - popup.score,
-        );
+        showCouponDiscovery(event.couponType, event.discountPct);
+        adjustDumpScorePanel(event.score - popup.score, {
+          critical: true,
+        });
       } catch {
-        updateDumpPopup(popupId, { rewardText: "저장 실패" });
+        adjustDumpScorePanel(0, {
+          rewardText: appendRewardText(dumpScorePanelRef.current?.rewardText ?? "", "저장 실패"),
+        });
       }
     })();
-  }, [addDumpPopup, updateDumpPopup]);
+  }, [accumulateDumpScore, adjustDumpScorePanel, scheduleHideDumpScorePanel, showCouponDiscovery]);
 
   const handleEquipmentUpgrade = useCallback(
     (part: YanmarEquipmentPart) => {
@@ -750,21 +1016,33 @@ export function ExcavatorGameWrapper({
     [equipmentLevels],
   );
 
-  const handleEquipmentReset = useCallback(() => {
+  const handleEquipmentReset = useCallback((part: YanmarEquipmentPart) => {
     const previewMode = modeRef.current !== "game";
+    const partLevel = equipmentLevels[part];
+    if (partLevel <= 0) return;
+
     if (previewMode) {
-      const nextLevels = { ...DEFAULT_YANMAR_EQUIPMENT_LEVELS };
-      const nextStats = calculateYanmarEquipmentStats(nextLevels);
-      equipmentStatsRef.current = nextStats;
-      setEquipmentLevels(nextLevels);
-      setEquipmentStats(nextStats);
+      const refundStars = getYanmarPartResetRefundStars(part, partLevel);
+      setEquipmentLevels((current) => {
+        const next = {
+          ...current,
+          [part]: DEFAULT_YANMAR_EQUIPMENT_LEVELS[part],
+        };
+        const nextStats = calculateYanmarEquipmentStats(next);
+        equipmentStatsRef.current = nextStats;
+        setEquipmentStats(nextStats);
+        return next;
+      });
+      if (refundStars > 0) {
+        setPreviewStars((value) => value + refundStars);
+      }
       return;
     }
 
-    const refundStars = getYanmarResetRefundStars(equipmentLevels);
-    if (refundStars <= 0) return;
+    const refundStars = getYanmarPartResetRefundStars(part, partLevel);
+    const partLabel = YANMAR_EQUIPMENT_CONFIG[part].label;
     const confirmed = window.confirm(
-      `강화를 초기화하면 사용한 스타의 ${Math.round(
+      `${partLabel} 강화를 초기화하면 사용한 스타의 ${Math.round(
         YANMAR_EQUIPMENT_RESET_REFUND_RATE * 100,
       )}%인 ${refundStars.toLocaleString()} 스타를 돌려받습니다.\n초기화하시겠습니까?`,
     );
@@ -775,6 +1053,8 @@ export function ExcavatorGameWrapper({
       try {
         const res = await fetch("/api/equipment/yanmar/reset", {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ part }),
         });
         const data = await res.json();
         if (!res.ok) return;
@@ -968,39 +1248,27 @@ export function ExcavatorGameWrapper({
         ) : null}
 
         {mode !== "intro" && mode !== "gameReady" && mode !== "ride" && (
-          <div className="absolute left-2 top-2 z-50 flex flex-col items-start gap-1.5">
-            <div className="flex items-center gap-1.5">
-              {(mode === "practice" || mode === "tutorial") && (
-                <button
-                  type="button"
-                  onClick={() => setShowTutorialMenu(true)}
-                  className="rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
-                >
-                  튜토리얼
-                </button>
-              )}
-              <div className="flex min-w-[8rem] items-center gap-1.5 rounded-lg border border-orange-100/20 bg-black/60 px-2 py-1.5 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                <span className="shrink-0 text-orange-100">적재량</span>
-                <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/20">
-                  <span
-                    className="block h-full rounded-full bg-orange-300 transition-all duration-150"
-                    style={{ width: `${Math.max(0, Math.min(100, hud.bucketLoad * 100))}%` }}
-                  />
-                </span>
-                <span className="shrink-0 text-orange-50">
-                  {getLoadUnits(hud.bucketLoad, equipmentStats.maxLoadUnits)}/
-                  {equipmentStats.maxLoadUnits} {Math.round(hud.bucketLoad * 100)}%
-                </span>
-                {digFeedback.canDump && hud.bucketLoad > 0.02 ? (
-                  <span className="ml-1 shrink-0 rounded-md border border-emerald-200/50 bg-emerald-500/90 px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm">
-                    하역가능
-                  </span>
-                ) : digFeedback.raiseArmForDump && hud.bucketLoad > 0.02 ? (
-                  <span className="ml-1 shrink-0 rounded-md border border-sky-200/50 bg-sky-600/90 px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm">
-                    붐·암 들기
-                  </span>
-                ) : null}
-              </div>
+          <div className="absolute left-2 top-2 z-50 flex max-w-[9.75rem] flex-col items-start gap-1.5">
+            {(mode === "practice" || mode === "tutorial") && (
+              <button
+                type="button"
+                onClick={() => setShowTutorialMenu(true)}
+                className="rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
+              >
+                튜토리얼
+              </button>
+            )}
+            <div className="flex w-full min-w-0 flex-col items-center gap-1 rounded-lg border border-orange-100/20 bg-black/60 px-2.5 py-2 text-center shadow-lg backdrop-blur-sm">
+              <span className="text-[10px] font-black text-orange-100">적재량</span>
+              <span className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+                <span
+                  className="block h-full rounded-full bg-orange-300 transition-all duration-150"
+                  style={{ width: `${loadOverlayPercent}%` }}
+                />
+              </span>
+              <span className="text-[9px] font-bold tabular-nums text-orange-50">
+                {loadOverlayUnits}/{equipmentStats.maxLoadUnits} ({Math.round(loadOverlayPercent)}%)
+              </span>
             </div>
             <button
               type="button"
@@ -1050,6 +1318,15 @@ export function ExcavatorGameWrapper({
             <div className="rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-[11px] font-black text-white shadow-lg backdrop-blur-sm">
               점수 <span className="text-yellow-100">{hud.score.toLocaleString()}</span>
             </div>
+            {digFeedback.canDump && hud.bucketLoad > 0.02 ? (
+              <div className="rounded-xl border border-emerald-200/50 bg-emerald-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                하역가능
+              </div>
+            ) : digFeedback.raiseArmForDump && hud.bucketLoad > 0.02 ? (
+              <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                붐·암 들기
+              </div>
+            ) : null}
             {digFeedback.truckCooldownRemaining > 0 ? (
               <div className="rounded-xl border border-sky-300/25 bg-black/50 px-3 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
                 다음 트럭{" "}
@@ -1065,6 +1342,7 @@ export function ExcavatorGameWrapper({
           ? (() => {
               const target = document.getElementById(GAME_IMMERSIVE_HEADER_RIGHT_ID);
               if (!target) return null;
+              const ownedStars = mode === "game" ? currency : previewStars;
               return createPortal(
                 <div className="flex items-center gap-2 text-[10px] font-black text-white">
                   {mode === "game" ? (
@@ -1075,10 +1353,12 @@ export function ExcavatorGameWrapper({
                       </span>
                     </span>
                   ) : null}
-                  <span className="rounded-lg border border-white/15 bg-black/25 px-2 py-1">
-                    <span className="text-amber-100">
-                      ⭐ {(mode === "game" ? currency : previewStars).toLocaleString()}
-                    </span>
+                  <span className="inline-flex items-center rounded-lg border border-white/15 bg-black/25 px-2.5 py-1">
+                    <StarAmount
+                      value={ownedStars}
+                      size={16}
+                      valueClassName="text-[11px] font-black text-amber-100"
+                    />
                   </span>
                 </div>,
                 target,
@@ -1173,7 +1453,8 @@ export function ExcavatorGameWrapper({
           </div>
         )}
 
-        {mode !== "intro" && <RewardPopupOverlay popups={scorePopups} />}
+        {mode !== "intro" && <RewardPopupOverlay panel={dumpScorePanel} />}
+        {mode !== "intro" && <CouponDiscoveryOverlay discovery={couponDiscovery} />}
 
         <YanmarGameSettingsMenu
           immersive={immersive}
@@ -1213,6 +1494,7 @@ export function ExcavatorGameWrapper({
               equipmentStatsRef={equipmentStatsRef}
               allowedRef={allowedRef}
               auxiliaryRef={auxiliaryRef}
+              autoPoseRef={autoPoseRef}
               tutorialStepRef={tutorialStepRef}
               tutorialDumpRef={tutorialDumpRef}
               digFeedbackRef={digFeedbackRef}
@@ -1221,7 +1503,6 @@ export function ExcavatorGameWrapper({
               onProgress={handleProgress}
               onDumpScore={handleDumpScore}
               onSimTick={handleSimTick}
-              scorePopups={scorePopups}
               cameraMode={cameraMode}
             />
           </div>
@@ -1234,9 +1515,23 @@ export function ExcavatorGameWrapper({
               touchInputRef.current =
                 typeof next === "function" ? next(touchInputRef.current) : next;
               syncMergedInput();
+              const merged = filterInput(
+                mergeControlInputs(touchInputRef.current, keyboardInputRef.current),
+                allowedRef.current,
+              );
+              if (
+                autoPoseRef.current.executing &&
+                hasManualControlInput(merged, allowedRef.current, auxiliaryRef.current)
+              ) {
+                cancelAutoArmPose(autoPoseRef.current);
+                setAutoPose({ ...autoPoseRef.current });
+              }
             }}
             auxiliary={auxiliary}
             onAuxiliaryChange={handleAuxiliaryChange}
+            autoPose={autoPose}
+            onSavePose={handleSavePose}
+            onExecutePose={handleExecutePose}
             allowed={allowed}
             tutorialStep={tutorialStep}
             showTouchZones={showTouchZones}

@@ -1,11 +1,19 @@
 import type { AuxiliaryControlState, ControlMask, ExcavatorControlState, HydraulicVelocity } from "./controls";
 import {
   applyControls,
+  buildAutoArmControlInput,
+  cancelAutoArmPose,
+  finishAutoArmPoseIfComplete,
+  getActiveAutoPoseJoint,
+  getAutoDigPoseReadiness,
+  hasManualControlInput,
+  isAutoPoseDigLoadingActive,
   CONTROL_SPEED,
   RIDE_CONTROL_SPEED,
   canLoadBucket as isBucketCurled,
   filterInput,
 } from "./controls";
+import type { AutoPoseState } from "./types";
 import {
   digAt,
   getActiveDigZones,
@@ -29,7 +37,7 @@ import {
   getBucketTipWorld,
   type DigFeedback,
 } from "./bucket";
-import { constrainArmFromDumpTruck } from "./dumpTruckCollision";
+import { constrainArmFromDumpTruck, isDumpTruckArmCollisionActive } from "./dumpTruckCollision";
 import {
   addDumpTruckLoad,
   canDumpTruckAcceptDump,
@@ -100,6 +108,7 @@ export interface SimTickParams {
   stats: YanmarEquipmentStats;
   allowed: ControlMask;
   auxiliary: AuxiliaryControlState;
+  autoPose: AutoPoseState;
   rawInput: ExcavatorControlState;
   tutorialDump: { current: number };
   digFeedback: DigFeedback;
@@ -176,6 +185,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     stats,
     allowed,
     auxiliary,
+    autoPose,
     rawInput,
     tutorialDump,
     digFeedback: fb,
@@ -193,6 +203,10 @@ export function tickExcavatorSim(params: SimTickParams) {
   params.dumpTruckPose.present = truckPose.present;
 
   let filtered = filterInput(rawInput, allowed);
+  if (autoPose.executing && hasManualControlInput(rawInput, allowed, auxiliary)) {
+    cancelAutoArmPose(autoPose);
+  }
+  const isAutoArm = autoPose.executing && autoPose.saved != null;
 
   const isRide = mode === "ride";
   const hydraulicSpeedScale = isRide
@@ -233,23 +247,53 @@ export function tickExcavatorSim(params: SimTickParams) {
     x: sim.posX,
     z: sim.posZ,
   };
-  applyControls(
-    sim,
-    filtered,
-    dt,
-    vel,
-    hydraulicSpeedScale,
-    travelSpeedScale,
-    speedProfile,
-  );
+  const truckArmCollisionActive =
+    truckPose.present && isDumpTruckArmCollisionActive(sim, boomSwing, truckPose);
+  const hydraulicSubsteps = truckArmCollisionActive ? 5 : 1;
+  const subDt = dt / hydraulicSubsteps;
+
+  for (let step = 0; step < hydraulicSubsteps; step += 1) {
+    const subBefore = {
+      boom: sim.boom,
+      arm: sim.arm,
+      bucket: sim.bucket,
+    };
+    let stepInput = filtered;
+    if (isAutoArm && autoPose.saved) {
+      const autoInput = buildAutoArmControlInput(sim, autoPose.saved);
+      stepInput = {
+        ...filtered,
+        left: { x: 0, y: autoInput.left.y },
+        right: autoInput.right,
+      };
+    }
+    applyControls(
+      sim,
+      stepInput,
+      subDt,
+      vel,
+      hydraulicSpeedScale,
+      travelSpeedScale,
+      speedProfile,
+    );
+    constrainArmFromDumpTruck(sim, vel, boomSwing, subBefore, truckPose);
+  }
+
+  if (isAutoArm) {
+    const autoBefore = {
+      boom: sim.boom,
+      arm: sim.arm,
+      bucket: sim.bucket,
+    };
+    finishAutoArmPoseIfComplete(sim, vel, autoPose);
+    constrainArmFromDumpTruck(sim, vel, boomSwing, autoBefore, truckPose);
+  }
   if (constrainExcavatorToMap(sim, terrain)) {
     vel.travel = 0;
   }
   if (constrainExcavatorToDumpTruck(sim, beforeTravel, truckPose)) {
     vel.travel = 0;
   }
-  constrainArmFromDumpTruck(sim, vel, boomSwing, beforeGroundContact, truckPose);
-  constrainArmFromDumpTruck(sim, vel, boomSwing, beforeGroundContact, truckPose);
 
   let bucketContact = bucketClearance(sim, terrain, boomSwing);
   let { clearance } = bucketContact;
@@ -320,22 +364,40 @@ export function tickExcavatorSim(params: SimTickParams) {
   const curled = isBucketCurled(sim.boom, sim.bucket);
   const bucketOpenReady = sim.bucket >= 0.35 && sim.bucket <= 1.85;
   const insertedDeepEnough = scraperDepthBelow >= -0.15 && scraperDepthBelow <= 2.75;
-  const bucketCurlingInward = filtered.right.x < -0.08;
-  const bucketCurlReady = bucketCurlingInward && sim.bucket <= 1.85;
-  const armPulling = filtered.left.y > 0.05 || vel.arm < -0.025;
+  const autoSaved = isAutoArm ? autoPose.saved : null;
+  const autoActiveJoint = autoSaved ? getActiveAutoPoseJoint(sim, autoSaved) : null;
+  const bucketCurlingInward =
+    filtered.right.x < -0.08 ||
+    (autoActiveJoint === "bucket" && autoSaved != null);
+  const bucketCurlReady =
+    (bucketCurlingInward && sim.bucket <= 1.85) ||
+    (autoActiveJoint === "bucket" && autoSaved != null && sim.bucket <= 1.85);
+  const armPulling =
+    filtered.left.y > 0.05 ||
+    vel.arm < -0.025 ||
+    autoActiveJoint === "arm";
   const naturalDigPose =
     inZone &&
     bucketInWorkRange &&
     bucketOpenReady &&
     insertedDeepEnough &&
     bucketCurlReady;
-  const digPoseScore =
+  const manualDigPoseScore =
     (bucketOpenReady ? 1 : 0) +
     (insertedDeepEnough ? 1 : 0) +
     (bucketCurlReady ? 1 : 0) +
     (armPulling ? 1 : 0);
-  const poseReadiness = digPoseScore / 4;
-  const canLoad = bucketInWorkRange && poseReadiness >= 0.5 && bucketCurlingInward;
+  const autoDigPoseScore =
+    autoSaved == null
+      ? 0
+      : getAutoDigPoseReadiness(sim, autoSaved, insertedDeepEnough, bucketOpenReady);
+  const poseReadiness = isAutoArm
+    ? Math.max(manualDigPoseScore / 4, autoDigPoseScore)
+    : manualDigPoseScore / 4;
+  const canLoad =
+    bucketInWorkRange &&
+    (poseReadiness >= 0.5 || (isAutoArm && autoDigPoseScore >= 0.25)) &&
+    (bucketCurlingInward || autoActiveJoint != null);
 
   fb.inDigZone = inZone;
   fb.inDumpZone = inDump;
@@ -381,11 +443,21 @@ export function tickExcavatorSim(params: SimTickParams) {
       Math.max(0, filtered.left.y) * 0.75 +
       Math.abs(filtered.right.y) * 0.3 +
       Math.max(0, -filtered.right.x) * 0.42;
+    const autoDigLoadingActive =
+      isAutoArm &&
+      autoSaved != null &&
+      isAutoPoseDigLoadingActive(sim, autoSaved, {
+        inZone,
+        bucketInWorkRange,
+        scrapeMotion,
+      });
     const activelyScraping =
-      bucketCurlingInward &&
-      (scrapeMotion > 0.015 || inputMotion > 0.05 || naturalDigPose);
+      (bucketCurlingInward &&
+        (scrapeMotion > 0.015 || inputMotion > 0.05 || naturalDigPose)) ||
+      autoDigLoadingActive;
     const naturalLoadReady =
-      inZone && bucketInWorkRange && poseReadiness >= 0.5 && bucketCurlingInward;
+      (inZone && bucketInWorkRange && poseReadiness >= 0.5 && bucketCurlingInward) ||
+      (autoDigLoadingActive && autoDigPoseScore >= 0.25);
     const dug =
       naturalLoadReady && activelyScraping
         ? digAt(

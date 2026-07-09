@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getMonthKey } from "@/lib/games";
+import { getSeasonKey, getSeasonPeriodKeys } from "@/lib/games";
 
 export interface RankingEntry {
   rank: number;
@@ -14,6 +14,7 @@ export interface UserGameStats {
   rank: number | null;
   bestScore: number;
   bestStars: number;
+  playTime: number;
 }
 
 type ScoreWithUser = {
@@ -38,10 +39,10 @@ function dedupeBestPerUser(scores: ScoreWithUser[]): ScoreWithUser[] {
 export async function getMonthlyRankings(
   gameId: string,
   limit = 10,
-  monthKey = getMonthKey(),
+  seasonKey = getSeasonKey(),
 ): Promise<RankingEntry[]> {
   const scores = await prisma.gameScore.findMany({
-    where: { gameId, monthKey },
+    where: { gameId, monthKey: { in: getSeasonPeriodKeys(seasonKey) } },
     orderBy: { score: "desc" },
     include: {
       user: { select: { nickname: true, loginId: true } },
@@ -63,10 +64,10 @@ export async function getMonthlyRankings(
 export async function getUserGameStats(
   gameId: string,
   userId: string,
-  monthKey = getMonthKey(),
+  seasonKey = getSeasonKey(),
 ): Promise<UserGameStats> {
   const scores = await prisma.gameScore.findMany({
-    where: { gameId, monthKey },
+    where: { gameId, monthKey: { in: getSeasonPeriodKeys(seasonKey) } },
     orderBy: { score: "desc" },
     include: {
       user: { select: { nickname: true, loginId: true } },
@@ -77,7 +78,7 @@ export async function getUserGameStats(
   const userEntry = ranked.find((s) => s.userId === userId);
 
   if (!userEntry) {
-    return { rank: null, bestScore: 0, bestStars: 0 };
+    return { rank: null, bestScore: 0, bestStars: 0, playTime: 0 };
   }
 
   const rank = ranked.findIndex((s) => s.userId === userId) + 1;
@@ -85,5 +86,6 @@ export async function getUserGameStats(
     rank,
     bestScore: userEntry.score,
     bestStars: userEntry.stars,
+    playTime: userEntry.playTime,
   };
 }

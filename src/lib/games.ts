@@ -148,10 +148,83 @@ export function getGameById(id: string): GameConfig | undefined {
   return GAMES.find((g) => g.id === id);
 }
 
+export interface SeasonInfo {
+  key: string;
+  year: number;
+  season: number;
+  label: string;
+  endsAt: Date;
+}
+
+function getSeasonNumber(month: number): number {
+  return Math.floor(month / 3) + 1;
+}
+
+export function getSeasonKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const season = getSeasonNumber(date.getMonth());
+  return `${year}-${season}`;
+}
+
+export function parseSeasonKey(key: string): { year: number; season: number } | null {
+  const match = key.match(/^(\d{4})-([1-4])$/);
+  if (!match) return null;
+  return { year: Number(match[1]), season: Number(match[2]) };
+}
+
+/** 시즌 키와 이전 월간 키(2026-07 등)를 함께 조회해 레거시 점수를 포함합니다. */
+export function getSeasonPeriodKeys(seasonKey: string): string[] {
+  const parsed = parseSeasonKey(seasonKey);
+  if (!parsed) return [seasonKey];
+
+  const keys = new Set<string>([seasonKey]);
+  const startMonth = (parsed.season - 1) * 3 + 1;
+  for (let month = startMonth; month < startMonth + 3; month++) {
+    keys.add(`${parsed.year}-${String(month).padStart(2, "0")}`);
+  }
+  return Array.from(keys);
+}
+
+export function legacyMonthKeyToSeasonKey(monthKey: string): string | null {
+  const match = monthKey.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+  const season = Math.floor((month - 1) / 3) + 1;
+  return `${year}-${season}`;
+}
+
+export function getSeasonEndDate(seasonKey: string): Date {
+  const parsed = parseSeasonKey(seasonKey);
+  if (!parsed) return new Date();
+  return new Date(parsed.year, parsed.season * 3, 0, 23, 59, 59, 999);
+}
+
+export function getSeasonInfo(date = new Date()): SeasonInfo {
+  const key = getSeasonKey(date);
+  const parsed = parseSeasonKey(key)!;
+  return {
+    key,
+    year: parsed.year,
+    season: parsed.season,
+    label: `${parsed.year}년 ${parsed.season}시즌`,
+    endsAt: getSeasonEndDate(key),
+  };
+}
+
+export function formatSeasonRemaining(endsAt: Date, now = new Date()): string {
+  const ms = Math.max(0, endsAt.getTime() - now.getTime());
+  const dayMs = 24 * 60 * 60 * 1000;
+  const hourMs = 60 * 60 * 1000;
+  const days = Math.floor(ms / dayMs);
+  const hours = Math.floor((ms % dayMs) / hourMs);
+  return `${days}일${hours}시간`;
+}
+
+/** @deprecated Use getSeasonKey for ranking periods */
 export function getMonthKey(date = new Date()): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
+  return getSeasonKey(date);
 }
 
 export function calculateStars(progress: number): number {

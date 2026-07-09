@@ -106,7 +106,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
       : result.completed
         ? "미션 완료!"
         : "시간 종료";
-  const homeLabel = isRide ? "소개로" : isYanmar ? "나가기" : "홈으로";
+  const homeLabel = isRide ? "탑승 홈으로" : isYanmar ? "나가기" : "홈으로";
   const myRankingEntry = myRank
     ? rankings.find((entry) => entry.rank === myRank) ?? null
     : null;
@@ -143,7 +143,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
           <p className="mt-2 text-sm text-green-600">⭐ {stars}별 획득!</p>
         )}
         {saved && myRank && (
-          <p className="mt-1 text-sm text-blue-600">이번 달 순위 #{myRank}</p>
+          <p className="mt-1 text-sm text-blue-600">시즌 순위 #{myRank}</p>
         )}
         {isYanmar && result.mode !== "game" && (
           <p className="mt-2 text-xs text-gray-400">연습 운행 결과는 랭킹에 저장되지 않습니다.</p>

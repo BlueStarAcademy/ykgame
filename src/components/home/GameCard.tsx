@@ -6,20 +6,29 @@ import { GameCardSprite } from "@/components/home/GameCardSprite";
 interface GameCardProps {
   game: GameConfig;
   progress?: { score: number; stars: number; playTime: number };
+  rank?: number | null;
+  playMode?: "ride";
 }
 
 interface CardInnerProps {
   game: GameConfig;
   progress?: { score: number; stars: number; playTime: number };
+  rank?: number | null;
   locked: boolean;
+  playMode?: "ride";
 }
 
 function formatScore(score: number) {
   return score > 0 ? `${score.toLocaleString()}점` : "—";
 }
 
-function CardInner({ game, progress, locked }: CardInnerProps) {
+function formatRank(rank?: number | null) {
+  return rank ? `#${rank}` : "—";
+}
+
+function CardInner({ game, progress, rank, locked, playMode }: CardInnerProps) {
   const score = progress?.score ?? 0;
+  const isRide = playMode === "ride";
 
   return (
     <>
@@ -58,9 +67,22 @@ function CardInner({ game, progress, locked }: CardInnerProps) {
         </div>
 
         {!locked ? (
-          <p className="relative z-10 mt-2 text-xs font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
-            {formatScore(score)}
-          </p>
+          <div className="relative z-10 mt-2 flex w-full flex-col items-center gap-1 px-2">
+            {isRide ? (
+              <span className="game-card-stat-pill rounded-full bg-black/25 px-2.5 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
+                탑승 체험
+              </span>
+            ) : (
+              <>
+                <span className="game-card-stat-pill max-w-full truncate rounded-full bg-black/25 px-2.5 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
+                  {formatScore(score)}
+                </span>
+                <span className="game-card-stat-pill rounded-full bg-black/25 px-2.5 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
+                  랭킹 {formatRank(rank)}
+                </span>
+              </>
+            )}
+          </div>
         ) : null}
 
         {locked ? (
@@ -75,13 +97,23 @@ function CardInner({ game, progress, locked }: CardInnerProps) {
   );
 }
 
-export function GameCard({ game, progress }: GameCardProps) {
+export function GameCard({ game, progress, rank, playMode }: GameCardProps) {
   const available = isGameAvailable(game.id);
-  const inner = <CardInner game={game} progress={progress} locked={!available} />;
+  const inner = (
+    <CardInner
+      game={game}
+      progress={progress}
+      rank={rank}
+      locked={!available}
+      playMode={playMode}
+    />
+  );
 
   if (available) {
+    const href =
+      playMode === "ride" ? `/games/${game.id}?play=ride` : `/games/${game.id}`;
     return (
-      <Link href={`/games/${game.id}`} className="game-card-active">
+      <Link href={href} className="game-card-active">
         <div className="game-card-surface">{inner}</div>
       </Link>
     );

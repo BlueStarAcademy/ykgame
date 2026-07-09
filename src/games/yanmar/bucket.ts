@@ -88,11 +88,17 @@ function linkPointWorld(
 export function getArmCollisionSamples(sim: ExcavatorSimState, boomSwing = 0): BucketTip[] {
   return [
     getBoomPivotWorld(sim, boomSwing),
+    linkPointWorld(sim, boomSwing, "boom", 0.18),
     linkPointWorld(sim, boomSwing, "boom", 0.35),
+    linkPointWorld(sim, boomSwing, "boom", 0.55),
     linkPointWorld(sim, boomSwing, "boom", 0.72),
+    linkPointWorld(sim, boomSwing, "boom", 0.92),
     getArmPivotWorld(sim, boomSwing),
+    linkPointWorld(sim, boomSwing, "arm", 0.2),
     linkPointWorld(sim, boomSwing, "arm", 0.35),
+    linkPointWorld(sim, boomSwing, "arm", 0.55),
     linkPointWorld(sim, boomSwing, "arm", 0.72),
+    linkPointWorld(sim, boomSwing, "arm", 0.92),
     getBucketBodyContactWorld(sim, boomSwing),
     getBucketScraperContactWorld(sim, boomSwing),
     getBucketTipWorld(sim, boomSwing),

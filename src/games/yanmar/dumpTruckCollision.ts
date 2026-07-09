@@ -1,8 +1,62 @@
 import type { DumpTruckPose } from "./dumpTruckState";
-import type { ExcavatorSimState } from "./ExcavatorScene";
+import type { ExcavatorSimState } from "./types";
 import type { HydraulicVelocity } from "./controls";
 import { getArmCollisionSamples } from "./bucket";
-import { dumpTruckBedCenterWorld, isInDumpTruckSolidVolume, isNearDumpTruck } from "./terrain";
+import { dumpTruckBedCenterWorld, isInDumpTruckSolidVolume } from "./terrain";
+import { DUMP_TRUCK_ARM_PROBE_RADIUS } from "./simConstants";
+
+const PROBE_OFFSETS: ReadonlyArray<readonly [number, number, number]> = [
+  [0, 0, 0],
+  [DUMP_TRUCK_ARM_PROBE_RADIUS, 0, 0],
+  [-DUMP_TRUCK_ARM_PROBE_RADIUS, 0, 0],
+  [0, DUMP_TRUCK_ARM_PROBE_RADIUS, 0],
+  [0, -DUMP_TRUCK_ARM_PROBE_RADIUS, 0],
+  [0, 0, DUMP_TRUCK_ARM_PROBE_RADIUS],
+  [0, 0, -DUMP_TRUCK_ARM_PROBE_RADIUS],
+];
+
+function isPointInsideDumpTruckSolid(
+  x: number,
+  y: number,
+  z: number,
+  groupX?: number,
+  groupZ?: number,
+) {
+  return isInDumpTruckSolidVolume(x, y, z, groupX, groupZ);
+}
+
+function isSampleCollidingDumpTruck(
+  x: number,
+  y: number,
+  z: number,
+  groupX?: number,
+  groupZ?: number,
+) {
+  return PROBE_OFFSETS.some(([dx, dy, dz]) =>
+    isPointInsideDumpTruckSolid(x + dx, y + dy, z + dz, groupX, groupZ),
+  );
+}
+
+/** 트럭 주변에서 붐·암 충돌 해석이 필요한지 (넓은 범위) */
+export function isDumpTruckArmCollisionActive(
+  sim: ExcavatorSimState,
+  boomSwing: number,
+  pose?: DumpTruckPose,
+): boolean {
+  if (pose && !pose.present) return false;
+  const groupX = pose?.groupX;
+  const groupZ = pose?.groupZ;
+  const bedCenter = dumpTruckBedCenterWorld(groupX, groupZ);
+  const reach = 8.5;
+
+  if (Math.hypot(sim.posX - bedCenter.x, sim.posZ - bedCenter.z) <= reach) {
+    return true;
+  }
+
+  return getArmCollisionSamples(sim, boomSwing).some(
+    (point) => Math.hypot(point.x - bedCenter.x, point.z - bedCenter.z) <= reach,
+  );
+}
 
 export function armPenetratesDumpTruck(
   sim: ExcavatorSimState,
@@ -13,7 +67,7 @@ export function armPenetratesDumpTruck(
   const groupX = pose?.groupX;
   const groupZ = pose?.groupZ;
   return getArmCollisionSamples(sim, boomSwing).some((point) =>
-    isInDumpTruckSolidVolume(point.x, point.y, point.z, groupX, groupZ),
+    isSampleCollidingDumpTruck(point.x, point.y, point.z, groupX, groupZ),
   );
 }
 
@@ -26,16 +80,13 @@ export function constrainArmFromDumpTruck(
   pose?: DumpTruckPose,
 ): boolean {
   if (pose && !pose.present) return false;
-  const bedCenter = dumpTruckBedCenterWorld(pose?.groupX, pose?.groupZ);
-  if (!isNearDumpTruck(sim.posX, sim.posZ, bedCenter.x, bedCenter.z)) return false;
   if (!armPenetratesDumpTruck(sim, boomSwing, pose)) return false;
 
   sim.boom = before.boom;
   sim.arm = before.arm;
   sim.bucket = before.bucket;
-  // 트럭 쪽으로 밀어넣는 조작만 정지 — 들어올리기·당기기는 유지
-  if (vel.boom > 0) vel.boom = 0;
-  if (vel.arm < 0) vel.arm = 0;
-  if (vel.bucket > 0) vel.bucket = 0;
+  vel.boom = 0;
+  vel.arm = 0;
+  vel.bucket = 0;
   return true;
 }

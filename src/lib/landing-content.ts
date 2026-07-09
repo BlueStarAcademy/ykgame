@@ -97,3 +97,18 @@ export const EXPERIENCE_STEPS = [
   },
   { step: "04", title: "플레이", desc: "탑승은 운전실 체험 · 게임은 굴착·하역·보상 도전" },
 ] as const;
+
+export const EXPERIENCE_MODES = [
+  {
+    title: "탑승 체험",
+    label: "Ride Experience",
+    desc: "얀마 굴착기의 실제 조작감을 느낄 수 있는 운전실 중심 체험입니다. 점수보다 조작, 회전, 붐·암·버킷 움직임을 천천히 익히는 데 집중합니다.",
+    points: ["실제 장비에 가까운 저속 조작", "튜토리얼 없이 바로 탑승", "체험 종료 시 랜딩으로 복귀"],
+  },
+  {
+    title: "게임 체험",
+    label: "Game Experience",
+    desc: "홈 화면에서 장비를 선택하고 미션, 스타, 쿠폰 보상, 랭킹에 도전하는 캐주얼 게임 모드입니다.",
+    points: ["장비별 미션 선택", "스타·쿠폰 보상 획득", "랭킹보드로 기록 경쟁"],
+  },
+] as const;

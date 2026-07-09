@@ -18,7 +18,7 @@ export function getExperienceMode(): ExperienceMode | null {
 }
 
 export function experienceDestination(mode: ExperienceMode): string {
-  return mode === "ride" ? "/games/yanmar?play=ride" : "/home";
+  return mode === "ride" ? "/ride" : "/home";
 }
 
 export function buildExperienceEntryHref(

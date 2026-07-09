@@ -10,6 +10,7 @@ import type {
 } from "./controls";
 import { COCKPIT_LAYOUT } from "./controls";
 import type { TutorialStep } from "./tutorial";
+import type { AutoPoseState } from "./types";
 
 
 interface CockpitOverlayProps {
@@ -29,6 +30,9 @@ interface CockpitOverlayProps {
   tutorialStep: TutorialStep | null;
   showTouchZones: boolean;
   hideVisualDeck?: boolean;
+  autoPose: AutoPoseState;
+  onSavePose: () => void;
+  onExecutePose: () => void;
 }
 
 interface JoystickLayout {
@@ -39,6 +43,33 @@ interface JoystickLayout {
 }
 
 const PEDAL_SWING_SPEED_PER_SECOND = 0.85;
+
+function getJoystickZoneMetrics(isPortrait: boolean) {
+  return {
+    centerYOffset: isPortrait ? 0.095 : 0.08,
+    width: isPortrait ? "15.5%" : "13.2%",
+    height: isPortrait ? "34%" : "54%",
+    heightHalfPct: isPortrait ? 17 : 27,
+  };
+}
+
+/** 좌·우 보조 메뉴 토글 공통 높이 (기능 / 자동) */
+const AUX_MENU_TOGGLE_CY = 0.495;
+
+function getHornTouchZoneStyle(layout: JoystickLayout, isPortrait: boolean) {
+  const { centerYOffset, heightHalfPct, width } = getJoystickZoneMetrics(isPortrait);
+  const autoToggleHalf = isPortrait ? "1.425rem" : "1.375rem";
+  const gap = isPortrait ? "0.24rem" : "0.2rem";
+  const joystickCenterTop = (layout.cy - centerYOffset) * 100;
+
+  return {
+    left: `${layout.cx * 100}%`,
+    top: `calc(${AUX_MENU_TOGGLE_CY * 100}% + ${autoToggleHalf} + ${gap})`,
+    bottom: `calc(${100 - joystickCenterTop}% + ${heightHalfPct}% + ${gap})`,
+    width,
+    transform: "translateX(-50%)",
+  };
+}
 
 /** `as const` layout literals widened so portrait offsets type-check. */
 type WidenNumbers<T> = T extends number
@@ -52,14 +83,19 @@ const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   ...COCKPIT_LAYOUT,
   left: { ...COCKPIT_LAYOUT.left, cx: 0.1, cy: 0.965 },
   right: { ...COCKPIT_LAYOUT.right, cx: 0.9, cy: 0.965 },
-  safetyLever: { ...COCKPIT_LAYOUT.safetyLever, cx: 0.075, cy: 0.3 },
+  safetyLever: { ...COCKPIT_LAYOUT.safetyLever, cx: 0.1, cy: 0.385 },
   travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cx: 0.455, cy: 0.92 },
   travelRight: { ...COCKPIT_LAYOUT.travelRight, cx: 0.545, cy: 0.92 },
   travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cx: 0.5, cy: 0.92 },
-  rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.915, cy: 0.105 },
-  hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.915, cy: 0.315 },
-  horn: { ...COCKPIT_LAYOUT.horn, cx: 0.915, cy: 0.495 },
+  rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.1, cy: 0.165 },
+  hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.1, cy: 0.275 },
+  horn: { ...COCKPIT_LAYOUT.horn, cx: 0.9, cy: 0.495 },
 };
+
+const FUNCTION_MENU_ITEM_ORDER = ["safety", "rpm", "pedal"] as const;
+
+/** column-reverse 기준: 토글 바로 위 실행 → 그 위 저장 */
+const AUTO_MENU_ITEM_ORDER = ["execute", "save"] as const;
 
 function VisualJoystick({
   side,
@@ -133,8 +169,10 @@ function VisualJoystick({
             <span className="yanmar-realstick-ring yanmar-realstick-ring-2" />
             <span className="yanmar-realstick-ring yanmar-realstick-ring-3" />
             <span className="yanmar-realstick-label">{side === "left" ? "L" : "R"}</span>
-            {side === "right" ? <span className="yanmar-realstick-horn" /> : null}
           </span>
+          {side === "right" ? (
+            <span className="yanmar-realstick-horn yanmar-realstick-horn-top" aria-hidden />
+          ) : null}
         </div>
       </div>
     </div>
@@ -422,6 +460,7 @@ function GameJoystick({
 }: GameJoystickProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
   const pointer = usePointerRelease(() => onChange(0, 0));
+  const joystickZone = getJoystickZoneMetrics(isPortrait);
 
   const updateFromEvent = useCallback(
     (clientX: number, clientY: number) => {
@@ -465,7 +504,6 @@ function GameJoystick({
   };
 
   const isDisabled = !enabled.x && !enabled.y;
-  const centerYOffset = isPortrait ? 0.095 : 0.08;
 
   return (
     <>
@@ -474,9 +512,9 @@ function GameJoystick({
         className={`absolute z-50 touch-none rounded-2xl ${isDisabled ? "pointer-events-none" : ""}`}
         style={{
           left: `${layout.cx * 100}%`,
-          top: `${(layout.cy - centerYOffset) * 100}%`,
-          width: isPortrait ? "15.5%" : "13.2%",
-          height: isPortrait ? "34%" : "54%",
+          top: `${(layout.cy - joystickZone.centerYOffset) * 100}%`,
+          width: joystickZone.width,
+          height: joystickZone.height,
           transform: "translate(-50%, -50%)",
         }}
         onPointerDown={handleStart}
@@ -491,15 +529,13 @@ function GameJoystick({
         aria-label={side === "left" ? "좌 조이스틱" : "우 조이스틱"}
       >
         {showTouchZone && (
-          <>
-            <div
-              className={`pointer-events-none absolute inset-0 rounded-2xl border ${
-                side === "left"
-                  ? "border-red-200/65"
-                  : "border-sky-200/65"
-              } bg-transparent`}
-            />
-          </>
+          <div
+            className={`pointer-events-none absolute inset-0 rounded-2xl border ${
+              side === "left"
+                ? "border-red-200/65"
+                : "border-sky-200/65"
+            } bg-transparent`}
+          />
         )}
         {highlighted && (
           <div className="yanmar-joystick-highlight absolute inset-[-10%] rounded-full border-2 border-amber-300/95 bg-amber-300/10" />
@@ -510,6 +546,38 @@ function GameJoystick({
       </div>
 
     </>
+  );
+}
+
+function HornTouchZone({
+  layout,
+  isPortrait,
+  showTouchZone,
+  onHorn,
+}: {
+  layout: JoystickLayout;
+  isPortrait: boolean;
+  showTouchZone: boolean;
+  onHorn: () => void;
+}) {
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    onHorn();
+  };
+
+  return (
+    <div
+      className="yanmar-horn-touch-zone absolute touch-none"
+      style={getHornTouchZoneStyle(layout, isPortrait)}
+      onPointerDown={handlePointerDown}
+      role="button"
+      tabIndex={-1}
+      aria-label="경적"
+    >
+      {showTouchZone ? (
+        <span className="pointer-events-none absolute inset-0 border border-yellow-200/70 bg-yellow-200/10" />
+      ) : null}
+    </div>
   );
 }
 
@@ -718,13 +786,14 @@ function DualTravelCenter({
   );
 }
 
-function SpeedModeLever({
+function RpmLever({
   active,
   cx,
   cy,
   showTouchZone,
   onToggle,
   isPortrait,
+  embedded = false,
 }: {
   active: boolean;
   cx: number;
@@ -732,25 +801,30 @@ function SpeedModeLever({
   showTouchZone: boolean;
   onToggle: () => void;
   isPortrait: boolean;
+  embedded?: boolean;
 }) {
   const buttonSize = isPortrait ? "2.85rem" : "2.75rem";
 
   return (
     <button
       type="button"
-      className={`yanmar-aux-button yanmar-aux-button-hydraulic absolute z-40 touch-none active:scale-95 ${
-        active ? "is-active" : ""
-      } ${isPortrait ? "yanmar-aux-button-portrait" : ""}`}
-      style={{
-        left: `${cx * 100}%`,
-        top: `${cy * 100}%`,
-        width: buttonSize,
-        height: buttonSize,
-        transform: "translate(-50%, -50%)",
-      }}
+      className={`yanmar-aux-button yanmar-aux-button-hydraulic z-40 touch-none active:scale-95 ${
+        embedded ? "relative h-full w-full" : "absolute"
+      } ${active ? "is-active" : ""} ${isPortrait ? "yanmar-aux-button-portrait" : ""}`}
+      style={
+        embedded
+          ? undefined
+          : {
+              left: `${cx * 100}%`,
+              top: `${cy * 100}%`,
+              width: buttonSize,
+              height: buttonSize,
+              transform: "translate(-50%, -50%)",
+            }
+      }
       onClick={onToggle}
       aria-pressed={active}
-      aria-label={active ? "유압 속도 x2" : "유압 속도 x1"}
+      aria-label={active ? "RPM x2" : "RPM x1"}
     >
       <span className="yanmar-aux-lever-well" aria-hidden>
         <VisualLever
@@ -762,7 +836,7 @@ function SpeedModeLever({
           compact
         />
       </span>
-      <span className="yanmar-aux-button-label">{isPortrait ? (active ? "x2" : "x1") : "유압"}</span>
+      <span className="yanmar-aux-button-label">{isPortrait ? (active ? "x2" : "x1") : "RPM"}</span>
       {showTouchZone && (
         <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-sky-200/65 bg-transparent" />
       )}
@@ -777,6 +851,7 @@ function SafetyLever({
   showTouchZone,
   onToggle,
   isPortrait,
+  embedded = false,
 }: {
   active: boolean;
   cx: number;
@@ -784,20 +859,25 @@ function SafetyLever({
   showTouchZone: boolean;
   onToggle: () => void;
   isPortrait: boolean;
+  embedded?: boolean;
 }) {
   return (
     <button
       type="button"
-      className={`yanmar-aux-button yanmar-aux-button-safety absolute z-50 touch-none active:scale-95 ${
-        active ? "is-active" : ""
-      } ${isPortrait ? "yanmar-aux-button-portrait" : ""}`}
-      style={{
-        left: `${cx * 100}%`,
-        top: `${cy * 100}%`,
-        width: isPortrait ? "2.85rem" : "2.75rem",
-        height: isPortrait ? "2.85rem" : "2.75rem",
-        transform: "translate(-50%, -50%)",
-      }}
+      className={`yanmar-aux-button yanmar-aux-button-safety z-50 touch-none active:scale-95 ${
+        embedded ? "relative h-full w-full" : "absolute"
+      } ${active ? "is-active" : ""} ${isPortrait ? "yanmar-aux-button-portrait" : ""}`}
+      style={
+        embedded
+          ? undefined
+          : {
+              left: `${cx * 100}%`,
+              top: `${cy * 100}%`,
+              width: isPortrait ? "2.85rem" : "2.75rem",
+              height: isPortrait ? "2.85rem" : "2.75rem",
+              transform: "translate(-50%, -50%)",
+            }
+      }
       onClick={onToggle}
       aria-pressed={active}
       aria-label={active ? "안전레버 잠김" : "안전레버 해제"}
@@ -820,55 +900,23 @@ function SafetyLever({
   );
 }
 
-function HornButton({
-  layout,
-  isPortrait,
-  showTouchZone,
-}: {
-  layout: CockpitLayout;
-  isPortrait: boolean;
-  showTouchZone: boolean;
-}) {
-  const cx = layout.horn.cx;
-  const cy = layout.horn.cy;
-
-  return (
-    <button
-      type="button"
-      className={`yanmar-horn-button absolute touch-none active:scale-95${
-        isPortrait ? " yanmar-horn-button-portrait" : ""
-      }`}
-      style={{
-        left: `${cx * 100}%`,
-        top: `${cy * 100}%`,
-        transform: "translate(-50%, -50%)",
-      }}
-      onClick={playHorn}
-      aria-label="경적"
-    >
-      <span className="yanmar-horn-button-dot" />
-      {showTouchZone ? (
-        <span className="pointer-events-none absolute inset-[-8%] rounded-md border border-yellow-200/70 bg-transparent" />
-      ) : null}
-    </button>
-  );
-}
-
 function PedalSwingControl({
   activeValue,
   showTouchZone,
   onChange,
   layout,
   isPortrait,
+  embedded = false,
 }: {
   activeValue: number;
   showTouchZone: boolean;
   onChange: (value: number) => void;
   layout: CockpitLayout;
   isPortrait: boolean;
+  embedded?: boolean;
 }) {
   const pedal = layout.rightPedal;
-  const touchCx = isPortrait ? pedal.cx : pedal.cx + 0.03;
+  const touchCx = embedded ? pedal.cx : isPortrait ? pedal.cx : pedal.cx + 0.03;
   const valueRef = useRef(activeValue);
   const directionRef = useRef(0);
   const frameRef = useRef<number | null>(null);
@@ -955,31 +1003,43 @@ function PedalSwingControl({
 
   const topPressAmount = Math.max(0, activeValue);
   const bottomPressAmount = Math.max(0, -activeValue);
+  const pedalSizeStyle = embedded
+    ? { width: "100%", height: "100%" }
+    : isPortrait
+      ? { width: "2.85rem", height: "4.55rem" }
+      : { width: "2.55rem", height: "5rem" };
+
   return (
     <div
-      className={`yanmar-pedal-button absolute z-40 select-none ${
+      className={`yanmar-pedal-button select-none ${
+        embedded ? "relative h-full w-full" : "absolute z-40"
+      } ${
         pressedDirection > 0 ? "is-top-active" : pressedDirection < 0 ? "is-bottom-active" : ""
       } ${isPortrait ? "yanmar-pedal-button-portrait" : ""}`}
       style={{
-        left: `${touchCx * 100}%`,
-        ...(isPortrait
-          ? {
-              top: `${pedal.cy * 100}%`,
-              width: "2.85rem",
-              height: "4.55rem",
-              transform: "translate(-50%, -50%)",
-            }
+        WebkitTouchCallout: "none",
+        ...(embedded
+          ? pedalSizeStyle
           : {
+              left: `${touchCx * 100}%`,
               top: `${pedal.cy * 100}%`,
-              width: "2.55rem",
-              height: "5rem",
+              ...pedalSizeStyle,
               transform: "translate(-50%, -50%)",
             }),
-        WebkitTouchCallout: "none",
       }}
       onContextMenu={(e) => e.preventDefault()}
       aria-label="우측 페달 붐 스윙"
     >
+      {embedded && (
+        <span className="yanmar-visual-pedal-nested pointer-events-none" aria-hidden>
+          <span
+            className="yanmar-pedal-pad"
+            style={{
+              transform: `translate(-50%, calc(-50% + ${(topPressAmount - bottomPressAmount) * 0.12}rem))`,
+            }}
+          />
+        </span>
+      )}
       {showTouchZone && (
         <div className="pointer-events-none absolute inset-0 rounded-lg border border-amber-200/65 bg-transparent">
           <span className="absolute inset-x-[8%] top-[6%] h-[42%] rounded-t-lg border border-amber-100/35" />
@@ -1018,6 +1078,262 @@ function PedalSwingControl({
   );
 }
 
+interface FunctionMenuProps {
+  expanded: boolean;
+  onToggle: () => void;
+  layout: CockpitLayout;
+  isPortrait: boolean;
+  showTouchZones: boolean;
+  auxiliary: AuxiliaryControlState;
+  onAuxiliaryChange: CockpitOverlayProps["onAuxiliaryChange"];
+}
+
+function FunctionMenu({
+  expanded,
+  onToggle,
+  layout,
+  isPortrait,
+  showTouchZones,
+  auxiliary,
+  onAuxiliaryChange,
+}: FunctionMenuProps) {
+  const anchorCx = layout.left.cx;
+  const toggleCy = AUX_MENU_TOGGLE_CY;
+  const buttonSize = isPortrait ? "2.85rem" : "2.75rem";
+  const pedalHeight = isPortrait ? "4.55rem" : "5rem";
+
+  return (
+    <div
+      className="yanmar-function-menu"
+      style={{
+        left: `${anchorCx * 100}%`,
+        top: `${toggleCy * 100}%`,
+      }}
+    >
+      <div className={`yanmar-function-menu-items ${expanded ? "is-expanded" : ""}`}>
+        {FUNCTION_MENU_ITEM_ORDER.map((key, index) => {
+          const openDelayMs = index * 50;
+          const closeDelayMs = (FUNCTION_MENU_ITEM_ORDER.length - 1 - index) * 35;
+
+          return (
+            <div
+              key={key}
+              className="yanmar-function-menu-item"
+              style={{
+                width: buttonSize,
+                height: key === "pedal" ? pedalHeight : buttonSize,
+                transitionDelay: `${expanded ? openDelayMs : closeDelayMs}ms`,
+              }}
+              aria-hidden={!expanded}
+            >
+              {key === "safety" ? (
+                <SafetyLever
+                  cx={layout.safetyLever.cx}
+                  cy={layout.safetyLever.cy}
+                  active={auxiliary.safetyLocked}
+                  showTouchZone={showTouchZones}
+                  isPortrait={isPortrait}
+                  embedded
+                  onToggle={() =>
+                    onAuxiliaryChange((current) => ({
+                      ...current,
+                      safetyLocked: !current.safetyLocked,
+                    }))
+                  }
+                />
+              ) : null}
+              {key === "rpm" ? (
+                <RpmLever
+                  cx={layout.hydraulicSpeed.cx}
+                  cy={layout.hydraulicSpeed.cy}
+                  active={auxiliary.highSpeed}
+                  showTouchZone={showTouchZones}
+                  isPortrait={isPortrait}
+                  embedded
+                  onToggle={() =>
+                    onAuxiliaryChange((current) => ({
+                      ...current,
+                      highSpeed: !current.highSpeed,
+                    }))
+                  }
+                />
+              ) : null}
+              {key === "pedal" ? (
+                <PedalSwingControl
+                  activeValue={auxiliary.boomSwing}
+                  showTouchZone={showTouchZones}
+                  layout={layout}
+                  isPortrait={isPortrait}
+                  embedded
+                  onChange={(boomSwing) =>
+                    onAuxiliaryChange((current) => ({ ...current, boomSwing }))
+                  }
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        className={`yanmar-function-menu-toggle yanmar-aux-button touch-none active:scale-95${
+          expanded ? " is-expanded" : ""
+        }${isPortrait ? " yanmar-aux-button-portrait yanmar-function-menu-toggle-portrait" : ""}`}
+        style={{
+          width: buttonSize,
+          height: buttonSize,
+        }}
+        onClick={onToggle}
+        aria-expanded={expanded}
+        aria-label={expanded ? "기능 메뉴 닫기" : "기능 메뉴 열기"}
+      >
+        <span className="yanmar-function-menu-icon" aria-hidden />
+        <span className="yanmar-function-menu-toggle-label">기능</span>
+        {showTouchZones ? (
+          <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-emerald-200/65 bg-transparent" />
+        ) : null}
+      </button>
+    </div>
+  );
+}
+
+function AutoMenuActionButton({
+  variant,
+  active = false,
+  disabled = false,
+  onClick,
+  showTouchZone,
+  ariaLabel,
+}: {
+  variant: "save" | "execute";
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  showTouchZone: boolean;
+  ariaLabel: string;
+}) {
+  const label = variant === "save" ? "저장" : "실행";
+
+  return (
+    <button
+      type="button"
+      className={`yanmar-auto-menu-action yanmar-aux-button relative h-full w-full touch-none active:scale-95${
+        active ? " is-active" : ""
+      }${disabled ? " is-disabled" : ""}`}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+    >
+      <span
+        className={`yanmar-auto-menu-icon yanmar-auto-menu-action-icon yanmar-auto-menu-icon-${variant === "execute" ? "play" : variant}`}
+        aria-hidden
+      />
+      <span className="yanmar-auto-menu-action-label">{label}</span>
+      {showTouchZone ? (
+        <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-violet-200/65 bg-transparent" />
+      ) : null}
+    </button>
+  );
+}
+
+interface AutoMenuProps {
+  expanded: boolean;
+  onToggle: () => void;
+  layout: CockpitLayout;
+  isPortrait: boolean;
+  showTouchZones: boolean;
+  autoPose: AutoPoseState;
+  onSavePose: () => void;
+  onExecutePose: () => void;
+}
+
+function AutoMenu({
+  expanded,
+  onToggle,
+  layout,
+  isPortrait,
+  showTouchZones,
+  autoPose,
+  onSavePose,
+  onExecutePose,
+}: AutoMenuProps) {
+  const anchorCx = layout.horn.cx;
+  const toggleCy = AUX_MENU_TOGGLE_CY;
+  const buttonSize = isPortrait ? "2.85rem" : "2.75rem";
+  const hasSavedPose = autoPose.saved != null;
+
+  return (
+    <div
+      className="yanmar-auto-menu"
+      style={{
+        left: `${anchorCx * 100}%`,
+        top: `${toggleCy * 100}%`,
+      }}
+    >
+      <div className={`yanmar-auto-menu-items ${expanded ? "is-expanded" : ""}`}>
+        {AUTO_MENU_ITEM_ORDER.map((key, index) => {
+          const openDelayMs = index * 50;
+          const closeDelayMs = (AUTO_MENU_ITEM_ORDER.length - 1 - index) * 35;
+
+          return (
+            <div
+              key={key}
+              className="yanmar-auto-menu-item"
+              style={{
+                width: buttonSize,
+                height: buttonSize,
+                transitionDelay: `${expanded ? openDelayMs : closeDelayMs}ms`,
+              }}
+              aria-hidden={!expanded}
+            >
+              {key === "save" ? (
+                <AutoMenuActionButton
+                  variant="save"
+                  active={hasSavedPose}
+                  onClick={onSavePose}
+                  showTouchZone={showTouchZones}
+                  ariaLabel={hasSavedPose ? "자세 저장됨" : "현재 자세 저장"}
+                />
+              ) : null}
+              {key === "execute" ? (
+                <AutoMenuActionButton
+                  variant="execute"
+                  active={autoPose.executing}
+                  disabled={!hasSavedPose || autoPose.executing}
+                  onClick={onExecutePose}
+                  showTouchZone={showTouchZones}
+                  ariaLabel={autoPose.executing ? "자동 자세 실행 중" : "저장된 자세 실행"}
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        className={`yanmar-auto-menu-toggle yanmar-aux-button touch-none active:scale-95${
+          expanded ? " is-expanded" : ""
+        }${isPortrait ? " yanmar-aux-button-portrait yanmar-auto-menu-toggle-portrait" : ""}`}
+        style={{
+          width: buttonSize,
+          height: buttonSize,
+        }}
+        onClick={onToggle}
+        aria-expanded={expanded}
+        aria-label={expanded ? "자동 메뉴 닫기" : "자동 메뉴 열기"}
+      >
+        <span className="yanmar-auto-menu-icon yanmar-auto-menu-icon-auto" aria-hidden />
+        <span className="yanmar-auto-menu-toggle-label">자동</span>
+        {showTouchZones ? (
+          <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-violet-200/65 bg-transparent" />
+        ) : null}
+      </button>
+    </div>
+  );
+}
+
 export function CockpitOverlay({
   input,
   onInputChange,
@@ -1027,6 +1343,9 @@ export function CockpitOverlay({
   tutorialStep,
   showTouchZones,
   hideVisualDeck = false,
+  autoPose,
+  onSavePose,
+  onExecutePose,
 }: CockpitOverlayProps) {
   const highlightLeft =
     tutorialStep?.highlight === "left" || tutorialStep?.highlight === "both";
@@ -1035,6 +1354,8 @@ export function CockpitOverlay({
   const highlightTravel = tutorialStep?.highlight === "travel";
   const layout = PORTRAIT_COCKPIT_LAYOUT;
   const isPortrait = true;
+  const [functionMenuExpanded, setFunctionMenuExpanded] = useState(false);
+  const [autoMenuExpanded, setAutoMenuExpanded] = useState(false);
 
   return (
     <>
@@ -1096,37 +1417,25 @@ export function CockpitOverlay({
               }))
             }
           />
-          <PedalSwingControl
-            activeValue={auxiliary.boomSwing}
-            showTouchZone={showTouchZones}
+          <FunctionMenu
+            expanded={functionMenuExpanded}
+            onToggle={() => setFunctionMenuExpanded((open) => !open)}
             layout={layout}
             isPortrait={isPortrait}
-            onChange={(boomSwing) => onAuxiliaryChange((current) => ({ ...current, boomSwing }))}
+            showTouchZones={showTouchZones}
+            auxiliary={auxiliary}
+            onAuxiliaryChange={onAuxiliaryChange}
           />
-          <SpeedModeLever
-            cx={layout.hydraulicSpeed.cx}
-            cy={layout.hydraulicSpeed.cy}
-            active={auxiliary.highSpeed}
-            showTouchZone={showTouchZones}
+          <AutoMenu
+            expanded={autoMenuExpanded}
+            onToggle={() => setAutoMenuExpanded((open) => !open)}
+            layout={layout}
             isPortrait={isPortrait}
-            onToggle={() =>
-              onAuxiliaryChange((current) => ({ ...current, highSpeed: !current.highSpeed }))
-            }
+            showTouchZones={showTouchZones}
+            autoPose={autoPose}
+            onSavePose={onSavePose}
+            onExecutePose={onExecutePose}
           />
-          <SafetyLever
-            cx={layout.safetyLever.cx}
-            cy={layout.safetyLever.cy}
-            active={auxiliary.safetyLocked}
-            showTouchZone={showTouchZones}
-            isPortrait={isPortrait}
-            onToggle={() =>
-              onAuxiliaryChange({
-                ...auxiliary,
-                safetyLocked: !auxiliary.safetyLocked,
-              })
-            }
-          />
-          <HornButton layout={layout} isPortrait={isPortrait} showTouchZone={showTouchZones} />
           <GameJoystick
             side="left"
             layout={layout.left}
@@ -1154,6 +1463,12 @@ export function CockpitOverlay({
             onChange={(x, y) =>
               onInputChange((current) => ({ ...current, right: { x, y } }))
             }
+          />
+          <HornTouchZone
+            layout={layout.right}
+            isPortrait={isPortrait}
+            showTouchZone={showTouchZones}
+            onHorn={playHorn}
           />
         </div>
       </div>

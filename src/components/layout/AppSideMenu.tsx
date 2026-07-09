@@ -11,6 +11,7 @@ interface AppSideMenuProps {
   isAdmin?: boolean;
   onOpenMailbox: () => void;
   onOpenInventory: () => void;
+  onOpenRanking: () => void;
   onOpenSettings: () => void;
   onLogout: () => void;
 }
@@ -68,6 +69,7 @@ export function AppSideMenu({
   isAdmin,
   onOpenMailbox,
   onOpenInventory,
+  onOpenRanking,
   onOpenSettings,
   onLogout,
 }: AppSideMenuProps) {
@@ -134,6 +136,11 @@ export function AppSideMenu({
             icon="🎟️"
             label="쿠폰함"
             onClick={() => handleMenuAction(onOpenInventory)}
+          />
+          <MenuItem
+            icon="📊"
+            label="랭킹보기"
+            onClick={() => handleMenuAction(onOpenRanking)}
           />
           <MenuItem
             icon="⚙️"

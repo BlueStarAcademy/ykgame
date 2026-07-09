@@ -91,7 +91,7 @@ export function YanmarGameSettingsMenu({
   if (!show) return null;
 
   const menu = (
-    <div className="relative">
+    <div className="relative shrink-0">
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
@@ -134,18 +134,17 @@ export function YanmarGameSettingsMenu({
             >
               기능정보
             </button>
-            {onShowRanking ? (
-              <button
-                type="button"
-                onClick={() => {
-                  onOpenChange(false);
-                  onShowRanking();
-                }}
-                className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10"
-              >
-                랭킹보드
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                onOpenChange(false);
+                onShowRanking?.();
+              }}
+              disabled={!onShowRanking}
+              className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10 disabled:text-white/35"
+            >
+              랭킹보드
+            </button>
           </div>
         </>
       ) : null}

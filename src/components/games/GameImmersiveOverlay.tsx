@@ -7,6 +7,21 @@ import { enablePwaMode } from "@/lib/pwa-mode";
 
 export const GAME_IMMERSIVE_HEADER_RIGHT_ID = "game-immersive-header-right";
 
+const PRACTICE_TICKER_MESSAGE = "연습모드에서는 재화나 점수가 누적되지 않습니다.";
+
+function PracticeModeTicker() {
+  return (
+    <div className="yanmar-practice-ticker shrink-0 overflow-hidden py-1.5" aria-live="polite">
+      <div className="yanmar-practice-ticker-track">
+        <span className="yanmar-practice-ticker-item">{PRACTICE_TICKER_MESSAGE}</span>
+        <span className="yanmar-practice-ticker-item" aria-hidden>
+          {PRACTICE_TICKER_MESSAGE}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 interface GameImmersiveOverlayProps {
   active: boolean;
   headerColor: string;
@@ -17,6 +32,7 @@ interface GameImmersiveOverlayProps {
   bestScore: number;
   hideHeaderStats?: boolean;
   hideRankingButton?: boolean;
+  showPracticeTicker?: boolean;
   children: React.ReactNode;
 }
 
@@ -30,6 +46,7 @@ export function GameImmersiveOverlay({
   bestScore,
   hideHeaderStats = false,
   hideRankingButton = false,
+  showPracticeTicker = false,
   children,
 }: GameImmersiveOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,7 +107,7 @@ export function GameImmersiveOverlay({
           <span className="text-xs font-medium opacity-90">{brandKo}</span>
         </div>
         <div className="flex items-center gap-2">
-          <div id={GAME_IMMERSIVE_HEADER_RIGHT_ID} className="flex items-center" />
+          <div id={GAME_IMMERSIVE_HEADER_RIGHT_ID} className="flex items-center gap-3" />
           {!hideHeaderStats && (
             <span className="text-[10px] opacity-80">
               {myRank ? `#${myRank}` : "-"} · {bestScore > 0 ? `${bestScore}점` : "0점"}
@@ -116,6 +133,7 @@ export function GameImmersiveOverlay({
           )}
         </div>
       </div>
+      {showPracticeTicker ? <PracticeModeTicker /> : null}
       <div className="relative min-h-0 flex-1 overflow-hidden">{children}</div>
     </div>,
     document.body,

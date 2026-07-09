@@ -1,6 +1,10 @@
-import { applyZoneMoundHeight, computeBaseTerrainHeight } from "./terrainShapes";
+import {
+  applyTruckDeparturePad,
+  applyZoneMoundHeight,
+  computeBaseTerrainHeight,
+} from "./terrainShapes";
 
-export const GRID_SIZE = 48;
+export const GRID_SIZE = 64;
 export const CELL_SIZE = 2;
 export const DIG_ZONE_CAPACITY_UNITS = 3000;
 export const DIG_ZONE_RESPAWN_MS = 10 * 60 * 1000;
@@ -53,11 +57,20 @@ export function createTerrain(
       const wz = originZ + (gz + 0.5) * CELL_SIZE;
       const zone =
         digZones.find((item) => distance(wx, wz, item.x, item.z) < item.radius) ?? null;
-      heights[idx] = computeBaseTerrainHeight(wx, wz, zone, {
-        x: DUMP_ZONE.x,
-        z: DUMP_ZONE.z,
-        radius: DUMP_ZONE.radius + 4,
-      });
+      heights[idx] = applyTruckDeparturePad(
+        wx,
+        wz,
+        computeBaseTerrainHeight(wx, wz, zone, {
+          x: DUMP_ZONE.x,
+          z: DUMP_ZONE.z,
+          radius: DUMP_ZONE.radius + 4,
+        }),
+        {
+          groupX: DUMP_TRUCK.groupX,
+          groupZ: DUMP_TRUCK.groupZ,
+          rotation: DUMP_TRUCK.rotation,
+        },
+      );
     }
   }
   return {
@@ -162,16 +175,16 @@ export const DUMP_TRUCK = {
 
 /** 트럭 고체 껍데기 — 칸 내부 공동은 비움 (하역 공간) */
 export const DUMP_TRUCK_SOLID = {
-  centerLocalX: 0.05,
+  centerLocalX: -0.12,
   centerLocalZ: 0,
-  halfX: 2.82,
-  halfZ: 1.82,
-  minY: 1.06,
-  maxY: 3.38,
-  cavityHalfX: DUMP_TRUCK.bedWidth / 2 - 0.22,
-  cavityHalfZ: DUMP_TRUCK.bedDepth / 2 - 0.18,
-  cavityMinY: 1.0,
-  cavityMaxY: 2.78,
+  halfX: 3.22,
+  halfZ: 1.62,
+  minY: 0.9,
+  maxY: 3.12,
+  cavityHalfX: DUMP_TRUCK.bedWidth / 2 - 0.18,
+  cavityHalfZ: DUMP_TRUCK.bedDepth / 2 - 0.15,
+  cavityMinY: 1.05,
+  cavityMaxY: 2.82,
 } as const;
 
 function dumpTruckLocalToWorld(

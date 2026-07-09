@@ -5,7 +5,7 @@ import {
   calculateScore,
   calculateStars,
   getGameById,
-  getMonthKey,
+  getSeasonKey,
   isGameAvailable,
 } from "@/lib/games";
 
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   const score = isYanmarArcade
     ? Math.round(typeof dumpUnits === "number" ? dumpUnits : arcadeScore)
     : calculateScore(progress, timeLeft ?? 0);
-  const monthKey = getMonthKey();
+  const seasonKey = getSeasonKey();
 
   const result = await prisma.$transaction(async (tx) => {
     const gameScore = await tx.gameScore.create({
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
         score,
         stars,
         playTime: playTime ?? 0,
-        monthKey,
+        monthKey: seasonKey,
       },
     });
 

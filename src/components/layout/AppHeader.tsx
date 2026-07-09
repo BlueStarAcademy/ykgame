@@ -6,6 +6,7 @@ import { clientLogout } from "@/lib/client-logout";
 import { MailboxModal, useMailboxBadge } from "@/components/layout/MailboxModal";
 import { InventoryModal } from "@/components/layout/InventoryModal";
 import { SettingsModal } from "@/components/layout/SettingsModal";
+import { RankingBoard } from "@/components/games/RankingBoard";
 import { AppSideMenu } from "@/components/layout/AppSideMenu";
 
 interface AppHeaderProps {
@@ -50,6 +51,7 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [mailboxOpen, setMailboxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [rankingOpen, setRankingOpen] = useState(false);
   const { unclaimedCount, refresh: refreshMailbox } = useMailboxBadge();
 
   const displayNickname =
@@ -91,6 +93,7 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
         isAdmin={displayRole === "ADMIN"}
         onOpenMailbox={() => setMailboxOpen(true)}
         onOpenInventory={() => setInventoryOpen(true)}
+        onOpenRanking={() => setRankingOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         onLogout={() => clientLogout()}
       />
@@ -101,6 +104,12 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
         onMailboxChange={refreshMailbox}
       />
       <InventoryModal open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
+      <RankingBoard
+        gameId="yanmar"
+        open={rankingOpen}
+        onClose={() => setRankingOpen(false)}
+        highlightNickname={displayNickname}
+      />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>
   );

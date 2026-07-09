@@ -2,16 +2,28 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  DEFAULT_YANMAR_EQUIPMENT_LEVELS,
+  YANMAR_EQUIPMENT_CONFIG,
   calculateYanmarEquipmentStats,
-  getYanmarResetRefundStars,
+  getYanmarPartResetRefundStars,
   mergeYanmarEquipmentLevelsFromDb,
+  type YanmarEquipmentPart,
 } from "@/games/yanmar/equipment";
 
-export async function POST() {
+export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let part: YanmarEquipmentPart;
+  try {
+    const body = await req.json();
+    part = body.part;
+    if (!part || !(part in YANMAR_EQUIPMENT_CONFIG)) {
+      return NextResponse.json({ error: "Invalid part" }, { status: 400 });
+    }
+  } catch {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
   try {
@@ -22,12 +34,28 @@ export async function POST() {
       });
 
       const levels = mergeYanmarEquipmentLevelsFromDb(rows);
+      const partLevel = levels[part];
+      const refundStars = getYanmarPartResetRefundStars(part, partLevel);
 
-      const refundStars = getYanmarResetRefundStars(levels);
+      if (partLevel <= 0) {
+        const user = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { currency: true },
+        });
+        if (!user) throw new Error("USER_NOT_FOUND");
+        return {
+          refundedStars: 0,
+          currency: user.currency,
+          levels,
+          stats: calculateYanmarEquipmentStats(levels),
+        };
+      }
 
       await tx.userEquipmentUpgrade.deleteMany({
-        where: { userId: session.user.id, gameId: "yanmar" },
+        where: { userId: session.user.id, gameId: "yanmar", part },
       });
+
+      const nextLevels = { ...levels, [part]: 0 };
 
       const updatedUser =
         refundStars > 0
@@ -45,8 +73,8 @@ export async function POST() {
       return {
         refundedStars: refundStars,
         currency: updatedUser.currency,
-        levels: { ...DEFAULT_YANMAR_EQUIPMENT_LEVELS },
-        stats: calculateYanmarEquipmentStats(DEFAULT_YANMAR_EQUIPMENT_LEVELS),
+        levels: nextLevels,
+        stats: calculateYanmarEquipmentStats(nextLevels),
       };
     });
 

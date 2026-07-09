@@ -12,18 +12,15 @@ export function StarAmount({
   valueClassName = "",
 }: StarAmountProps) {
   return (
-    <span className={`inline-flex items-center gap-1 ${className}`.trim()}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/images/star-currency.svg"
-        alt=""
-        width={size}
-        height={size}
-        className="shrink-0 select-none"
-        draggable={false}
+    <span className={`inline-flex items-center gap-1 leading-none ${className}`.trim()}>
+      <span
+        className="inline-flex shrink-0 items-center justify-center leading-none"
+        style={{ width: size, height: size, fontSize: size }}
         aria-hidden
-      />
-      <span className={valueClassName}>{value.toLocaleString()}</span>
+      >
+        ⭐
+      </span>
+      <span className={`leading-none ${valueClassName}`.trim()}>{value.toLocaleString()}</span>
     </span>
   );
 }
