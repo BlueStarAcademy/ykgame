@@ -21,11 +21,15 @@ import {
   isInDigZone,
   isInDumpZone,
   isInDumpTruckBed,
+  clampToDumpTruckBed,
+  dumpTruckBedDeckWorldY,
   getMapWorldBounds,
   sampleHeight,
   updateDigZoneRespawns,
+  worldToDumpTruckLocal,
   type TerrainData,
   DIG_ZONE,
+  DUMP_TRUCK,
   DUMP_ZONE,
   DUMP_TRUCK_BED,
 } from "./terrain";
@@ -35,6 +39,7 @@ import {
   getBucketTipWorld,
   type DigFeedback,
 } from "./bucket";
+import { constrainArmFromDumpTruck } from "./dumpTruckCollision";
 import type { DiggingScoreState } from "./scoring";
 import type { GameMode, TutorialStep } from "./tutorial";
 import type { YanmarEquipmentStats } from "./equipment";
@@ -339,14 +344,22 @@ const YANMAR_LOGO_ASPECT = 512 / 62;
 const YK_LABEL_ASPECT = 512 / 160;
 const YANMAR_LOGO_WIDTH = 1.24;
 const YK_LOGO_WIDTH = 0.96;
+const REAR_BODY_PANEL_X = -1.715;
+const REAR_BODY_PANEL_Z = -0.36;
+const YANMAR_REAR_BODY_Z = -0.24;
+const YK_REAR_BODY_Y = 1.42;
+const YANMAR_REAR_BODY_Y = 1.22;
+const YK_REAR_BODY_WIDTH = 0.88;
+const YANMAR_REAR_LOGO_ASPECT = 640 / 160;
+const YANMAR_REAR_BODY_WIDTH = 1.0;
 const MINI_EXCAVATOR_BODY_LENGTH_SCALE = 0.58;
 const MINI_EXCAVATOR_BODY_WIDTH_SCALE = 0.82;
 const EXCAVATOR_FIXED_VISUAL_Y = 0.68;
 const EXCAVATOR_COLLISION_RADIUS = 1.35;
 const DUMP_TRUCK_COLLIDER = {
-  centerOffsetX: 0.42,
+  centerOffsetX: 0.05,
   centerOffsetZ: 0,
-  halfX: 4.15,
+  halfX: 3.05,
   halfZ: 2.05,
 } as const;
 
@@ -356,10 +369,102 @@ function configureDecalTexture(texture: THREE.Texture, anisotropy = 16) {
   texture.magFilter = THREE.LinearFilter;
   texture.anisotropy = anisotropy;
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.premultiplyAlpha = false;
 }
 
 function logoHeightForWidth(width: number, aspect: number) {
   return width / aspect;
+}
+
+function createYkGeongiLabelTexture(orientation: "horizontal" | "vertical" = "horizontal") {
+  if (typeof document === "undefined") return null;
+
+  const scale = 6;
+  const horizontal = orientation === "horizontal";
+  const baseWidth = horizontal ? 512 : 168;
+  const baseHeight = horizontal ? 160 : 420;
+  const canvas = document.createElement("canvas");
+  canvas.width = baseWidth * scale;
+  canvas.height = baseHeight * scale;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  ctx.scale(scale, scale);
+  ctx.clearRect(0, 0, baseWidth, baseHeight);
+  ctx.font = '900 72px "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+
+  const drawGeongi = (x: number, y: number) => {
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "rgba(255,255,255,0.98)";
+    ctx.fillStyle = "#111827";
+    ctx.strokeText("건기", x, y);
+    ctx.fillText("건기", x, y);
+  };
+
+  if (horizontal) {
+    ctx.fillStyle = "#1565C0";
+    ctx.fillText("Y", 168, 82);
+    ctx.fillStyle = "#C62828";
+    ctx.fillText("K", 228, 82);
+    drawGeongi(332, 82);
+  } else {
+    ctx.fillStyle = "#1565C0";
+    ctx.fillText("Y", baseWidth / 2, 96);
+    ctx.fillStyle = "#C62828";
+    ctx.fillText("K", baseWidth / 2, 168);
+    drawGeongi(baseWidth / 2, 268);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  configureDecalTexture(texture);
+  return texture;
+}
+
+function createYanmarRearLabelTexture() {
+  if (typeof document === "undefined") return null;
+
+  const scale = 6;
+  const baseWidth = 640;
+  const baseHeight = 160;
+  const canvas = document.createElement("canvas");
+  canvas.width = baseWidth * scale;
+  canvas.height = baseHeight * scale;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  ctx.scale(scale, scale);
+  ctx.clearRect(0, 0, baseWidth, baseHeight);
+  ctx.fillStyle = "#C62828";
+
+  const drawChevron = (x: number, y: number, w: number, h: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + w * 0.5, y + h);
+    ctx.lineTo(x + w, y);
+    ctx.lineTo(x + w * 0.78, y);
+    ctx.lineTo(x + w * 0.5, y + h * 0.55);
+    ctx.lineTo(x + w * 0.22, y);
+    ctx.closePath();
+    ctx.fill();
+  };
+
+  // Yanmar emblem: two downward chevrons before the wordmark.
+  drawChevron(38, 45, 94, 62);
+  drawChevron(38, 82, 94, 44);
+
+  ctx.font = '900 76px Arial, "Helvetica Neue", sans-serif';
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("YANMAR", 168, 84);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  configureDecalTexture(texture);
+  return texture;
 }
 
 function clampControl(value: number, min = -1, max = 1) {
@@ -405,6 +510,7 @@ function RedLinkPanel({
   logoWidth = 1.2,
   logoHeight = 0.24,
   logoX,
+  logoRotation = 0,
   coreStartRatio = 0.04,
   rootReliefScale = 1,
 }: {
@@ -415,12 +521,14 @@ function RedLinkPanel({
   logoWidth?: number;
   logoHeight?: number;
   logoX?: number;
+  logoRotation?: number;
   coreStartRatio?: number;
   rootReliefScale?: number;
 }) {
   const coreEndRatio = 0.96;
   const coreLength = length * Math.max(0.1, coreEndRatio - coreStartRatio);
   const coreX = length * ((coreStartRatio + coreEndRatio) / 2);
+  const hasLogo = Boolean(logo && logoX != null);
 
   return (
     <>
@@ -442,22 +550,34 @@ function RedLinkPanel({
             <boxGeometry args={[length * 0.18 * rootReliefScale, height * 0.16 * rootReliefScale, 0.028]} />
             <meshStandardMaterial color="#11151a" roughness={0.65} metalness={0.1} />
           </mesh>
-          <mesh position={[length * 0.52, 0, 0.058]}>
-            <boxGeometry args={[length * 0.72, 0.018, 0.018]} />
-            <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.18} />
-          </mesh>
-          {logo && logoX != null && (
-            <mesh position={[logoX, 0.04, side * 0.056]} scale={[-1, 1, 1]}>
+          {!hasLogo ? (
+            <mesh position={[length * 0.52, 0, 0.058]}>
+              <boxGeometry args={[length * 0.72, 0.018, 0.018]} />
+              <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.18} />
+            </mesh>
+          ) : null}
+          {hasLogo ? (
+            <mesh
+              position={[logoX!, 0.04, side * 0.068]}
+              rotation={[0, 0, logoRotation]}
+              scale={[-1, 1, 1]}
+              renderOrder={12}
+            >
               <planeGeometry args={[logoWidth, logoHeight]} />
               <meshBasicMaterial
                 map={logo}
                 transparent
+                alphaTest={0.35}
                 toneMapped={false}
+                depthTest
                 depthWrite={false}
                 side={THREE.DoubleSide}
+                polygonOffset
+                polygonOffsetFactor={-2}
+                polygonOffsetUnits={-2}
               />
             </mesh>
-          )}
+          ) : null}
         </group>
       ))}
       <mesh position={[coreX, 0, 0]}>
@@ -466,38 +586,6 @@ function RedLinkPanel({
       </mesh>
     </>
   );
-}
-
-function createLabelTexture(text: string) {
-  if (typeof document === "undefined") return null;
-
-  const scale = 4;
-  const baseWidth = 512;
-  const baseHeight = 160;
-  const canvas = document.createElement("canvas");
-  canvas.width = baseWidth * scale;
-  canvas.height = baseHeight * scale;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-
-  ctx.scale(scale, scale);
-  ctx.clearRect(0, 0, baseWidth, baseHeight);
-  ctx.font = '900 76px "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineWidth = 10;
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = "rgba(255,255,255,0.96)";
-  ctx.strokeText(text, 256, 80);
-  ctx.fillStyle = "#0b6edc";
-  ctx.fillText(text.slice(0, 2), 184, 80);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(text.slice(2), 310, 80);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  configureDecalTexture(texture);
-  return texture;
 }
 
 function CockpitJoystick({
@@ -911,12 +999,94 @@ function TankTrack({
   );
 }
 
+function BodyBrandDecal({
+  texture,
+  width,
+  aspect,
+  x,
+  y,
+  z = 0,
+  renderOrder = 91,
+}: {
+  texture: THREE.Texture;
+  width: number;
+  aspect: number;
+  x: number;
+  y: number;
+  z?: number;
+  renderOrder?: number;
+}) {
+  const height = logoHeightForWidth(width, aspect);
+
+  return (
+    <group position={[x, y, z]}>
+      <mesh
+        position={[-0.01, 0, 0]}
+        rotation={[0, -Math.PI / 2, 0]}
+        renderOrder={renderOrder}
+      >
+        <planeGeometry args={[width, height]} />
+        <meshBasicMaterial
+          map={texture}
+          transparent
+          alphaTest={0.12}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+          side={THREE.FrontSide}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function RearBodyBrandMarks() {
+  const [ykLogo, setYkLogo] = useState<THREE.Texture | null>(null);
+  const [yanmarLogo, setYanmarLogo] = useState<THREE.Texture | null>(null);
+
+  useLayoutEffect(() => {
+    const ykTexture = createYkGeongiLabelTexture("horizontal");
+    const yanmarTexture = createYanmarRearLabelTexture();
+    if (ykTexture) setYkLogo(ykTexture);
+    if (yanmarTexture) setYanmarLogo(yanmarTexture);
+    return () => {
+      ykTexture?.dispose();
+      yanmarTexture?.dispose();
+    };
+  }, []);
+
+  return (
+    <>
+      {ykLogo ? (
+        <BodyBrandDecal
+          texture={ykLogo}
+          width={YK_REAR_BODY_WIDTH}
+          aspect={YK_LABEL_ASPECT}
+          x={REAR_BODY_PANEL_X}
+          y={YK_REAR_BODY_Y}
+          z={REAR_BODY_PANEL_Z}
+          renderOrder={91}
+        />
+      ) : null}
+      {yanmarLogo ? (
+        <BodyBrandDecal
+          texture={yanmarLogo}
+          width={YANMAR_REAR_BODY_WIDTH}
+          aspect={YANMAR_REAR_LOGO_ASPECT}
+          x={REAR_BODY_PANEL_X}
+          y={YANMAR_REAR_BODY_Y}
+          z={YANMAR_REAR_BODY_Z}
+          renderOrder={90}
+        />
+      ) : null}
+    </>
+  );
+}
+
 function ExcavatorBodyAssembly({
   velRef,
-  ykLogo,
 }: {
   velRef: React.MutableRefObject<HydraulicVelocity>;
-  ykLogo?: THREE.Texture | null;
 }) {
   return (
     <group scale={[MINI_EXCAVATOR_BODY_LENGTH_SCALE, 1, MINI_EXCAVATOR_BODY_WIDTH_SCALE]}>
@@ -1164,36 +1334,6 @@ function ExcavatorBodyAssembly({
         <boxGeometry args={[0.48, 0.72, 1.52]} />
         <meshStandardMaterial color="#1f262e" roughness={0.44} metalness={0.34} />
       </mesh>
-      <mesh position={[-1.705, 0.96, 0]} rotation={[0, -Math.PI / 2, 0]}>
-        <planeGeometry args={[1.18, 0.34]} />
-        <meshBasicMaterial color="#f8fafc" side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
-      <Text
-        position={[-1.715, 0.96, 0.006]}
-        rotation={[0, -Math.PI / 2, 0]}
-        fontSize={0.24}
-        color="#0b6edc"
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.018}
-        outlineColor="#ffffff"
-      >
-        YK건기
-      </Text>
-      {ykLogo ? (
-        <mesh position={[-1.725, 0.72, 0]} rotation={[0, -Math.PI / 2, 0]}>
-          <planeGeometry args={[0.92, logoHeightForWidth(0.92, YK_LABEL_ASPECT)]} />
-          <meshBasicMaterial
-            map={ykLogo}
-            transparent
-            side={THREE.DoubleSide}
-            depthWrite={false}
-            polygonOffset
-            polygonOffsetFactor={-2}
-            toneMapped={false}
-          />
-        </mesh>
-      ) : null}
       <mesh position={[-1.42, 1.02, 0.82]}>
         <boxGeometry args={[0.42, 0.08, 0.08]} />
         <meshStandardMaterial color="#ef3127" roughness={0.28} metalness={0.18} />
@@ -1205,6 +1345,8 @@ function ExcavatorBodyAssembly({
           <meshStandardMaterial color="#c8d0d8" roughness={0.24} metalness={0.62} />
         </mesh>
       ))}
+
+      <RearBodyBrandMarks />
     </group>
   );
 }
@@ -1231,11 +1373,18 @@ function ExcavatorArm({
   const tipRef = useRef<THREE.Mesh>(null);
   const bladeRef = useRef<THREE.Group>(null);
   const yanmarLogo = useLoader(THREE.TextureLoader, "/images/yanmar/yanmar-logo-white.png");
-  const ykLogo = useMemo(() => createLabelTexture("YK건기"), []);
+  const [ykBoomLogo, setYkBoomLogo] = useState<THREE.Texture | null>(null);
 
   useLayoutEffect(() => {
     configureDecalTexture(yanmarLogo);
   }, [yanmarLogo]);
+
+  useLayoutEffect(() => {
+    const texture = createYkGeongiLabelTexture("horizontal");
+    if (!texture) return;
+    setYkBoomLogo(texture);
+    return () => texture.dispose();
+  }, []);
 
   const boomLen = 3;
   const armLen = 2.5;
@@ -1290,7 +1439,7 @@ function ExcavatorArm({
       {/* 모델 전방(+X)을 주행·시선 방향(+Z)과 일치 */}
       <group rotation={[0, -Math.PI / 2, 0]}>
         <group visible={showBody}>
-          <ExcavatorBodyAssembly velRef={velRef} ykLogo={ykLogo} />
+          <ExcavatorBodyAssembly velRef={velRef} />
         </group>
         <group ref={bladeRef} visible={showBody} position={[-0.75, 0.25, 0]} />
 
@@ -1304,7 +1453,7 @@ function ExcavatorArm({
             length={boomLen}
             height={0.42}
             sideDepth={0.155}
-            logo={ykLogo ?? undefined}
+            logo={ykBoomLogo ?? undefined}
             logoWidth={YK_LOGO_WIDTH}
             logoHeight={logoHeightForWidth(YK_LOGO_WIDTH, YK_LABEL_ASPECT)}
             logoX={boomLen * 0.48}
@@ -1404,34 +1553,34 @@ function GameCamera({
 
     if (mode === 1) {
       camera.position.set(
-        s.posX - forwardX * 7.2 + sideX * 3.4,
-        isPortrait ? 4.35 : 4.9,
-        s.posZ - forwardZ * 7.2 + sideZ * 3.4,
+        s.posX - forwardX * 5.9 + sideX * 2.75,
+        isPortrait ? 3.85 : 4.35,
+        s.posZ - forwardZ * 5.9 + sideZ * 2.75,
       );
       camera.lookAt(
-        s.posX + forwardX * 3.25 - sideX * 0.5,
+        s.posX + forwardX * 2.9 - sideX * 0.45,
         isPortrait ? 1.55 : 2.05,
-        s.posZ + forwardZ * 3.25 - sideZ * 0.5,
+        s.posZ + forwardZ * 2.9 - sideZ * 0.45,
       );
       return;
     }
 
     camera.position.set(
-      s.posX - forwardX * 14.5 + sideX * 7.8,
-      isPortrait ? 7.4 : 8.2,
-      s.posZ - forwardZ * 14.5 + sideZ * 7.8,
+      s.posX - forwardX * 11.5 + sideX * 6.2,
+      isPortrait ? 6.2 : 6.9,
+      s.posZ - forwardZ * 11.5 + sideZ * 6.2,
     );
     camera.lookAt(
-      s.posX + forwardX * 4.4 - sideX * 0.8,
+      s.posX + forwardX * 3.9 - sideX * 0.7,
       isPortrait ? 1.55 : 2.0,
-      s.posZ + forwardZ * 4.4 - sideZ * 0.8,
+      s.posZ + forwardZ * 3.9 - sideZ * 0.7,
     );
   });
   return null;
 }
 
-// Use the visible bucket shell's lowest sampled point, not the old mathematical tip.
-const MIN_BUCKET_GROUND_CLEARANCE = -1.05;
+// 굴착 구역 밖(이동로): 버킷이 지면 위에 유지. 굴착 구역 안에서만 깊게 파고들 수 있음.
+const MIN_BUCKET_GROUND_CLEARANCE = 0.05;
 const MIN_BUCKET_DIG_ZONE_CLEARANCE = -2.15;
 const EXCAVATOR_MAP_WALL_MARGIN = 4.6;
 
@@ -1473,12 +1622,9 @@ function constrainExcavatorToMap(sim: ExcavatorSimState, terrain: TerrainData) {
 }
 
 function isExcavatorCollidingWithDumpTruck(x: number, z: number) {
-  const cos = Math.cos(-DUMP_TRUCK_BED.rotation);
-  const sin = Math.sin(-DUMP_TRUCK_BED.rotation);
-  const dx = x - DUMP_TRUCK_BED.x;
-  const dz = z - DUMP_TRUCK_BED.z;
-  const localX = dx * cos - dz * sin - DUMP_TRUCK_COLLIDER.centerOffsetX;
-  const localZ = dx * sin + dz * cos - DUMP_TRUCK_COLLIDER.centerOffsetZ;
+  const local = worldToDumpTruckLocal(x, z);
+  const localX = local.x - DUMP_TRUCK_COLLIDER.centerOffsetX;
+  const localZ = local.z - DUMP_TRUCK_COLLIDER.centerOffsetZ;
   const outsideX = Math.max(Math.abs(localX) - DUMP_TRUCK_COLLIDER.halfX, 0);
   const outsideZ = Math.max(Math.abs(localZ) - DUMP_TRUCK_COLLIDER.halfZ, 0);
 
@@ -1525,8 +1671,17 @@ function SimLoop({
 
     const hydraulicSpeedScale = auxiliaryRef.current?.highSpeed ? 0.5 : 0.25;
     const boomSwing = auxiliaryRef.current?.boomSwing ?? 0;
-    const beforeControlClearance = bucketClearance(sim, terrainRef.current, boomSwing).clearance;
-    const bucketAnchoredToGround = beforeControlClearance < 0.18;
+    const beforeControlBucket = bucketClearance(sim, terrainRef.current, boomSwing);
+    const bucketTipInDigZone = isInDigZone(
+      beforeControlBucket.tip.x,
+      beforeControlBucket.tip.z,
+      terrainRef.current,
+    );
+    const bucketAnchoredToGround =
+      bucketTipInDigZone && beforeControlBucket.clearance < 0.18;
+    const wantsTravel =
+      allowed.travel &&
+      (Math.abs(raw.travel.left) > 0.08 || Math.abs(raw.travel.right) > 0.08);
     if (bucketAnchoredToGround) {
       filtered = {
         ...filtered,
@@ -1558,6 +1713,8 @@ function SimLoop({
     if (constrainExcavatorToDumpTruck(sim, beforeTravel)) {
       velRef.current.travel = 0;
     }
+    constrainArmFromDumpTruck(sim, velRef.current, boomSwing, beforeGroundContact);
+    constrainArmFromDumpTruck(sim, velRef.current, boomSwing, beforeGroundContact);
 
     let bucketContact = constrainBucketGroundContact(
       sim,
@@ -1590,21 +1747,53 @@ function SimLoop({
     }
     const scraper = getBucketScraperContactWorld(sim, boomSwing);
     const bucketTip = getBucketTipWorld(sim, boomSwing);
+    const bedDeckY = dumpTruckBedDeckWorldY();
+    const minDumpHeight = bedDeckY + DUMP_TRUCK.dumpMinHeightAboveDeck;
+    const bucketReachY = Math.max(scraper.y, bucketTip.y);
     const scraperGroundH = sampleHeight(terrainRef.current, scraper.x, scraper.z);
     const scraperDepthBelow = scraperGroundH - scraper.y;
     updateDigZoneRespawns(terrainRef.current);
     const activeDigZones = getActiveDigZones(terrainRef.current);
     const scraperInDigZone = isInDigZone(scraper.x, scraper.z, terrainRef.current);
     const tipInDigZone = isInDigZone(bucketTip.x, bucketTip.z, terrainRef.current);
-    const scraperInTruckBed = isInDumpTruckBed(scraper.x, scraper.z);
-    const tipInTruckBed = isInDumpTruckBed(bucketTip.x, bucketTip.z);
+    // Use the whole visible rear bed rectangle as the dump target.
+    const isInDumpTruckRearBox = (wx: number, wz: number) => {
+      const local = worldToDumpTruckLocal(wx, wz);
+      const relX = local.x - DUMP_TRUCK.bedLocalX;
+      const relZ = local.z - DUMP_TRUCK.bedLocalZ;
+      const visualBoxMargin = 0.3;
+      const halfW = DUMP_TRUCK.bedWidth / 2 + visualBoxMargin;
+      const halfD = DUMP_TRUCK.bedDepth / 2 + visualBoxMargin;
+      return (
+        Math.abs(relX) <= halfW &&
+        Math.abs(relZ) <= halfD
+      );
+    };
+    const bucketMouthCenter = {
+      x: (scraper.x + bucketTip.x) / 2,
+      z: (scraper.z + bucketTip.z) / 2,
+    };
+    const bucketOverTruck = isInDumpTruckRearBox(
+      bucketMouthCenter.x,
+      bucketMouthCenter.z,
+    );
+    const bucketNearDumpTarget =
+      Math.hypot(bucketMouthCenter.x - DUMP_ZONE.x, bucketMouthCenter.z - DUMP_ZONE.z) <=
+      DUMP_ZONE.radius + 1.2;
+    const bodyInDumpZone = isInDumpZone(sim.posX, sim.posZ);
+    const bucketOpening = sim.bucket > 1.1;
+    const bucketAboveBed = bucketReachY >= minDumpHeight;
     const bodyNearDigZone =
       activeDigZones.some(
         (zone) => Math.hypot(sim.posX - zone.x, sim.posZ - zone.z) < zone.radius + 9,
       );
     const inZone = scraperInDigZone || tipInDigZone || bodyNearDigZone;
-    const inDump = isInDumpZone(scraper.x, scraper.z) || isInDumpZone(bucketTip.x, bucketTip.z);
-    const inTruckDumpTarget = inDump && (scraperInTruckBed || tipInTruckBed);
+    const bucketContactsInDump =
+      isInDumpZone(scraper.x, scraper.z) || isInDumpZone(bucketTip.x, bucketTip.z);
+    const bucketReadyOverTruck = bucketNearDumpTarget && (bucketAboveBed || bucketOpening);
+    const inDump = bodyInDumpZone || bucketContactsInDump || bucketOverTruck || bucketReadyOverTruck;
+    /** 정확한 칸 판정 대신, 트럭 주변에서 버킷을 들고 열면 적재함 안으로 보정 투하 */
+    const inTruckDumpTarget = bucketOverTruck || bucketReadyOverTruck;
     const bucketInWorkRange = scraperDepthBelow > -1.4 && scraperDepthBelow < 2.6;
     const tipOnGround = scraperDepthBelow > -1.2 && scraperDepthBelow < 2.6;
     const curled = isBucketCurled(sim.boom, sim.bucket);
@@ -1641,6 +1830,9 @@ function SimLoop({
     fb.optimalDigPose = naturalDigPose;
     fb.digPoseScore = poseReadiness;
     fb.canDump = inTruckDumpTarget && sim.bucketLoad > 0.02;
+    fb.raiseArmForDump =
+      inDump && sim.bucketLoad > 0.02 && bucketOverTruck && !bucketAboveBed && !bucketOpening;
+    fb.travelBlockedRaiseArm = bucketAnchoredToGround && wantsTravel;
 
     const isGame = modeRef.current === "game";
 
@@ -1707,49 +1899,47 @@ function SimLoop({
     }
 
     const bucketDumpOpen = sim.bucket > 1.35;
-    const bucketFullyOpen = sim.bucket > 2.15;
-    if (sim.bucketLoad > 0 && bucketDumpOpen) {
-      const spillRate = inTruckDumpTarget ? 1.65 : bucketFullyOpen ? 2.2 : 0.75;
+    if (sim.bucketLoad > 0 && bucketDumpOpen && inTruckDumpTarget) {
+      const spillRate = 1.65;
       const remainingLoad = sim.bucketLoad;
       const dumpAmount =
         remainingLoad < 0.025
           ? remainingLoad
           : Math.min(remainingLoad, remainingLoad * spillRate * dt);
       sim.bucketLoad = Math.max(0, sim.bucketLoad - dumpAmount);
-      if (inTruckDumpTarget) {
-        if (isGame) {
-          scoreRef.current.dumped += dumpAmount;
-          const progress = Math.min(
-            100,
-            Math.round((scoreRef.current.dumped / scoreRef.current.target) * 100),
-          );
-          if (progress !== lastReportedProgressRef.current) {
-            lastReportedProgressRef.current = progress;
-            onProgress(scoreRef.current.dumped, progress);
-          }
-        } else {
-          tutorialDumpRef.current += dumpAmount;
+      if (isGame) {
+        scoreRef.current.dumped += dumpAmount;
+        const progress = Math.min(
+          100,
+          Math.round((scoreRef.current.dumped / scoreRef.current.target) * 100),
+        );
+        if (progress !== lastReportedProgressRef.current) {
+          lastReportedProgressRef.current = progress;
+          onProgress(scoreRef.current.dumped, progress);
         }
+      } else {
+        tutorialDumpRef.current += dumpAmount;
+      }
 
-        const stats = equipmentStatsRef.current;
-        const chunkRatio = stats.scoreChunkUnits / stats.maxLoadUnits;
-        dumpScoreRemainderRef.current += dumpAmount;
-        while (dumpScoreRemainderRef.current >= chunkRatio) {
-          dumpScoreRemainderRef.current -= chunkRatio;
-          const critical = Math.random() < stats.criticalChance;
-          const dropX = tipInTruckBed ? bucketTip.x : scraper.x;
-          const dropZ = tipInTruckBed ? bucketTip.z : scraper.z;
-          const dropY = sampleHeight(terrainRef.current, dropX, dropZ) + 0.9;
-          onDumpScore({
-            score: Math.round(
-              stats.baseScorePerChunk * (critical ? stats.criticalMultiplier : 1),
-            ),
-            critical,
-            x: dropX,
-            y: dropY,
-            z: dropZ,
-          });
-        }
+      const stats = equipmentStatsRef.current;
+      const chunkRatio = stats.scoreChunkUnits / stats.maxLoadUnits;
+      dumpScoreRemainderRef.current += dumpAmount;
+      while (dumpScoreRemainderRef.current >= chunkRatio) {
+        dumpScoreRemainderRef.current -= chunkRatio;
+        const critical = Math.random() < stats.criticalChance;
+        const dropPoint = clampToDumpTruckBed(bucketMouthCenter.x, bucketMouthCenter.z);
+        const dropX = dropPoint.x;
+        const dropZ = dropPoint.z;
+        const dropY = bedDeckY + 0.22;
+        onDumpScore({
+          score: Math.round(
+            stats.baseScorePerChunk * (critical ? stats.criticalMultiplier : 1),
+          ),
+          critical,
+          x: dropX,
+          y: dropY,
+          z: dropZ,
+        });
       }
     }
 
@@ -1867,15 +2057,15 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
         <meshBasicMaterial color="#d5ffd9" transparent opacity={0.52} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[DUMP_ZONE.x, 0.25, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
-        <boxGeometry args={[4.2, 4.2, 0.08]} />
+        <boxGeometry args={[DUMP_TRUCK_BED.width + 0.6, DUMP_TRUCK_BED.depth + 0.6, 0.08]} />
         <meshBasicMaterial color="#a5d6a7" transparent opacity={0.55} />
       </mesh>
       <mesh
-        position={[DUMP_TRUCK_BED.x, 0.28, DUMP_TRUCK_BED.z]}
+        position={[DUMP_TRUCK_BED.centerX, 0.28, DUMP_TRUCK_BED.centerZ]}
         rotation={[-Math.PI / 2, 0, DUMP_TRUCK_BED.rotation]}
       >
         <boxGeometry args={[DUMP_TRUCK_BED.width, DUMP_TRUCK_BED.depth, 0.08]} />
-        <meshBasicMaterial color="#b8ffba" transparent opacity={0.24} />
+        <meshBasicMaterial color="#b8ffba" transparent opacity={0.35} />
       </mesh>
       <Text
         position={[DUMP_ZONE.x, 0.34, DUMP_ZONE.z - DUMP_ZONE.radius - 1.2]}
@@ -1909,85 +2099,113 @@ function NavigationGuide({
   simRef: React.MutableRefObject<ExcavatorSimState>;
   terrainRef: React.MutableRefObject<TerrainData>;
 }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const targetRef = useRef<NavigationTarget | null>(null);
   const [target, setTarget] = useState<NavigationTarget | null>(null);
   const updateRef = useRef(0);
+  targetRef.current = target;
 
   useFrame((state) => {
-    if (state.clock.elapsedTime - updateRef.current < 0.12) return;
-    updateRef.current = state.clock.elapsedTime;
+    const now = state.clock.elapsedTime;
+    if (now - updateRef.current >= 0.12) {
+      updateRef.current = now;
+
+      const sim = simRef.current;
+      const zones = getActiveDigZones(terrainRef.current);
+      const nearestDig =
+        zones
+          .map((zone) => ({
+            zone,
+            distance: Math.hypot(zone.x - sim.posX, zone.z - sim.posZ),
+          }))
+          .sort((a, b) => a.distance - b.distance)[0]?.zone ?? DIG_ZONE;
+      const inDig = zones.some(
+        (zone) => Math.hypot(zone.x - sim.posX, zone.z - sim.posZ) < zone.radius,
+      );
+      const inDump = isInDumpZone(sim.posX, sim.posZ);
+      const next =
+        inDig || (!inDump && sim.bucketLoad > 0.08)
+          ? {
+              label: "DUMP" as const,
+              x: DUMP_ZONE.x,
+              z: DUMP_ZONE.z,
+              color: "#8cff91",
+              outline: "#0f421b",
+            }
+          : {
+              label: "DIG" as const,
+              x: nearestDig.x,
+              z: nearestDig.z,
+              color: "#ffd25a",
+              outline: "#603a00",
+            };
+
+      const distance = Math.max(0, Math.hypot(next.x - sim.posX, next.z - sim.posZ));
+      setTarget((current) =>
+        current?.label === next.label &&
+        Math.abs(current.x - next.x) < 0.1 &&
+        Math.abs(current.z - next.z) < 0.1 &&
+        Math.abs(current.distance - distance) < 0.5
+          ? current
+          : { ...next, distance },
+      );
+    }
+
+    const group = groupRef.current;
+    const activeTarget = targetRef.current;
+    if (!group || !activeTarget) {
+      if (group) group.visible = false;
+      return;
+    }
 
     const sim = simRef.current;
-    const zones = getActiveDigZones(terrainRef.current);
-    const nearestDig =
-      zones
-        .map((zone) => ({
-          zone,
-          distance: Math.hypot(zone.x - sim.posX, zone.z - sim.posZ),
-        }))
-        .sort((a, b) => a.distance - b.distance)[0]?.zone ?? DIG_ZONE;
-    const inDig = zones.some(
-      (zone) => Math.hypot(zone.x - sim.posX, zone.z - sim.posZ) < zone.radius,
-    );
-    const inDump = isInDumpZone(sim.posX, sim.posZ);
-    const next =
-      inDig || (!inDump && sim.bucketLoad > 0.08)
-        ? {
-            label: "DUMP" as const,
-            x: DUMP_ZONE.x,
-            z: DUMP_ZONE.z,
-            color: "#8cff91",
-            outline: "#0f421b",
-          }
-        : {
-            label: "DIG" as const,
-            x: nearestDig.x,
-            z: nearestDig.z,
-            color: "#ffd25a",
-            outline: "#603a00",
-          };
+    const dx = activeTarget.x - sim.posX;
+    const dz = activeTarget.z - sim.posZ;
+    const length = Math.max(0.001, Math.hypot(dx, dz));
+    const guideDistance = Math.min(8, Math.max(4.2, length * 0.28));
+    const x = sim.posX + (dx / length) * guideDistance;
+    const z = sim.posZ + (dz / length) * guideDistance;
+    const angle = Math.atan2(dx, dz);
+    const groundY = sampleHeight(terrainRef.current, x, z);
 
-    const distance = Math.max(0, Math.hypot(next.x - sim.posX, next.z - sim.posZ));
-    setTarget((current) =>
-      current?.label === next.label &&
-      Math.abs(current.x - next.x) < 0.1 &&
-      Math.abs(current.z - next.z) < 0.1 &&
-      Math.abs(current.distance - distance) < 0.5
-        ? current
-        : { ...next, distance },
-    );
+    group.visible = true;
+    group.position.set(x, groundY + 0.52, z);
+    group.rotation.set(0, angle, 0);
   });
 
   if (!target) return null;
 
-  const sim = simRef.current;
-  const dx = target.x - sim.posX;
-  const dz = target.z - sim.posZ;
-  const length = Math.max(0.001, Math.hypot(dx, dz));
-  const guideDistance = Math.min(8, Math.max(4.2, length * 0.28));
-  const x = sim.posX + (dx / length) * guideDistance;
-  const z = sim.posZ + (dz / length) * guideDistance;
-  const angle = Math.atan2(dx, dz);
   const meterText = `${target.label} ${Math.round(target.distance)}m`;
+  const guideMaterialProps = {
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  } as const;
 
   return (
-    <group position={[x, 0.55, z]} rotation={[0, angle, 0]}>
-      <mesh position={[0, 0.02, 0.15]} rotation={[Math.PI / 2, 0, 0]}>
+    <group ref={groupRef} renderOrder={1200}>
+      <mesh position={[0, 0.02, 0.15]} rotation={[Math.PI / 2, 0, 0]} renderOrder={1201}>
         <cylinderGeometry args={[0.1, 0.1, 2.25, 12]} />
-        <meshBasicMaterial color={target.color} transparent opacity={0.78} />
+        <meshBasicMaterial color={target.color} opacity={0.88} {...guideMaterialProps} />
       </mesh>
-      <mesh position={[0, 0.02, 1.55]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[0, 0.02, 1.55]} rotation={[Math.PI / 2, 0, 0]} renderOrder={1201}>
         <coneGeometry args={[0.42, 0.92, 24]} />
-        <meshBasicMaterial color={target.color} transparent opacity={0.92} />
+        <meshBasicMaterial color={target.color} opacity={0.96} {...guideMaterialProps} />
       </mesh>
       <Text
-        position={[0, 0.08, -1.15]}
+        position={[0, 0.1, -1.15]}
         rotation={[-Math.PI / 2, 0, Math.PI]}
         fontSize={0.82}
         color={target.color}
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.045}
+        outlineWidth={0.05}
         outlineColor={target.outline}
+        renderOrder={1202}
+        material-depthTest={false}
+        material-depthWrite={false}
+        material-toneMapped={false}
       >
         {meterText}
       </Text>
@@ -2234,9 +2452,6 @@ function SceneContent(props: ExcavatorSceneProps) {
       <TerrainRockScatter terrainRef={props.terrainRef} />
       <WorksiteSetDressing />
       <ZoneMarkers terrainRef={props.terrainRef} />
-      <NavigationGuide simRef={props.simRef} terrainRef={props.terrainRef} />
-      <WaypointMarker tutorialStepRef={props.tutorialStepRef} />
-      <AuxiliarySceneEffects auxiliaryRef={props.auxiliaryRef} />
       <ExcavatorArm
         simRef={props.simRef}
         velRef={props.velRef}
@@ -2244,6 +2459,9 @@ function SceneContent(props: ExcavatorSceneProps) {
         inputRef={props.inputRef}
         showBody={props.cameraMode !== 3}
       />
+      <NavigationGuide simRef={props.simRef} terrainRef={props.terrainRef} />
+      <WaypointMarker tutorialStepRef={props.tutorialStepRef} />
+      <AuxiliarySceneEffects auxiliaryRef={props.auxiliaryRef} />
       <GameCamera
         simRef={props.simRef}
         mode={props.cameraMode}

@@ -3,10 +3,18 @@
 interface DumpHintPanelProps {
   bucketLoad: number;
   inDumpZone: boolean;
+  canDump: boolean;
+  raiseArmForDump: boolean;
   show: boolean;
 }
 
-export function DumpHintPanel({ bucketLoad, inDumpZone, show }: DumpHintPanelProps) {
+export function DumpHintPanel({
+  bucketLoad,
+  inDumpZone,
+  canDump,
+  raiseArmForDump,
+  show,
+}: DumpHintPanelProps) {
   if (!show) return null;
 
   const steps = [
@@ -19,8 +27,20 @@ export function DumpHintPanel({ bucketLoad, inDumpZone, show }: DumpHintPanelPro
       label: inDumpZone ? "초록 하역 구역 안" : "주행·스윙으로 초록 구역 이동",
     },
     {
-      ok: false,
-      label: "우조버 오른쪽 — 버킷 펴기",
+      ok: !raiseArmForDump && (canDump || inDumpZone),
+      label: raiseArmForDump
+        ? "우조이스틱 뒤로 — 붐·암 들어 트럭 칸 위로"
+        : inDumpZone
+          ? "트럭 칸 위 — 버킷 위치 맞춤"
+          : "트럭 쪽으로 스윙·주행",
+    },
+    {
+      ok: canDump,
+      label: canDump
+        ? "우조이스틱 오른쪽으로 버킷 펴기"
+        : raiseArmForDump
+          ? "먼저 붐·암을 들어올리세요"
+          : "트럭 칸 위로 버킷·차체를 더 올려주세요",
     },
   ];
 

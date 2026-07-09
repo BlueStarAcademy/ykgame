@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { GameCardSprite } from "@/components/home/GameCardSprite";
 import { PhaserGameWrapper } from "@/components/games/PhaserGameWrapper";
@@ -252,6 +253,7 @@ function DefaultGameLobby({
 
 export function GamePlayClient({ gameId }: GamePlayClientProps) {
   const game = getGameById(gameId);
+  const router = useRouter();
   const { data: session } = useSession();
   const [phase, setPhase] = useState<GamePhase>("lobby");
   const [playMode, setPlayMode] = useState<PlayMode | null>(null);
@@ -277,18 +279,21 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
   }, [loadStats]);
 
   const handleStartPractice = () => {
+    setResult(null);
     setPlayMode("practice");
     setYanmarExitSignal(0);
     setPhase("playing");
   };
 
   const handleStartGame = () => {
+    setResult(null);
     setPlayMode("game");
     setYanmarExitSignal(0);
     setPhase("playing");
   };
 
   const handleStart = () => {
+    setResult(null);
     setPlayMode(null);
     setYanmarExitSignal(0);
     setPhase("playing");
@@ -305,6 +310,10 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
 
   const handleGameEnd = (gameResult: GameResult) => {
     setResult(gameResult);
+    if (gameId === "yanmar") {
+      loadStats();
+      return;
+    }
     setPhase("result");
   };
 
@@ -313,6 +322,15 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
     setPlayMode(null);
     setPhase("lobby");
     loadStats();
+  };
+
+  const handleStay = () => {
+    setResult(null);
+    loadStats();
+  };
+
+  const handleExitHome = () => {
+    router.push("/home");
   };
 
   if (!game) return null;
@@ -376,6 +394,15 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
             bestScore={myStats.bestScore}
           />
         </GameImmersiveOverlay>
+      )}
+
+      {gameId === "yanmar" && phase === "playing" && result && (
+        <GameResultScreen
+          gameId={gameId}
+          result={result}
+          onStay={handleStay}
+          onExit={handleExitHome}
+        />
       )}
 
       <RankingBoard

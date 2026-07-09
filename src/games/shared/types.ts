@@ -7,6 +7,7 @@ export interface GameResult {
   timeLeft: number;
   completed: boolean;
   arcadeScore?: number;
+  dumpUnits?: number;
   rewardStars?: number;
   mode?: "game" | "practice" | "tutorial";
 }

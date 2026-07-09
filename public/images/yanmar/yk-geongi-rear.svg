@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="160" viewBox="0 0 512 160">
+  <text
+    x="256"
+    y="86"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    font-family="'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif"
+    font-weight="900"
+    font-size="74"
+  >
+    <tspan fill="#1565C0">Y</tspan><tspan fill="#C62828">K</tspan><tspan dx="10" fill="#111827" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" paint-order="stroke fill">건기</tspan>
+  </text>
+</svg>

@@ -60,6 +60,7 @@ export function RankingBoard({
 
   const headerColor = game?.headerColor ?? "#1565C0";
   const brandColor = game?.color ?? headerColor;
+  const isYanmar = gameId === "yanmar";
 
   return (
     <div
@@ -89,7 +90,11 @@ export function RankingBoard({
                 {game?.brandEn} 랭킹
               </h3>
               <p className="mt-1 text-[11px] text-white/75">
-                {monthKey ? `${monthKey} 월간 순위` : "이번 달 순위"}
+                {monthKey
+                  ? `${monthKey} ${isYanmar ? "누적 하역량 순위" : "월간 순위"}`
+                  : isYanmar
+                    ? "누적 하역량 순위"
+                    : "이번 달 순위"}
               </p>
             </div>
             <button
@@ -139,18 +144,26 @@ export function RankingBoard({
                           ) : null}
                         </p>
                         <p className="mt-0.5 text-[10px] text-slate-500">
-                          <span className="text-amber-500">
-                            {"★".repeat(r.stars)}
-                            {"☆".repeat(3 - r.stars)}
-                          </span>
-                          <span className="mx-1 text-slate-300">·</span>
-                          ⏱ {formatTime(r.playTime)}
+                          {isYanmar ? (
+                            "누적 하역량"
+                          ) : (
+                            <>
+                              <span className="text-amber-500">
+                                {"★".repeat(r.stars)}
+                                {"☆".repeat(3 - r.stars)}
+                              </span>
+                              <span className="mx-1 text-slate-300">·</span>
+                              ⏱ {formatTime(r.playTime)}
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
                     <span className="shrink-0 text-sm font-black text-slate-900">
                       {r.score.toLocaleString()}
-                      <span className="ml-0.5 text-[10px] font-semibold text-slate-400">점</span>
+                      {!isYanmar ? (
+                        <span className="ml-0.5 text-[10px] font-semibold text-slate-400">점</span>
+                      ) : null}
                     </span>
                   </li>
                 );

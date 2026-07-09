@@ -31,7 +31,12 @@ import {
   createInitialTerrain,
   type ExcavatorSimState,
 } from "./ExcavatorScene";
-import { getDefaultCockpitLayoutMode } from "@/lib/fullscreen";
+import {
+  applyCockpitOrientation,
+  clearForcedLandscapeFallback,
+  getDefaultCockpitLayoutMode,
+  restoreDefaultCockpitOrientation,
+} from "@/lib/fullscreen";
 import { createHydraulicVelocity, type HydraulicVelocity } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
 import { DigPoseGraph } from "./DigHintPanel";
@@ -362,6 +367,7 @@ export function ExcavatorGameWrapper({
     arm: -0.95,
     bucket: -0.12,
     score: 0,
+    dumpedUnits: 0,
   });
   const [scorePopups, setScorePopups] = useState<DumpScorePopup[]>([]);
   const [equipmentLevels, setEquipmentLevels] = useState<YanmarEquipmentLevels>(
@@ -383,24 +389,35 @@ export function ExcavatorGameWrapper({
   const [resettingEquipment, setResettingEquipment] = useState(false);
   const [headerHudReady, setHeaderHudReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(1);
-  /**
-   * Always start portrait. In-game HUD toggle only changes CSS layout —
-   * it must never call Screen Orientation / Fullscreen APIs (they force
-   * landscape on many Android PWAs).
-   */
   const [layoutMode, setLayoutMode] = useState<CockpitLayoutMode>(
     getDefaultCockpitLayoutMode,
   );
   const layoutPortrait = layoutMode === "portrait";
+  const orientationTouchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!orientationTouchedRef.current && layoutMode === "portrait") {
+      return;
+    }
+    orientationTouchedRef.current = true;
+    void applyCockpitOrientation(layoutMode);
+  }, [layoutMode]);
+
+  useEffect(() => {
+    return () => {
+      clearForcedLandscapeFallback();
+      void restoreDefaultCockpitOrientation();
+    };
+  }, []);
   const gameFrameStyle: CSSProperties | undefined = immersive
     ? layoutPortrait
       ? {
-          width: "min(100vw, calc(100dvh * 9 / 16))",
-          height: "min(100dvh, calc(100vw * 16 / 9))",
+          width: "min(100cqw, calc(100cqh * 9 / 16))",
+          height: "min(100cqh, calc(100cqw * 16 / 9))",
         }
       : {
-          width: "min(100vw, calc(100dvh * 16 / 9))",
-          height: "min(100dvh, calc(100vw * 9 / 16))",
+          width: "100cqw",
+          height: "100cqh",
         }
     : undefined;
   const endedRef = useRef(false);
@@ -438,6 +455,8 @@ export function ExcavatorGameWrapper({
       prev.armPulling === fb.armPulling &&
       prev.optimalDigPose === fb.optimalDigPose &&
       prev.canDump === fb.canDump &&
+      prev.raiseArmForDump === fb.raiseArmForDump &&
+      prev.travelBlockedRaiseArm === fb.travelBlockedRaiseArm &&
       Math.abs(prev.digPoseScore - fb.digPoseScore) < 0.01
         ? prev
         : { ...fb },
@@ -592,6 +611,7 @@ export function ExcavatorGameWrapper({
       arm: -0.95,
       bucket: -0.12,
       score: 0,
+      dumpedUnits: 0,
     });
   }, [clearAllInput, config.duration, config.target, setAuxiliary, setHud]);
 
@@ -630,13 +650,14 @@ export function ExcavatorGameWrapper({
       timeLeft: config.duration > 0 ? Math.ceil(score.timeLeft) : 0,
       completed: isComplete(score),
       arcadeScore: arcadeScoreRef.current,
+      dumpUnits: Math.round(Math.max(0, score.dumped) * equipmentStats.maxLoadUnits),
       rewardStars: rewardStarsRef.current,
       mode:
         currentMode === "game" || currentMode === "tutorial"
           ? currentMode
           : "practice",
     });
-  }, [clearAllInput, config.duration, onEnd]);
+  }, [clearAllInput, config.duration, equipmentStats.maxLoadUnits, onEnd]);
 
   useEffect(() => {
     if (exitSignal === lastExitSignalRef.current) return;
@@ -705,19 +726,25 @@ export function ExcavatorGameWrapper({
 
   const handleProgress = useCallback(
     (dumped: number, progress: number) => {
-      if (progress !== lastHudProgressRef.current) {
+      const dumpedUnits = Math.round(Math.max(0, dumped) * equipmentStats.maxLoadUnits);
+      if (progress !== lastHudProgressRef.current || hud.dumpedUnits !== dumpedUnits) {
         lastHudProgressRef.current = progress;
         setHud((h) => ({
           ...h,
           progress,
           bucketLoad: simRef.current.bucketLoad,
+          dumpedUnits,
         }));
       }
       if (!endedRef.current && dumped >= config.target) {
-        setHud((h) => ({ ...h, progress: 100 }));
+        setHud((h) => ({
+          ...h,
+          progress: 100,
+          dumpedUnits,
+        }));
       }
     },
-    [config.target, setHud],
+    [config.target, equipmentStats.maxLoadUnits, hud.dumpedUnits, setHud],
   );
 
   const addDumpPopup = useCallback((popup: Omit<DumpScorePopup, "id">) => {
@@ -727,7 +754,7 @@ export function ExcavatorGameWrapper({
     setScorePopups((items) => [...items.slice(-4), { id, ...popup }]);
     window.setTimeout(() => {
       setScorePopups((items) => items.filter((item) => item.id !== id));
-    }, 4600);
+    }, 9500);
     return id;
   }, []);
 
@@ -911,6 +938,9 @@ export function ExcavatorGameWrapper({
           timeLeft: 0,
           completed: false,
           arcadeScore: arcadeScoreRef.current,
+          dumpUnits: Math.round(
+            Math.max(0, scoreRef.current.dumped) * equipmentStats.maxLoadUnits,
+          ),
           rewardStars: rewardStarsRef.current,
           mode: "game",
         });
@@ -920,7 +950,7 @@ export function ExcavatorGameWrapper({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [config.duration, mode, onEnd, syncDigHud]);
+  }, [config.duration, equipmentStats.maxLoadUnits, mode, onEnd, syncDigHud]);
 
   useEffect(() => {
     if (tutorialStep?.id !== "dig") return;
@@ -1002,15 +1032,20 @@ export function ExcavatorGameWrapper({
     <div
       className={`relative touch-manipulation ${
         immersive
-          ? "flex h-full w-full items-center justify-center bg-slate-950"
+          ? layoutPortrait
+            ? "flex h-full w-full items-center justify-center overflow-hidden bg-slate-950"
+            : "flex h-full w-full items-stretch justify-stretch overflow-hidden bg-slate-950"
           : "mx-auto w-full max-w-lg"
       } ${layoutPortrait ? "yanmar-layout-portrait" : "yanmar-layout-landscape"}`}
       data-yanmar-layout={layoutMode}
+      style={immersive ? { containerType: "size" } : undefined}
     >
       <div
-        className={`relative w-full overflow-hidden bg-slate-300 ${
+        className={`relative overflow-hidden bg-slate-300 ${
           immersive
-            ? "shadow-2xl shadow-black/50"
+            ? layoutPortrait
+              ? "shadow-2xl shadow-black/50"
+              : "h-full w-full shadow-none"
             : layoutPortrait
               ? "h-[520px] rounded-b-xl shadow-lg"
               : "aspect-video rounded-b-xl shadow-lg"
@@ -1045,6 +1080,12 @@ export function ExcavatorGameWrapper({
           onResetEquipment={handleEquipmentReset}
         />
 
+        {mode !== "intro" && mode !== "gameReady" && digFeedback.travelBlockedRaiseArm ? (
+          <div className="pointer-events-none absolute left-1/2 top-[3.25rem] z-[60] w-[min(18rem,88%)] -translate-x-1/2 rounded-xl border border-amber-300/45 bg-amber-500/90 px-3 py-2 text-center text-[11px] font-black leading-snug text-white shadow-xl backdrop-blur-sm">
+            ⚠️ 붐을 더 들어야 움직일 수 있습니다
+          </div>
+        ) : null}
+
         {mode !== "intro" && mode !== "gameReady" && (
           <div className="absolute left-2 top-2 z-50 flex flex-col items-start gap-1.5">
             <div className="flex items-center gap-1.5">
@@ -1072,6 +1113,10 @@ export function ExcavatorGameWrapper({
                 {digFeedback.canDump && hud.bucketLoad > 0.02 ? (
                   <span className="ml-1 shrink-0 rounded-md border border-emerald-200/50 bg-emerald-500/90 px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm">
                     하역가능
+                  </span>
+                ) : digFeedback.raiseArmForDump && hud.bucketLoad > 0.02 ? (
+                  <span className="ml-1 shrink-0 rounded-md border border-sky-200/50 bg-sky-600/90 px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm">
+                    붐·암 들기
                   </span>
                 ) : null}
               </div>
@@ -1119,17 +1164,27 @@ export function ExcavatorGameWrapper({
           </div>
         )}
 
+        {mode !== "intro" && (
+          <div className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-[11px] font-black text-white shadow-lg backdrop-blur-sm">
+            점수 <span className="text-yellow-100">{hud.score.toLocaleString()}</span>
+          </div>
+        )}
+
         {headerHudReady && mode !== "intro"
           ? (() => {
               const target = document.getElementById(GAME_IMMERSIVE_HEADER_RIGHT_ID);
               if (!target) return null;
               return createPortal(
                 <div className="flex items-center gap-2 text-[10px] font-black text-white">
+                  {mode === "game" ? (
+                    <span className="rounded-lg border border-white/15 bg-black/25 px-2 py-1">
+                      하역량{" "}
+                      <span className="text-emerald-100">
+                        {hud.dumpedUnits.toLocaleString()}
+                      </span>
+                    </span>
+                  ) : null}
                   <span className="rounded-lg border border-white/15 bg-black/25 px-2 py-1">
-                    점수 <span className="text-yellow-100">{hud.score.toLocaleString()}</span>
-                  </span>
-                  <span className="rounded-lg border border-white/15 bg-black/25 px-2 py-1">
-                    {mode === "game" ? "스타" : "체험 스타"}{" "}
                     <span className="text-amber-100">
                       ⭐ {(mode === "game" ? currency : previewStars).toLocaleString()}
                     </span>
@@ -1168,7 +1223,72 @@ export function ExcavatorGameWrapper({
           </div>
         )}
 
-        {mode !== "intro" && mode !== "gameReady" && (
+        {!layoutPortrait && mode !== "intro" ? (
+          <div className="yanmar-landscape-hud absolute right-2 top-2 z-30 flex items-start gap-2.5">
+            {showDigPoseGraph ? (
+              <div className="yanmar-dig-pose-panel pointer-events-none w-[116px] shrink-0 rounded-sm border border-white/10 bg-black/55 px-2 py-1.5 text-white shadow-xl backdrop-blur-sm">
+                <DigPoseGraph
+                  boom={hud.boom}
+                  arm={hud.arm}
+                  bucket={hud.bucket}
+                  feedback={digFeedback}
+                />
+              </div>
+            ) : null}
+            <div className="flex flex-col items-end gap-2">
+              {mode !== "gameReady" ? (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCameraMode((current) => ((current % 3) + 1) as CameraMode)}
+                    className="flex h-[30px] items-center gap-1 rounded-lg border border-white/20 bg-black/70 px-2 text-[10px] font-black text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
+                    aria-label={`카메라 ${cameraMode}번 시점`}
+                  >
+                    <span
+                      className="relative h-3.5 w-5 rounded-[0.25rem] border border-white/65"
+                      aria-hidden
+                    >
+                      <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/75" />
+                      <span className="absolute left-1 top-[-0.22rem] h-1 w-2 rounded-t-[0.18rem] border-x border-t border-white/55" />
+                    </span>
+                    <span>카메라{cameraMode}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      orientationTouchedRef.current = true;
+                      setLayoutMode("portrait");
+                    }}
+                    className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-white/20 bg-black/70 shadow-lg backdrop-blur-sm hover:bg-black/85"
+                    aria-label="세로 레이아웃으로 전환"
+                    title="세로 모드"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/images/yanmar/orientation-toggle.png"
+                      alt=""
+                      width={18}
+                      height={18}
+                      className="pointer-events-none select-none opacity-95"
+                      draggable={false}
+                    />
+                  </button>
+                </div>
+              ) : null}
+              {showMinimap ? (
+                <ExcavatorMinimap
+                  simRef={simRef}
+                  terrainRef={terrainRef}
+                  tutorialStepRef={tutorialStepRef}
+                  visible
+                  embedded
+                />
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {layoutPortrait && mode !== "intro" && mode !== "gameReady" && (
           <div className="absolute right-2 top-2 z-30 flex items-center gap-1.5">
             <button
               type="button"
@@ -1188,15 +1308,12 @@ export function ExcavatorGameWrapper({
             <button
               type="button"
               onClick={() => {
-                setLayoutMode((current) =>
-                  current === "portrait" ? "landscape" : "portrait",
-                );
+                orientationTouchedRef.current = true;
+                setLayoutMode("landscape");
               }}
               className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-white/20 bg-black/70 shadow-lg backdrop-blur-sm hover:bg-black/85"
-              aria-label={
-                layoutPortrait ? "가로 레이아웃으로 전환" : "세로 레이아웃으로 전환"
-              }
-              title={layoutPortrait ? "가로 모드" : "세로 모드"}
+              aria-label="가로 레이아웃으로 전환"
+              title="가로 모드"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -1211,12 +1328,13 @@ export function ExcavatorGameWrapper({
           </div>
         )}
 
-        {mode !== "intro" && showMinimap && (
+        {layoutPortrait && mode !== "intro" && showMinimap && (
           <ExcavatorMinimap
             simRef={simRef}
             terrainRef={terrainRef}
             tutorialStepRef={tutorialStepRef}
             visible
+            displaySize={88}
           />
         )}
 
@@ -1224,6 +1342,8 @@ export function ExcavatorGameWrapper({
           <DumpHintPanel
             bucketLoad={hud.bucketLoad}
             inDumpZone={digFeedback.inDumpZone}
+            canDump={digFeedback.canDump}
+            raiseArmForDump={digFeedback.raiseArmForDump}
             show
           />
         ) : null}
@@ -1234,7 +1354,7 @@ export function ExcavatorGameWrapper({
           </div>
         )}
 
-        {mode !== "intro" && showDigPoseGraph && (
+        {layoutPortrait && mode !== "intro" && showDigPoseGraph && (
           <div className="yanmar-dig-pose-panel pointer-events-none absolute right-[8.25rem] top-2 z-20 w-[116px] rounded-sm border border-white/10 bg-black/55 px-2 py-1.5 text-white shadow-xl backdrop-blur-sm">
             <DigPoseGraph
               boom={hud.boom}
@@ -1264,17 +1384,6 @@ export function ExcavatorGameWrapper({
           myRank={myRank}
           bestScore={bestScore}
         />
-
-        {mode === "game" && (
-          <div className="yanmar-zone-legend absolute right-2 top-[10.35rem] z-20 flex items-center gap-1.5 rounded-xl bg-black/45 px-1.5 py-1 shadow-lg backdrop-blur-sm">
-            <div className="rounded-lg bg-orange-600/85 px-2 py-1 text-[10px] font-black text-white">
-              🟠 굴착
-            </div>
-            <div className="rounded-lg bg-green-600/85 px-2 py-1 text-[10px] font-black text-white">
-              🟢 덤프
-            </div>
-          </div>
-        )}
 
         {stepCompleteFlash && (
           <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">

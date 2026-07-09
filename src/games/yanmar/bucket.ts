@@ -41,6 +41,64 @@ export function getBucketTipWorld(sim: ExcavatorSimState, boomSwing = 0): Bucket
   return bucketPointWorld(sim, boomSwing, -BUCKET_LEN, 0);
 }
 
+export function getBoomPivotWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {
+  const facing = sim.heading + sim.swing + boomSwing * 0.38;
+  return {
+    x: sim.posX + Math.sin(facing) * BOOM_OFFSET,
+    y: BOOM_PIVOT_Y,
+    z: sim.posZ + Math.cos(facing) * BOOM_OFFSET,
+  };
+}
+
+export function getArmPivotWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {
+  return bucketPointWorld(sim, boomSwing, 0, 0);
+}
+
+function linkPointWorld(
+  sim: ExcavatorSimState,
+  boomSwing: number,
+  link: "boom" | "arm",
+  t: number,
+): BucketTip {
+  const facing = sim.heading + sim.swing + boomSwing * 0.38;
+  const boomEndX = Math.sin(sim.boom) * BOOM_LEN;
+  const boomEndY = Math.cos(sim.boom) * BOOM_LEN;
+  const visualArmAngle = sim.boom - sim.arm * VISUAL_ARM_ROTATION_SCALE;
+  const along = Math.max(0, Math.min(1, t));
+
+  let reach: number;
+  let height: number;
+  if (link === "boom") {
+    reach = Math.sin(sim.boom) * BOOM_LEN * along;
+    height = BOOM_PIVOT_Y + Math.cos(sim.boom) * BOOM_LEN * along;
+  } else {
+    const armAlong = ARM_LEN * along;
+    reach = boomEndX + Math.sin(visualArmAngle) * armAlong;
+    height = BOOM_PIVOT_Y + boomEndY + Math.cos(visualArmAngle) * armAlong;
+  }
+
+  return {
+    x: sim.posX + Math.sin(facing) * BOOM_OFFSET + Math.cos(facing) * reach,
+    y: height,
+    z: sim.posZ + Math.cos(facing) * BOOM_OFFSET - Math.sin(facing) * reach,
+  };
+}
+
+/** 붐·암·버킷 vs 덤프트럭 고체 충돌 샘플 */
+export function getArmCollisionSamples(sim: ExcavatorSimState, boomSwing = 0): BucketTip[] {
+  return [
+    getBoomPivotWorld(sim, boomSwing),
+    linkPointWorld(sim, boomSwing, "boom", 0.35),
+    linkPointWorld(sim, boomSwing, "boom", 0.72),
+    getArmPivotWorld(sim, boomSwing),
+    linkPointWorld(sim, boomSwing, "arm", 0.35),
+    linkPointWorld(sim, boomSwing, "arm", 0.72),
+    getBucketBodyContactWorld(sim, boomSwing),
+    getBucketScraperContactWorld(sim, boomSwing),
+    getBucketTipWorld(sim, boomSwing),
+  ];
+}
+
 function lowestBucketPoint(
   sim: ExcavatorSimState,
   boomSwing: number,
@@ -90,6 +148,10 @@ export interface DigFeedback {
   optimalDigPose: boolean;
   digPoseScore: number;
   canDump: boolean;
+  /** 하역 구역인데 붐·암을 더 들어올려야 함 */
+  raiseArmForDump: boolean;
+  /** 주행 레버 입력 중 버킷/암이 낮아 이동 불가 */
+  travelBlockedRaiseArm: boolean;
 }
 
 export function createDigFeedback(): DigFeedback {
@@ -108,5 +170,7 @@ export function createDigFeedback(): DigFeedback {
     optimalDigPose: false,
     digPoseScore: 0,
     canDump: false,
+    raiseArmForDump: false,
+    travelBlockedRaiseArm: false,
   };
 }

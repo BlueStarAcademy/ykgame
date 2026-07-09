@@ -63,6 +63,7 @@ export function GameImmersiveOverlay({
   return createPortal(
     <div
       ref={containerRef}
+      data-game-immersive=""
       className="fixed inset-0 z-[200] flex flex-col bg-black"
       style={{
         paddingTop: "env(safe-area-inset-top)",
@@ -115,7 +116,7 @@ export function GameImmersiveOverlay({
           )}
         </div>
       </div>
-      <div className="relative min-h-0 flex-1">{children}</div>
+      <div className="relative min-h-0 flex-1 overflow-hidden">{children}</div>
     </div>,
     document.body,
   );

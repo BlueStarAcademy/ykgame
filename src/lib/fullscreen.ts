@@ -1,8 +1,5 @@
 /**
- * 브라우저 전체화면 API + iOS 홈화면 추가(PWA) 지원 유틸
- *
- * Do not call Screen Orientation .lock() from gameplay.
- * A leftover landscape lock from older builds must be cleared once at boot.
+ * 브라우저 전체화면 API + iOS 홈화면 추가(PWA) + 조작석 방향 전환
  */
 
 export function isFullscreenSupported(): boolean {
@@ -85,4 +82,107 @@ export function unlockOrientation(): void {
   } catch {
     // ignore
   }
+}
+
+export type CockpitOrientation = "portrait" | "landscape";
+
+export function isOrientationLockSupported(): boolean {
+  if (typeof screen === "undefined") return false;
+  return typeof screen.orientation?.lock === "function";
+}
+
+function getOrientationLockType(mode: CockpitOrientation): OrientationLockType {
+  return mode === "landscape" ? "landscape" : "portrait-primary";
+}
+
+async function requestDocumentFullscreen(): Promise<boolean> {
+  if (typeof document === "undefined") return false;
+  try {
+    const target = document.documentElement;
+    const req =
+      target.requestFullscreen?.bind(target) ||
+      (target as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> })
+        .webkitRequestFullscreen?.bind(target);
+    if (!req) return false;
+    await req();
+    return !!document.fullscreenElement;
+  } catch {
+    return false;
+  }
+}
+
+/** 인게임 가로/세로 토글 시 기기 화면 방향을 맞춘다. */
+export async function lockCockpitOrientation(
+  mode: CockpitOrientation,
+): Promise<boolean> {
+  if (typeof screen === "undefined") return false;
+
+  const lockType = getOrientationLockType(mode);
+  const tryLock = async () => {
+    if (!screen.orientation?.lock) return false;
+    await screen.orientation.lock(lockType);
+    return true;
+  };
+
+  try {
+    if (await tryLock()) return true;
+  } catch {
+    // Fullscreen unlocks orientation lock requirements on some mobile browsers.
+  }
+
+  if (isMobileDevice()) {
+    try {
+      await requestDocumentFullscreen();
+      if (await tryLock()) return true;
+    } catch {
+      // ignore
+    }
+  }
+
+  return false;
+}
+
+export async function restoreDefaultCockpitOrientation(): Promise<void> {
+  try {
+    if (isOrientationLockSupported()) {
+      await lockCockpitOrientation("portrait");
+      return;
+    }
+  } catch {
+    // ignore
+  }
+  unlockOrientation();
+}
+
+const FORCED_LANDSCAPE_CLASS = "yanmar-forced-landscape";
+
+export function setForcedLandscapeFallback(active: boolean): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.classList.toggle(FORCED_LANDSCAPE_CLASS, active);
+}
+
+export function clearForcedLandscapeFallback(): void {
+  setForcedLandscapeFallback(false);
+}
+
+/** Screen Orientation API가 실패했을 때 CSS로 가로 화면을 흉내 낸다. */
+export function shouldUseForcedLandscapeFallback(mode: CockpitOrientation): boolean {
+  if (typeof window === "undefined") return false;
+  return mode === "landscape" && window.matchMedia("(orientation: portrait)").matches;
+}
+
+export async function applyCockpitOrientation(mode: CockpitOrientation): Promise<boolean> {
+  const locked = await lockCockpitOrientation(mode);
+  if (locked) {
+    clearForcedLandscapeFallback();
+    return true;
+  }
+
+  if (mode === "portrait") {
+    clearForcedLandscapeFallback();
+    return false;
+  }
+
+  setForcedLandscapeFallback(shouldUseForcedLandscapeFallback(mode));
+  return false;
 }

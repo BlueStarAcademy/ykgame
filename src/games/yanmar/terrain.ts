@@ -139,14 +139,126 @@ export function sampleHeight(terrain: TerrainData, wx: number, wz: number): numb
 
 /** 굴착·덤프 구역 (확장 맵 기준) */
 export const DIG_ZONE = { x: 4, z: 18, radius: 12 };
-export const DUMP_ZONE = { x: 32, z: -12, radius: 8 };
-export const DUMP_TRUCK_BED = {
-  x: DUMP_ZONE.x + 1.6,
-  z: DUMP_ZONE.z - 0.8,
-  width: 7.2,
-  depth: 5.4,
+
+/** DumpTruck.tsx 외부 group — ExcavatorScene 3D 모델과 동일 */
+export const DUMP_TRUCK = {
+  groupX: 33.27,
+  groupZ: -12.68,
   rotation: -0.36,
-  margin: 1.6,
+  /** inner group 0.3 + bed deck mesh -0.65 */
+  bedLocalX: -0.35,
+  bedLocalZ: 0,
+  bedWidth: 5.2,
+  bedDepth: 2.86,
+  /** 버킷 접점이 칸 안인지 판정 (여유 있게 — 쉬운 난이도) */
+  margin: 0.45,
+  /** 버킷을 펼 때 차체 위치 여유 */
+  bodyMargin: 0.85,
+  /** 적재함 상단 덱 높이 (DumpTruck.tsx 메시: 0.55+0.78+0.30) */
+  bedDeckWorldY: 1.63,
+  /** 칸 위에서 하역 판정 최소 높이 (덱 대비) */
+  dumpMinHeightAboveDeck: -0.4,
+} as const;
+
+/** 트럭 고체 껍데기 — 칸 내부 공동은 비움 (하역 공간) */
+export const DUMP_TRUCK_SOLID = {
+  centerLocalX: 0.05,
+  centerLocalZ: 0,
+  halfX: 2.82,
+  halfZ: 1.82,
+  minY: 1.06,
+  maxY: 3.38,
+  cavityHalfX: DUMP_TRUCK.bedWidth / 2 - 0.22,
+  cavityHalfZ: DUMP_TRUCK.bedDepth / 2 - 0.18,
+  cavityMinY: 1.0,
+  cavityMaxY: 2.78,
+} as const;
+
+function dumpTruckLocalToWorld(localX: number, localZ: number) {
+  const cos = Math.cos(DUMP_TRUCK.rotation);
+  const sin = Math.sin(DUMP_TRUCK.rotation);
+  return {
+    x: DUMP_TRUCK.groupX + localX * cos + localZ * sin,
+    z: DUMP_TRUCK.groupZ - localX * sin + localZ * cos,
+  };
+}
+
+export function dumpTruckBedCenterWorld() {
+  return dumpTruckLocalToWorld(DUMP_TRUCK.bedLocalX, DUMP_TRUCK.bedLocalZ);
+}
+
+export function worldToDumpTruckLocal(wx: number, wz: number) {
+  const cos = Math.cos(DUMP_TRUCK.rotation);
+  const sin = Math.sin(DUMP_TRUCK.rotation);
+  const dx = wx - DUMP_TRUCK.groupX;
+  const dz = wz - DUMP_TRUCK.groupZ;
+  return {
+    x: dx * cos - dz * sin,
+    z: dx * sin + dz * cos,
+  };
+}
+
+export function dumpTruckBedDeckWorldY() {
+  return DUMP_TRUCK.bedDeckWorldY;
+}
+
+export function isInDumpTruckSolidVolume(wx: number, wy: number, wz: number): boolean {
+  if (wy < DUMP_TRUCK_SOLID.minY || wy > DUMP_TRUCK_SOLID.maxY) return false;
+  const local = worldToDumpTruckLocal(wx, wz);
+  const hullX = local.x - DUMP_TRUCK_SOLID.centerLocalX;
+  const hullZ = local.z - DUMP_TRUCK_SOLID.centerLocalZ;
+  if (Math.abs(hullX) > DUMP_TRUCK_SOLID.halfX || Math.abs(hullZ) > DUMP_TRUCK_SOLID.halfZ) {
+    return false;
+  }
+  const bedRelX = local.x - DUMP_TRUCK.bedLocalX;
+  const bedRelZ = local.z - DUMP_TRUCK.bedLocalZ;
+  const inBedCavity =
+    wy >= DUMP_TRUCK_SOLID.cavityMinY &&
+    wy <= DUMP_TRUCK_SOLID.cavityMaxY &&
+    Math.abs(bedRelX) <= DUMP_TRUCK_SOLID.cavityHalfX &&
+    Math.abs(bedRelZ) <= DUMP_TRUCK_SOLID.cavityHalfZ;
+  return !inBedCavity;
+}
+
+export function clampToDumpTruckBed(wx: number, wz: number, inset = 0.08) {
+  const local = worldToDumpTruckLocal(wx, wz);
+  const relX = local.x - DUMP_TRUCK.bedLocalX;
+  const relZ = local.z - DUMP_TRUCK.bedLocalZ;
+  const halfW = Math.max(0.4, DUMP_TRUCK.bedWidth / 2 - inset);
+  const halfD = Math.max(0.3, DUMP_TRUCK.bedDepth / 2 - inset);
+  const clampedRelX = Math.max(-halfW, Math.min(halfW, relX));
+  const clampedRelZ = Math.max(-halfD, Math.min(halfD, relZ));
+  return dumpTruckLocalToWorld(
+    DUMP_TRUCK.bedLocalX + clampedRelX,
+    DUMP_TRUCK.bedLocalZ + clampedRelZ,
+  );
+}
+
+const _dumpBedCenter = dumpTruckBedCenterWorld();
+
+/** 하역 접근·내비 — 트럭 적재함 중심 기준 */
+export const DUMP_ZONE = {
+  x: _dumpBedCenter.x,
+  z: _dumpBedCenter.z,
+  radius: 5.4,
+};
+
+export function isNearDumpTruck(wx: number, wz: number) {
+  return Math.hypot(wx - DUMP_ZONE.x, wz - DUMP_ZONE.z) < DUMP_ZONE.radius + 7;
+}
+
+/** 트럭 group 배치 + 칸 치수 (씬·디버그 오버레이) */
+export const DUMP_TRUCK_BED = {
+  x: DUMP_TRUCK.groupX,
+  z: DUMP_TRUCK.groupZ,
+  rotation: DUMP_TRUCK.rotation,
+  width: DUMP_TRUCK.bedWidth,
+  depth: DUMP_TRUCK.bedDepth,
+  margin: DUMP_TRUCK.margin,
+  centerX: _dumpBedCenter.x,
+  centerZ: _dumpBedCenter.z,
+  bedLocalX: DUMP_TRUCK.bedLocalX,
+  bedLocalZ: DUMP_TRUCK.bedLocalZ,
 };
 
 function distance(ax: number, az: number, bx: number, bz: number) {
@@ -250,16 +362,14 @@ export function isInDumpZone(wx: number, wz: number): boolean {
   return Math.sqrt(dx * dx + dz * dz) < DUMP_ZONE.radius;
 }
 
-export function isInDumpTruckBed(wx: number, wz: number): boolean {
-  const cos = Math.cos(-DUMP_TRUCK_BED.rotation);
-  const sin = Math.sin(-DUMP_TRUCK_BED.rotation);
-  const dx = wx - DUMP_TRUCK_BED.x;
-  const dz = wz - DUMP_TRUCK_BED.z;
-  const localX = dx * cos - dz * sin;
-  const localZ = dx * sin + dz * cos;
+export function isInDumpTruckBed(wx: number, wz: number, extraMargin = 0): boolean {
+  const local = worldToDumpTruckLocal(wx, wz);
+  const relX = local.x - DUMP_TRUCK.bedLocalX;
+  const relZ = local.z - DUMP_TRUCK.bedLocalZ;
+  const margin = DUMP_TRUCK.margin + extraMargin;
   return (
-    Math.abs(localX) <= DUMP_TRUCK_BED.width / 2 + DUMP_TRUCK_BED.margin &&
-    Math.abs(localZ) <= DUMP_TRUCK_BED.depth / 2 + DUMP_TRUCK_BED.margin
+    Math.abs(relX) <= DUMP_TRUCK.bedWidth / 2 + margin &&
+    Math.abs(relZ) <= DUMP_TRUCK.bedDepth / 2 + margin
   );
 }
 

@@ -110,16 +110,16 @@ body {
   }
   74% {
     opacity: 1;
-    transform: translate3d(0, -10px, 0) scale(1);
+    transform: translate3d(0, -28px, 0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate3d(0, -34px, 0) scale(0.98);
+    transform: translate3d(0, -76px, 0) scale(0.98);
   }
 }
 
 .yanmar-score-pop {
-  animation: yanmar-score-pop 4.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: yanmar-score-pop 9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   white-space: nowrap;
   will-change: transform, opacity;
 }
@@ -1817,6 +1817,15 @@ body {
 .yanmar-travel-cluster {
   position: absolute;
   inset: 0;
+  filter: none;
+  -webkit-filter: none;
+}
+
+.yanmar-visual-lever-travel {
+  filter: none;
+  -webkit-filter: none;
+  perspective: 9rem;
+  transform-style: preserve-3d;
 }
 
 .yanmar-visual-lever-travel .yanmar-lever-mount {
@@ -1826,49 +1835,61 @@ body {
 .yanmar-visual-lever-travel .yanmar-lever-slot {
   top: 72%;
   height: 4.25rem;
-  width: 1rem;
-  transform: translate(-50%, -50%) perspective(6rem) rotateX(32deg);
+  width: 1.18rem;
+  transform: translate3d(-50%, -50%, -0.12rem) rotateX(58deg) scaleY(0.92);
+  transform-origin: 50% 88%;
   border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 20%),
-    radial-gradient(ellipse at 50% 10%, rgba(148, 163, 184, 0.32), transparent 38%),
-    linear-gradient(180deg, #111827, #020617);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 20%),
+    radial-gradient(ellipse at 50% 10%, rgba(148, 163, 184, 0.36), transparent 38%),
+    linear-gradient(180deg, #1f2937, #020617);
   box-shadow:
-    inset 0 0 0 0.08rem rgba(255, 255, 255, 0.12),
+    inset 0 0 0 0.08rem rgba(255, 255, 255, 0.14),
     inset 0 -0.42rem 0.48rem rgba(0, 0, 0, 0.7);
 }
 
 .yanmar-visual-lever-travel .yanmar-lever-pivot {
   top: 75%;
-  height: 0.68rem;
-  width: 0.68rem;
-  background: radial-gradient(circle at 42% 25%, #334155, #020617 76%);
+  height: 0.78rem;
+  width: 0.78rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: radial-gradient(circle at 42% 25%, #475569, #020617 76%);
+  transform: translate(-50%, -50%) rotateX(18deg);
+  box-shadow:
+    inset 0 -0.12rem 0.18rem rgba(0, 0, 0, 0.48),
+    0 0.22rem 0.28rem rgba(0, 0, 0, 0.34);
 }
 
 .yanmar-visual-lever-travel .yanmar-lever-stick {
   bottom: 0.02rem;
   height: 3.55rem;
-  width: 0.44rem;
+  width: 0.56rem;
   transform-origin: 50% 100%;
-  background: linear-gradient(90deg, #020617, #1f2937 48%, #020617);
+  transform-style: preserve-3d;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(90deg, #020617, #334155 48%, #020617);
   box-shadow:
-    inset 0.08rem 0 0.08rem rgba(255, 255, 255, 0.08),
-    0.14rem 0.34rem 0.34rem rgba(0, 0, 0, 0.48);
-  will-change: transform;
+    inset 0.1rem 0 0.1rem rgba(255, 255, 255, 0.1),
+    0.12rem 0.3rem 0.3rem rgba(0, 0, 0, 0.46);
+  filter: none;
+  -webkit-filter: none;
 }
 
 .yanmar-visual-lever-travel .yanmar-lever-stick > span {
-  top: -0.86rem;
-  height: 1.28rem;
-  width: 1.72rem;
-  border-radius: 0.34rem;
+  top: -0.9rem;
+  height: 1.36rem;
+  width: 1.86rem;
+  border-radius: 0.36rem;
+  border: 1px solid rgba(203, 213, 225, 0.28);
+  transform: translateX(-50%) translateZ(0.08rem) rotateX(-10deg);
   background:
-    radial-gradient(ellipse at 34% 20%, rgba(255, 255, 255, 0.34), transparent 26%),
-    linear-gradient(180deg, #4b5563 0%, #1f2937 66%, #020617 100%);
+    radial-gradient(ellipse at 34% 20%, rgba(255, 255, 255, 0.42), transparent 26%),
+    linear-gradient(180deg, #64748b 0%, #334155 58%, #0f172a 100%);
   box-shadow:
-    inset 0.12rem 0.12rem 0.14rem rgba(255, 255, 255, 0.2),
+    inset 0.12rem 0.12rem 0.14rem rgba(255, 255, 255, 0.24),
     inset -0.14rem -0.14rem 0.18rem rgba(0, 0, 0, 0.58),
-    0 0.18rem 0.24rem rgba(0, 0, 0, 0.44);
+    0 0.16rem 0.22rem rgba(0, 0, 0, 0.42);
 }
 
 .yanmar-visual-pedal {
@@ -1911,20 +1932,42 @@ body {
 /* In-game layout toggle (yanmar-layout-portrait | yanmar-layout-landscape) */
 .yanmar-layout-landscape .yanmar-control-deck {
   bottom: 0;
-  height: clamp(8.5rem, 32dvh, 10.75rem);
+  height: clamp(4.1rem, 16dvh, 5.4rem);
   transform: none;
 }
 
 .yanmar-layout-landscape .yanmar-control-rail {
-  height: 46%;
+  height: 42%;
   left: 4.5%;
   right: 4.5%;
-  border-radius: 1.35rem 1.35rem 0 0;
+  border-radius: 1rem 1rem 0 0;
 }
 
 .yanmar-layout-landscape .yanmar-visual-joystick {
-  height: 8rem;
-  width: 7.1rem;
+  height: 4.1rem;
+  width: 3.65rem;
+}
+
+.yanmar-layout-landscape .yanmar-visual-lever-travel .yanmar-lever-slot {
+  top: 73%;
+  height: 2.45rem;
+  width: 0.92rem;
+}
+
+.yanmar-layout-landscape .yanmar-visual-lever-travel .yanmar-lever-stick {
+  height: 2.05rem;
+  width: 0.46rem;
+}
+
+.yanmar-layout-landscape .yanmar-horn-button {
+  height: 1.95rem;
+  width: 2.35rem;
+}
+
+.yanmar-layout-landscape .yanmar-zone-legend {
+  top: auto !important;
+  bottom: calc(clamp(4.1rem, 16dvh, 5.4rem) + 0.35rem);
+  right: 0.5rem !important;
 }
 
 .yanmar-layout-landscape .yanmar-aux-button {
@@ -1955,35 +1998,55 @@ body {
 
 .yanmar-layout-portrait .yanmar-control-deck {
   bottom: 0;
-  height: clamp(15rem, 38dvh, 19rem);
+  height: clamp(16rem, 40dvh, 20rem);
   transform: none;
 }
 
 .yanmar-layout-portrait .yanmar-visual-joystick {
-  height: 7rem;
-  width: 6.1rem;
+  height: 5.75rem;
+  width: 5rem;
 }
 
 .yanmar-layout-portrait .yanmar-control-rail {
-  height: 8%;
+  height: 4.5%;
   left: 2.5%;
   right: 2.5%;
-  border-radius: 1.1rem 1.1rem 0 0;
-  transform: perspective(14rem) rotateX(8deg);
+  border-radius: 0.85rem 0.85rem 0 0;
+  transform: perspective(14rem) rotateX(6deg);
 }
 
 .yanmar-layout-portrait .yanmar-bottom-connector {
   left: 2%;
   right: 2%;
+  height: 0.38rem;
+}
+
+.yanmar-layout-portrait .yanmar-aux-button {
+  overflow: visible;
+}
+
+.yanmar-layout-portrait .yanmar-aux-lever-well {
+  inset: 0.16rem 0.2rem 0.48rem;
+  overflow: visible;
+}
+
+.yanmar-layout-portrait .yanmar-aux-button-label {
+  bottom: 0.06rem;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.62);
+  padding: 0.08rem 0.22rem;
+  font-size: 0.46rem;
 }
 
 .yanmar-layout-portrait .yanmar-visual-lever-travel .yanmar-lever-slot {
   top: 73%;
   height: 4.1rem;
+  width: 1.14rem;
 }
 
 .yanmar-layout-portrait .yanmar-visual-lever-travel .yanmar-lever-stick {
   height: 3.45rem;
+  width: 0.54rem;
 }
 
 .yanmar-layout-portrait .yanmar-deck-brand-badge,
@@ -1992,13 +2055,13 @@ body {
 }
 
 .yanmar-layout-portrait .yanmar-portrait-3d-button {
-  height: 3.35rem;
-  width: 3.35rem;
+  height: 2.85rem;
+  width: 2.85rem;
 }
 
 .yanmar-layout-portrait .yanmar-horn-button-portrait {
-  height: 3.35rem;
-  width: 3.35rem;
+  height: 2.85rem;
+  width: 2.85rem;
 }
 
 .yanmar-layout-portrait .yanmar-safety-lock-status,
@@ -2024,28 +2087,28 @@ body {
 
 .yanmar-layout-portrait .yanmar-visual-lever-compact.yanmar-visual-lever-safety .yanmar-lever-pivot,
 .yanmar-layout-portrait .yanmar-visual-lever-compact.yanmar-visual-lever-hydraulic .yanmar-lever-pivot {
-  top: 78%;
-  height: 0.42rem;
-  width: 0.42rem;
+  top: 72%;
+  height: 0.38rem;
+  width: 0.38rem;
 }
 
 .yanmar-layout-portrait .yanmar-visual-lever-compact.yanmar-visual-lever-safety .yanmar-lever-stick,
 .yanmar-layout-portrait .yanmar-visual-lever-compact.yanmar-visual-lever-hydraulic .yanmar-lever-stick {
-  bottom: 0.02rem;
-  height: 1.55rem;
-  width: 0.4rem;
+  bottom: 0;
+  height: 1.32rem;
+  width: 0.36rem;
 }
 
 .yanmar-layout-portrait .yanmar-visual-lever-compact.yanmar-visual-lever-safety .yanmar-lever-red > span {
-  top: -0.42rem;
-  height: 0.98rem;
-  width: 0.62rem;
+  top: -0.3rem;
+  height: 0.82rem;
+  width: 0.54rem;
 }
 
 .yanmar-layout-portrait .yanmar-visual-lever-compact.yanmar-visual-lever-hydraulic .yanmar-lever-red > span {
-  top: -0.38rem;
-  height: 0.78rem;
-  width: 0.78rem;
+  top: -0.26rem;
+  height: 0.66rem;
+  width: 0.66rem;
 }
 
 .yanmar-layout-portrait .yanmar-visual-pedal-nested .yanmar-pedal-pad {
@@ -2062,6 +2125,24 @@ body {
 .yanmar-layout-portrait .yanmar-zone-legend {
   top: 15.75rem !important;
   right: 0.5rem !important;
+}
+
+/* Screen Orientation API 미지원 기기용 가로 화면 fallback */
+html.yanmar-forced-landscape,
+html.yanmar-forced-landscape body {
+  overflow: hidden !important;
+}
+
+html.yanmar-forced-landscape [data-game-immersive] {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 100dvh;
+  height: 100dvw;
+  max-width: none;
+  max-height: none;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center center;
 }
 
 @keyframes card-shimmer {
