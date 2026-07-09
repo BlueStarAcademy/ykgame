@@ -1,6 +1,6 @@
 import { DUMP_TRUCK } from "./terrain";
 
-export type DumpTruckPhase = "ready" | "departing" | "cooldown" | "arriving";
+export type DumpTruckPhase = "ready" | "engineStart" | "departing" | "cooldown" | "arriving";
 
 export interface DumpTruckPose {
   groupX: number;
@@ -17,11 +17,13 @@ export interface DumpTruckRuntimeState {
   phaseElapsed: number;
 }
 
-const DEPART_DISTANCE = 30;
-export const DUMP_TRUCK_DEPART_DURATION_SEC = 2.6;
-export const DUMP_TRUCK_ARRIVE_DURATION_SEC = 2.2;
+const DEPART_DISTANCE = 38;
+export const DUMP_TRUCK_ENGINE_START_DURATION_SEC = 2.2;
+export const DUMP_TRUCK_DEPART_DURATION_SEC = 5.8;
+export const DUMP_TRUCK_ARRIVE_DURATION_SEC = 10;
+const ENGINE_START_DURATION = DUMP_TRUCK_ENGINE_START_DURATION_SEC;
 const DEPART_DURATION = DUMP_TRUCK_DEPART_DURATION_SEC;
-const ARRIVE_DISTANCE = 30;
+const ARRIVE_DISTANCE = 40;
 const ARRIVE_DURATION = DUMP_TRUCK_ARRIVE_DURATION_SEC;
 
 export function createDumpTruckState(): DumpTruckRuntimeState {
@@ -46,6 +48,17 @@ function easeInOut(t: number) {
   return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
 }
 
+/** 출발·주차 — 처음·끝 구간을 더 천천히 */
+function easeDepart(t: number) {
+  return t * t * (3 - 2 * t);
+}
+
+/** 복귀 주차 — 마지막 구간 감속 */
+function easeArrive(t: number) {
+  const inv = 1 - t;
+  return 1 - inv * inv * inv;
+}
+
 export function getDumpTruckPose(state: DumpTruckRuntimeState): DumpTruckPose {
   const cos = Math.cos(DUMP_TRUCK.rotation);
   const sin = Math.sin(DUMP_TRUCK.rotation);
@@ -57,6 +70,19 @@ export function getDumpTruckPose(state: DumpTruckRuntimeState): DumpTruckPose {
     groupZ: DUMP_TRUCK.groupZ + worldOffsetZ,
     present,
   };
+}
+
+export function getDumpTruckMotionProgress(state: DumpTruckRuntimeState) {
+  if (state.phase === "engineStart") {
+    return { kind: "engineStart" as const, t: Math.min(1, state.phaseElapsed / ENGINE_START_DURATION) };
+  }
+  if (state.phase === "departing") {
+    return { kind: "departing" as const, t: Math.min(1, state.phaseElapsed / DEPART_DURATION) };
+  }
+  if (state.phase === "arriving") {
+    return { kind: "arriving" as const, t: Math.min(1, state.phaseElapsed / ARRIVE_DURATION) };
+  }
+  return { kind: "idle" as const, t: 0 };
 }
 
 export function canDumpTruckAcceptDump(
@@ -77,7 +103,7 @@ export function getDumpTruckFillRatio(state: DumpTruckRuntimeState, capacityUnit
 
 export function beginDumpTruckDeparture(state: DumpTruckRuntimeState) {
   if (state.phase !== "ready") return;
-  state.phase = "departing";
+  state.phase = "engineStart";
   state.phaseElapsed = 0;
 }
 
@@ -93,6 +119,42 @@ export function addDumpTruckLoad(
   }
 }
 
+export function formatDumpTruckReturnTime(seconds: number) {
+  const total = Math.max(0, Math.ceil(seconds));
+  if (total < 60) return `${total}초`;
+  const minutes = Math.floor(total / 60);
+  const remainder = total % 60;
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
+
+export function getDumpTruckReturnEtaSec(
+  state: DumpTruckRuntimeState,
+  cooldownSec: number,
+) {
+  if (state.phase === "cooldown") return state.cooldownRemaining;
+  if (state.phase === "engineStart") {
+    const engineLeft = Math.max(0, ENGINE_START_DURATION - state.phaseElapsed);
+    return engineLeft + DEPART_DURATION + cooldownSec + ARRIVE_DURATION;
+  }
+  if (state.phase === "departing") {
+    const departLeft = Math.max(0, DEPART_DURATION - state.phaseElapsed);
+    return departLeft + cooldownSec + ARRIVE_DURATION;
+  }
+  if (state.phase === "arriving") {
+    return Math.max(0, ARRIVE_DURATION - state.phaseElapsed);
+  }
+  return 0;
+}
+
+export function shouldShowDumpTruckReturnTimer(state: DumpTruckRuntimeState) {
+  return (
+    state.phase === "engineStart" ||
+    state.phase === "departing" ||
+    state.phase === "cooldown" ||
+    state.phase === "arriving"
+  );
+}
+
 export function updateDumpTruckState(
   state: DumpTruckRuntimeState,
   dt: number,
@@ -100,9 +162,17 @@ export function updateDumpTruckState(
 ) {
   state.phaseElapsed += dt;
 
+  if (state.phase === "engineStart") {
+    if (state.phaseElapsed >= ENGINE_START_DURATION) {
+      state.phase = "departing";
+      state.phaseElapsed = 0;
+    }
+    return;
+  }
+
   if (state.phase === "departing") {
     const t = Math.min(1, state.phaseElapsed / DEPART_DURATION);
-    state.offsetLocalX = easeInOut(t) * DEPART_DISTANCE;
+    state.offsetLocalX = easeDepart(t) * DEPART_DISTANCE;
     if (t >= 1) {
       state.phase = "cooldown";
       state.phaseElapsed = 0;
@@ -115,9 +185,9 @@ export function updateDumpTruckState(
 
   if (state.phase === "cooldown") {
     state.cooldownRemaining = Math.max(0, state.cooldownRemaining - dt);
-    if (state.cooldownRemaining <= 0) {
+    if (state.cooldownRemaining <= ARRIVE_DURATION) {
       state.phase = "arriving";
-      state.phaseElapsed = 0;
+      state.phaseElapsed = ARRIVE_DURATION - state.cooldownRemaining;
       state.offsetLocalX = -ARRIVE_DISTANCE;
     }
     return;
@@ -125,7 +195,7 @@ export function updateDumpTruckState(
 
   if (state.phase === "arriving") {
     const t = Math.min(1, state.phaseElapsed / ARRIVE_DURATION);
-    state.offsetLocalX = -ARRIVE_DISTANCE + easeInOut(t) * ARRIVE_DISTANCE;
+    state.offsetLocalX = -ARRIVE_DISTANCE + easeArrive(t) * ARRIVE_DISTANCE;
     if (t >= 1) {
       state.phase = "ready";
       state.phaseElapsed = 0;

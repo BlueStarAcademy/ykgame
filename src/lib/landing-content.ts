@@ -88,8 +88,12 @@ export const BRAND_PROFILES: Record<
 };
 
 export const EXPERIENCE_STEPS = [
-  { step: "01", title: "소개 페이지", desc: "앱 실행 또는 사이트 접속으로 YK건기 체험존 소개 확인" },
-  { step: "02", title: "체험하기", desc: "QR·버튼으로 로그인 (이미 로그인 시 바로 홈 이동)" },
-  { step: "03", title: "장비 선택", desc: "8개 브랜드 중 원하는 미니게임 선택" },
-  { step: "04", title: "직접 운전", desc: "실제 조작법으로 미션 수행·랭킹 도전" },
+  { step: "01", title: "소개 페이지", desc: "탑승 체험 또는 게임 체험 중 선택" },
+  { step: "02", title: "로그인", desc: "QR·버튼으로 로그인 (이미 로그인 시 바로 이동)" },
+  {
+    step: "03",
+    title: "탑승 / 게임",
+    desc: "탑승 체험은 실제 속도·전 조작부 시뮬레이터, 게임 체험은 홈에서 장비 선택",
+  },
+  { step: "04", title: "플레이", desc: "탑승은 운전실 체험 · 게임은 굴착·하역·보상 도전" },
 ] as const;

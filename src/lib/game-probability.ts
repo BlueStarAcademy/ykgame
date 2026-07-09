@@ -2,6 +2,7 @@ import {
   YANMAR_EQUIPMENT_CONFIG,
   YANMAR_REWARD_CONFIG,
   YANMAR_EQUIPMENT_RESET_REFUND_RATE,
+  YANMAR_TRUCK_UPGRADE_COSTS,
   formatYanmarUpgradeCostSequence,
   getYanmarTruckCapacityUnits,
   getYanmarTruckCooldownSec,
@@ -10,6 +11,7 @@ import {
 import {
   DUMP_TRUCK_ARRIVE_DURATION_SEC,
   DUMP_TRUCK_DEPART_DURATION_SEC,
+  DUMP_TRUCK_ENGINE_START_DURATION_SEC,
 } from "@/games/yanmar/dumpTruckState";
 
 const PARTS_DISCOUNTS = [10, 15, 20] as const;
@@ -27,14 +29,15 @@ export function getGameProbabilityReport() {
   const partsChance = YANMAR_REWARD_CONFIG.partsCouponChance;
   const rentalChance = YANMAR_REWARD_CONFIG.rentalCouponChance;
   const starChance = 1 - partsChance - rentalChance;
-  const truckConfig = YANMAR_EQUIPMENT_CONFIG.TRUCK;
-  const maxTruckLevel = truckConfig.maxLevel;
-  const maxTruckCapacity = getYanmarTruckCapacityUnits(maxTruckLevel);
-  const minTruckCooldown = getYanmarTruckCooldownSec(maxTruckLevel);
-  const truckLevelTable = Array.from({ length: maxTruckLevel + 1 }, (_, level) => {
-    const capacity = getYanmarTruckCapacityUnits(level);
-    const cooldown = getYanmarTruckCooldownSec(level);
-    return `+${level}: 하역량 ${capacity} / 재도착 ${cooldown.toFixed(1)}초`;
+  const capacityConfig = YANMAR_EQUIPMENT_CONFIG.TRUCK_CAPACITY;
+  const speedConfig = YANMAR_EQUIPMENT_CONFIG.TRUCK_SPEED;
+  const maxTruckCapacity = getYanmarTruckCapacityUnits(capacityConfig.maxLevel);
+  const minTruckCooldown = getYanmarTruckCooldownSec(speedConfig.maxLevel);
+  const truckCapacityTable = Array.from({ length: capacityConfig.maxLevel + 1 }, (_, level) => {
+    return `+${level}: 하역량 ${getYanmarTruckCapacityUnits(level)}`;
+  }).join(" · ");
+  const truckSpeedTable = Array.from({ length: speedConfig.maxLevel + 1 }, (_, level) => {
+    return `+${level}: 재도착 ${getYanmarTruckCooldownSec(level).toFixed(0)}초`;
   }).join(" · ");
 
   return {
@@ -80,32 +83,32 @@ export function getGameProbabilityReport() {
             {
               label: "동작 흐름",
               value: "적재 → 만차 출발 → 쿨타임 → 신규 트럭 도착",
-              detail: `만차 시 하역 불가 · 출발 ${DUMP_TRUCK_DEPART_DURATION_SEC}초 · 도착 ${DUMP_TRUCK_ARRIVE_DURATION_SEC}초`,
+              detail: `만차 시 하역 불가 · 시동 ${DUMP_TRUCK_ENGINE_START_DURATION_SEC}초 · 출발 ${DUMP_TRUCK_DEPART_DURATION_SEC}초 · 복귀 ${DUMP_TRUCK_ARRIVE_DURATION_SEC}초`,
             },
             {
               label: "기본 최대 하역량",
               value: `${YANMAR_REWARD_CONFIG.baseTruckCapacityUnits} 적재량`,
-              detail: `강화 최대 +${truckConfig.capacityPerLevel * maxTruckLevel} → ${maxTruckCapacity} 적재량`,
+              detail: `강화 최대 +${capacityConfig.capacityPerLevel * capacityConfig.maxLevel} → ${maxTruckCapacity} 적재량`,
             },
             {
               label: "기본 재도착 대기",
               value: `${YANMAR_REWARD_CONFIG.baseTruckCooldownSec}초`,
-              detail: `강화 최소 ${minTruckCooldown}초 (레벨당 -${truckConfig.cooldownReductionPerLevel}초)`,
+              detail: `속도 강화 최소 ${minTruckCooldown.toFixed(0)}초 (레벨당 5% 단축)`,
             },
             {
-              label: "레벨별 스탯",
-              value: `+0 ~ +${maxTruckLevel}`,
-              detail: truckLevelTable,
+              label: "하역량 강화 레벨표",
+              value: `+0 ~ +${capacityConfig.maxLevel}`,
+              detail: truckCapacityTable,
+            },
+            {
+              label: "속도 강화 레벨표",
+              value: `+0 ~ +${speedConfig.maxLevel}`,
+              detail: truckSpeedTable,
             },
             {
               label: "덤프트럭 강화 비용",
               value: "고정 비용표",
-              detail: `${formatYanmarUpgradeCostSequence("TRUCK", maxTruckLevel)} 스타`,
-            },
-            {
-              label: "강화 효과 (1레벨)",
-              value: truckConfig.description,
-              detail: `최대 누적 +${truckConfig.capacityPerLevel * maxTruckLevel} 하역량 / -${(truckConfig.cooldownReductionPerLevel * maxTruckLevel).toFixed(1)}초 재도착`,
+              detail: `${YANMAR_TRUCK_UPGRADE_COSTS.join(" / ")} 스타`,
             },
           ],
         },
@@ -115,15 +118,17 @@ export function getGameProbabilityReport() {
             (part) => {
               const config = YANMAR_EQUIPMENT_CONFIG[part];
               const maxEffect =
-                part === "TRUCK"
-                  ? `+${YANMAR_EQUIPMENT_CONFIG.TRUCK.capacityPerLevel * config.maxLevel} / -${(YANMAR_EQUIPMENT_CONFIG.TRUCK.cooldownReductionPerLevel * config.maxLevel).toFixed(1)}초`
-                  : part === "ARM"
-                    ? pctPoint(YANMAR_EQUIPMENT_CONFIG.ARM.effectPerLevel * config.maxLevel)
-                    : part === "BOOM"
-                      ? `+${(YANMAR_EQUIPMENT_CONFIG.BOOM.effectPerLevel * config.maxLevel * 100).toFixed(0)}%`
-                      : part === "BUCKET"
-                        ? `+${YANMAR_EQUIPMENT_CONFIG.BUCKET.effectPerLevel * config.maxLevel}`
-                        : `+${(YANMAR_EQUIPMENT_CONFIG.ENGINE.effectPerLevel * config.maxLevel * 100).toFixed(0)}%`;
+                part === "TRUCK_CAPACITY"
+                  ? `+${YANMAR_EQUIPMENT_CONFIG.TRUCK_CAPACITY.capacityPerLevel * config.maxLevel}`
+                  : part === "TRUCK_SPEED"
+                    ? `${getYanmarTruckCooldownSec(0).toFixed(0)}초 → ${getYanmarTruckCooldownSec(config.maxLevel).toFixed(0)}초`
+                    : part === "ARM"
+                      ? pctPoint(YANMAR_EQUIPMENT_CONFIG.ARM.effectPerLevel * config.maxLevel)
+                      : part === "BOOM"
+                        ? `+${(YANMAR_EQUIPMENT_CONFIG.BOOM.effectPerLevel * config.maxLevel * 100).toFixed(0)}%`
+                        : part === "BUCKET"
+                          ? `+${YANMAR_EQUIPMENT_CONFIG.BUCKET.effectPerLevel * config.maxLevel}`
+                          : `+${(YANMAR_EQUIPMENT_CONFIG.ENGINE.effectPerLevel * config.maxLevel * 100).toFixed(0)}%`;
               return {
                 label: `${config.label} (+${config.maxLevel} 최대)`,
                 value: config.description,
@@ -147,6 +152,11 @@ export function getGameProbabilityReport() {
                 "BUCKET",
                 YANMAR_EQUIPMENT_CONFIG.BUCKET.maxLevel,
               ),
+            },
+            {
+              label: "덤프트럭",
+              value: "고정 비용표",
+              detail: YANMAR_TRUCK_UPGRADE_COSTS.join(" / "),
             },
             {
               label: "강화 초기화",

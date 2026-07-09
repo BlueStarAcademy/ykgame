@@ -8,7 +8,7 @@ import {
   createGravelTexture,
   createPaintedMetalTexture,
 } from "./proceduralTextures";
-import { DIG_ZONE, DUMP_ZONE, getActiveDigZones, sampleHeight, type TerrainData } from "./terrain";
+import { DIG_ZONE, DUMP_TRUCK, DUMP_ZONE, getActiveDigZones, sampleHeight, type TerrainData } from "./terrain";
 
 function RoadMesh({
   from,
@@ -33,6 +33,79 @@ function RoadMesh({
       <boxGeometry args={[width, 0.06, length]} />
       <meshStandardMaterial map={texture} color="#c8b59a" roughness={0.94} metalness={0.02} />
     </mesh>
+  );
+}
+
+function TruckDepartureLane({
+  compactTexture,
+  gravelTexture,
+}: {
+  compactTexture: THREE.Texture;
+  gravelTexture: THREE.Texture;
+}) {
+  const cos = Math.cos(DUMP_TRUCK.rotation);
+  const sin = Math.sin(DUMP_TRUCK.rotation);
+  const dirX = cos;
+  const dirZ = -sin;
+  const laneLength = 44;
+  const laneWidth = 4.6;
+  const startX = DUMP_TRUCK.groupX - dirX * 2.2;
+  const startZ = DUMP_TRUCK.groupZ - dirZ * 2.2;
+  const endX = startX + dirX * laneLength;
+  const endZ = startZ + dirZ * laneLength;
+  const cx = (startX + endX) / 2;
+  const cz = (startZ + endZ) / 2;
+  const angle = Math.atan2(endX - startX, endZ - startZ);
+  const dashCount = 11;
+
+  return (
+    <group>
+      <mesh position={[cx, 0.702, cz]} rotation={[0, angle, 0]} receiveShadow>
+        <boxGeometry args={[laneWidth, 0.05, laneLength]} />
+        <meshStandardMaterial map={compactTexture} color="#9a8b72" roughness={0.96} metalness={0.02} />
+      </mesh>
+      <mesh position={[cx, 0.708, cz]} rotation={[0, angle, 0]} receiveShadow>
+        <boxGeometry args={[laneWidth + 0.5, 0.04, laneLength + 0.8]} />
+        <meshStandardMaterial map={gravelTexture} color="#7a6f5c" roughness={0.98} metalness={0.01} transparent opacity={0.35} />
+      </mesh>
+      {Array.from({ length: dashCount }, (_, i) => {
+        const t = (i + 0.5) / dashCount;
+        const px = startX + dirX * laneLength * t;
+        const pz = startZ + dirZ * laneLength * t;
+        return (
+          <mesh key={`dash-${i}`} position={[px, 0.716, pz]} rotation={[0, angle, 0]}>
+            <boxGeometry args={[0.14, 0.02, 1.35]} />
+            <meshStandardMaterial color="#f5d565" roughness={0.55} emissive="#fbbf24" emissiveIntensity={0.08} />
+          </mesh>
+        );
+      })}
+      {[-1, 1].map((side) => (
+        <mesh
+          key={`edge-${side}`}
+          position={[
+            cx + Math.cos(angle + Math.PI / 2) * side * (laneWidth / 2 + 0.08),
+            0.714,
+            cz + Math.sin(angle + Math.PI / 2) * side * (laneWidth / 2 + 0.08),
+          ]}
+          rotation={[0, angle, 0]}
+        >
+          <boxGeometry args={[0.08, 0.025, laneLength]} />
+          <meshStandardMaterial color="#e8edf2" roughness={0.42} />
+        </mesh>
+      ))}
+      <mesh
+        position={[DUMP_TRUCK.groupX, 0.698, DUMP_TRUCK.groupZ]}
+        rotation={[-Math.PI / 2, 0, DUMP_TRUCK.rotation]}
+        receiveShadow
+      >
+        <planeGeometry args={[7.2, 5.4]} />
+        <meshStandardMaterial map={gravelTexture} color="#b5a48c" roughness={0.94} metalness={0.02} />
+      </mesh>
+      <mesh position={[endX, 0.704, endZ]} rotation={[-Math.PI / 2, 0, angle]}>
+        <ringGeometry args={[2.4, 3.6, 32, 1, 0, Math.PI]} />
+        <meshStandardMaterial map={compactTexture} color="#8f8270" roughness={0.95} />
+      </mesh>
+    </group>
   );
 }
 
@@ -69,6 +142,7 @@ export function MapSiteDecor({
         texture={compactTexture}
         y={0.708}
       />
+      <TruckDepartureLane compactTexture={compactTexture} gravelTexture={gravelTexture} />
       <mesh position={[DUMP_ZONE.x, 0.72, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[DUMP_ZONE.radius + 2.2, 48]} />
         <meshStandardMaterial

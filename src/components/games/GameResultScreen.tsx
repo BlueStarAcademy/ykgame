@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import type { GameId } from "@/lib/games";
@@ -97,18 +98,26 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
   ]);
 
   const nickname = session?.user?.nickname ?? "";
-  const title = isYanmar
-    ? "운행 결과"
-    : result.completed
-      ? "미션 완료!"
-      : "시간 종료";
-  const homeLabel = isYanmar ? "나가기" : "홈으로";
+  const isRide = result.mode === "ride";
+  const title = isRide
+    ? "탑승 체험 종료"
+    : isYanmar
+      ? "운행 결과"
+      : result.completed
+        ? "미션 완료!"
+        : "시간 종료";
+  const homeLabel = isRide ? "소개로" : isYanmar ? "나가기" : "홈으로";
   const myRankingEntry = myRank
     ? rankings.find((entry) => entry.rank === myRank) ?? null
     : null;
   const yRankingRows = rankings.slice(0, 10);
   const resultCard = (
-    <div className="mx-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg">
+    <div
+      className="mx-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg"
+      onClick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+    >
       <h2 className="text-center text-xl font-bold" style={{ color: game?.color }}>
         {title}
       </h2>
@@ -251,15 +260,32 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
     </div>
   );
 
-  return (
-    <>
-      {isYanmar ? (
-        <div className="fixed inset-0 z-[230] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]">
+  if (isYanmar) {
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+      <>
+        <div
+          className="fixed inset-0 z-[320] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]"
+          onClick={onStay}
+        >
           {resultCard}
         </div>
-      ) : (
-        resultCard
-      )}
+
+        <RankingBoard
+          gameId={gameId}
+          open={showRanking}
+          onClose={() => setShowRanking(false)}
+          highlightNickname={nickname}
+        />
+      </>,
+      document.body,
+    );
+  }
+
+  return (
+    <>
+      {resultCard}
 
       <RankingBoard
         gameId={gameId}

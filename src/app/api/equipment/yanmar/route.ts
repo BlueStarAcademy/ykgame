@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  DEFAULT_YANMAR_EQUIPMENT_LEVELS,
   calculateYanmarEquipmentStats,
   getYanmarUpgradeCost,
+  mergeYanmarEquipmentLevelsFromDb,
   type YanmarEquipmentPart,
 } from "@/games/yanmar/equipment";
 
@@ -25,10 +25,7 @@ export async function GET() {
     }),
   ]);
 
-  const levels = { ...DEFAULT_YANMAR_EQUIPMENT_LEVELS };
-  for (const row of rows) {
-    levels[row.part as YanmarEquipmentPart] = row.level;
-  }
+  const levels = mergeYanmarEquipmentLevelsFromDb(rows);
 
   return NextResponse.json({
     currency: user?.currency ?? 0,

@@ -11,7 +11,6 @@ import type {
 import { COCKPIT_LAYOUT } from "./controls";
 import type { TutorialStep } from "./tutorial";
 
-export type CockpitLayoutMode = "portrait" | "landscape";
 
 interface CockpitOverlayProps {
   input: ExcavatorControlState;
@@ -29,7 +28,7 @@ interface CockpitOverlayProps {
   allowed: ControlMask;
   tutorialStep: TutorialStep | null;
   showTouchZones: boolean;
-  layoutMode: CockpitLayoutMode;
+  hideVisualDeck?: boolean;
 }
 
 interface JoystickLayout {
@@ -49,19 +48,6 @@ type WidenNumbers<T> = T extends number
     : T;
 type CockpitLayout = WidenNumbers<typeof COCKPIT_LAYOUT>;
 
-const LANDSCAPE_COCKPIT_LAYOUT: CockpitLayout = {
-  ...COCKPIT_LAYOUT,
-  left: { ...COCKPIT_LAYOUT.left, cy: 0.72 },
-  right: { ...COCKPIT_LAYOUT.right, cy: 0.72 },
-  safetyLever: { ...COCKPIT_LAYOUT.safetyLever, cy: 0.74 },
-  travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cy: 0.7 },
-  travelRight: { ...COCKPIT_LAYOUT.travelRight, cy: 0.7 },
-  travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cy: 0.7 },
-  hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cy: 0.74 },
-  rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cy: 0.64 },
-  horn: { ...COCKPIT_LAYOUT.horn, cx: 0.905, cy: 0.84 },
-};
-
 const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   ...COCKPIT_LAYOUT,
   left: { ...COCKPIT_LAYOUT.left, cx: 0.1, cy: 0.965 },
@@ -74,14 +60,6 @@ const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.915, cy: 0.315 },
   horn: { ...COCKPIT_LAYOUT.horn, cx: 0.915, cy: 0.495 },
 };
-
-function useControlLayout(layoutMode: CockpitLayoutMode) {
-  const isPortrait = layoutMode === "portrait";
-  return {
-    isPortrait,
-    layout: isPortrait ? PORTRAIT_COCKPIT_LAYOUT : LANDSCAPE_COCKPIT_LAYOUT,
-  };
-}
 
 function VisualJoystick({
   side,
@@ -333,7 +311,6 @@ function VisualHydraulicSpeedStatus({
 
 function VisualControlDeck({
   input,
-  auxiliary,
   highlightLeft,
   highlightRight,
   highlightTravel,
@@ -341,7 +318,6 @@ function VisualControlDeck({
   isPortrait,
 }: {
   input: ExcavatorControlState;
-  auxiliary: AuxiliaryControlState;
   highlightLeft: boolean;
   highlightRight: boolean;
   highlightTravel: boolean;
@@ -362,35 +338,6 @@ function VisualControlDeck({
         highlighted={highlightTravel}
         layout={layout}
       />
-      {!isPortrait ? (
-        <>
-          <VisualLever
-            cx={layout.safetyLever.cx}
-            cy={layout.safetyLever.cy}
-            value={auxiliary.safetyLocked ? 1 : -0.25}
-            color="red"
-            variant="safety"
-          />
-          <VisualSafetyLockStatus
-            locked={auxiliary.safetyLocked}
-            cx={layout.safetyLever.cx}
-            cy={layout.safetyLever.cy}
-          />
-          <VisualLever
-            cx={layout.hydraulicSpeed.cx}
-            cy={layout.hydraulicSpeed.cy}
-            value={auxiliary.highSpeed ? 1 : -1}
-            color="red"
-            variant="hydraulic"
-          />
-          <VisualHydraulicSpeedStatus
-            highSpeed={auxiliary.highSpeed}
-            cx={layout.hydraulicSpeed.cx}
-            cy={layout.hydraulicSpeed.cy}
-          />
-          <VisualPedal value={auxiliary.boomSwing} layout={layout} />
-        </>
-      ) : null}
       <VisualJoystick side="right" value={input.right} highlighted={highlightRight} layout={layout} isPortrait={isPortrait} />
     </div>
   );
@@ -1079,28 +1026,30 @@ export function CockpitOverlay({
   allowed,
   tutorialStep,
   showTouchZones,
-  layoutMode,
+  hideVisualDeck = false,
 }: CockpitOverlayProps) {
   const highlightLeft =
     tutorialStep?.highlight === "left" || tutorialStep?.highlight === "both";
   const highlightRight =
     tutorialStep?.highlight === "right" || tutorialStep?.highlight === "both";
   const highlightTravel = tutorialStep?.highlight === "travel";
-  const { layout, isPortrait } = useControlLayout(layoutMode);
+  const layout = PORTRAIT_COCKPIT_LAYOUT;
+  const isPortrait = true;
 
   return (
     <>
       <div className="yanmar-control-deck pointer-events-none absolute inset-x-0 z-10 mx-auto">
         <div className="relative h-full w-full">
-          <VisualControlDeck
-            input={input}
-            auxiliary={auxiliary}
-            highlightLeft={highlightLeft}
-            highlightRight={highlightRight}
-            highlightTravel={highlightTravel}
-            layout={layout}
-            isPortrait={isPortrait}
-          />
+          {!hideVisualDeck ? (
+            <VisualControlDeck
+              input={input}
+              highlightLeft={highlightLeft}
+              highlightRight={highlightRight}
+              highlightTravel={highlightTravel}
+              layout={layout}
+              isPortrait={isPortrait}
+            />
+          ) : null}
         </div>
       </div>
 

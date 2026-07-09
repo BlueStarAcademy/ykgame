@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   },
   other: {
     "mobile-web-app-capable": "yes",
-    "apple-mobile-web-app-orientations": "portrait landscape",
+    "apple-mobile-web-app-orientations": "portrait",
     "screen-orientation": "auto",
     "x5-orientation": "auto",
   },

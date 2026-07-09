@@ -124,6 +124,22 @@ body {
   will-change: transform, opacity;
 }
 
+@keyframes yanmar-hotspot-pulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.55);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.08);
+    box-shadow: 0 0 0 6px rgba(251, 191, 36, 0);
+  }
+}
+
+.yanmar-hotspot-pulse {
+  animation: yanmar-hotspot-pulse 1.2s ease-in-out infinite;
+}
+
 .yanmar-control-deck {
   bottom: 0;
   height: clamp(9.5rem, 34dvh, 15rem);
@@ -1929,73 +1945,7 @@ body {
   filter: drop-shadow(0 0.04rem 0 rgba(255, 255, 255, 0.08));
 }
 
-/* In-game layout toggle (yanmar-layout-portrait | yanmar-layout-landscape) */
-.yanmar-layout-landscape .yanmar-control-deck {
-  bottom: 0;
-  height: clamp(4.1rem, 16dvh, 5.4rem);
-  transform: none;
-}
-
-.yanmar-layout-landscape .yanmar-control-rail {
-  height: 42%;
-  left: 4.5%;
-  right: 4.5%;
-  border-radius: 1rem 1rem 0 0;
-}
-
-.yanmar-layout-landscape .yanmar-visual-joystick {
-  height: 4.1rem;
-  width: 3.65rem;
-}
-
-.yanmar-layout-landscape .yanmar-visual-lever-travel .yanmar-lever-slot {
-  top: 73%;
-  height: 2.45rem;
-  width: 0.92rem;
-}
-
-.yanmar-layout-landscape .yanmar-visual-lever-travel .yanmar-lever-stick {
-  height: 2.05rem;
-  width: 0.46rem;
-}
-
-.yanmar-layout-landscape .yanmar-horn-button {
-  height: 1.95rem;
-  width: 2.35rem;
-}
-
-.yanmar-layout-landscape .yanmar-zone-legend {
-  top: auto !important;
-  bottom: calc(clamp(4.1rem, 16dvh, 5.4rem) + 0.35rem);
-  right: 0.5rem !important;
-}
-
-.yanmar-layout-landscape .yanmar-aux-button {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  overflow: visible;
-}
-
-.yanmar-layout-landscape .yanmar-aux-button .yanmar-aux-lever-well,
-.yanmar-layout-landscape .yanmar-aux-button .yanmar-aux-button-label {
-  display: none;
-}
-
-.yanmar-layout-landscape .yanmar-pedal-button {
-  opacity: 0.92;
-}
-
-.yanmar-layout-landscape .yanmar-portrait-side-button,
-.yanmar-layout-landscape .yanmar-portrait-3d-button {
-  display: none !important;
-}
-
-.yanmar-layout-landscape .yanmar-safety-lock-status,
-.yanmar-layout-landscape .yanmar-hydraulic-speed-status {
-  display: flex;
-}
-
+/* In-game portrait cockpit layout */
 .yanmar-layout-portrait .yanmar-control-deck {
   bottom: 0;
   height: clamp(16rem, 40dvh, 20rem);
@@ -2125,24 +2075,6 @@ body {
 .yanmar-layout-portrait .yanmar-zone-legend {
   top: 15.75rem !important;
   right: 0.5rem !important;
-}
-
-/* Screen Orientation API 미지원 기기용 가로 화면 fallback */
-html.yanmar-forced-landscape,
-html.yanmar-forced-landscape body {
-  overflow: hidden !important;
-}
-
-html.yanmar-forced-landscape [data-game-immersive] {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  width: 100dvh;
-  height: 100dvw;
-  max-width: none;
-  max-height: none;
-  transform: translate(-50%, -50%) rotate(90deg);
-  transform-origin: center center;
 }
 
 @keyframes card-shimmer {
@@ -2327,6 +2259,24 @@ html.pwa-mode body {
 .landing-logo {
   background: linear-gradient(145deg, #ef5350 0%, #c62828 50%, #b71c1c 100%);
   border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.landing-cta-ride {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.35);
+}
+
+.landing-cta-ride:hover {
+  box-shadow: 0 12px 36px rgba(14, 165, 233, 0.45);
+}
+
+.landing-cta-game {
+  background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
+  box-shadow: 0 4px 16px rgba(229, 57, 53, 0.35);
+}
+
+.landing-cta-game:hover {
+  box-shadow: 0 12px 36px rgba(229, 57, 53, 0.5);
 }
 
 .landing-cta {

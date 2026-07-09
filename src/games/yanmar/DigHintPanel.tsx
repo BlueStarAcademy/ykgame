@@ -215,7 +215,7 @@ export function DigPoseGraph({
         <GraphRow
           label="버킷"
           value={bucket}
-          min={-0.05}
+          min={0.35}
           max={3.6}
           optimalMin={0.35}
           optimalMax={1.1}

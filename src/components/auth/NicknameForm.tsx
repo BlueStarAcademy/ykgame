@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { experienceDestination, getExperienceMode } from "@/lib/experience-mode";
 import { withPwaQuery } from "@/lib/pwa-mode";
 
 export function NicknameForm() {
@@ -31,7 +32,9 @@ export function NicknameForm() {
     }
 
     await update({ user: { nickname: data.nickname, currency: data.currency } });
-    router.push(withPwaQuery("/home"));
+    const experience = getExperienceMode();
+    const nextPath = experience ? experienceDestination(experience) : "/home";
+    router.push(withPwaQuery(nextPath));
     router.refresh();
   }
 

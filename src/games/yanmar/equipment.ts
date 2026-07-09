@@ -1,8 +1,7 @@
 export const YANMAR_REWARD_CONFIG = {
   baseMaxLoadUnits: 1000,
-  baseTruckCapacityUnits: 1200,
-  baseTruckCooldownSec: 14,
-  minTruckCooldownSec: 6,
+  baseTruckCapacityUnits: 3000,
+  baseTruckCooldownSec: 600,
   scoreChunkUnits: 200,
   baseScorePerChunkMin: 80,
   baseScorePerChunkMax: 100,
@@ -14,6 +13,10 @@ export const YANMAR_REWARD_CONFIG = {
   minStarReward: 1,
   maxStarReward: 3,
 } as const;
+
+export const YANMAR_TRUCK_UPGRADE_COSTS = [
+  50, 100, 150, 200, 250, 300, 400, 500, 750, 1000,
+] as const;
 
 export const YANMAR_EQUIPMENT_CONFIG = {
   ARM: {
@@ -40,12 +43,17 @@ export const YANMAR_EQUIPMENT_CONFIG = {
     effectPerLevel: 0.1,
     description: "이동속도 +10%",
   },
-  TRUCK: {
-    label: "덤프트럭",
-    maxLevel: 5,
-    capacityPerLevel: 400,
-    cooldownReductionPerLevel: 1.6,
-    description: "최대 하역량 +400 / 재도착 -1.6초",
+  TRUCK_CAPACITY: {
+    label: "[덤프트럭] 하역량 증가",
+    maxLevel: 10,
+    capacityPerLevel: 500,
+    description: "최대 하역량 +500",
+  },
+  TRUCK_SPEED: {
+    label: "[덤프트럭] 속도 상승",
+    maxLevel: 10,
+    cooldownReductionPerLevel: 0.05,
+    description: "복귀 대기 5% 단축",
   },
 } as const;
 
@@ -68,7 +76,8 @@ export const DEFAULT_YANMAR_EQUIPMENT_LEVELS: YanmarEquipmentLevels = {
   BOOM: 0,
   BUCKET: 0,
   ENGINE: 0,
-  TRUCK: 0,
+  TRUCK_CAPACITY: 0,
+  TRUCK_SPEED: 0,
 };
 
 export const YANMAR_UPGRADE_COSTS = {
@@ -76,10 +85,14 @@ export const YANMAR_UPGRADE_COSTS = {
   BOOM: [10, 25, 50, 75, 100, 150, 200, 300, 500, 1000],
   BUCKET: [20, 50, 100, 200, 500],
   ENGINE: [20, 50, 100, 200, 500],
-  TRUCK: [20, 50, 100, 200, 500],
+  TRUCK_CAPACITY: YANMAR_TRUCK_UPGRADE_COSTS,
+  TRUCK_SPEED: YANMAR_TRUCK_UPGRADE_COSTS,
 } as const satisfies Record<YanmarEquipmentPart, readonly number[]>;
 
 export const YANMAR_EQUIPMENT_RESET_REFUND_RATE = 0.7;
+
+/** @deprecated legacy DB row — migrated to TRUCK_CAPACITY */
+export const LEGACY_TRUCK_EQUIPMENT_PART = "TRUCK" as const;
 
 export function getYanmarUpgradeCost(part: YanmarEquipmentPart, nextLevel: number) {
   if (nextLevel < 1) return 0;
@@ -110,6 +123,25 @@ export function formatYanmarUpgradeCostSequence(part: YanmarEquipmentPart, maxLe
   return Array.from({ length: maxLevel }, (_, index) =>
     getYanmarUpgradeCost(part, index + 1),
   ).join(" / ");
+}
+
+export function mergeYanmarEquipmentLevelsFromDb(
+  rows: Array<{ part: string; level: number }>,
+): YanmarEquipmentLevels {
+  const levels = { ...DEFAULT_YANMAR_EQUIPMENT_LEVELS };
+  for (const row of rows) {
+    if (row.part === LEGACY_TRUCK_EQUIPMENT_PART) {
+      levels.TRUCK_CAPACITY = Math.max(
+        levels.TRUCK_CAPACITY,
+        Math.min(YANMAR_EQUIPMENT_CONFIG.TRUCK_CAPACITY.maxLevel, row.level),
+      );
+      continue;
+    }
+    if (row.part in YANMAR_EQUIPMENT_CONFIG) {
+      levels[row.part as YanmarEquipmentPart] = row.level;
+    }
+  }
+  return clampYanmarEquipmentLevels(levels);
 }
 
 export function clampYanmarEquipmentLevels(
@@ -144,13 +176,12 @@ export function calculateYanmarEquipmentStats(
   levels: Partial<Record<YanmarEquipmentPart, number>>,
 ): YanmarEquipmentStats {
   const safeLevels = clampYanmarEquipmentLevels(levels);
-  const truckConfig = YANMAR_EQUIPMENT_CONFIG.TRUCK;
   return {
     maxLoadUnits:
       YANMAR_REWARD_CONFIG.baseMaxLoadUnits +
       safeLevels.BUCKET * YANMAR_EQUIPMENT_CONFIG.BUCKET.effectPerLevel,
-    truckCapacityUnits: getYanmarTruckCapacityUnits(safeLevels.TRUCK),
-    truckCooldownSec: getYanmarTruckCooldownSec(safeLevels.TRUCK),
+    truckCapacityUnits: getYanmarTruckCapacityUnits(safeLevels.TRUCK_CAPACITY),
+    truckCooldownSec: getYanmarTruckCooldownSec(safeLevels.TRUCK_SPEED),
     scoreChunkUnits: YANMAR_REWARD_CONFIG.scoreChunkUnits,
     criticalChance:
       YANMAR_REWARD_CONFIG.baseCriticalChance +
@@ -163,26 +194,26 @@ export function calculateYanmarEquipmentStats(
   };
 }
 
-export function getYanmarTruckCapacityUnits(truckLevel = 0) {
+export function getYanmarTruckCapacityUnits(capacityLevel = 0) {
   const level = Math.max(
     0,
-    Math.min(YANMAR_EQUIPMENT_CONFIG.TRUCK.maxLevel, Math.floor(truckLevel)),
+    Math.min(YANMAR_EQUIPMENT_CONFIG.TRUCK_CAPACITY.maxLevel, Math.floor(capacityLevel)),
   );
   return (
     YANMAR_REWARD_CONFIG.baseTruckCapacityUnits +
-    level * YANMAR_EQUIPMENT_CONFIG.TRUCK.capacityPerLevel
+    level * YANMAR_EQUIPMENT_CONFIG.TRUCK_CAPACITY.capacityPerLevel
   );
 }
 
-export function getYanmarTruckCooldownSec(truckLevel = 0) {
+export function getYanmarTruckCooldownSec(speedLevel = 0) {
   const level = Math.max(
     0,
-    Math.min(YANMAR_EQUIPMENT_CONFIG.TRUCK.maxLevel, Math.floor(truckLevel)),
+    Math.min(YANMAR_EQUIPMENT_CONFIG.TRUCK_SPEED.maxLevel, Math.floor(speedLevel)),
   );
+  const factor = 1 - YANMAR_EQUIPMENT_CONFIG.TRUCK_SPEED.cooldownReductionPerLevel;
   return Math.max(
-    YANMAR_REWARD_CONFIG.minTruckCooldownSec,
-    YANMAR_REWARD_CONFIG.baseTruckCooldownSec -
-      level * YANMAR_EQUIPMENT_CONFIG.TRUCK.cooldownReductionPerLevel,
+    30,
+    YANMAR_REWARD_CONFIG.baseTruckCooldownSec * factor ** level,
   );
 }
 

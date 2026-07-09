@@ -9,7 +9,7 @@ export interface GameResult {
   arcadeScore?: number;
   dumpUnits?: number;
   rewardStars?: number;
-  mode?: "game" | "practice" | "tutorial";
+  mode?: "game" | "practice" | "tutorial" | "ride";
 }
 
 export interface MissionConfig {

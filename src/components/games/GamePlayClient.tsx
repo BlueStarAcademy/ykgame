@@ -24,7 +24,7 @@ interface MyStats {
 }
 
 type GamePhase = "lobby" | "playing" | "result";
-type PlayMode = "practice" | "game";
+type PlayMode = "practice" | "game" | "ride";
 
 function controlLabel(type: string) {
   if (type === "excavator") return "듀얼 조이스틱";
@@ -251,7 +251,14 @@ function DefaultGameLobby({
   );
 }
 
-export function GamePlayClient({ gameId }: GamePlayClientProps) {
+export function GamePlayClient({
+  gameId,
+  initialPlay,
+  standalone = false,
+}: GamePlayClientProps & {
+  initialPlay?: "ride";
+  standalone?: boolean;
+}) {
   const game = getGameById(gameId);
   const router = useRouter();
   const { data: session } = useSession();
@@ -259,6 +266,7 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
   const [playMode, setPlayMode] = useState<PlayMode | null>(null);
   const [result, setResult] = useState<GameResult | null>(null);
   const [yanmarExitSignal, setYanmarExitSignal] = useState(0);
+  const [yanmarResumeSignal, setYanmarResumeSignal] = useState(0);
   const [myStats, setMyStats] = useState<MyStats>({
     rank: null,
     bestScore: 0,
@@ -277,6 +285,15 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
   useEffect(() => {
     loadStats();
   }, [loadStats]);
+
+  useEffect(() => {
+    if (gameId === "yanmar" && initialPlay === "ride") {
+      setResult(null);
+      setPlayMode("ride");
+      setYanmarExitSignal(0);
+      setPhase("playing");
+    }
+  }, [gameId, initialPlay]);
 
   const handleStartPractice = () => {
     setResult(null);
@@ -300,6 +317,10 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
   };
 
   const handleExitGame = () => {
+    if (gameId === "yanmar" && (playMode === "ride" || initialPlay === "ride")) {
+      router.push("/");
+      return;
+    }
     if (gameId === "yanmar") {
       setYanmarExitSignal((value) => value + 1);
       return;
@@ -326,11 +347,12 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
 
   const handleStay = () => {
     setResult(null);
+    setYanmarResumeSignal((value) => value + 1);
     loadStats();
   };
 
   const handleExitHome = () => {
-    router.push("/home");
+    router.push(playMode === "ride" || initialPlay === "ride" ? "/" : "/home");
   };
 
   if (!game) return null;
@@ -349,9 +371,11 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
 
   return (
     <>
-      <Link href="/home" className="game-page-back">
-        <span aria-hidden>←</span> 홈으로
-      </Link>
+      {!standalone ? (
+        <Link href="/home" className="game-page-back">
+          <span aria-hidden>←</span> 홈으로
+        </Link>
+      ) : null}
 
       {phase === "lobby" &&
         (gameId === "yanmar" ? (
@@ -387,6 +411,7 @@ export function GamePlayClient({ gameId }: GamePlayClientProps) {
             gameId={gameId}
             onEnd={handleGameEnd}
             exitSignal={yanmarExitSignal}
+            resumeSignal={yanmarResumeSignal}
             immersive
             initialPlayMode={playMode ?? undefined}
             onShowRanking={() => setShowRanking(true)}

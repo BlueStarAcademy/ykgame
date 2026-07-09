@@ -3,11 +3,10 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  DEFAULT_YANMAR_EQUIPMENT_LEVELS,
+  mergeYanmarEquipmentLevelsFromDb,
   YANMAR_REWARD_CONFIG,
   calculateYanmarEquipmentStats,
   calculateYanmarChunkScore,
-  type YanmarEquipmentPart,
 } from "@/games/yanmar/equipment";
 
 const PARTS_DISCOUNTS = [10, 15, 20] as const;
@@ -102,10 +101,7 @@ export async function POST(request: Request) {
     where: { userId: session.user.id, gameId: "yanmar" },
     select: { part: true, level: true },
   });
-  const levels = { ...DEFAULT_YANMAR_EQUIPMENT_LEVELS };
-  for (const row of rows) {
-    levels[row.part as YanmarEquipmentPart] = row.level;
-  }
+  const levels = mergeYanmarEquipmentLevelsFromDb(rows);
   const stats = calculateYanmarEquipmentStats(levels);
 
   const events = Array.from({ length: safeChunkCount }, () => {

@@ -28,6 +28,8 @@ enum EquipmentPart {
   BUCKET
   ENGINE
   TRUCK
+  TRUCK_CAPACITY
+  TRUCK_SPEED
 }
 
 model User {

@@ -8,18 +8,28 @@ import { prisma } from "@/lib/prisma";
 
 export default async function GamePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ gameId: string }>;
+  searchParams: Promise<{ play?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
   if (!session.user.nickname) redirect("/nickname");
 
   const { gameId } = await params;
+  const { play } = await searchParams;
   if (!isValidGameId(gameId)) notFound();
   if (!isGameAvailable(gameId)) redirect("/home");
 
   getGameById(gameId);
+
+  const initialPlay = play === "ride" ? "ride" : undefined;
+  const isRideEntry = gameId === "yanmar" && initialPlay === "ride";
+
+  if (isRideEntry) {
+    return <GamePlayClient gameId={gameId} initialPlay="ride" standalone />;
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },

@@ -99,7 +99,7 @@ export function createAuxiliaryControls(): AuxiliaryControlState {
   };
 }
 
-/** 최대 각속도·주행속도 */
+/** 최대 각속도·주행속도 (게임 — 빠른 피드백) */
 export const CONTROL_SPEED = {
   swing: 1.4,
   travel: 5.5,
@@ -108,6 +108,21 @@ export const CONTROL_SPEED = {
   arm: 0.85,
   bucket: 1.2,
 } as const;
+
+/** 탑승 체험 — 실제 미니 굴착기에 가까운 저속 프로필 */
+export const RIDE_CONTROL_SPEED = {
+  swing: 0.52,
+  travel: 2.1,
+  trackTurn: 0.5,
+  boom: 0.48,
+  arm: 0.3,
+  bucket: 0.42,
+} as const;
+
+export type ControlSpeedProfile = typeof CONTROL_SPEED | typeof RIDE_CONTROL_SPEED;
+
+/** 버킷 말기(우 조이스틱 좌) 시 각속도 — 펴기보다 완만하게 */
+const BUCKET_CURL_SPEED_SCALE = 0.72;
 
 /** 유압 가속 (입력 시) */
 const ACCEL = {
@@ -130,7 +145,7 @@ const DAMPING = {
 export const JOINT_LIMITS = {
   boom: { min: 0.06, max: 1.45 },
   arm: { min: -2.05, max: 0.55 },
-  bucket: { min: -0.05, max: 3.6 },
+  bucket: { min: 0.35, max: 3.6 },
 } as const;
 
 export interface HydraulicVelocity {
@@ -194,19 +209,20 @@ export function applyControls(
   vel: HydraulicVelocity,
   hydraulicSpeedScale = 1,
   travelSpeedScale = 1,
+  speedProfile: ControlSpeedProfile = CONTROL_SPEED,
 ) {
   const { left, right, travel } = input;
 
   vel.swing = approach(
     vel.swing,
-    -left.x * CONTROL_SPEED.swing,
+    -left.x * speedProfile.swing,
     ACCEL.swing,
     DAMPING.swing,
     dt,
   );
   vel.arm = approach(
     vel.arm,
-    -left.y * CONTROL_SPEED.arm * hydraulicSpeedScale,
+    -left.y * speedProfile.arm * hydraulicSpeedScale,
     ACCEL.arm,
     DAMPING.arm,
     dt,
@@ -218,14 +234,14 @@ export function applyControls(
 
   vel.travel = approach(
     vel.travel,
-    trackAverage * CONTROL_SPEED.travel * travelSpeedScale,
+    trackAverage * speedProfile.travel * travelSpeedScale,
     ACCEL.travel,
     DAMPING.travel,
     dt,
   );
   vel.trackTurn = approach(
     vel.trackTurn,
-    trackDelta * CONTROL_SPEED.trackTurn,
+    trackDelta * speedProfile.trackTurn,
     ACCEL.travel,
     DAMPING.travel,
     dt,
@@ -233,14 +249,17 @@ export function applyControls(
   // 우 조이스틱 앞=붐 하강(각도↑·버킷↓), 뒤=붐 상승 — 3D 암 골격과 일치
   vel.boom = approach(
     vel.boom,
-    right.y * CONTROL_SPEED.boom * hydraulicSpeedScale,
+    right.y * speedProfile.boom * hydraulicSpeedScale,
     ACCEL.boom,
     DAMPING.boom,
     dt,
   );
   vel.bucket = approach(
     vel.bucket,
-    right.x * CONTROL_SPEED.bucket * hydraulicSpeedScale,
+    right.x *
+      speedProfile.bucket *
+      hydraulicSpeedScale *
+      (right.x < 0 ? BUCKET_CURL_SPEED_SCALE : 1),
     ACCEL.bucket,
     DAMPING.bucket,
     dt,

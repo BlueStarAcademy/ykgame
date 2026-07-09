@@ -3,7 +3,7 @@ import type { ControlMask } from "./controls";
 import { ALL_CONTROLS } from "./controls";
 
 export type { ControlMask };
-export type GameMode = "intro" | "practice" | "tutorial" | "gameReady" | "game";
+export type GameMode = "intro" | "ride" | "practice" | "tutorial" | "gameReady" | "game";
 
 export type TutorialHighlight = "left" | "right" | "travel" | "both" | null;
 
@@ -68,7 +68,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     instruction: "우 조이스틱 좌 — 버킷 말기",
     highlight: "right",
     allowed: { leftX: false, leftY: false, rightX: true, rightY: false, travel: false },
-    bucketMax: -0.025,
+    bucketMax: 0.35,
   },
   {
     id: "dig",

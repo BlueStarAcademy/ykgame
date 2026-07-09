@@ -11,8 +11,9 @@ interface PhaserGameWrapperProps {
   gameId: GameId;
   onEnd: (result: GameResult) => void;
   exitSignal?: number;
+  resumeSignal?: number;
   immersive?: boolean;
-  initialPlayMode?: "practice" | "game";
+  initialPlayMode?: "practice" | "game" | "ride";
   onShowRanking?: () => void;
   myRank?: number | null;
   bestScore?: number;
@@ -101,6 +102,7 @@ export function PhaserGameWrapper({
   gameId,
   onEnd,
   exitSignal = 0,
+  resumeSignal = 0,
   immersive = false,
   initialPlayMode,
   onShowRanking,
@@ -112,6 +114,7 @@ export function PhaserGameWrapper({
       <ExcavatorGameWrapper
         onEnd={onEnd}
         exitSignal={exitSignal}
+        resumeSignal={resumeSignal}
         immersive={immersive}
         initialPlayMode={initialPlayMode}
         onShowRanking={onShowRanking}

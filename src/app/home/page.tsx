@@ -52,13 +52,13 @@ export default async function HomePage() {
               YK
             </div>
             <h1 className="text-lg font-black tracking-tight text-slate-900">
-              YK건기 브랜드 캐주얼 게임
+              YK건기 게임 체험
             </h1>
           </div>
           <p className="mx-auto mt-3 max-w-[18rem] text-xs leading-relaxed text-slate-500">
-            실제 장비 조작감으로 굴착·하역을 체험하고
+            미션·스타·쿠폰 보상과 랭킹에 도전하는
             <br />
-            점수·스타·쿠폰 보상에 도전하세요
+            브랜드 캐주얼 게임 허브입니다
           </p>
 
           <div className="mx-auto mt-4 grid max-w-[14rem] grid-cols-2 gap-2">

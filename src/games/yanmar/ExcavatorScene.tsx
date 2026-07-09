@@ -4,56 +4,37 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
-import { RoundedBox, Text } from "@react-three/drei";
+import { RoundedBox, Text, Billboard } from "@react-three/drei";
 import * as THREE from "three";
-import type { AuxiliaryControlState, ExcavatorControlState, ControlMask } from "./controls";
-import {
-  applyControls,
-  canLoadBucket as isBucketCurled,
-  filterInput,
-  type HydraulicVelocity,
-} from "./controls";
+import type { AuxiliaryControlState, ExcavatorControlState, ControlMask, HydraulicVelocity } from "./controls";
 import { ExcavatorBucket } from "./ExcavatorBucket";
 import {
   createTerrain,
-  digAt,
   getActiveDigZones,
-  isInDigZone,
   isInDumpZone,
-  isInDumpTruckBed,
-  clampToDumpTruckBed,
-  dumpTruckBedCenterWorld,
   dumpTruckBedDeckWorldY,
-  getMapWorldBounds,
   sampleHeight,
-  updateDigZoneRespawns,
-  worldToDumpTruckLocal,
   type TerrainData,
   DIG_ZONE,
-  DUMP_TRUCK,
   DUMP_ZONE,
+  DUMP_TRUCK,
   DUMP_TRUCK_BED,
 } from "./terrain";
+import type { DigFeedback } from "./bucket";
 import {
-  getBucketBodyContactWorld,
-  getBucketScraperContactWorld,
-  getBucketTipWorld,
-  type DigFeedback,
-} from "./bucket";
-import { constrainArmFromDumpTruck } from "./dumpTruckCollision";
-import {
-  addDumpTruckLoad,
-  canDumpTruckAcceptDump,
+  formatDumpTruckReturnTime,
   getDumpTruckFillRatio,
+  getDumpTruckMotionProgress,
   getDumpTruckPose,
+  getDumpTruckReturnEtaSec,
   isDumpTruckVisible,
+  shouldShowDumpTruckReturnTimer,
   type DumpTruckPose,
   type DumpTruckRuntimeState,
-  updateDumpTruckState,
 } from "./dumpTruckState";
 import type { DiggingScoreState } from "./scoring";
 import type { GameMode, TutorialStep } from "./tutorial";
-import { calculateYanmarChunkScore, type YanmarEquipmentStats } from "./equipment";
+import type { YanmarEquipmentStats } from "./equipment";
 import {
   createGroundDirtTexture,
   createRockTexture,
@@ -64,27 +45,14 @@ import {
   type ScatterRock,
 } from "./terrainScatter";
 import { MapSiteDecor } from "./mapDecor";
+import type { CameraMode, DumpScorePopup, ExcavatorSimState } from "./types";
+import {
+  createSimLoopRuntime,
+  tickExcavatorSim,
+  type DumpSoilVisual,
+} from "./simLoop";
 
-export interface ExcavatorSimState {
-  swing: number;
-  boom: number;
-  arm: number;
-  bucket: number;
-  posX: number;
-  posZ: number;
-  heading: number;
-  bucketLoad: number;
-}
-
-export interface DumpScorePopup {
-  id: number;
-  score: number;
-  critical: boolean;
-  rewardText?: string;
-  x: number;
-  y: number;
-  z: number;
-}
+export type { CameraMode, DumpScorePopup, ExcavatorSimState };
 
 interface ExcavatorSceneProps {
   inputRef: React.RefObject<ExcavatorControlState>;
@@ -106,10 +74,7 @@ interface ExcavatorSceneProps {
   onSimTick: () => void;
   scorePopups: DumpScorePopup[];
   cameraMode: CameraMode;
-  layoutPortrait: boolean;
 }
-
-export type CameraMode = 1 | 2 | 3;
 
 function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<TerrainData> }) {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -316,18 +281,12 @@ function DigDustCloud({
   );
 }
 
-type DumpSoilVisual = {
-  active: boolean;
-  spawnX: number;
-  spawnY: number;
-  spawnZ: number;
-  intensity: number;
-};
+type DumpSoilVisualState = DumpSoilVisual;
 
 function DumpSoilParticles({
   visualRef,
 }: {
-  visualRef: React.MutableRefObject<DumpSoilVisual>;
+  visualRef: React.MutableRefObject<DumpSoilVisualState>;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const particleStates = useRef(
@@ -461,13 +420,6 @@ const YANMAR_REAR_BODY_WIDTH = 1.0;
 const MINI_EXCAVATOR_BODY_LENGTH_SCALE = 0.58;
 const MINI_EXCAVATOR_BODY_WIDTH_SCALE = 0.82;
 const EXCAVATOR_FIXED_VISUAL_Y = 0.68;
-const EXCAVATOR_COLLISION_RADIUS = 1.35;
-const DUMP_TRUCK_COLLIDER = {
-  centerOffsetX: 0.05,
-  centerOffsetZ: 0,
-  halfX: 3.05,
-  halfZ: 2.05,
-} as const;
 
 function configureDecalTexture(texture: THREE.Texture, anisotropy = 16) {
   texture.generateMipmaps = false;
@@ -1612,15 +1564,10 @@ function ExcavatorArm({
 function GameCamera({
   simRef,
   mode,
-  portrait,
 }: {
   simRef: React.MutableRefObject<ExcavatorSimState>;
   mode: CameraMode;
-  portrait: boolean;
 }) {
-  const portraitRef = useRef(portrait);
-  portraitRef.current = portrait;
-
   useFrame(({ camera }) => {
     const s = simRef.current;
     const facing = s.heading + s.swing;
@@ -1628,17 +1575,16 @@ function GameCamera({
     const forwardZ = Math.cos(facing);
     const sideX = Math.cos(facing);
     const sideZ = -Math.sin(facing);
-    const isPortrait = portraitRef.current;
     const persp = camera as THREE.PerspectiveCamera;
 
     if (mode === 3) {
       // First-person view: frame the boom so its root sits visually on the control deck.
-      const camY = isPortrait ? 2.72 : 2.95;
-      const lookY = isPortrait ? 1.68 : 1.9;
-      const back = isPortrait ? 0.96 : 1.48;
-      const lookAhead = isPortrait ? 5.1 : 6.1;
-      const side = isPortrait ? 0.36 : 0.5;
-      const fov = isPortrait ? 54 : 56;
+      const camY = 2.72;
+      const lookY = 1.68;
+      const back = 0.96;
+      const lookAhead = 5.1;
+      const side = 0.36;
+      const fov = 54;
       if (Math.abs(persp.fov - fov) > 0.01) {
         persp.fov = fov;
         persp.updateProjectionMatrix();
@@ -1660,12 +1606,12 @@ function GameCamera({
     if (mode === 1) {
       camera.position.set(
         s.posX - forwardX * 5.9 + sideX * 2.75,
-        isPortrait ? 3.85 : 4.35,
+        3.85,
         s.posZ - forwardZ * 5.9 + sideZ * 2.75,
       );
       camera.lookAt(
         s.posX + forwardX * 2.9 - sideX * 0.45,
-        isPortrait ? 1.55 : 2.05,
+        1.55,
         s.posZ + forwardZ * 2.9 - sideZ * 0.45,
       );
       return;
@@ -1673,12 +1619,12 @@ function GameCamera({
 
     camera.position.set(
       s.posX - forwardX * 11.5 + sideX * 6.2,
-      isPortrait ? 6.2 : 6.9,
+      6.2,
       s.posZ - forwardZ * 11.5 + sideZ * 6.2,
     );
     camera.lookAt(
       s.posX + forwardX * 3.9 - sideX * 0.7,
-      isPortrait ? 1.55 : 2.0,
+      1.55,
       s.posZ + forwardZ * 3.9 - sideZ * 0.7,
     );
   });
@@ -1686,68 +1632,6 @@ function GameCamera({
 }
 
 // 굴착 구역 밖(이동로): 버킷이 지면 위에 유지. 굴착 구역 안에서만 깊게 파고들 수 있음.
-const MIN_BUCKET_GROUND_CLEARANCE = 0.05;
-const MIN_BUCKET_DIG_ZONE_CLEARANCE = -2.15;
-const EXCAVATOR_MAP_WALL_MARGIN = 4.6;
-
-function bucketClearance(sim: ExcavatorSimState, terrain: TerrainData, boomSwing: number) {
-  const tip = getBucketBodyContactWorld(sim, boomSwing);
-  const groundH = sampleHeight(terrain, tip.x, tip.z);
-  return {
-    tip,
-    groundH,
-    depthBelow: groundH - tip.y,
-    clearance: tip.y - groundH,
-  };
-}
-
-function constrainBucketGroundContact(
-  sim: ExcavatorSimState,
-  terrain: TerrainData,
-  boomSwing: number,
-) {
-  return bucketClearance(sim, terrain, boomSwing);
-}
-
-function constrainExcavatorToMap(sim: ExcavatorSimState, terrain: TerrainData) {
-  const bounds = getMapWorldBounds(terrain);
-  const nextX = clampControl(
-    sim.posX,
-    bounds.minX + EXCAVATOR_MAP_WALL_MARGIN,
-    bounds.maxX - EXCAVATOR_MAP_WALL_MARGIN,
-  );
-  const nextZ = clampControl(
-    sim.posZ,
-    bounds.minZ + EXCAVATOR_MAP_WALL_MARGIN,
-    bounds.maxZ - EXCAVATOR_MAP_WALL_MARGIN,
-  );
-  const blocked = nextX !== sim.posX || nextZ !== sim.posZ;
-  sim.posX = nextX;
-  sim.posZ = nextZ;
-  return blocked;
-}
-
-function isExcavatorCollidingWithDumpTruck(x: number, z: number, pose?: DumpTruckPose) {
-  if (pose && !pose.present) return false;
-  const local = worldToDumpTruckLocal(x, z, pose?.groupX, pose?.groupZ);
-  const localX = local.x - DUMP_TRUCK_COLLIDER.centerOffsetX;
-  const localZ = local.z - DUMP_TRUCK_COLLIDER.centerOffsetZ;
-  const outsideX = Math.max(Math.abs(localX) - DUMP_TRUCK_COLLIDER.halfX, 0);
-  const outsideZ = Math.max(Math.abs(localZ) - DUMP_TRUCK_COLLIDER.halfZ, 0);
-
-  return outsideX * outsideX + outsideZ * outsideZ <= EXCAVATOR_COLLISION_RADIUS ** 2;
-}
-
-function constrainExcavatorToDumpTruck(
-  sim: ExcavatorSimState,
-  previous: { x: number; z: number },
-  pose?: DumpTruckPose,
-) {
-  if (!isExcavatorCollidingWithDumpTruck(sim.posX, sim.posZ, pose)) return false;
-  sim.posX = previous.x;
-  sim.posZ = previous.z;
-  return true;
-}
 
 function SimLoop({
   inputRef,
@@ -1767,325 +1651,43 @@ function SimLoop({
   onDumpScore,
   onSimTick,
 }: ExcavatorSceneProps) {
-  const lastReportedProgressRef = useRef(-1);
-  const dumpScoreRemainderRef = useRef(0);
+  const runtimeRef = useRef(createSimLoopRuntime());
   const dustRef = useRef<THREE.Group>(null);
-  const dumpSoilVisualRef = useRef<DumpSoilVisual>({
-    active: false,
-    spawnX: 0,
-    spawnY: 0,
-    spawnZ: 0,
-    intensity: 0,
-  });
+  const dumpSoilVisualRef = useRef<DumpSoilVisualState>(runtimeRef.current.dumpSoilVisual);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
-    const sim = simRef.current;
-    const stats = equipmentStatsRef.current;
-    const truckState = dumpTruckStateRef.current;
-    updateDumpTruckState(truckState, dt, stats.truckCooldownSec);
-    dumpTruckPoseRef.current = getDumpTruckPose(truckState);
-    const truckPose = dumpTruckPoseRef.current;
-    const raw = inputRef.current;
-    const allowed = allowedRef.current;
-    let filtered = filterInput(raw, allowed);
-    const fb = digFeedbackRef.current;
-
-    const hydraulicSpeedScale = auxiliaryRef.current?.highSpeed ? 0.5 : 0.25;
-    const boomSwing = auxiliaryRef.current?.boomSwing ?? 0;
-    const beforeControlBucket = bucketClearance(sim, terrainRef.current, boomSwing);
-    const bucketTipInDigZone = isInDigZone(
-      beforeControlBucket.tip.x,
-      beforeControlBucket.tip.z,
-      terrainRef.current,
-    );
-    const bucketAnchoredToGround =
-      bucketTipInDigZone && beforeControlBucket.clearance < 0.18;
-    const wantsTravel =
-      allowed.travel &&
-      (Math.abs(raw.travel.left) > 0.08 || Math.abs(raw.travel.right) > 0.08);
-    if (bucketAnchoredToGround) {
-      filtered = {
-        ...filtered,
-        travel: { left: 0, right: 0 },
-      };
-      velRef.current.travel = 0;
-      velRef.current.trackTurn = 0;
-    }
-    const beforeGroundContact = {
-      boom: sim.boom,
-      arm: sim.arm,
-      bucket: sim.bucket,
-    };
-    const beforeTravel = {
-      x: sim.posX,
-      z: sim.posZ,
-    };
-    applyControls(
-      sim,
-      filtered,
+    tickExcavatorSim({
       dt,
-      velRef.current,
-      hydraulicSpeedScale,
-      equipmentStatsRef.current.travelSpeedMultiplier,
-    );
-    if (constrainExcavatorToMap(sim, terrainRef.current)) {
-      velRef.current.travel = 0;
-    }
-    if (constrainExcavatorToDumpTruck(sim, beforeTravel, truckPose)) {
-      velRef.current.travel = 0;
-    }
-    constrainArmFromDumpTruck(sim, velRef.current, boomSwing, beforeGroundContact, truckPose);
-    constrainArmFromDumpTruck(sim, velRef.current, boomSwing, beforeGroundContact, truckPose);
+      sim: simRef.current,
+      vel: velRef.current,
+      terrain: terrainRef.current,
+      score: scoreRef.current,
+      mode: modeRef.current,
+      stats: equipmentStatsRef.current,
+      allowed: allowedRef.current,
+      auxiliary: auxiliaryRef.current,
+      rawInput: inputRef.current,
+      tutorialDump: tutorialDumpRef,
+      digFeedback: digFeedbackRef.current,
+      dumpTruckState: dumpTruckStateRef.current,
+      dumpTruckPose: dumpTruckPoseRef.current,
+      runtime: runtimeRef.current,
+      onProgress,
+      onDumpScore,
+      onSimTick,
+    });
 
-    let bucketContact = constrainBucketGroundContact(
-      sim,
-      terrainRef.current,
-      boomSwing,
-    );
-    let { clearance } = bucketContact;
-    const bucketContactInDigZone = isInDigZone(
-      bucketContact.tip.x,
-      bucketContact.tip.z,
-      terrainRef.current,
-    );
-    const minBucketClearance = bucketContactInDigZone
-      ? MIN_BUCKET_DIG_ZONE_CLEARANCE
-      : MIN_BUCKET_GROUND_CLEARANCE;
-    if (clearance < minBucketClearance - 0.02) {
-      sim.boom = beforeGroundContact.boom;
-      sim.arm = beforeGroundContact.arm;
-      sim.bucket = beforeGroundContact.bucket;
-      // 땅 쪽으로 밀어넣는 속도만 정지 — 들어올리기·말기 방향 조작은 유지
-      if (velRef.current.boom > 0) velRef.current.boom = 0;
-      if (velRef.current.arm > 0) velRef.current.arm = 0;
-      if (velRef.current.bucket > 0) velRef.current.bucket = 0;
-      bucketContact = constrainBucketGroundContact(
-        sim,
-        terrainRef.current,
-        boomSwing,
-      );
-      ({ clearance } = bucketContact);
-    }
-    const scraper = getBucketScraperContactWorld(sim, boomSwing);
-    const bucketTip = getBucketTipWorld(sim, boomSwing);
-    const bedDeckY = dumpTruckBedDeckWorldY();
-    const minDumpHeight = bedDeckY + DUMP_TRUCK.dumpMinHeightAboveDeck;
-    const truckBedCenter = dumpTruckBedCenterWorld(truckPose.groupX, truckPose.groupZ);
-    const bucketReachY = Math.max(scraper.y, bucketTip.y);
-    const scraperGroundH = sampleHeight(terrainRef.current, scraper.x, scraper.z);
-    const scraperDepthBelow = scraperGroundH - scraper.y;
-    updateDigZoneRespawns(terrainRef.current);
-    const activeDigZones = getActiveDigZones(terrainRef.current);
-    const scraperInDigZone = isInDigZone(scraper.x, scraper.z, terrainRef.current);
-    const tipInDigZone = isInDigZone(bucketTip.x, bucketTip.z, terrainRef.current);
-    // Use the whole visible rear bed rectangle as the dump target.
-    const isInDumpTruckRearBox = (wx: number, wz: number) => {
-      const local = worldToDumpTruckLocal(wx, wz, truckPose.groupX, truckPose.groupZ);
-      const relX = local.x - DUMP_TRUCK.bedLocalX;
-      const relZ = local.z - DUMP_TRUCK.bedLocalZ;
-      const visualBoxMargin = 0.3;
-      const halfW = DUMP_TRUCK.bedWidth / 2 + visualBoxMargin;
-      const halfD = DUMP_TRUCK.bedDepth / 2 + visualBoxMargin;
-      return (
-        Math.abs(relX) <= halfW &&
-        Math.abs(relZ) <= halfD
-      );
-    };
-    const bucketMouthCenter = {
-      x: (scraper.x + bucketTip.x) / 2,
-      z: (scraper.z + bucketTip.z) / 2,
-    };
-    const bucketOverTruck = isInDumpTruckRearBox(
-      bucketMouthCenter.x,
-      bucketMouthCenter.z,
-    );
-    const bucketNearDumpTarget =
-      Math.hypot(bucketMouthCenter.x - truckBedCenter.x, bucketMouthCenter.z - truckBedCenter.z) <=
-      DUMP_ZONE.radius + 1.2;
-    const bodyInDumpZone = isInDumpZone(sim.posX, sim.posZ);
-    const bucketOpening = sim.bucket > 1.1;
-    const bucketAboveBed = bucketReachY >= minDumpHeight;
-    const bodyNearDigZone =
-      activeDigZones.some(
-        (zone) => Math.hypot(sim.posX - zone.x, sim.posZ - zone.z) < zone.radius + 9,
-      );
-    const inZone = scraperInDigZone || tipInDigZone || bodyNearDigZone;
-    const bucketContactsInDump =
-      isInDumpZone(scraper.x, scraper.z) || isInDumpZone(bucketTip.x, bucketTip.z);
-    const bucketReadyOverTruck = bucketNearDumpTarget && (bucketAboveBed || bucketOpening);
-    const inDump = bodyInDumpZone || bucketContactsInDump || bucketOverTruck || bucketReadyOverTruck;
-    /** 정확한 칸 판정 대신, 트럭 주변에서 버킷을 들고 열면 적재함 안으로 보정 투하 */
-    const inTruckDumpTarget = bucketOverTruck || bucketReadyOverTruck;
-    const bucketInWorkRange = scraperDepthBelow > -1.4 && scraperDepthBelow < 2.6;
-    const tipOnGround = scraperDepthBelow > -1.2 && scraperDepthBelow < 2.6;
-    const curled = isBucketCurled(sim.boom, sim.bucket);
-    const bucketOpenReady = sim.bucket >= -0.05 && sim.bucket <= 1.85;
-    const insertedDeepEnough = scraperDepthBelow >= -0.15 && scraperDepthBelow <= 2.75;
-    const bucketCurlingInward = filtered.right.x < -0.08;
-    const bucketCurlReady = bucketCurlingInward && sim.bucket <= 1.85;
-    const armPulling = filtered.left.y > 0.05 || velRef.current.arm < -0.025;
-    const naturalDigPose =
-      inZone &&
-      bucketInWorkRange &&
-      bucketOpenReady &&
-      insertedDeepEnough &&
-      bucketCurlReady;
-    const digPoseScore =
-      (bucketOpenReady ? 1 : 0) +
-      (insertedDeepEnough ? 1 : 0) +
-      (bucketCurlReady ? 1 : 0) +
-      (armPulling ? 1 : 0);
-    const poseReadiness = digPoseScore / 4;
-    const canLoad = bucketInWorkRange && poseReadiness >= 0.5 && bucketCurlingInward;
-
-    fb.inDigZone = inZone;
-    fb.inDumpZone = inDump;
-    fb.tipOnGround = tipOnGround;
-    fb.bucketCurled = curled;
-    fb.canLoad = canLoad;
-    fb.groundDepth = scraperDepthBelow;
-    fb.digging = false;
-    fb.bucketOpenReady = bucketOpenReady;
-    fb.insertedDeepEnough = insertedDeepEnough;
-    fb.bucketCurlReady = bucketCurlReady;
-    fb.armPulling = armPulling;
-    fb.optimalDigPose = naturalDigPose;
-    fb.digPoseScore = poseReadiness;
-    const truckCanAccept = canDumpTruckAcceptDump(truckState, stats.truckCapacityUnits);
-    const truckFillRatio = getDumpTruckFillRatio(truckState, stats.truckCapacityUnits);
-    fb.truckPresent = isDumpTruckVisible(truckState);
-    fb.truckCanAccept = truckCanAccept;
-    fb.truckFillRatio = truckFillRatio;
-    fb.truckCooldownRemaining =
-      truckState.phase === "cooldown" ? truckState.cooldownRemaining : 0;
-    fb.canDump = inTruckDumpTarget && sim.bucketLoad > 0.02 && truckCanAccept;
-    fb.raiseArmForDump =
-      inDump && sim.bucketLoad > 0.02 && bucketOverTruck && !bucketAboveBed && !bucketOpening;
-    fb.travelBlockedRaiseArm = bucketAnchoredToGround && wantsTravel;
-
-    const isGame = modeRef.current === "game";
-
-    const isTutorial = modeRef.current === "tutorial";
-    const digRate = isTutorial ? 9.5 : 7.2;
-    const loadRate = isTutorial ? 7.0 : 5.4;
-
-    if (inZone && bucketInWorkRange && sim.bucketLoad < 1) {
-      const scrape = Math.max(0.38, scraperDepthBelow + 0.9);
-      const digX = scraperInDigZone ? scraper.x : tipInDigZone ? bucketTip.x : scraper.x;
-      const digZ = scraperInDigZone ? scraper.z : tipInDigZone ? bucketTip.z : scraper.z;
-      const inwardBucketMotion = Math.max(0, -velRef.current.bucket);
-      const pullArmMotion = Math.max(0, -velRef.current.arm);
-      const scrapeMotion =
-        pullArmMotion * 0.8 +
-        Math.abs(velRef.current.travel) * 0.22 +
-        inwardBucketMotion * 0.48 +
-        Math.abs(velRef.current.boom) * 0.25;
-      const inputMotion =
-        Math.max(0, filtered.left.y) * 0.75 +
-        Math.abs(filtered.right.y) * 0.3 +
-        Math.max(0, -filtered.right.x) * 0.42;
-      const activelyScraping =
-        bucketCurlingInward &&
-        (scrapeMotion > 0.015 || inputMotion > 0.05 || naturalDigPose);
-      const naturalLoadReady =
-        inZone && bucketInWorkRange && poseReadiness >= 0.5 && bucketCurlingInward;
-      const dug =
-        naturalLoadReady && activelyScraping
-          ? digAt(
-              terrainRef.current,
-              digX,
-              digZ,
-              naturalDigPose ? 4.4 : 3.7,
-              scrape * dt * digRate * (naturalDigPose ? 1.35 : 1.08),
-            )
-          : 0;
-      fb.digging = dug > 0.002 || (naturalLoadReady && activelyScraping);
-
-      if (naturalLoadReady && activelyScraping) {
-        const poseBonus = 0.85 + fb.digPoseScore * 0.9;
-        const scrapeLoad =
-          (scrapeMotion + inputMotion * 0.24) * (isTutorial ? 0.22 : 0.17) * dt;
-        const minimumLoad = (isTutorial ? 0.75 : 0.52) * poseBonus * dt;
-        const maxLoadDelta = (isTutorial ? 0.92 : 0.72) * poseBonus * dt;
-        const loadDelta = Math.min(
-          Math.max(dug * loadRate * 0.45 + scrapeLoad, minimumLoad),
-          maxLoadDelta,
-        );
-        sim.bucketLoad = Math.min(
-          1,
-          sim.bucketLoad + loadDelta,
-        );
-      }
-
-      if (dustRef.current && fb.digging) {
+    const dust = runtimeRef.current.digDust;
+    if (dustRef.current) {
+      if (dust.active) {
         dustRef.current.visible = true;
-        dustRef.current.position.set(digX, scraperGroundH + 0.08, digZ);
-      } else if (dustRef.current) {
+        dustRef.current.position.set(dust.x, dust.y, dust.z);
+      } else {
         dustRef.current.visible = false;
       }
-    } else if (dustRef.current) {
-      dustRef.current.visible = false;
     }
-
-    const bucketDumpOpen = sim.bucket > 1.35;
-    if (sim.bucketLoad > 0 && bucketDumpOpen && inTruckDumpTarget && truckCanAccept) {
-      const spillRate = 1.65;
-      const remainingLoad = sim.bucketLoad;
-      const dumpAmount =
-        remainingLoad < 0.025
-          ? remainingLoad
-          : Math.min(remainingLoad, remainingLoad * spillRate * dt);
-      sim.bucketLoad = Math.max(0, sim.bucketLoad - dumpAmount);
-      addDumpTruckLoad(truckState, dumpAmount * stats.maxLoadUnits, stats.truckCapacityUnits);
-      dumpSoilVisualRef.current.active = true;
-      dumpSoilVisualRef.current.intensity = Math.min(
-        1.2,
-        dumpSoilVisualRef.current.intensity + dumpAmount * 6.5,
-      );
-      dumpSoilVisualRef.current.spawnX = bucketMouthCenter.x;
-      dumpSoilVisualRef.current.spawnY = Math.max(bucketReachY, bedDeckY + 0.35);
-      dumpSoilVisualRef.current.spawnZ = bucketMouthCenter.z;
-      if (isGame) {
-        scoreRef.current.dumped += dumpAmount;
-        const progress = Math.min(
-          100,
-          Math.round((scoreRef.current.dumped / scoreRef.current.target) * 100),
-        );
-        if (progress !== lastReportedProgressRef.current) {
-          lastReportedProgressRef.current = progress;
-          onProgress(scoreRef.current.dumped, progress);
-        }
-      } else {
-        tutorialDumpRef.current += dumpAmount;
-      }
-
-      const chunkRatio = stats.scoreChunkUnits / stats.maxLoadUnits;
-      dumpScoreRemainderRef.current += dumpAmount;
-      while (dumpScoreRemainderRef.current >= chunkRatio) {
-        dumpScoreRemainderRef.current -= chunkRatio;
-        const critical = Math.random() < stats.criticalChance;
-        const dropPoint = clampToDumpTruckBed(
-          bucketMouthCenter.x,
-          bucketMouthCenter.z,
-          0.08,
-          truckPose.groupX,
-          truckPose.groupZ,
-        );
-        const dropX = dropPoint.x;
-        const dropZ = dropPoint.z;
-        const dropY = bedDeckY + 0.22;
-        onDumpScore({
-          score: calculateYanmarChunkScore(stats, critical),
-          critical,
-          x: dropX,
-          y: dropY,
-          z: dropZ,
-        });
-      }
-    }
-
-    onSimTick();
+    dumpSoilVisualRef.current = runtimeRef.current.dumpSoilVisual;
   });
 
   return (
@@ -2387,6 +1989,68 @@ function SafetyCone({ x, z }: { x: number; z: number }) {
   );
 }
 
+function DumpTruckWorldHud({
+  stateRef,
+  statsRef,
+}: {
+  stateRef: React.MutableRefObject<DumpTruckRuntimeState>;
+  statsRef: React.RefObject<YanmarEquipmentStats>;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const labelRef = useRef<THREE.Object3D & { text?: string }>(null);
+
+  useFrame(() => {
+    const state = stateRef.current;
+    const stats = statsRef.current;
+    const capacity = stats?.truckCapacityUnits ?? 3000;
+    const cooldownSec = stats?.truckCooldownSec ?? 600;
+    const pose = getDumpTruckPose(state);
+    const group = groupRef.current;
+    const label = labelRef.current;
+
+    if (group) {
+      if (state.phase === "cooldown") {
+        group.position.set(DUMP_TRUCK_BED.x, 3.35, DUMP_TRUCK_BED.z);
+      } else {
+        group.position.set(pose.groupX, 3.35, pose.groupZ);
+      }
+      group.visible =
+        state.phase === "cooldown" ||
+        isDumpTruckVisible(state) ||
+        shouldShowDumpTruckReturnTimer(state);
+    }
+
+    if (!label || !("text" in label)) return;
+
+    if (shouldShowDumpTruckReturnTimer(state)) {
+      label.text = `복귀 ${formatDumpTruckReturnTime(
+        getDumpTruckReturnEtaSec(state, cooldownSec),
+      )}`;
+      return;
+    }
+
+    label.text = `${Math.round(state.fillUnits)}/${capacity}`;
+  });
+
+  return (
+    <group ref={groupRef}>
+      <Billboard follow>
+        <Text
+          ref={labelRef}
+          fontSize={0.52}
+          color="#f8fafc"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.045}
+          outlineColor="#0f172a"
+        >
+          0/3000
+        </Text>
+      </Billboard>
+    </group>
+  );
+}
+
 function DumpTruck({
   stateRef,
   statsRef,
@@ -2395,14 +2059,21 @@ function DumpTruck({
   statsRef: React.RefObject<YanmarEquipmentStats>;
 }) {
   const groupRef = useRef<THREE.Group>(null);
+  const bodyRef = useRef<THREE.Group>(null);
   const fillMeshRef = useRef<THREE.Mesh>(null);
+  const exhaustRef = useRef<THREE.Mesh>(null);
+  const wheelRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const prevOffsetRef = useRef(0);
   const wheelXs = [-2.65, -1.65, 1.85, 2.85];
+  let wheelIndex = 0;
 
-  useFrame(() => {
+  useFrame((_, dt) => {
     const group = groupRef.current;
-    if (!group) return;
+    const body = bodyRef.current;
+    if (!group || !body) return;
     const state = stateRef.current;
     const pose = getDumpTruckPose(state);
+    const motion = getDumpTruckMotionProgress(state);
     const cos = Math.cos(DUMP_TRUCK_BED.rotation);
     const sin = Math.sin(DUMP_TRUCK_BED.rotation);
     const offsetX = pose.groupX - DUMP_TRUCK_BED.x;
@@ -2416,9 +2087,46 @@ function DumpTruck({
     );
     group.visible = isDumpTruckVisible(state);
 
+    body.position.y = 0.78;
+    body.rotation.z = 0;
+    body.rotation.y = 0;
+
+    const exhaust = exhaustRef.current;
+    if (exhaust?.material instanceof THREE.MeshStandardMaterial) {
+      exhaust.material.emissiveIntensity =
+        motion.kind === "engineStart"
+          ? 0.55 + Math.sin(state.phaseElapsed * 22) * 0.35
+          : motion.kind === "departing" || motion.kind === "arriving"
+            ? 0.35
+            : 0.12;
+    }
+
+    if (motion.kind === "engineStart") {
+      const ramp = Math.min(1, motion.t * 2.4);
+      body.position.y = 0.78 + Math.sin(state.phaseElapsed * 28) * 0.022 * ramp;
+      body.rotation.z = Math.sin(state.phaseElapsed * 19) * 0.012 * ramp;
+    } else if (motion.kind === "arriving" && motion.t > 0.78) {
+      const parkT = (motion.t - 0.78) / 0.22;
+      const settle = Math.sin(parkT * Math.PI) * (1 - parkT);
+      body.rotation.y = settle * 0.018;
+      body.position.y = 0.78 - settle * 0.012;
+    }
+
+    const offsetDelta = state.offsetLocalX - prevOffsetRef.current;
+    prevOffsetRef.current = state.offsetLocalX;
+    const wheelSpin =
+      motion.kind === "departing" || motion.kind === "arriving"
+        ? offsetDelta * 0.38
+        : motion.kind === "engineStart"
+          ? Math.sin(state.phaseElapsed * 16) * 0.004
+          : 0;
+    for (const wheel of wheelRefs.current) {
+      if (wheel) wheel.rotation.x -= wheelSpin;
+    }
+
     const fillMesh = fillMeshRef.current;
     if (fillMesh) {
-      const capacity = statsRef.current?.truckCapacityUnits ?? 1200;
+      const capacity = statsRef.current?.truckCapacityUnits ?? 3000;
       const fillRatio = getDumpTruckFillRatio(state, capacity);
       const visible = fillRatio > 0.02 && isDumpTruckVisible(state);
       fillMesh.visible = visible;
@@ -2431,7 +2139,7 @@ function DumpTruck({
 
   return (
     <group ref={groupRef} rotation={[0, DUMP_TRUCK_BED.rotation, 0]}>
-      <group position={[0.3, 0.78, 0]}>
+      <group ref={bodyRef} position={[0.3, 0.78, 0]}>
         <mesh position={[-0.65, 0.18, 0]}>
           <boxGeometry args={[5.2, 0.24, 2.86]} />
           <meshStandardMaterial color="#b88f2b" roughness={0.48} metalness={0.2} />
@@ -2486,9 +2194,9 @@ function DumpTruck({
           <boxGeometry args={[1.72, 0.32, 2.76]} />
           <meshStandardMaterial color="#303a42" roughness={0.44} metalness={0.38} />
         </mesh>
-        <mesh position={[2.42, 1.72, 0]}>
+        <mesh ref={exhaustRef} position={[2.42, 1.72, 0]}>
           <cylinderGeometry args={[0.08, 0.1, 0.22, 16]} />
-          <meshStandardMaterial color="#f59e0b" emissive="#fbbf24" emissiveIntensity={0.8} />
+          <meshStandardMaterial color="#f59e0b" emissive="#fbbf24" emissiveIntensity={0.12} />
         </mesh>
         <mesh position={[2.02, 0.18, 1.42]}>
           <boxGeometry args={[1.55, 0.22, 0.12]} />
@@ -2497,9 +2205,16 @@ function DumpTruck({
       </group>
 
       {wheelXs.map((x) =>
-        [-1.62, 1.62].map((z) => (
+        [-1.62, 1.62].map((z) => {
+          const wheelSlot = wheelIndex++;
+          return (
           <group key={`${x}:${z}`} position={[x, 0.38, z]}>
-            <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <mesh
+              ref={(node) => {
+                wheelRefs.current[wheelSlot] = node;
+              }}
+              rotation={[Math.PI / 2, 0, 0]}
+            >
               <cylinderGeometry args={[0.48, 0.48, 0.34, 32]} />
               <meshStandardMaterial color="#11161b" roughness={0.58} metalness={0.2} />
             </mesh>
@@ -2512,7 +2227,8 @@ function DumpTruck({
               <meshStandardMaterial color="#1f2937" roughness={0.72} />
             </mesh>
           </group>
-        )),
+          );
+        }),
       )}
 
       <Text
@@ -2566,6 +2282,7 @@ function WorksiteSetDressing({
         <SafetyCone key={`${x}:${z}`} x={x} z={z} />
       ))}
       <DumpTruck stateRef={dumpTruckStateRef} statsRef={equipmentStatsRef} />
+      <DumpTruckWorldHud stateRef={dumpTruckStateRef} statsRef={equipmentStatsRef} />
     </>
   );
 }
@@ -2664,7 +2381,6 @@ function SceneContent(props: ExcavatorSceneProps) {
       <GameCamera
         simRef={props.simRef}
         mode={props.cameraMode}
-        portrait={props.layoutPortrait}
       />
       <SimLoop {...props} />
     </>
@@ -2694,7 +2410,7 @@ export function createInitialSim(): ExcavatorSimState {
     swing: 0,
     boom: 0.45,
     arm: -0.95,
-    bucket: -0.12,
+    bucket: 0.85,
     posX: -18,
     posZ: -22,
     heading: 0,

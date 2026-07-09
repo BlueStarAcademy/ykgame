@@ -5,7 +5,7 @@ import {
   DEFAULT_YANMAR_EQUIPMENT_LEVELS,
   calculateYanmarEquipmentStats,
   getYanmarResetRefundStars,
-  type YanmarEquipmentPart,
+  mergeYanmarEquipmentLevelsFromDb,
 } from "@/games/yanmar/equipment";
 
 export async function POST() {
@@ -21,10 +21,7 @@ export async function POST() {
         select: { part: true, level: true },
       });
 
-      const levels = { ...DEFAULT_YANMAR_EQUIPMENT_LEVELS };
-      for (const row of rows) {
-        levels[row.part as YanmarEquipmentPart] = row.level;
-      }
+      const levels = mergeYanmarEquipmentLevelsFromDb(rows);
 
       const refundStars = getYanmarResetRefundStars(levels);
 
