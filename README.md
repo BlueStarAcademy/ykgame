@@ -42,6 +42,21 @@ GitHub에 push하면 Railway가 자동으로 빌드·배포합니다.
 - Health check: `/api/health`
 - PORT / AUTH_URL 자동 처리
 
+### 배포가 오래된 커밋에 멈춘 경우
+
+GitHub `BlueStarAcademy/ykgame` `master` 최신 커밋과 Railway Deployments의 커밋이 다르면, 서비스가 **다른 저장소/브랜치**에 연결된 것입니다.
+
+1. **ykgame-web** → **Settings** → **Source** 확인
+   - Repository: `BlueStarAcademy/ykgame`
+   - Branch: `master`
+   - Root Directory: `/` (비어 있거나 루트)
+2. **Disconnect** 후 같은 repo/branch로 **다시 Connect**
+3. Railway 대시보드에서 `Ctrl+K` (Mac: `Cmd+K`) → **Deploy Latest Commit** 실행
+4. GitHub → **Settings** → **Applications** → **Railway** → `BlueStarAcademy/ykgame` 접근 권한 확인
+5. 배포 로그에 `Railway git repo: BlueStarAcademy/ykgame` / `Railway git commit: ...` 가 보이는지 확인
+
+> `Redeploy`는 **같은 커밋**을 다시 빌드합니다. 최신 GitHub 코드를 받으려면 push 후 자동 배포 또는 **Deploy Latest Commit**이 필요합니다.
+
 ---
 
 ## 로컬 실행 (Railway Postgres 공유)

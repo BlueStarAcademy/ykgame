@@ -29,7 +29,7 @@ async function main() {
     },
   });
 
-  console.log("Seeded admin user: ykgameadmin / 123456 [deploy-rev: f396945-watchpatterns]");
+  console.log("Seeded admin user: ykgameadmin / 123456 [deploy-rev: 4d3012c-railway-git-debug]");
 }
 
 main()

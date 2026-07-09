@@ -4,7 +4,20 @@ import { spawn, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { ensureAuthSecret } from "./ensure-auth-secret.mjs";
 
-const DEPLOY_REV = "f396945-watchpatterns";
+const DEPLOY_REV = "4d3012c-railway-git-debug";
+
+function logRailwayGitSource() {
+  if (!process.env.RAILWAY_ENVIRONMENT) return;
+
+  const owner = process.env.RAILWAY_GIT_REPO_OWNER ?? "unknown";
+  const name = process.env.RAILWAY_GIT_REPO_NAME ?? "unknown";
+  const branch = process.env.RAILWAY_GIT_BRANCH ?? "unknown";
+  const sha = process.env.RAILWAY_GIT_COMMIT_SHA ?? "unknown";
+
+  console.log(`Railway git repo:  ${owner}/${name}`);
+  console.log(`Railway git branch: ${branch}`);
+  console.log(`Railway git commit: ${sha}`);
+}
 
 const port = process.env.PORT || "3000";
 const host = "0.0.0.0";
@@ -57,6 +70,7 @@ if (!hasDatabase) {
 
 resolveDatabaseUrl();
 ensureAuthSecret();
+logRailwayGitSource();
 
 if (process.env.RAILWAY_ENVIRONMENT) {
   process.env.AUTH_TRUST_HOST ??= "true";

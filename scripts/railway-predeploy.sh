@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 set -e
 
+. "$(dirname "$0")/log-railway-git.sh"
+
 BUILD_PLACEHOLDER="postgresql://build:build@127.0.0.1:5432/build"
 
 is_placeholder_url() {
@@ -65,4 +67,4 @@ npm run db:seed
 echo "==> Verifying admin login..."
 npx tsx scripts/verify-admin-login.ts
 
-echo "==> Deploy prep complete (rev: f396945-watchpatterns)."
+echo "==> Deploy prep complete (rev: 4d3012c-railway-git-debug)."
