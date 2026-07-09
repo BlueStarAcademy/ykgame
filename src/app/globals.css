@@ -1447,22 +1447,22 @@ body {
 
 .yanmar-safety-lock-status {
   position: absolute;
-  left: 24.5%;
-  top: 83%;
+  z-index: 12;
   display: flex;
   align-items: center;
   gap: 0.25rem;
   transform: translate(-50%, -50%);
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(15, 23, 42, 0.72);
-  padding: 0.22rem 0.48rem;
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 0.48rem;
+  background: rgba(15, 23, 42, 0.88);
+  padding: 0.24rem 0.52rem;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.54rem;
   font-weight: 900;
+  pointer-events: none;
   box-shadow:
     inset 0 0.12rem 0.18rem rgba(255, 255, 255, 0.08),
-    0 0.34rem 0.48rem rgba(0, 0, 0, 0.28);
+    0 0.34rem 0.48rem rgba(0, 0, 0, 0.32);
 }
 
 .yanmar-safety-lock-status.is-locked {
@@ -1482,22 +1482,22 @@ body {
 
 .yanmar-hydraulic-speed-status {
   position: absolute;
-  left: 66.5%;
-  top: 83%;
-  min-width: 1.85rem;
+  z-index: 12;
+  min-width: 1.95rem;
   transform: translate(-50%, -50%);
   border-radius: 999px;
   border: 1px solid rgba(125, 211, 252, 0.48);
-  background: rgba(8, 47, 73, 0.72);
-  padding: 0.2rem 0.48rem;
+  background: rgba(8, 47, 73, 0.88);
+  padding: 0.24rem 0.52rem;
   text-align: center;
   color: #bae6fd;
-  font-size: 0.56rem;
+  font-size: 0.58rem;
   font-weight: 1000;
   line-height: 1;
+  pointer-events: none;
   box-shadow:
     inset 0 0.12rem 0.18rem rgba(255, 255, 255, 0.1),
-    0 0.34rem 0.48rem rgba(0, 0, 0, 0.28);
+    0 0.34rem 0.48rem rgba(0, 0, 0, 0.32);
 }
 
 .yanmar-hydraulic-speed-status.is-high {
@@ -1951,7 +1951,6 @@ body {
 .yanmar-layout-landscape .yanmar-safety-lock-status,
 .yanmar-layout-landscape .yanmar-hydraulic-speed-status {
   display: flex;
-  top: 76%;
 }
 
 .yanmar-layout-portrait .yanmar-control-deck {

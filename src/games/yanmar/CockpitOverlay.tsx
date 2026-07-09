@@ -292,17 +292,37 @@ function VisualPedal({
   );
 }
 
-function VisualSafetyLockStatus({ locked }: { locked: boolean }) {
+function VisualSafetyLockStatus({ locked, cx, cy }: { locked: boolean; cx: number; cy: number }) {
   return (
-    <div className={`yanmar-safety-lock-status ${locked ? "is-locked" : "is-unlocked"}`}>
+    <div
+      className={`yanmar-safety-lock-status ${locked ? "is-locked" : "is-unlocked"}`}
+      style={{
+        left: `${cx * 100}%`,
+        top: `${(cy + 0.13) * 100}%`,
+      }}
+    >
       <span>{locked ? "잠김" : "해제"}</span>
     </div>
   );
 }
 
-function VisualHydraulicSpeedStatus({ highSpeed }: { highSpeed: boolean }) {
+function VisualHydraulicSpeedStatus({
+  highSpeed,
+  cx,
+  cy,
+}: {
+  highSpeed: boolean;
+  cx: number;
+  cy: number;
+}) {
   return (
-    <div className={`yanmar-hydraulic-speed-status ${highSpeed ? "is-high" : "is-low"}`}>
+    <div
+      className={`yanmar-hydraulic-speed-status ${highSpeed ? "is-high" : "is-low"}`}
+      style={{
+        left: `${cx * 100}%`,
+        top: `${(cy + 0.13) * 100}%`,
+      }}
+    >
       {highSpeed ? "x2" : "x1"}
     </div>
   );
@@ -348,7 +368,11 @@ function VisualControlDeck({
             color="red"
             variant="safety"
           />
-          <VisualSafetyLockStatus locked={auxiliary.safetyLocked} />
+          <VisualSafetyLockStatus
+            locked={auxiliary.safetyLocked}
+            cx={layout.safetyLever.cx}
+            cy={layout.safetyLever.cy}
+          />
           <VisualLever
             cx={layout.hydraulicSpeed.cx}
             cy={layout.hydraulicSpeed.cy}
@@ -356,7 +380,11 @@ function VisualControlDeck({
             color="red"
             variant="hydraulic"
           />
-          <VisualHydraulicSpeedStatus highSpeed={auxiliary.highSpeed} />
+          <VisualHydraulicSpeedStatus
+            highSpeed={auxiliary.highSpeed}
+            cx={layout.hydraulicSpeed.cx}
+            cy={layout.hydraulicSpeed.cy}
+          />
           <VisualPedal value={auxiliary.boomSwing} layout={layout} />
         </>
       ) : null}
