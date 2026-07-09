@@ -70,6 +70,8 @@ if (process.env.RAILWAY_ENVIRONMENT) {
 
 process.env.HOSTNAME = host;
 
+console.log("YKGAME deploy rev: middleware-auth-fix-1");
+
 console.log(`Starting Next.js on ${host}:${port}...`);
 
 const nextBin = resolve(process.cwd(), "node_modules/next/dist/bin/next");

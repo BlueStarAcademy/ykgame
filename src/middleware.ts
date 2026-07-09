@@ -70,6 +70,6 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icons|images|games|assets|api/health|manifest.webmanifest).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icons|images|games|assets|api|manifest.webmanifest).*)",
   ],
 };

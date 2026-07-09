@@ -65,4 +65,4 @@ npm run db:seed
 echo "==> Verifying admin login..."
 npx tsx scripts/verify-admin-login.ts
 
-echo "==> Deploy prep complete."
+echo "==> Deploy prep complete (rev: e704ce4+)."

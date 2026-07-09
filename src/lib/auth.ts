@@ -9,9 +9,7 @@ import type { Role } from "@/generated/prisma/client";
 ensureAuthSecretEnv();
 
 function logAuthFailure(reason: string, loginId?: string) {
-  if (process.env.RAILWAY_ENVIRONMENT) {
-    console.warn(`[auth] sign-in failed: ${reason}${loginId ? ` (loginId=${loginId})` : ""}`);
-  }
+  console.warn(`[auth] sign-in failed: ${reason}${loginId ? ` (loginId=${loginId})` : ""}`);
 }
 
 declare module "next-auth" {
@@ -56,6 +54,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         rememberMe: { label: "자동 로그인", type: "text" },
       },
       authorize: async (credentials) => {
+        console.warn("[auth] authorize called");
+
         const loginId = (credentials?.loginId as string | undefined)?.trim();
         const password = credentials?.password as string | undefined;
 
@@ -87,9 +87,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        if (process.env.RAILWAY_ENVIRONMENT) {
-          console.warn(`[auth] sign-in ok: ${loginId}`);
-        }
+        console.warn(`[auth] sign-in ok: ${loginId}`);
 
         return {
           id: user.id,
