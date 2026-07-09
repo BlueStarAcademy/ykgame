@@ -50,12 +50,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         rememberMe: { label: "자동 로그인", type: "text" },
       },
       authorize: async (credentials) => {
-        const loginId = credentials?.loginId as string | undefined;
+        const loginId = (credentials?.loginId as string | undefined)?.trim();
         const password = credentials?.password as string | undefined;
 
         if (!loginId || !password) return null;
 
-        const user = await prisma.user.findUnique({ where: { loginId } });
+        let user;
+        try {
+          user = await prisma.user.findUnique({ where: { loginId } });
+        } catch (error) {
+          console.error("[auth] database lookup failed:", error);
+          return null;
+        }
+
         if (!user || !user.isActive) return null;
 
         const valid = await bcrypt.compare(password, user.passwordHash);

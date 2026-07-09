@@ -17,10 +17,8 @@ function createPrismaClient(connectionString: string) {
     idleTimeoutMillis: 30_000,
   });
 
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.pgPool = pool;
-    globalForPrisma.dbUrl = connectionString;
-  }
+  globalForPrisma.pgPool = pool;
+  globalForPrisma.dbUrl = connectionString;
 
   const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
