@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto";
 
 function deriveFromDatabaseUrl() {
-  const dbUrl =
-    process.env.DATABASE_PUBLIC_URL?.trim() ||
-    process.env.DATABASE_URL?.trim() ||
-    process.env.DATABASE_PRIVATE_URL?.trim();
+  const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT);
+  const dbUrl = onRailway
+    ? process.env.DATABASE_URL?.trim() ||
+      process.env.DATABASE_PUBLIC_URL?.trim() ||
+      process.env.DATABASE_PRIVATE_URL?.trim()
+    : process.env.DATABASE_PUBLIC_URL?.trim() ||
+      process.env.DATABASE_URL?.trim() ||
+      process.env.DATABASE_PRIVATE_URL?.trim();
 
   if (!dbUrl) return undefined;
 

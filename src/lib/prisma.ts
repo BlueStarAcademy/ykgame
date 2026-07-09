@@ -10,11 +10,16 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient(connectionString: string) {
+  const useSsl =
+    connectionString.includes("proxy.rlwy.net") ||
+    connectionString.includes("rlwy.net");
+
   const pool = new pg.Pool({
     connectionString,
     max: 10,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 30_000,
+    ssl: useSsl ? { rejectUnauthorized: false } : undefined,
   });
 
   globalForPrisma.pgPool = pool;

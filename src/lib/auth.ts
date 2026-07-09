@@ -8,6 +8,12 @@ import type { Role } from "@/generated/prisma/client";
 
 ensureAuthSecretEnv();
 
+function logAuthFailure(reason: string, loginId?: string) {
+  if (process.env.RAILWAY_ENVIRONMENT) {
+    console.warn(`[auth] sign-in failed: ${reason}${loginId ? ` (loginId=${loginId})` : ""}`);
+  }
+}
+
 declare module "next-auth" {
   interface Session {
     user: {
@@ -53,7 +59,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const loginId = (credentials?.loginId as string | undefined)?.trim();
         const password = credentials?.password as string | undefined;
 
-        if (!loginId || !password) return null;
+        if (!loginId || !password) {
+          logAuthFailure("missing credentials");
+          return null;
+        }
 
         let user;
         try {
@@ -63,13 +72,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        if (!user || !user.isActive) return null;
+        if (!user) {
+          logAuthFailure("user not found", loginId);
+          return null;
+        }
+        if (!user.isActive) {
+          logAuthFailure("user inactive", loginId);
+          return null;
+        }
 
         const valid = await bcrypt.compare(password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          logAuthFailure("invalid password", loginId);
+          return null;
+        }
+
+        if (process.env.RAILWAY_ENVIRONMENT) {
+          console.warn(`[auth] sign-in ok: ${loginId}`);
+        }
 
         return {
           id: user.id,
+          name: user.nickname ?? user.loginId,
           loginId: user.loginId,
           email: user.email,
           nickname: user.nickname,

@@ -62,4 +62,7 @@ done
 echo "==> Seeding admin account (idempotent)..."
 npm run db:seed
 
+echo "==> Verifying admin login..."
+npx tsx scripts/verify-admin-login.ts
+
 echo "==> Deploy prep complete."

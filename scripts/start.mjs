@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import "dotenv/config";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { ensureAuthSecret } from "./ensure-auth-secret.mjs";
 
@@ -12,7 +12,35 @@ function missingEnv(name) {
   return !value || value.trim() === "";
 }
 
-ensureAuthSecret();
+function resolveDatabaseUrl() {
+  const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+  const result = spawnSync(npx, ["tsx", "scripts/resolve-db-url.ts"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    env: process.env,
+    shell: process.platform === "win32",
+  });
+
+  if (result.status !== 0) {
+    console.error(result.stderr || result.stdout || "Failed to resolve DATABASE_URL.");
+    process.exit(1);
+  }
+
+  const url = result.stdout.trim();
+  if (!url) {
+    console.error("FATAL: DATABASE_URL resolver returned an empty value.");
+    process.exit(1);
+  }
+
+  process.env.DATABASE_URL = url;
+
+  try {
+    const parsed = new URL(url);
+    console.log(`Database host: ${parsed.hostname}:${parsed.port || "5432"}${parsed.pathname}`);
+  } catch {
+    console.log("Database URL resolved.");
+  }
+}
 
 const hasDatabase =
   !missingEnv("DATABASE_URL") ||
@@ -25,8 +53,19 @@ if (!hasDatabase) {
   process.exit(1);
 }
 
+resolveDatabaseUrl();
+ensureAuthSecret();
+
 if (process.env.RAILWAY_ENVIRONMENT) {
   process.env.AUTH_TRUST_HOST ??= "true";
+
+  const domain = process.env.RAILWAY_PUBLIC_DOMAIN?.trim();
+  if (domain && missingEnv("AUTH_URL")) {
+    const authUrl = `https://${domain}`;
+    process.env.AUTH_URL = authUrl;
+    process.env.NEXTAUTH_URL ??= authUrl;
+    console.log(`AUTH_URL set to ${authUrl}`);
+  }
 }
 
 process.env.HOSTNAME = host;
@@ -46,3 +85,4 @@ child.on("error", (error) => {
 });
 
 child.on("exit", (code) => process.exit(code ?? 0));
+
