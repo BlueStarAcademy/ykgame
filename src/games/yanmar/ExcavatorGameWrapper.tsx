@@ -971,6 +971,7 @@ export function ExcavatorGameWrapper({
   const handleEquipmentUpgrade = useCallback(
     (part: YanmarEquipmentPart) => {
       const previewMode = modeRef.current !== "game";
+      const practiceMode = modeRef.current === "practice";
       if (previewMode) {
         setEquipmentLevels((current) => {
           const maxLevel = YANMAR_EQUIPMENT_CONFIG[part].maxLevel;
@@ -983,9 +984,11 @@ export function ExcavatorGameWrapper({
           setEquipmentStats(nextStats);
           return next;
         });
-        setPreviewStars((value) =>
-          Math.max(0, value - getYanmarUpgradeCost(part, equipmentLevels[part] + 1)),
-        );
+        if (!practiceMode) {
+          setPreviewStars((value) =>
+            Math.max(0, value - getYanmarUpgradeCost(part, equipmentLevels[part] + 1)),
+          );
+        }
         return;
       }
 
@@ -1018,11 +1021,11 @@ export function ExcavatorGameWrapper({
 
   const handleEquipmentReset = useCallback((part: YanmarEquipmentPart) => {
     const previewMode = modeRef.current !== "game";
+    const practiceMode = modeRef.current === "practice";
     const partLevel = equipmentLevels[part];
     if (partLevel <= 0) return;
 
     if (previewMode) {
-      const refundStars = getYanmarPartResetRefundStars(part, partLevel);
       setEquipmentLevels((current) => {
         const next = {
           ...current,
@@ -1033,8 +1036,11 @@ export function ExcavatorGameWrapper({
         setEquipmentStats(nextStats);
         return next;
       });
-      if (refundStars > 0) {
-        setPreviewStars((value) => value + refundStars);
+      if (!practiceMode) {
+        const refundStars = getYanmarPartResetRefundStars(part, partLevel);
+        if (refundStars > 0) {
+          setPreviewStars((value) => value + refundStars);
+        }
       }
       return;
     }

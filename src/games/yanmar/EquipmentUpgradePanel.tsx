@@ -353,6 +353,7 @@ export function EquipmentUpgradePanel({
   if (!open) return null;
 
   const previewMode = mode !== "game";
+  const practiceMode = mode === "practice";
   const balance = previewMode ? previewStars : currency;
   const config = YANMAR_EQUIPMENT_CONFIG[selected];
   const level = getDisplayLevel(selected);
@@ -388,7 +389,9 @@ export function EquipmentUpgradePanel({
               Yanmar Parts
             </p>
             <h2 className="text-base font-black">장비강화</h2>
-            {previewMode ? (
+            {practiceMode ? (
+              <p className="mt-0.5 text-[10px] text-white/65">연습모드 · 재화 변동 없음</p>
+            ) : previewMode ? (
               <p className="mt-0.5 text-[10px] text-white/65">튜토리얼 임시 강화</p>
             ) : null}
           </div>
@@ -498,7 +501,7 @@ export function EquipmentUpgradePanel({
               </span>
             </p>
             <UpgradeStatCompare part={selected} level={level} maxed={maxed} />
-            {levels[selected] > 0 ? (
+            {levels[selected] > 0 && !practiceMode ? (
               <p className="mt-3 text-center text-[10px] font-bold text-slate-500">
                 초기화시 {refundRateLabel} 환급
               </p>
@@ -518,6 +521,8 @@ export function EquipmentUpgradePanel({
                   "최대 강화"
                 ) : isUpgradingSelected ? (
                   "강화중..."
+                ) : practiceMode ? (
+                  "강화"
                 ) : previewMode ? (
                   "체험 강화"
                 ) : (
@@ -535,6 +540,8 @@ export function EquipmentUpgradePanel({
                 >
                   {resettingEquipment ? (
                     "초기화중"
+                  ) : practiceMode ? (
+                    "초기화"
                   ) : (
                     <>
                       <span>초기화</span>
