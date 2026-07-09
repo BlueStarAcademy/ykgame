@@ -1,11 +1,19 @@
+import type { DumpTruckPose } from "./dumpTruckState";
 import type { ExcavatorSimState } from "./ExcavatorScene";
 import type { HydraulicVelocity } from "./controls";
 import { getArmCollisionSamples } from "./bucket";
-import { isInDumpTruckSolidVolume, isNearDumpTruck } from "./terrain";
+import { dumpTruckBedCenterWorld, isInDumpTruckSolidVolume, isNearDumpTruck } from "./terrain";
 
-export function armPenetratesDumpTruck(sim: ExcavatorSimState, boomSwing: number): boolean {
+export function armPenetratesDumpTruck(
+  sim: ExcavatorSimState,
+  boomSwing: number,
+  pose?: DumpTruckPose,
+): boolean {
+  if (pose && !pose.present) return false;
+  const groupX = pose?.groupX;
+  const groupZ = pose?.groupZ;
   return getArmCollisionSamples(sim, boomSwing).some((point) =>
-    isInDumpTruckSolidVolume(point.x, point.y, point.z),
+    isInDumpTruckSolidVolume(point.x, point.y, point.z, groupX, groupZ),
   );
 }
 
@@ -15,9 +23,12 @@ export function constrainArmFromDumpTruck(
   vel: HydraulicVelocity,
   boomSwing: number,
   before: { boom: number; arm: number; bucket: number },
+  pose?: DumpTruckPose,
 ): boolean {
-  if (!isNearDumpTruck(sim.posX, sim.posZ)) return false;
-  if (!armPenetratesDumpTruck(sim, boomSwing)) return false;
+  if (pose && !pose.present) return false;
+  const bedCenter = dumpTruckBedCenterWorld(pose?.groupX, pose?.groupZ);
+  if (!isNearDumpTruck(sim.posX, sim.posZ, bedCenter.x, bedCenter.z)) return false;
+  if (!armPenetratesDumpTruck(sim, boomSwing, pose)) return false;
 
   sim.boom = before.boom;
   sim.arm = before.arm;

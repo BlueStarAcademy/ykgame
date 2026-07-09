@@ -5,6 +5,8 @@ interface DumpHintPanelProps {
   inDumpZone: boolean;
   canDump: boolean;
   raiseArmForDump: boolean;
+  truckCooldownRemaining?: number;
+  truckCanAccept?: boolean;
   show: boolean;
 }
 
@@ -13,6 +15,8 @@ export function DumpHintPanel({
   inDumpZone,
   canDump,
   raiseArmForDump,
+  truckCooldownRemaining = 0,
+  truckCanAccept = true,
   show,
 }: DumpHintPanelProps) {
   if (!show) return null;
@@ -35,12 +39,17 @@ export function DumpHintPanel({
           : "트럭 쪽으로 스윙·주행",
     },
     {
-      ok: canDump,
-      label: canDump
-        ? "우조이스틱 오른쪽으로 버킷 펴기"
-        : raiseArmForDump
-          ? "먼저 붐·암을 들어올리세요"
-          : "트럭 칸 위로 버킷·차체를 더 올려주세요",
+      ok: truckCooldownRemaining <= 0 && truckCanAccept && (canDump || inDumpZone),
+      label:
+        truckCooldownRemaining > 0
+          ? `다음 트럭 대기 ${Math.ceil(truckCooldownRemaining)}초`
+          : !truckCanAccept
+            ? "트럭 만차 — 출발 중"
+            : canDump
+              ? "우조이스틱 오른쪽으로 버킷 펴기"
+              : raiseArmForDump
+                ? "먼저 붐·암을 들어올리세요"
+                : "트럭 칸 위로 버킷·차체를 더 올려주세요",
     },
   ];
 

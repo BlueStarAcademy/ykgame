@@ -15,7 +15,7 @@ const MENU_ITEMS = [
     href: "/admin/probability",
     emoji: "🎲",
     title: "확률정보",
-    desc: "게임 보상·쿠폰·강화 확률 확인",
+    desc: "게임 보상·쿠폰·강화·덤프트럭 확률 확인",
     color: "border-violet-200 bg-gradient-to-br from-violet-50 to-white",
   },
   {

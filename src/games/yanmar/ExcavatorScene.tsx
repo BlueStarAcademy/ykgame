@@ -22,6 +22,7 @@ import {
   isInDumpZone,
   isInDumpTruckBed,
   clampToDumpTruckBed,
+  dumpTruckBedCenterWorld,
   dumpTruckBedDeckWorldY,
   getMapWorldBounds,
   sampleHeight,
@@ -40,9 +41,19 @@ import {
   type DigFeedback,
 } from "./bucket";
 import { constrainArmFromDumpTruck } from "./dumpTruckCollision";
+import {
+  addDumpTruckLoad,
+  canDumpTruckAcceptDump,
+  getDumpTruckFillRatio,
+  getDumpTruckPose,
+  isDumpTruckVisible,
+  type DumpTruckPose,
+  type DumpTruckRuntimeState,
+  updateDumpTruckState,
+} from "./dumpTruckState";
 import type { DiggingScoreState } from "./scoring";
 import type { GameMode, TutorialStep } from "./tutorial";
-import type { YanmarEquipmentStats } from "./equipment";
+import { calculateYanmarChunkScore, type YanmarEquipmentStats } from "./equipment";
 import {
   createGroundDirtTexture,
   createRockTexture,
@@ -88,6 +99,8 @@ interface ExcavatorSceneProps {
   tutorialStepRef: React.RefObject<TutorialStep | null>;
   tutorialDumpRef: React.MutableRefObject<number>;
   digFeedbackRef: React.MutableRefObject<DigFeedback>;
+  dumpTruckStateRef: React.MutableRefObject<DumpTruckRuntimeState>;
+  dumpTruckPoseRef: React.MutableRefObject<DumpTruckPose>;
   onProgress: (dumped: number, progress: number) => void;
   onDumpScore: (popup: Omit<DumpScorePopup, "id">) => void;
   onSimTick: () => void;
@@ -297,6 +310,99 @@ function DigDustCloud({
         >
           <sphereGeometry args={[0.22 + index * 0.03, 6, 6]} />
           <meshBasicMaterial color={index % 2 ? "#a67c4e" : "#c49a62"} transparent opacity={0.42} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+type DumpSoilVisual = {
+  active: boolean;
+  spawnX: number;
+  spawnY: number;
+  spawnZ: number;
+  intensity: number;
+};
+
+function DumpSoilParticles({
+  visualRef,
+}: {
+  visualRef: React.MutableRefObject<DumpSoilVisual>;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const particleStates = useRef(
+    Array.from({ length: 20 }, () => ({
+      active: false,
+      x: 0,
+      y: 0,
+      z: 0,
+      vy: 0,
+      life: 0,
+    })),
+  );
+
+  useFrame((_, dt) => {
+    const group = groupRef.current;
+    if (!group) return;
+
+    const visual = visualRef.current;
+    visual.intensity = Math.max(0, visual.intensity - dt * 2.8);
+    const dumping = visual.active && visual.intensity > 0.02;
+    if (!dumping) {
+      visual.active = false;
+    }
+
+    if (dumping) {
+      const spawnBudget = Math.ceil(visual.intensity * 5);
+      for (let i = 0; i < spawnBudget; i += 1) {
+        const slot = particleStates.current.find((particle) => !particle.active);
+        if (!slot) break;
+        slot.active = true;
+        slot.x = visual.spawnX + (Math.random() - 0.5) * 0.55;
+        slot.z = visual.spawnZ + (Math.random() - 0.5) * 0.45;
+        slot.y = visual.spawnY + Math.random() * 0.35;
+        slot.vy = -(2.2 + Math.random() * 2.4);
+        slot.life = 0.55 + Math.random() * 0.45;
+      }
+    }
+
+    const bedY = dumpTruckBedDeckWorldY() + 0.08;
+    let anyVisible = false;
+    particleStates.current.forEach((particle, index) => {
+      const mesh = group.children[index] as THREE.Mesh | undefined;
+      if (!mesh) return;
+      if (!particle.active) {
+        mesh.visible = false;
+        return;
+      }
+      particle.life -= dt;
+      if (particle.life <= 0) {
+        particle.active = false;
+        mesh.visible = false;
+        return;
+      }
+      particle.vy -= 11.5 * dt;
+      particle.y += particle.vy * dt;
+      if (particle.y <= bedY) {
+        particle.active = false;
+        mesh.visible = false;
+        return;
+      }
+      mesh.visible = true;
+      anyVisible = true;
+      mesh.position.set(particle.x, particle.y, particle.z);
+      mesh.rotation.x += dt * 4.2;
+      mesh.rotation.z += dt * 3.1;
+    });
+    group.visible = anyVisible;
+  });
+
+  return (
+    <group ref={groupRef} visible={false}>
+      {Array.from({ length: 20 }, (_, index) => (
+        <mesh key={index} visible={false}>
+          <boxGeometry args={[0.11, 0.07, 0.1]} />
+          <meshStandardMaterial color="#7a5230" roughness={0.92} metalness={0.02} />
         </mesh>
       ))}
     </group>
@@ -1621,8 +1727,9 @@ function constrainExcavatorToMap(sim: ExcavatorSimState, terrain: TerrainData) {
   return blocked;
 }
 
-function isExcavatorCollidingWithDumpTruck(x: number, z: number) {
-  const local = worldToDumpTruckLocal(x, z);
+function isExcavatorCollidingWithDumpTruck(x: number, z: number, pose?: DumpTruckPose) {
+  if (pose && !pose.present) return false;
+  const local = worldToDumpTruckLocal(x, z, pose?.groupX, pose?.groupZ);
   const localX = local.x - DUMP_TRUCK_COLLIDER.centerOffsetX;
   const localZ = local.z - DUMP_TRUCK_COLLIDER.centerOffsetZ;
   const outsideX = Math.max(Math.abs(localX) - DUMP_TRUCK_COLLIDER.halfX, 0);
@@ -1634,8 +1741,9 @@ function isExcavatorCollidingWithDumpTruck(x: number, z: number) {
 function constrainExcavatorToDumpTruck(
   sim: ExcavatorSimState,
   previous: { x: number; z: number },
+  pose?: DumpTruckPose,
 ) {
-  if (!isExcavatorCollidingWithDumpTruck(sim.posX, sim.posZ)) return false;
+  if (!isExcavatorCollidingWithDumpTruck(sim.posX, sim.posZ, pose)) return false;
   sim.posX = previous.x;
   sim.posZ = previous.z;
   return true;
@@ -1653,6 +1761,8 @@ function SimLoop({
   auxiliaryRef,
   tutorialDumpRef,
   digFeedbackRef,
+  dumpTruckStateRef,
+  dumpTruckPoseRef,
   onProgress,
   onDumpScore,
   onSimTick,
@@ -1660,10 +1770,22 @@ function SimLoop({
   const lastReportedProgressRef = useRef(-1);
   const dumpScoreRemainderRef = useRef(0);
   const dustRef = useRef<THREE.Group>(null);
+  const dumpSoilVisualRef = useRef<DumpSoilVisual>({
+    active: false,
+    spawnX: 0,
+    spawnY: 0,
+    spawnZ: 0,
+    intensity: 0,
+  });
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
     const sim = simRef.current;
+    const stats = equipmentStatsRef.current;
+    const truckState = dumpTruckStateRef.current;
+    updateDumpTruckState(truckState, dt, stats.truckCooldownSec);
+    dumpTruckPoseRef.current = getDumpTruckPose(truckState);
+    const truckPose = dumpTruckPoseRef.current;
     const raw = inputRef.current;
     const allowed = allowedRef.current;
     let filtered = filterInput(raw, allowed);
@@ -1710,11 +1832,11 @@ function SimLoop({
     if (constrainExcavatorToMap(sim, terrainRef.current)) {
       velRef.current.travel = 0;
     }
-    if (constrainExcavatorToDumpTruck(sim, beforeTravel)) {
+    if (constrainExcavatorToDumpTruck(sim, beforeTravel, truckPose)) {
       velRef.current.travel = 0;
     }
-    constrainArmFromDumpTruck(sim, velRef.current, boomSwing, beforeGroundContact);
-    constrainArmFromDumpTruck(sim, velRef.current, boomSwing, beforeGroundContact);
+    constrainArmFromDumpTruck(sim, velRef.current, boomSwing, beforeGroundContact, truckPose);
+    constrainArmFromDumpTruck(sim, velRef.current, boomSwing, beforeGroundContact, truckPose);
 
     let bucketContact = constrainBucketGroundContact(
       sim,
@@ -1749,6 +1871,7 @@ function SimLoop({
     const bucketTip = getBucketTipWorld(sim, boomSwing);
     const bedDeckY = dumpTruckBedDeckWorldY();
     const minDumpHeight = bedDeckY + DUMP_TRUCK.dumpMinHeightAboveDeck;
+    const truckBedCenter = dumpTruckBedCenterWorld(truckPose.groupX, truckPose.groupZ);
     const bucketReachY = Math.max(scraper.y, bucketTip.y);
     const scraperGroundH = sampleHeight(terrainRef.current, scraper.x, scraper.z);
     const scraperDepthBelow = scraperGroundH - scraper.y;
@@ -1758,7 +1881,7 @@ function SimLoop({
     const tipInDigZone = isInDigZone(bucketTip.x, bucketTip.z, terrainRef.current);
     // Use the whole visible rear bed rectangle as the dump target.
     const isInDumpTruckRearBox = (wx: number, wz: number) => {
-      const local = worldToDumpTruckLocal(wx, wz);
+      const local = worldToDumpTruckLocal(wx, wz, truckPose.groupX, truckPose.groupZ);
       const relX = local.x - DUMP_TRUCK.bedLocalX;
       const relZ = local.z - DUMP_TRUCK.bedLocalZ;
       const visualBoxMargin = 0.3;
@@ -1778,7 +1901,7 @@ function SimLoop({
       bucketMouthCenter.z,
     );
     const bucketNearDumpTarget =
-      Math.hypot(bucketMouthCenter.x - DUMP_ZONE.x, bucketMouthCenter.z - DUMP_ZONE.z) <=
+      Math.hypot(bucketMouthCenter.x - truckBedCenter.x, bucketMouthCenter.z - truckBedCenter.z) <=
       DUMP_ZONE.radius + 1.2;
     const bodyInDumpZone = isInDumpZone(sim.posX, sim.posZ);
     const bucketOpening = sim.bucket > 1.1;
@@ -1829,7 +1952,14 @@ function SimLoop({
     fb.armPulling = armPulling;
     fb.optimalDigPose = naturalDigPose;
     fb.digPoseScore = poseReadiness;
-    fb.canDump = inTruckDumpTarget && sim.bucketLoad > 0.02;
+    const truckCanAccept = canDumpTruckAcceptDump(truckState, stats.truckCapacityUnits);
+    const truckFillRatio = getDumpTruckFillRatio(truckState, stats.truckCapacityUnits);
+    fb.truckPresent = isDumpTruckVisible(truckState);
+    fb.truckCanAccept = truckCanAccept;
+    fb.truckFillRatio = truckFillRatio;
+    fb.truckCooldownRemaining =
+      truckState.phase === "cooldown" ? truckState.cooldownRemaining : 0;
+    fb.canDump = inTruckDumpTarget && sim.bucketLoad > 0.02 && truckCanAccept;
     fb.raiseArmForDump =
       inDump && sim.bucketLoad > 0.02 && bucketOverTruck && !bucketAboveBed && !bucketOpening;
     fb.travelBlockedRaiseArm = bucketAnchoredToGround && wantsTravel;
@@ -1899,7 +2029,7 @@ function SimLoop({
     }
 
     const bucketDumpOpen = sim.bucket > 1.35;
-    if (sim.bucketLoad > 0 && bucketDumpOpen && inTruckDumpTarget) {
+    if (sim.bucketLoad > 0 && bucketDumpOpen && inTruckDumpTarget && truckCanAccept) {
       const spillRate = 1.65;
       const remainingLoad = sim.bucketLoad;
       const dumpAmount =
@@ -1907,6 +2037,15 @@ function SimLoop({
           ? remainingLoad
           : Math.min(remainingLoad, remainingLoad * spillRate * dt);
       sim.bucketLoad = Math.max(0, sim.bucketLoad - dumpAmount);
+      addDumpTruckLoad(truckState, dumpAmount * stats.maxLoadUnits, stats.truckCapacityUnits);
+      dumpSoilVisualRef.current.active = true;
+      dumpSoilVisualRef.current.intensity = Math.min(
+        1.2,
+        dumpSoilVisualRef.current.intensity + dumpAmount * 6.5,
+      );
+      dumpSoilVisualRef.current.spawnX = bucketMouthCenter.x;
+      dumpSoilVisualRef.current.spawnY = Math.max(bucketReachY, bedDeckY + 0.35);
+      dumpSoilVisualRef.current.spawnZ = bucketMouthCenter.z;
       if (isGame) {
         scoreRef.current.dumped += dumpAmount;
         const progress = Math.min(
@@ -1921,20 +2060,23 @@ function SimLoop({
         tutorialDumpRef.current += dumpAmount;
       }
 
-      const stats = equipmentStatsRef.current;
       const chunkRatio = stats.scoreChunkUnits / stats.maxLoadUnits;
       dumpScoreRemainderRef.current += dumpAmount;
       while (dumpScoreRemainderRef.current >= chunkRatio) {
         dumpScoreRemainderRef.current -= chunkRatio;
         const critical = Math.random() < stats.criticalChance;
-        const dropPoint = clampToDumpTruckBed(bucketMouthCenter.x, bucketMouthCenter.z);
+        const dropPoint = clampToDumpTruckBed(
+          bucketMouthCenter.x,
+          bucketMouthCenter.z,
+          0.08,
+          truckPose.groupX,
+          truckPose.groupZ,
+        );
         const dropX = dropPoint.x;
         const dropZ = dropPoint.z;
         const dropY = bedDeckY + 0.22;
         onDumpScore({
-          score: Math.round(
-            stats.baseScorePerChunk * (critical ? stats.criticalMultiplier : 1),
-          ),
+          score: calculateYanmarChunkScore(stats, critical),
           critical,
           x: dropX,
           y: dropY,
@@ -1946,7 +2088,12 @@ function SimLoop({
     onSimTick();
   });
 
-  return <DigDustCloud dustRef={dustRef} digFeedbackRef={digFeedbackRef} />;
+  return (
+    <>
+      <DigDustCloud dustRef={dustRef} digFeedbackRef={digFeedbackRef} />
+      <DumpSoilParticles visualRef={dumpSoilVisualRef} />
+    </>
+  );
 }
 
 function WaypointMarker({
@@ -2240,11 +2387,50 @@ function SafetyCone({ x, z }: { x: number; z: number }) {
   );
 }
 
-function DumpTruck() {
+function DumpTruck({
+  stateRef,
+  statsRef,
+}: {
+  stateRef: React.MutableRefObject<DumpTruckRuntimeState>;
+  statsRef: React.RefObject<YanmarEquipmentStats>;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const fillMeshRef = useRef<THREE.Mesh>(null);
   const wheelXs = [-2.65, -1.65, 1.85, 2.85];
 
+  useFrame(() => {
+    const group = groupRef.current;
+    if (!group) return;
+    const state = stateRef.current;
+    const pose = getDumpTruckPose(state);
+    const cos = Math.cos(DUMP_TRUCK_BED.rotation);
+    const sin = Math.sin(DUMP_TRUCK_BED.rotation);
+    const offsetX = pose.groupX - DUMP_TRUCK_BED.x;
+    const offsetZ = pose.groupZ - DUMP_TRUCK_BED.z;
+    const localOffsetX = offsetX * cos - offsetZ * sin;
+    const localOffsetZ = offsetX * sin + offsetZ * cos;
+    group.position.set(
+      DUMP_TRUCK_BED.x + localOffsetX,
+      0.55,
+      DUMP_TRUCK_BED.z + localOffsetZ,
+    );
+    group.visible = isDumpTruckVisible(state);
+
+    const fillMesh = fillMeshRef.current;
+    if (fillMesh) {
+      const capacity = statsRef.current?.truckCapacityUnits ?? 1200;
+      const fillRatio = getDumpTruckFillRatio(state, capacity);
+      const visible = fillRatio > 0.02 && isDumpTruckVisible(state);
+      fillMesh.visible = visible;
+      if (visible) {
+        fillMesh.position.set(-0.65, 0.42 + fillRatio * 0.35, 0);
+        fillMesh.scale.set(1, 0.8 + fillRatio * 1.4, 1);
+      }
+    }
+  });
+
   return (
-    <group position={[DUMP_TRUCK_BED.x, 0.55, DUMP_TRUCK_BED.z]} rotation={[0, DUMP_TRUCK_BED.rotation, 0]}>
+    <group ref={groupRef} rotation={[0, DUMP_TRUCK_BED.rotation, 0]}>
       <group position={[0.3, 0.78, 0]}>
         <mesh position={[-0.65, 0.18, 0]}>
           <boxGeometry args={[5.2, 0.24, 2.86]} />
@@ -2253,6 +2439,10 @@ function DumpTruck() {
         <mesh position={[-0.65, 0.33, 0]}>
           <boxGeometry args={[4.85, 0.06, 2.44]} />
           <meshStandardMaterial color="#2f3338" roughness={0.62} metalness={0.16} />
+        </mesh>
+        <mesh ref={fillMeshRef} visible={false} position={[-0.65, 0.42, 0]}>
+          <boxGeometry args={[4.2, 0.12, 2.05]} />
+          <meshStandardMaterial color="#6d4c2c" roughness={0.88} metalness={0.04} />
         </mesh>
         {[-1, 1].map((side) => (
           <mesh key={`bed-top-rail-${side}`} position={[-0.65, 1.52, side * 1.58]}>
@@ -2341,7 +2531,13 @@ function DumpTruck() {
   );
 }
 
-function WorksiteSetDressing() {
+function WorksiteSetDressing({
+  dumpTruckStateRef,
+  equipmentStatsRef,
+}: {
+  dumpTruckStateRef: React.MutableRefObject<DumpTruckRuntimeState>;
+  equipmentStatsRef: React.RefObject<YanmarEquipmentStats>;
+}) {
   const cones = [
     [-35, -35],
     [-15, -35],
@@ -2369,7 +2565,7 @@ function WorksiteSetDressing() {
       {cones.map(([x, z]) => (
         <SafetyCone key={`${x}:${z}`} x={x} z={z} />
       ))}
-      <DumpTruck />
+      <DumpTruck stateRef={dumpTruckStateRef} statsRef={equipmentStatsRef} />
     </>
   );
 }
@@ -2450,7 +2646,10 @@ function SceneContent(props: ExcavatorSceneProps) {
       <TerrainMesh terrainRef={props.terrainRef} />
       <MapSiteDecor terrainRef={props.terrainRef} />
       <TerrainRockScatter terrainRef={props.terrainRef} />
-      <WorksiteSetDressing />
+      <WorksiteSetDressing
+        dumpTruckStateRef={props.dumpTruckStateRef}
+        equipmentStatsRef={props.equipmentStatsRef}
+      />
       <ZoneMarkers terrainRef={props.terrainRef} />
       <ExcavatorArm
         simRef={props.simRef}

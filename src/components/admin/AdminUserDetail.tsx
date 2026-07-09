@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { YANMAR_EQUIPMENT_CONFIG } from "@/games/yanmar/equipment";
 import { AdminShell } from "./AdminShell";
 
 interface UserDetail {
@@ -173,14 +174,21 @@ export function AdminUserDetail({ userId }: { userId: string }) {
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="text-sm font-black text-slate-900">장비강화</h2>
             <div className="mt-3 flex flex-wrap gap-2">
-              {user.equipmentUpgrades.map((upgrade) => (
+              {user.equipmentUpgrades.map((upgrade) => {
+                const partLabel =
+                  upgrade.part in YANMAR_EQUIPMENT_CONFIG
+                    ? YANMAR_EQUIPMENT_CONFIG[upgrade.part as keyof typeof YANMAR_EQUIPMENT_CONFIG]
+                        .label
+                    : upgrade.part;
+                return (
                 <span
                   key={upgrade.part}
                   className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700"
                 >
-                  {upgrade.part} +{upgrade.level}
+                  {partLabel} +{upgrade.level}
                 </span>
-              ))}
+                );
+              })}
             </div>
           </section>
         ) : null}

@@ -174,24 +174,37 @@ export const DUMP_TRUCK_SOLID = {
   cavityMaxY: 2.78,
 } as const;
 
-function dumpTruckLocalToWorld(localX: number, localZ: number) {
+function dumpTruckLocalToWorld(
+  localX: number,
+  localZ: number,
+  groupX: number = DUMP_TRUCK.groupX,
+  groupZ: number = DUMP_TRUCK.groupZ,
+) {
   const cos = Math.cos(DUMP_TRUCK.rotation);
   const sin = Math.sin(DUMP_TRUCK.rotation);
   return {
-    x: DUMP_TRUCK.groupX + localX * cos + localZ * sin,
-    z: DUMP_TRUCK.groupZ - localX * sin + localZ * cos,
+    x: groupX + localX * cos + localZ * sin,
+    z: groupZ - localX * sin + localZ * cos,
   };
 }
 
-export function dumpTruckBedCenterWorld() {
-  return dumpTruckLocalToWorld(DUMP_TRUCK.bedLocalX, DUMP_TRUCK.bedLocalZ);
+export function dumpTruckBedCenterWorld(
+  groupX: number = DUMP_TRUCK.groupX,
+  groupZ: number = DUMP_TRUCK.groupZ,
+) {
+  return dumpTruckLocalToWorld(DUMP_TRUCK.bedLocalX, DUMP_TRUCK.bedLocalZ, groupX, groupZ);
 }
 
-export function worldToDumpTruckLocal(wx: number, wz: number) {
+export function worldToDumpTruckLocal(
+  wx: number,
+  wz: number,
+  groupX: number = DUMP_TRUCK.groupX,
+  groupZ: number = DUMP_TRUCK.groupZ,
+) {
   const cos = Math.cos(DUMP_TRUCK.rotation);
   const sin = Math.sin(DUMP_TRUCK.rotation);
-  const dx = wx - DUMP_TRUCK.groupX;
-  const dz = wz - DUMP_TRUCK.groupZ;
+  const dx = wx - groupX;
+  const dz = wz - groupZ;
   return {
     x: dx * cos - dz * sin,
     z: dx * sin + dz * cos,
@@ -202,9 +215,15 @@ export function dumpTruckBedDeckWorldY() {
   return DUMP_TRUCK.bedDeckWorldY;
 }
 
-export function isInDumpTruckSolidVolume(wx: number, wy: number, wz: number): boolean {
+export function isInDumpTruckSolidVolume(
+  wx: number,
+  wy: number,
+  wz: number,
+  groupX: number = DUMP_TRUCK.groupX,
+  groupZ: number = DUMP_TRUCK.groupZ,
+): boolean {
   if (wy < DUMP_TRUCK_SOLID.minY || wy > DUMP_TRUCK_SOLID.maxY) return false;
-  const local = worldToDumpTruckLocal(wx, wz);
+  const local = worldToDumpTruckLocal(wx, wz, groupX, groupZ);
   const hullX = local.x - DUMP_TRUCK_SOLID.centerLocalX;
   const hullZ = local.z - DUMP_TRUCK_SOLID.centerLocalZ;
   if (Math.abs(hullX) > DUMP_TRUCK_SOLID.halfX || Math.abs(hullZ) > DUMP_TRUCK_SOLID.halfZ) {
@@ -220,8 +239,14 @@ export function isInDumpTruckSolidVolume(wx: number, wy: number, wz: number): bo
   return !inBedCavity;
 }
 
-export function clampToDumpTruckBed(wx: number, wz: number, inset = 0.08) {
-  const local = worldToDumpTruckLocal(wx, wz);
+export function clampToDumpTruckBed(
+  wx: number,
+  wz: number,
+  inset = 0.08,
+  groupX: number = DUMP_TRUCK.groupX,
+  groupZ: number = DUMP_TRUCK.groupZ,
+) {
+  const local = worldToDumpTruckLocal(wx, wz, groupX, groupZ);
   const relX = local.x - DUMP_TRUCK.bedLocalX;
   const relZ = local.z - DUMP_TRUCK.bedLocalZ;
   const halfW = Math.max(0.4, DUMP_TRUCK.bedWidth / 2 - inset);
@@ -231,6 +256,8 @@ export function clampToDumpTruckBed(wx: number, wz: number, inset = 0.08) {
   return dumpTruckLocalToWorld(
     DUMP_TRUCK.bedLocalX + clampedRelX,
     DUMP_TRUCK.bedLocalZ + clampedRelZ,
+    groupX,
+    groupZ,
   );
 }
 
@@ -243,8 +270,13 @@ export const DUMP_ZONE = {
   radius: 5.4,
 };
 
-export function isNearDumpTruck(wx: number, wz: number) {
-  return Math.hypot(wx - DUMP_ZONE.x, wz - DUMP_ZONE.z) < DUMP_ZONE.radius + 7;
+export function isNearDumpTruck(
+  wx: number,
+  wz: number,
+  centerX: number = DUMP_ZONE.x,
+  centerZ: number = DUMP_ZONE.z,
+) {
+  return Math.hypot(wx - centerX, wz - centerZ) < DUMP_ZONE.radius + 7;
 }
 
 /** 트럭 group 배치 + 칸 치수 (씬·디버그 오버레이) */
@@ -362,8 +394,14 @@ export function isInDumpZone(wx: number, wz: number): boolean {
   return Math.sqrt(dx * dx + dz * dz) < DUMP_ZONE.radius;
 }
 
-export function isInDumpTruckBed(wx: number, wz: number, extraMargin = 0): boolean {
-  const local = worldToDumpTruckLocal(wx, wz);
+export function isInDumpTruckBed(
+  wx: number,
+  wz: number,
+  extraMargin = 0,
+  groupX: number = DUMP_TRUCK.groupX,
+  groupZ: number = DUMP_TRUCK.groupZ,
+): boolean {
+  const local = worldToDumpTruckLocal(wx, wz, groupX, groupZ);
   const relX = local.x - DUMP_TRUCK.bedLocalX;
   const relZ = local.z - DUMP_TRUCK.bedLocalZ;
   const margin = DUMP_TRUCK.margin + extraMargin;

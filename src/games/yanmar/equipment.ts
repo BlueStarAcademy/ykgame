@@ -1,7 +1,11 @@
 export const YANMAR_REWARD_CONFIG = {
   baseMaxLoadUnits: 1000,
+  baseTruckCapacityUnits: 1200,
+  baseTruckCooldownSec: 14,
+  minTruckCooldownSec: 6,
   scoreChunkUnits: 200,
-  baseScorePerChunk: 100,
+  baseScorePerChunkMin: 80,
+  baseScorePerChunkMax: 100,
   baseCriticalChance: 0.25,
   baseCriticalMultiplier: 2,
   couponExpiresInDays: 90,
@@ -36,6 +40,13 @@ export const YANMAR_EQUIPMENT_CONFIG = {
     effectPerLevel: 0.1,
     description: "이동속도 +10%",
   },
+  TRUCK: {
+    label: "덤프트럭",
+    maxLevel: 5,
+    capacityPerLevel: 400,
+    cooldownReductionPerLevel: 1.6,
+    description: "최대 하역량 +400 / 재도착 -1.6초",
+  },
 } as const;
 
 export type YanmarEquipmentPart = keyof typeof YANMAR_EQUIPMENT_CONFIG;
@@ -44,8 +55,9 @@ export type YanmarEquipmentLevels = Record<YanmarEquipmentPart, number>;
 
 export interface YanmarEquipmentStats {
   maxLoadUnits: number;
+  truckCapacityUnits: number;
+  truckCooldownSec: number;
   scoreChunkUnits: number;
-  baseScorePerChunk: number;
   criticalChance: number;
   criticalMultiplier: number;
   travelSpeedMultiplier: number;
@@ -56,6 +68,7 @@ export const DEFAULT_YANMAR_EQUIPMENT_LEVELS: YanmarEquipmentLevels = {
   BOOM: 0,
   BUCKET: 0,
   ENGINE: 0,
+  TRUCK: 0,
 };
 
 export const YANMAR_UPGRADE_COSTS = {
@@ -63,6 +76,7 @@ export const YANMAR_UPGRADE_COSTS = {
   BOOM: [10, 25, 50, 75, 100, 150, 200, 300, 500, 1000],
   BUCKET: [20, 50, 100, 200, 500],
   ENGINE: [20, 50, 100, 200, 500],
+  TRUCK: [20, 50, 100, 200, 500],
 } as const satisfies Record<YanmarEquipmentPart, readonly number[]>;
 
 export const YANMAR_EQUIPMENT_RESET_REFUND_RATE = 0.7;
@@ -112,16 +126,32 @@ export function clampYanmarEquipmentLevels(
   );
 }
 
+export function rollYanmarBaseScorePerChunk(): number {
+  const min = YANMAR_REWARD_CONFIG.baseScorePerChunkMin;
+  const max = YANMAR_REWARD_CONFIG.baseScorePerChunkMax;
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+export function calculateYanmarChunkScore(
+  stats: YanmarEquipmentStats,
+  critical: boolean,
+  baseScore = rollYanmarBaseScorePerChunk(),
+): number {
+  return Math.round(baseScore * (critical ? stats.criticalMultiplier : 1));
+}
+
 export function calculateYanmarEquipmentStats(
   levels: Partial<Record<YanmarEquipmentPart, number>>,
 ): YanmarEquipmentStats {
   const safeLevels = clampYanmarEquipmentLevels(levels);
+  const truckConfig = YANMAR_EQUIPMENT_CONFIG.TRUCK;
   return {
     maxLoadUnits:
       YANMAR_REWARD_CONFIG.baseMaxLoadUnits +
       safeLevels.BUCKET * YANMAR_EQUIPMENT_CONFIG.BUCKET.effectPerLevel,
+    truckCapacityUnits: getYanmarTruckCapacityUnits(safeLevels.TRUCK),
+    truckCooldownSec: getYanmarTruckCooldownSec(safeLevels.TRUCK),
     scoreChunkUnits: YANMAR_REWARD_CONFIG.scoreChunkUnits,
-    baseScorePerChunk: YANMAR_REWARD_CONFIG.baseScorePerChunk,
     criticalChance:
       YANMAR_REWARD_CONFIG.baseCriticalChance +
       safeLevels.ARM * YANMAR_EQUIPMENT_CONFIG.ARM.effectPerLevel,
@@ -131,6 +161,29 @@ export function calculateYanmarEquipmentStats(
     travelSpeedMultiplier:
       1 + safeLevels.ENGINE * YANMAR_EQUIPMENT_CONFIG.ENGINE.effectPerLevel,
   };
+}
+
+export function getYanmarTruckCapacityUnits(truckLevel = 0) {
+  const level = Math.max(
+    0,
+    Math.min(YANMAR_EQUIPMENT_CONFIG.TRUCK.maxLevel, Math.floor(truckLevel)),
+  );
+  return (
+    YANMAR_REWARD_CONFIG.baseTruckCapacityUnits +
+    level * YANMAR_EQUIPMENT_CONFIG.TRUCK.capacityPerLevel
+  );
+}
+
+export function getYanmarTruckCooldownSec(truckLevel = 0) {
+  const level = Math.max(
+    0,
+    Math.min(YANMAR_EQUIPMENT_CONFIG.TRUCK.maxLevel, Math.floor(truckLevel)),
+  );
+  return Math.max(
+    YANMAR_REWARD_CONFIG.minTruckCooldownSec,
+    YANMAR_REWARD_CONFIG.baseTruckCooldownSec -
+      level * YANMAR_EQUIPMENT_CONFIG.TRUCK.cooldownReductionPerLevel,
+  );
 }
 
 export function getLoadUnits(bucketLoadRatio: number, maxLoadUnits: number) {

@@ -152,6 +152,10 @@ export interface DigFeedback {
   raiseArmForDump: boolean;
   /** 주행 레버 입력 중 버킷/암이 낮아 이동 불가 */
   travelBlockedRaiseArm: boolean;
+  truckPresent: boolean;
+  truckCanAccept: boolean;
+  truckFillRatio: number;
+  truckCooldownRemaining: number;
 }
 
 export function createDigFeedback(): DigFeedback {
@@ -172,5 +176,9 @@ export function createDigFeedback(): DigFeedback {
     canDump: false,
     raiseArmForDump: false,
     travelBlockedRaiseArm: false,
+    truckPresent: true,
+    truckCanAccept: true,
+    truckFillRatio: 0,
+    truckCooldownRemaining: 0,
   };
 }

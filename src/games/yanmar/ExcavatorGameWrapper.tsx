@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
 import { GAME_IMMERSIVE_HEADER_RIGHT_ID } from "@/components/games/GameImmersiveOverlay";
+import { StarAmount } from "@/components/StarAmount";
 import type { GameResult } from "@/games/shared/types";
 import { getMissionConfig } from "@/games/registry";
 import type { AuxiliaryControlState, ControlMask, ExcavatorControlState } from "./controls";
@@ -44,6 +45,12 @@ import { DumpHintPanel } from "./DumpHintPanel";
 import { ControlsGuidePanel } from "./ControlsGuidePanel";
 import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
 import { createDigFeedback, type DigFeedback } from "./bucket";
+import {
+  createDumpTruckState,
+  getDumpTruckPose,
+  resetDumpTruckState,
+  type DumpTruckPose,
+} from "./dumpTruckState";
 import type { TerrainData } from "./terrain";
 import {
   DEFAULT_YANMAR_EQUIPMENT_LEVELS,
@@ -107,6 +114,7 @@ function EquipmentUpgradeModal({
   previewStars,
   upgradingPart,
   resettingEquipment,
+  portrait,
   onClose,
   onUpgrade,
   onResetEquipment,
@@ -118,6 +126,7 @@ function EquipmentUpgradeModal({
   previewStars: number;
   upgradingPart: YanmarEquipmentPart | null;
   resettingEquipment: boolean;
+  portrait: boolean;
   onClose: () => void;
   onUpgrade: (part: YanmarEquipmentPart) => void;
   onResetEquipment: () => void;
@@ -132,8 +141,20 @@ function EquipmentUpgradeModal({
   const resetRefundStars = getYanmarResetRefundStars(levels);
 
   return (
-    <div className="absolute inset-0 z-[80] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm landscape:items-start landscape:overflow-y-auto landscape:py-2">
-      <div className="flex max-h-[min(92dvh,40rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-2xl landscape:max-h-[min(94dvh,22rem)]">
+    <div
+      className={
+        portrait
+          ? "absolute inset-0 z-[80] flex flex-col bg-black/65 backdrop-blur-sm"
+          : "absolute inset-0 z-[80] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm landscape:items-start landscape:overflow-y-auto landscape:py-2"
+      }
+    >
+      <div
+        className={
+          portrait
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl"
+            : "flex max-h-[min(92dvh,40rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-2xl landscape:max-h-[min(94dvh,22rem)]"
+        }
+      >
         <div className="flex shrink-0 items-center justify-between bg-gradient-to-br from-slate-800 to-slate-950 px-4 py-3 text-white">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-amber-200">
@@ -153,16 +174,27 @@ function EquipmentUpgradeModal({
           </button>
         </div>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
-          <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
-            {previewMode ? "체험 스타" : "보유 스타"} ⭐ {balance.toLocaleString()}
+          <div className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+            <span>{previewMode ? "체험 스타" : "보유 스타"}</span>
+            <StarAmount value={balance} size={16} valueClassName="text-amber-900" />
           </div>
           {hasPreviewUpgrade ? (
             <p className="rounded-xl bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-600">
-              {previewMode
-                ? "튜토리얼 강화는 언제든 기본값으로 되돌릴 수 있습니다."
-                : `강화 초기화 시 사용한 스타의 ${Math.round(
-                    YANMAR_EQUIPMENT_RESET_REFUND_RATE * 100,
-                  )}%인 ${resetRefundStars.toLocaleString()} 스타를 돌려받습니다.`}
+              {previewMode ? (
+                "튜토리얼 강화는 언제든 기본값으로 되돌릴 수 있습니다."
+              ) : (
+                <>
+                  강화 초기화 시 사용한 스타의{" "}
+                  {Math.round(YANMAR_EQUIPMENT_RESET_REFUND_RATE * 100)}%인{" "}
+                  <StarAmount
+                    value={resetRefundStars}
+                    size={12}
+                    className="inline-flex align-middle"
+                    valueClassName="font-bold text-slate-700"
+                  />
+                  를 돌려받습니다.
+                </>
+              )}
             </p>
           ) : null}
           {previewMode || hasPreviewUpgrade ? (
@@ -192,25 +224,39 @@ function EquipmentUpgradeModal({
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-black text-gray-900">
-                      {config.label} 강화 +{level}
+                      {config.label} 강화{" "}
+                      <span
+                        className={
+                          maxed
+                            ? "text-amber-500"
+                            : level > 0
+                              ? "text-red-600"
+                              : "text-slate-400"
+                        }
+                      >
+                        +{level}
+                      </span>
                     </p>
                     <p className="mt-0.5 text-[10px] text-gray-500">
-                      {config.description} · 최대 +{config.maxLevel}
+                      {config.description} · 최대{" "}
+                      <span className="font-bold text-amber-600">+{config.maxLevel}</span>
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => onUpgrade(part)}
                     disabled={disabled}
-                    className="rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:bg-gray-300"
+                    className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:bg-gray-300"
                   >
-                    {maxed
-                      ? "최대"
-                      : upgradingPart === part
-                        ? "강화중"
-                        : previewMode
-                          ? "체험 강화"
-                          : `${cost} 스타`}
+                    {maxed ? (
+                      "최대"
+                    ) : upgradingPart === part ? (
+                      "강화중"
+                    ) : previewMode ? (
+                      "체험 강화"
+                    ) : (
+                      <StarAmount value={cost} size={13} valueClassName="text-white" />
+                    )}
                   </button>
                 </div>
                 {!previewMode && !maxed && balance < cost ? (
@@ -427,6 +473,8 @@ export function ExcavatorGameWrapper({
   const tutorialIndexRef = useRef(0);
   const digFeedbackRef = useRef<DigFeedback>(createDigFeedback());
   const [digFeedback, setDigFeedback] = useState<DigFeedback>(createDigFeedback());
+  const dumpTruckStateRef = useRef(createDumpTruckState());
+  const dumpTruckPoseRef = useRef<DumpTruckPose>(getDumpTruckPose(dumpTruckStateRef.current));
   const digHudTickRef = useRef(0);
   const lastHudProgressRef = useRef(-1);
   const arcadeScoreRef = useRef(0);
@@ -455,6 +503,10 @@ export function ExcavatorGameWrapper({
       prev.armPulling === fb.armPulling &&
       prev.optimalDigPose === fb.optimalDigPose &&
       prev.canDump === fb.canDump &&
+      prev.truckPresent === fb.truckPresent &&
+      prev.truckCanAccept === fb.truckCanAccept &&
+      Math.abs(prev.truckFillRatio - fb.truckFillRatio) < 0.02 &&
+      Math.abs(prev.truckCooldownRemaining - fb.truckCooldownRemaining) < 0.15 &&
       prev.raiseArmForDump === fb.raiseArmForDump &&
       prev.travelBlockedRaiseArm === fb.travelBlockedRaiseArm &&
       Math.abs(prev.digPoseScore - fb.digPoseScore) < 0.01
@@ -590,6 +642,8 @@ export function ExcavatorGameWrapper({
     terrainRef.current = createInitialTerrain();
     scoreRef.current = createScoreState(config.target, config.duration);
     tutorialDumpRef.current = 0;
+    resetDumpTruckState(dumpTruckStateRef.current);
+    dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
     endedRef.current = false;
     elapsedRef.current = 0;
     lastHudProgressRef.current = -1;
@@ -1075,6 +1129,7 @@ export function ExcavatorGameWrapper({
           previewStars={previewStars}
           upgradingPart={upgradingPart}
           resettingEquipment={resettingEquipment}
+          portrait={layoutPortrait}
           onClose={() => setShowEquipmentUpgrade(false)}
           onUpgrade={handleEquipmentUpgrade}
           onResetEquipment={handleEquipmentReset}
@@ -1338,12 +1393,41 @@ export function ExcavatorGameWrapper({
           />
         )}
 
+        {mode !== "intro" && digFeedback.inDumpZone ? (
+          <div className="pointer-events-none absolute right-2 top-2 z-20 w-[9.5rem] rounded-lg border border-white/15 bg-black/75 px-2.5 py-2 text-white backdrop-blur-sm">
+            <p className="text-[10px] font-bold text-amber-200">덤프트럭</p>
+            {digFeedback.truckCooldownRemaining > 0 ? (
+              <p className="mt-1 text-[10px] font-semibold text-sky-200">
+                다음 트럭 도착까지 {Math.ceil(digFeedback.truckCooldownRemaining)}초
+              </p>
+            ) : digFeedback.truckPresent ? (
+              <>
+                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/15">
+                  <div
+                    className="h-full rounded-full bg-amber-400 transition-[width] duration-150"
+                    style={{ width: `${Math.round(digFeedback.truckFillRatio * 100)}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-[9px] text-white/80">
+                  적재 {Math.round(digFeedback.truckFillRatio * equipmentStats.truckCapacityUnits)}/
+                  {equipmentStats.truckCapacityUnits}
+                  {!digFeedback.truckCanAccept ? " · 만차 출발!" : ""}
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-[10px] text-white/70">트럭 이동 중...</p>
+            )}
+          </div>
+        ) : null}
+
         {mode === "tutorial" && tutorialStep?.id === "dump" ? (
           <DumpHintPanel
             bucketLoad={hud.bucketLoad}
             inDumpZone={digFeedback.inDumpZone}
             canDump={digFeedback.canDump}
             raiseArmForDump={digFeedback.raiseArmForDump}
+            truckCooldownRemaining={digFeedback.truckCooldownRemaining}
+            truckCanAccept={digFeedback.truckCanAccept}
             show
           />
         ) : null}
@@ -1408,6 +1492,8 @@ export function ExcavatorGameWrapper({
               tutorialStepRef={tutorialStepRef}
               tutorialDumpRef={tutorialDumpRef}
               digFeedbackRef={digFeedbackRef}
+              dumpTruckStateRef={dumpTruckStateRef}
+              dumpTruckPoseRef={dumpTruckPoseRef}
               onProgress={handleProgress}
               onDumpScore={handleDumpScore}
               onSimTick={handleSimTick}

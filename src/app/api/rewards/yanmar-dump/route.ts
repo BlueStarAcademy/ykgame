@@ -6,6 +6,7 @@ import {
   DEFAULT_YANMAR_EQUIPMENT_LEVELS,
   YANMAR_REWARD_CONFIG,
   calculateYanmarEquipmentStats,
+  calculateYanmarChunkScore,
   type YanmarEquipmentPart,
 } from "@/games/yanmar/equipment";
 
@@ -109,9 +110,7 @@ export async function POST(request: Request) {
 
   const events = Array.from({ length: safeChunkCount }, () => {
     const critical = Math.random() < stats.criticalChance;
-    const score = Math.round(
-      stats.baseScorePerChunk * (critical ? stats.criticalMultiplier : 1),
-    );
+    const score = calculateYanmarChunkScore(stats, critical);
     return createRewardEvent(score, critical);
   });
 
