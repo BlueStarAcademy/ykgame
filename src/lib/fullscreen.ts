@@ -78,7 +78,7 @@ export async function exitFullscreen(): Promise<void> {
  */
 export function unlockOrientation(): void {
   try {
-    screen.orientation?.unlock?.();
+    getLockableOrientation()?.unlock?.();
   } catch {
     // ignore
   }
@@ -86,12 +86,21 @@ export function unlockOrientation(): void {
 
 export type CockpitOrientation = "portrait" | "landscape";
 
-export function isOrientationLockSupported(): boolean {
-  if (typeof screen === "undefined") return false;
-  return typeof screen.orientation?.lock === "function";
+type LockableScreenOrientation = ScreenOrientation & {
+  lock?: (orientation: string) => Promise<void>;
+  unlock?: () => void;
+};
+
+function getLockableOrientation(): LockableScreenOrientation | undefined {
+  if (typeof screen === "undefined") return undefined;
+  return screen.orientation as LockableScreenOrientation | undefined;
 }
 
-function getOrientationLockType(mode: CockpitOrientation): OrientationLockType {
+export function isOrientationLockSupported(): boolean {
+  return typeof getLockableOrientation()?.lock === "function";
+}
+
+function getOrientationLockType(mode: CockpitOrientation): string {
   return mode === "landscape" ? "landscape" : "portrait-primary";
 }
 
@@ -118,9 +127,10 @@ export async function lockCockpitOrientation(
   if (typeof screen === "undefined") return false;
 
   const lockType = getOrientationLockType(mode);
+  const orientation = getLockableOrientation();
   const tryLock = async () => {
-    if (!screen.orientation?.lock) return false;
-    await screen.orientation.lock(lockType);
+    if (!orientation?.lock) return false;
+    await orientation.lock(lockType);
     return true;
   };
 
