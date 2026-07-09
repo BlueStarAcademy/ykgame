@@ -1,3 +1,5 @@
+import { applyZoneMoundHeight, computeBaseTerrainHeight } from "./terrainShapes";
+
 export const GRID_SIZE = 48;
 export const CELL_SIZE = 2;
 export const DIG_ZONE_CAPACITY_UNITS = 3000;
@@ -49,14 +51,13 @@ export function createTerrain(
       const idx = gz * GRID_SIZE + gx;
       const wx = originX + (gx + 0.5) * CELL_SIZE;
       const wz = originZ + (gz + 0.5) * CELL_SIZE;
-      let h = 0.75 + Math.random() * 0.15;
-      const zone = digZones.find((item) => distance(wx, wz, item.x, item.z) < item.radius);
-      if (zone) {
-        // 굴착 구역 — 흙 더미 (눈에 띄게 높게)
-        const mound = 1 - distance(wx, wz, zone.x, zone.z) / zone.radius;
-        h = 0.9 + mound * 1.1 + Math.random() * 0.2;
-      }
-      heights[idx] = h;
+      const zone =
+        digZones.find((item) => distance(wx, wz, item.x, item.z) < item.radius) ?? null;
+      heights[idx] = computeBaseTerrainHeight(wx, wz, zone, {
+        x: DUMP_ZONE.x,
+        z: DUMP_ZONE.z,
+        radius: DUMP_ZONE.radius + 4,
+      });
     }
   }
   return {
@@ -200,12 +201,9 @@ function addMoundAtZone(terrain: TerrainData, zone: DigZone) {
       const idx = gz * terrain.gridSize + gx;
       const wx = terrain.originX + (gx + 0.5) * terrain.cellSize;
       const wz = terrain.originZ + (gz + 0.5) * terrain.cellSize;
-      const dist = distance(wx, wz, zone.x, zone.z);
-      if (dist >= zone.radius) continue;
-      const mound = 1 - dist / zone.radius;
-      const h = 0.9 + mound * 1.1 + Math.random() * 0.2;
-      terrain.heights[idx] = Math.max(terrain.heights[idx], h);
-      terrain.baseHeights[idx] = terrain.heights[idx];
+      const next = applyZoneMoundHeight(wx, wz, zone, terrain.heights[idx]);
+      terrain.heights[idx] = next;
+      terrain.baseHeights[idx] = next;
     }
   }
 }

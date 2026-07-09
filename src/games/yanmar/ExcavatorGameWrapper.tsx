@@ -437,6 +437,7 @@ export function ExcavatorGameWrapper({
       prev.bucketCurlReady === fb.bucketCurlReady &&
       prev.armPulling === fb.armPulling &&
       prev.optimalDigPose === fb.optimalDigPose &&
+      prev.canDump === fb.canDump &&
       Math.abs(prev.digPoseScore - fb.digPoseScore) < 0.01
         ? prev
         : { ...fb },
@@ -992,6 +993,11 @@ export function ExcavatorGameWrapper({
     };
   }, [syncMergedInput]);
 
+  const loadOverlayEnabled = mode !== "intro" && mode !== "gameReady";
+  const loadOverlayPercent = Math.max(0, Math.min(100, hud.bucketLoad * 100));
+  const loadOverlayUnits = getLoadUnits(hud.bucketLoad, equipmentStats.maxLoadUnits);
+  const loadOverlayActive = loadOverlayEnabled && digFeedback.digging;
+
   return (
     <div
       className={`relative touch-manipulation ${
@@ -1061,8 +1067,13 @@ export function ExcavatorGameWrapper({
                 </span>
                 <span className="shrink-0 text-orange-50">
                   {getLoadUnits(hud.bucketLoad, equipmentStats.maxLoadUnits)}/
-                  {equipmentStats.maxLoadUnits}
+                  {equipmentStats.maxLoadUnits} {Math.round(hud.bucketLoad * 100)}%
                 </span>
+                {digFeedback.canDump && hud.bucketLoad > 0.02 ? (
+                  <span className="ml-1 shrink-0 rounded-md border border-emerald-200/50 bg-emerald-500/90 px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm">
+                    하역가능
+                  </span>
+                ) : null}
               </div>
             </div>
             <button
@@ -1072,6 +1083,39 @@ export function ExcavatorGameWrapper({
             >
               장비강화
             </button>
+          </div>
+        )}
+
+        {loadOverlayEnabled && (
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 z-50 w-[min(12.5rem,58%)] rounded-xl border border-orange-100/35 bg-black/70 px-3 py-2.5 text-center text-white shadow-2xl backdrop-blur-md"
+            style={{
+              opacity: loadOverlayActive ? 1 : 0,
+              transform: `translate(-50%, calc(-50% + ${loadOverlayActive ? "0rem" : "-2.2rem"})) scale(${loadOverlayActive ? 1 : 0.92})`,
+              transition:
+                "opacity 3000ms ease-out, transform 3000ms ease-out",
+            }}
+            aria-hidden={!loadOverlayActive}
+          >
+            <p className="text-[9px] font-black uppercase tracking-[0.24em] text-orange-200">
+              LOADING
+            </p>
+            <div className="mt-1.5 flex items-end justify-center gap-1">
+              <span className="text-2xl font-black tabular-nums text-orange-100 drop-shadow">
+                {Math.round(loadOverlayPercent)}
+              </span>
+              <span className="pb-0.5 text-xs font-black text-orange-200">%</span>
+            </div>
+            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/18">
+              <span
+                className="block h-full rounded-full bg-gradient-to-r from-orange-300 via-amber-200 to-yellow-100"
+                style={{ width: `${loadOverlayPercent}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-[10px] font-bold text-white/85">
+              적재량 {loadOverlayUnits}/{equipmentStats.maxLoadUnits}{" "}
+              {Math.round(loadOverlayPercent)}%
+            </p>
           </div>
         )}
 
@@ -1222,14 +1266,14 @@ export function ExcavatorGameWrapper({
         />
 
         {mode === "game" && (
-          <>
-            <div className="absolute right-2 top-[17rem] z-20 rounded-lg bg-orange-600/80 px-2 py-1 text-[10px] text-white">
+          <div className="yanmar-zone-legend absolute right-2 top-[10.35rem] z-20 flex items-center gap-1.5 rounded-xl bg-black/45 px-1.5 py-1 shadow-lg backdrop-blur-sm">
+            <div className="rounded-lg bg-orange-600/85 px-2 py-1 text-[10px] font-black text-white">
               🟠 굴착
             </div>
-            <div className="absolute right-2 top-[18.75rem] z-20 rounded-lg bg-green-600/80 px-2 py-1 text-[10px] text-white">
+            <div className="rounded-lg bg-green-600/85 px-2 py-1 text-[10px] font-black text-white">
               🟢 덤프
             </div>
-          </>
+          </div>
         )}
 
         {stepCompleteFlash && (

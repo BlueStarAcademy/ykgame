@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, type RefObject } from "react";
+import { useLayoutEffect, useMemo, type RefObject } from "react";
 import * as THREE from "three";
+import { createBucketDirtTexture } from "./proceduralTextures";
 
 const STEEL = {
   color: "#3f4b55",
@@ -148,6 +149,7 @@ export function ExcavatorBucket({
 }: {
   dirtRef: RefObject<THREE.Mesh | null>;
 }) {
+  const dirtTexture = useMemo(() => createBucketDirtTexture(), []);
   const sideShape = useMemo(() => {
     const shape = new THREE.Shape();
 
@@ -162,6 +164,8 @@ export function ExcavatorBucket({
 
     return shape;
   }, []);
+
+  useLayoutEffect(() => () => dirtTexture.dispose(), [dirtTexture]);
 
   const teeth = [-0.3, -0.15, 0, 0.15, 0.3];
 
@@ -235,7 +239,12 @@ export function ExcavatorBucket({
 
         <mesh ref={dirtRef} position={[0.48, -0.35, 0]} visible={false}>
           <boxGeometry args={[0.72, 0.28, 0.62]} />
-          <meshStandardMaterial color="#7a5532" roughness={0.96} />
+          <meshStandardMaterial
+            map={dirtTexture}
+            color="#8f6438"
+            roughness={0.98}
+            metalness={0}
+          />
         </mesh>
       </group>
     </group>

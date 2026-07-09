@@ -87,11 +87,9 @@ export function ExcavatorMinimap({
 
       // 굴착 구역
       const digZones = getActiveDigZones(terrain);
-      let firstDigLabel: { px: number; py: number; r: number } | null = null;
       for (const zone of digZones) {
         const dig = worldToMinimap(zone.x, zone.z, bounds);
         const digR = (zone.radius / (bounds.maxX - bounds.minX)) * inner;
-        firstDigLabel ??= { px: dig.px, py: dig.py, r: digR };
         ctx.fillStyle = "rgba(255,143,0,0.28)";
         ctx.beginPath();
         ctx.arc(dig.px, dig.py, Math.max(digR, 4), 0, Math.PI * 2);
@@ -161,17 +159,6 @@ export function ExcavatorMinimap({
       ctx.beginPath();
       ctx.arc(px, py, 1.5, 0, Math.PI * 2);
       ctx.fill();
-
-      ctx.fillStyle = "rgba(255,255,255,0.75)";
-      ctx.font = "700 8px sans-serif";
-      if (firstDigLabel) {
-        ctx.fillText(
-          "DIG",
-          Math.max(7, firstDigLabel.px - 8),
-          Math.max(11, firstDigLabel.py - firstDigLabel.r - 3),
-        );
-      }
-      ctx.fillText("DUMP", Math.min(SIZE - 28, dump.px - 12), Math.max(11, dump.py - dumpR - 3));
 
       raf = requestAnimationFrame(draw);
     };

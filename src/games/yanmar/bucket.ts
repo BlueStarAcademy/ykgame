@@ -3,7 +3,7 @@ import type { ExcavatorSimState } from "./ExcavatorScene";
 const BOOM_LEN = 3;
 const ARM_LEN = 2.5;
 const BUCKET_LEN = 1.2;
-const BOOM_PIVOT_Y = 1.0;
+const BOOM_PIVOT_Y = 1.68;
 const BOOM_OFFSET = 0.8;
 const VISUAL_ARM_ROTATION_SCALE = 1.18;
 const VISUAL_BUCKET_ROTATION_SCALE = 1.02;
@@ -89,6 +89,7 @@ export interface DigFeedback {
   armPulling: boolean;
   optimalDigPose: boolean;
   digPoseScore: number;
+  canDump: boolean;
 }
 
 export function createDigFeedback(): DigFeedback {
@@ -106,5 +107,6 @@ export function createDigFeedback(): DigFeedback {
     armPulling: false,
     optimalDigPose: false,
     digPoseScore: 0,
+    canDump: false,
   };
 }

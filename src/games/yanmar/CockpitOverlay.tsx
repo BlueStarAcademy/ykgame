@@ -49,25 +49,38 @@ type WidenNumbers<T> = T extends number
     : T;
 type CockpitLayout = WidenNumbers<typeof COCKPIT_LAYOUT>;
 
+const LANDSCAPE_COCKPIT_LAYOUT: CockpitLayout = {
+  ...COCKPIT_LAYOUT,
+  left: { ...COCKPIT_LAYOUT.left, cy: 0.66 },
+  right: { ...COCKPIT_LAYOUT.right, cy: 0.66 },
+  safetyLever: { ...COCKPIT_LAYOUT.safetyLever, cy: 0.67 },
+  travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cy: 0.65 },
+  travelRight: { ...COCKPIT_LAYOUT.travelRight, cy: 0.65 },
+  travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cy: 0.65 },
+  hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cy: 0.67 },
+  rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cy: 0.58 },
+  horn: { ...COCKPIT_LAYOUT.horn, cy: 0.06 },
+};
+
 const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   ...COCKPIT_LAYOUT,
   left: { ...COCKPIT_LAYOUT.left, cx: 0.13, cy: 0.91 },
   right: { ...COCKPIT_LAYOUT.right, cx: 0.87, cy: 0.91 },
-  safetyLever: { ...COCKPIT_LAYOUT.safetyLever, cx: 0.11, cy: 0.46 },
+  safetyLever: { ...COCKPIT_LAYOUT.safetyLever, cx: 0.11, cy: 0.38 },
   travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cx: 0.455, cy: 0.91 },
   travelRight: { ...COCKPIT_LAYOUT.travelRight, cx: 0.545, cy: 0.91 },
   travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cx: 0.5, cy: 0.91 },
-  // Right column top→bottom: pedal → hydraulic → horn → stick.
+  // Side columns share the same row rhythm so controls do not look staggered.
+  rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.89, cy: 0.11 },
   hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.89, cy: 0.35 },
-  rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.89, cy: 0.18 },
-  horn: { ...COCKPIT_LAYOUT.horn, cx: 0.89, cy: 0.52 },
+  horn: { ...COCKPIT_LAYOUT.horn, cx: 0.89, cy: 0.54 },
 };
 
 function useControlLayout(layoutMode: CockpitLayoutMode) {
   const isPortrait = layoutMode === "portrait";
   return {
     isPortrait,
-    layout: isPortrait ? PORTRAIT_COCKPIT_LAYOUT : COCKPIT_LAYOUT,
+    layout: isPortrait ? PORTRAIT_COCKPIT_LAYOUT : LANDSCAPE_COCKPIT_LAYOUT,
   };
 }
 
@@ -86,6 +99,7 @@ function VisualJoystick({
   const y = Math.max(-1, Math.min(1, value.y));
   const visualX = side === "right" ? -x : x;
   const visualY = side === "right" ? -y : y;
+  const tiltX = side === "left" ? visualX : -visualX;
   const pullDepth = Math.max(0, -y);
   const pushDepth = Math.max(0, y);
   const stickDrop = pullDepth * 0.42 - pushDepth * 0.22;
@@ -102,30 +116,44 @@ function VisualJoystick({
       }}
     >
       <div className="yanmar-realstick">
-        <div className="yanmar-realstick-base" />
+        <div className="yanmar-realstick-shadow" aria-hidden />
+        <div className="yanmar-realstick-base">
+          <span className="yanmar-realstick-base-plate" />
+          <span className="yanmar-realstick-base-led" />
+        </div>
         <div
           className="yanmar-realstick-boot"
           style={{
-            transform: `translate3d(-50%, ${bootDrop}rem, 0) rotate(${-visualX * 3.5}deg) scaleY(${bootScaleY})`,
+            transform: `translate3d(-50%, ${bootDrop}rem, 0) rotate(${tiltX * 3.5}deg) scaleY(${bootScaleY})`,
           }}
         >
-          <span />
-          <span />
-          <span />
-          <span />
+          <span className="yanmar-realstick-boot-ring ring-1" />
+          <span className="yanmar-realstick-boot-ring ring-2" />
+          <span className="yanmar-realstick-boot-ring ring-3" />
+          <span className="yanmar-realstick-boot-ring ring-4" />
+          <span className="yanmar-realstick-boot-ring ring-5" />
         </div>
         <div
           className="yanmar-realstick-upper"
           style={{
-            transform: `translate3d(-50%, ${stickDrop}rem, 0) rotate(${-visualX * 12}deg) skewX(${visualY * -2}deg)`,
+            transform: `translate3d(-50%, ${stickDrop}rem, 0) rotate(${tiltX * 12}deg) skewX(${visualY * -2}deg)`,
           }}
         >
           <span className="yanmar-realstick-stem" />
-          <span className="yanmar-realstick-collar" />
+          <span className="yanmar-realstick-collar">
+            <span className="yanmar-realstick-collar-bolt bolt-left" />
+            <span className="yanmar-realstick-collar-bolt bolt-right" />
+          </span>
           <span className="yanmar-realstick-grip">
+            <span className="yanmar-realstick-grip-knurl" />
             <span className="yanmar-realstick-cap" />
             <span className="yanmar-realstick-face" />
             <span className="yanmar-realstick-side" />
+            <span className="yanmar-realstick-ring yanmar-realstick-ring-1" />
+            <span className="yanmar-realstick-ring yanmar-realstick-ring-2" />
+            <span className="yanmar-realstick-ring yanmar-realstick-ring-3" />
+            <span className="yanmar-realstick-label">{side === "left" ? "L" : "R"}</span>
+            {side === "right" ? <span className="yanmar-realstick-horn" /> : null}
           </span>
         </div>
       </div>
@@ -154,16 +182,24 @@ function VisualLever({
   const v = Math.max(-1, Math.min(1, value));
   const pullDepth = Math.max(0, -v);
   const pushDepth = Math.max(0, v);
+  const isTravel = variant === "travel";
   const stickDrop = compact
     ? pullDepth * 0.1 - pushDepth * 0.04
-    : pullDepth * 0.42 - pushDepth * 0.12;
+    : isTravel
+      ? pullDepth * 0.86 - pushDepth * 0.78
+      : pullDepth * 0.42 - pushDepth * 0.12;
   const bendX = compact
     ? v >= 0
       ? v * -8
       : v * -14
-    : v >= 0
-      ? v * -22
-      : v * -48;
+    : isTravel
+      ? v >= 0
+        ? v * -58
+        : v * -68
+      : v >= 0
+        ? v * -22
+        : v * -48;
+  const slideY = isTravel ? -v * 0.42 : 0;
   return (
     <div
       className={`yanmar-visual-part yanmar-visual-lever ${
@@ -183,7 +219,7 @@ function VisualLever({
         <div
           className={`yanmar-lever-stick yanmar-lever-${color}`}
           style={{
-            transform: `translateX(-50%) translateY(${stickDrop}rem) rotateX(${bendX}deg)`,
+            transform: `translateX(-50%) translateY(calc(${stickDrop}rem + ${slideY}rem)) rotateX(${bendX}deg)`,
           }}
         >
           <span />
@@ -229,39 +265,27 @@ function VisualTravelLevers({
 function VisualPedal({
   value,
   layout,
-  isPortrait = false,
-  nested = false,
 }: {
   value: number;
   layout: CockpitLayout;
-  isPortrait?: boolean;
-  /** When true, fills parent panel well instead of absolute deck coords */
-  nested?: boolean;
 }) {
   const top = Math.max(0, value);
   const bottom = Math.max(0, -value);
   const pedal = layout.rightPedal;
-  const pressOffset = (top - bottom) * (nested ? 0.1 : 0.22);
+  const pressOffset = (top - bottom) * 0.22;
+
   return (
     <div
-      className={`yanmar-visual-part yanmar-visual-pedal${
-        nested ? " yanmar-visual-pedal-nested" : ""
-      }`}
-      style={
-        nested
-          ? undefined
-          : {
-              left: `${(pedal.cx + (isPortrait ? 0 : 0.03)) * 100}%`,
-              top: `${pedal.cy * 100}%`,
-            }
-      }
+      className="yanmar-visual-part yanmar-visual-pedal"
+      style={{
+        left: `${(pedal.cx + 0.03) * 100}%`,
+        top: `${pedal.cy * 100}%`,
+      }}
     >
       <div
         className="yanmar-pedal-pad"
         style={{
-          transform: nested
-            ? `translate(-50%, calc(-50% + ${pressOffset}rem))`
-            : `translate(-50%, ${pressOffset}rem)`,
+          transform: `translate(-50%, ${pressOffset}rem)`,
         }}
       />
     </div>
@@ -271,9 +295,6 @@ function VisualPedal({
 function VisualSafetyLockStatus({ locked }: { locked: boolean }) {
   return (
     <div className={`yanmar-safety-lock-status ${locked ? "is-locked" : "is-unlocked"}`}>
-      <span className="yanmar-safety-lock-icon" aria-hidden>
-        {locked ? "🔒" : "🔓"}
-      </span>
       <span>{locked ? "잠김" : "해제"}</span>
     </div>
   );
@@ -284,82 +305,6 @@ function VisualHydraulicSpeedStatus({ highSpeed }: { highSpeed: boolean }) {
     <div className={`yanmar-hydraulic-speed-status ${highSpeed ? "is-high" : "is-low"}`}>
       {highSpeed ? "x2" : "x1"}
     </div>
-  );
-}
-
-function VisualPortraitSideButtons({
-  auxiliary,
-  layout,
-}: {
-  auxiliary: AuxiliaryControlState;
-  layout: CockpitLayout;
-}) {
-  const pedal = layout.rightPedal;
-  return (
-    <>
-      <div
-        className={`yanmar-portrait-3d-button yanmar-portrait-3d-button-safety ${
-          auxiliary.safetyLocked ? "is-active" : ""
-        }`}
-        style={{
-          left: `${layout.safetyLever.cx * 100}%`,
-          top: `${layout.safetyLever.cy * 100}%`,
-        }}
-      >
-        <div className="yanmar-portrait-3d-well">
-          <VisualLever
-            cx={layout.safetyLever.cx}
-            cy={layout.safetyLever.cy}
-            value={auxiliary.safetyLocked ? 1 : -0.25}
-            color="red"
-            variant="safety"
-            compact
-          />
-        </div>
-        <span className="yanmar-portrait-status-label">
-          {auxiliary.safetyLocked ? "잠김" : "해제"}
-        </span>
-      </div>
-      <div
-        className="yanmar-portrait-3d-button yanmar-portrait-3d-button-pedal"
-        style={{
-          left: `${pedal.cx * 100}%`,
-          top: `${pedal.cy * 100}%`,
-        }}
-      >
-        <div className="yanmar-portrait-3d-well">
-          <VisualPedal
-            value={auxiliary.boomSwing}
-            layout={layout}
-            isPortrait
-            nested
-          />
-        </div>
-      </div>
-      <div
-        className={`yanmar-portrait-3d-button yanmar-portrait-3d-button-hydraulic ${
-          auxiliary.highSpeed ? "is-active" : ""
-        }`}
-        style={{
-          left: `${layout.hydraulicSpeed.cx * 100}%`,
-          top: `${layout.hydraulicSpeed.cy * 100}%`,
-        }}
-      >
-        <div className="yanmar-portrait-3d-well">
-          <VisualLever
-            cx={layout.hydraulicSpeed.cx}
-            cy={layout.hydraulicSpeed.cy}
-            value={auxiliary.highSpeed ? 1 : -1}
-            color="red"
-            variant="hydraulic"
-            compact
-          />
-        </div>
-        <span className="yanmar-portrait-status-label">
-          {auxiliary.highSpeed ? "x2" : "x1"}
-        </span>
-      </div>
-    </>
   );
 }
 
@@ -382,11 +327,19 @@ function VisualControlDeck({
 }) {
   return (
     <div className="pointer-events-none absolute inset-0">
-      <div className="yanmar-bottom-connector" />
+      <div className="yanmar-control-rail">
+        <div className="yanmar-deck-brand-badge">YANMAR</div>
+        <div className="yanmar-deck-instrument-strip" />
+        <div className="yanmar-bottom-connector" />
+      </div>
       <VisualJoystick side="left" value={input.left} highlighted={highlightLeft} layout={layout} />
-      {isPortrait ? (
-        <VisualPortraitSideButtons auxiliary={auxiliary} layout={layout} />
-      ) : (
+      <VisualTravelLevers
+        left={input.travel.left}
+        right={input.travel.right}
+        highlighted={highlightTravel}
+        layout={layout}
+      />
+      {!isPortrait ? (
         <>
           <VisualLever
             cx={layout.safetyLever.cx}
@@ -396,16 +349,6 @@ function VisualControlDeck({
             variant="safety"
           />
           <VisualSafetyLockStatus locked={auxiliary.safetyLocked} />
-        </>
-      )}
-      <VisualTravelLevers
-        left={input.travel.left}
-        right={input.travel.right}
-        highlighted={highlightTravel}
-        layout={layout}
-      />
-      {isPortrait ? null : (
-        <>
           <VisualLever
             cx={layout.hydraulicSpeed.cx}
             cy={layout.hydraulicSpeed.cy}
@@ -416,7 +359,7 @@ function VisualControlDeck({
           <VisualHydraulicSpeedStatus highSpeed={auxiliary.highSpeed} />
           <VisualPedal value={auxiliary.boomSwing} layout={layout} />
         </>
-      )}
+      ) : null}
       <VisualJoystick side="right" value={input.right} highlighted={highlightRight} layout={layout} />
     </div>
   );
@@ -811,23 +754,36 @@ function SpeedModeLever({
   onToggle: () => void;
   isPortrait: boolean;
 }) {
-  const hitboxWidth = isPortrait ? "12.5%" : "4.6%";
+  const buttonSize = isPortrait ? "3.35rem" : "2.75rem";
 
   return (
     <button
       type="button"
-      className="absolute z-40 touch-none active:scale-[0.98]"
+      className={`yanmar-aux-button yanmar-aux-button-hydraulic absolute z-40 touch-none active:scale-95 ${
+        active ? "is-active" : ""
+      } ${isPortrait ? "yanmar-aux-button-portrait" : ""}`}
       style={{
         left: `${cx * 100}%`,
         top: `${cy * 100}%`,
-        width: hitboxWidth,
-        height: isPortrait ? "8%" : "44%",
+        width: buttonSize,
+        height: buttonSize,
         transform: "translate(-50%, -50%)",
       }}
       onClick={onToggle}
       aria-pressed={active}
       aria-label={active ? "유압 속도 x2" : "유압 속도 x1"}
     >
+      <span className="yanmar-aux-lever-well" aria-hidden>
+        <VisualLever
+          cx={cx}
+          cy={cy}
+          value={active ? 1 : -1}
+          color="red"
+          variant="hydraulic"
+          compact
+        />
+      </span>
+      <span className="yanmar-aux-button-label">유압</span>
       {showTouchZone && (
         <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-sky-200/65 bg-transparent" />
       )}
@@ -853,20 +809,33 @@ function SafetyLever({
   return (
     <button
       type="button"
-      className="absolute z-50 touch-none active:scale-[0.98]"
+      className={`yanmar-aux-button yanmar-aux-button-safety absolute z-50 touch-none active:scale-95 ${
+        active ? "is-active" : ""
+      } ${isPortrait ? "yanmar-aux-button-portrait" : ""}`}
       style={{
         left: `${cx * 100}%`,
         top: `${cy * 100}%`,
-        width: isPortrait ? "12.5%" : "5.2%",
-        height: isPortrait ? "8%" : "48%",
+        width: isPortrait ? "3.35rem" : "2.75rem",
+        height: isPortrait ? "3.35rem" : "2.75rem",
         transform: "translate(-50%, -50%)",
       }}
       onClick={onToggle}
       aria-pressed={active}
       aria-label={active ? "안전레버 잠김" : "안전레버 해제"}
     >
+      <span className="yanmar-aux-lever-well" aria-hidden>
+        <VisualLever
+          cx={cx}
+          cy={cy}
+          value={active ? 1 : -0.25}
+          color="red"
+          variant="safety"
+          compact
+        />
+      </span>
+      <span className="yanmar-aux-button-label">안전</span>
       {showTouchZone && (
-        <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-red-200/65 bg-transparent" />
+        <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-slate-200/65 bg-transparent" />
       )}
     </button>
   );
@@ -882,7 +851,7 @@ function HornButton({
   showTouchZone: boolean;
 }) {
   const cx = isPortrait ? layout.horn.cx : layout.right.cx;
-  const cy = isPortrait ? layout.horn.cy : Math.max(0.28, layout.right.cy - 0.49);
+  const cy = layout.horn.cy;
 
   return (
     <button
@@ -925,6 +894,7 @@ function PedalSwingControl({
   const directionRef = useRef(0);
   const frameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number | null>(null);
+  const [pressedDirection, setPressedDirection] = useState(0);
 
   useEffect(() => {
     valueRef.current = activeValue;
@@ -979,6 +949,7 @@ function PedalSwingControl({
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     directionRef.current = value;
+    setPressedDirection(value);
     lastFrameTimeRef.current = null;
     if (frameRef.current == null) {
       frameRef.current = requestAnimationFrame(animate);
@@ -994,10 +965,12 @@ function PedalSwingControl({
     } catch {
       /* already released */
     }
+    setPressedDirection(0);
     stopAnimation();
   };
 
   const handleLostCapture = () => {
+    setPressedDirection(0);
     stopAnimation();
   };
 
@@ -1005,36 +978,39 @@ function PedalSwingControl({
   const bottomPressAmount = Math.max(0, -activeValue);
   return (
     <div
-      className="absolute z-40 select-none"
+      className={`yanmar-pedal-button absolute z-40 select-none ${
+        pressedDirection > 0 ? "is-top-active" : pressedDirection < 0 ? "is-bottom-active" : ""
+      } ${isPortrait ? "yanmar-pedal-button-portrait" : ""}`}
       style={{
         left: `${touchCx * 100}%`,
         ...(isPortrait
           ? {
-              top: `calc(${pedal.cy * 100}% - 0.75%)`,
-              width: "12.5%",
-              height: "9%",
+              top: `${pedal.cy * 100}%`,
+              width: "3.15rem",
+              height: "5.4rem",
               transform: "translate(-50%, -50%)",
             }
           : {
-              bottom: 0,
-              width: `${pedal.width * 100}%`,
-              height: `${pedal.height * 100}%`,
-              transform: "translateX(-50%)",
+              top: `${pedal.cy * 100}%`,
+              width: "2.55rem",
+              height: "5rem",
+              transform: "translate(-50%, -50%)",
             }),
         WebkitTouchCallout: "none",
       }}
       onContextMenu={(e) => e.preventDefault()}
       aria-label="우측 페달 붐 스윙"
     >
+      <span className="yanmar-pedal-button-label">PEDAL</span>
       {showTouchZone && (
         <div className="pointer-events-none absolute inset-0 rounded-lg border border-amber-200/65 bg-transparent">
-          <span className="absolute inset-x-[8%] top-[7%] h-[43%] rounded-t-lg border border-amber-100/35" />
-          <span className="absolute inset-x-[8%] bottom-[7%] h-[43%] rounded-b-lg border border-amber-100/35" />
+          <span className="absolute inset-x-[8%] top-[6%] h-[42%] rounded-t-lg border border-amber-100/35" />
+          <span className="absolute inset-x-[8%] bottom-[6%] h-[42%] rounded-b-lg border border-amber-100/35" />
         </div>
       )}
       <button
         type="button"
-        className="absolute inset-x-[8%] top-[7%] h-[43%] rounded-t-lg bg-transparent transition-transform duration-300 ease-out"
+        className="yanmar-pedal-button-half yanmar-pedal-button-top absolute inset-x-[8%] top-[6%] h-[42%] rounded-t-lg transition-transform duration-300 ease-out"
         style={{
           transform: `translateY(${topPressAmount * 0.35}rem) scale(${1 - topPressAmount * 0.03})`,
         }}
@@ -1043,12 +1019,12 @@ function PedalSwingControl({
         onPointerCancel={release}
         onLostPointerCapture={handleLostCapture}
         onContextMenu={(e) => e.preventDefault()}
-        aria-pressed={activeValue > 0}
+        aria-pressed={pressedDirection > 0}
         aria-label="우측 페달 위쪽: 암 우측 회전"
       />
       <button
         type="button"
-        className="absolute inset-x-[8%] bottom-[7%] h-[43%] rounded-b-lg bg-transparent transition-transform duration-300 ease-out"
+        className="yanmar-pedal-button-half yanmar-pedal-button-bottom absolute inset-x-[8%] bottom-[6%] h-[42%] rounded-b-lg transition-transform duration-300 ease-out"
         style={{
           transform: `translateY(${-bottomPressAmount * 0.35}rem) scale(${1 - bottomPressAmount * 0.03})`,
         }}
@@ -1057,7 +1033,7 @@ function PedalSwingControl({
         onPointerCancel={release}
         onLostPointerCapture={handleLostCapture}
         onContextMenu={(e) => e.preventDefault()}
-        aria-pressed={activeValue < 0}
+        aria-pressed={pressedDirection < 0}
         aria-label="우측 페달 아래쪽: 암 좌측 회전"
       />
     </div>
