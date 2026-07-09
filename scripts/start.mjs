@@ -4,6 +4,8 @@ import { spawn, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { ensureAuthSecret } from "./ensure-auth-secret.mjs";
 
+const DEPLOY_REV = "f396945-watchpatterns";
+
 const port = process.env.PORT || "3000";
 const host = "0.0.0.0";
 
@@ -70,7 +72,7 @@ if (process.env.RAILWAY_ENVIRONMENT) {
 
 process.env.HOSTNAME = host;
 
-console.log("YKGAME deploy rev: middleware-auth-fix-1");
+console.log(`YKGAME deploy rev: ${DEPLOY_REV}`);
 
 console.log(`Starting Next.js on ${host}:${port}...`);
 
