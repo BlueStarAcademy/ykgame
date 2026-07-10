@@ -157,10 +157,11 @@ function BrandGuideLobby({
               <div className="game-lobby-reward-grid">
                 {rewards.map((reward) => (
                   <div key={reward.label} className="game-lobby-reward-card">
-                    <p className="game-lobby-reward-label">
-                      {reward.icon} {reward.label}
-                    </p>
-                    <p className="game-lobby-reward-desc">{reward.desc}</p>
+                    <span className="game-lobby-reward-label">
+                      <span aria-hidden>{reward.icon}</span>
+                      {reward.label}
+                    </span>
+                    <span className="game-lobby-reward-desc">{reward.desc}</span>
                   </div>
                 ))}
               </div>

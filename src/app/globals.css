@@ -3476,19 +3476,26 @@ html.pwa-mode body {
   display: grid;
   flex: 1 1 0;
   min-height: 0;
+  align-content: start;
   grid-template-columns: 1fr;
-  gap: 0.55rem;
+  gap: 0.65rem;
+  padding: 0.15rem 0.1rem 1.1rem;
   overflow-y: auto;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .game-lobby-reward-card {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   overflow: hidden;
   border-radius: 0.875rem;
   border: 1px solid rgba(212, 168, 83, 0.28);
   background: linear-gradient(145deg, #fffdf8 0%, #fff9ee 100%);
-  padding: 0.75rem 0.8rem;
+  padding: 0.85rem 0.95rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
@@ -3506,18 +3513,29 @@ html.pwa-mode body {
 
 .game-lobby-reward-label {
   position: relative;
+  display: inline-flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 0.35rem;
   font-size: 0.75rem;
   font-weight: 800;
-  line-height: 1.4;
+  line-height: 1.35;
   color: #78350f;
+  white-space: nowrap;
 }
 
 .game-lobby-reward-desc {
   position: relative;
-  margin-top: 0.25rem;
+  flex: 0 1 auto;
+  max-width: 48%;
+  margin-top: 0;
+  text-align: right;
   font-size: 0.6875rem;
-  line-height: 1.45;
+  font-weight: 700;
+  line-height: 1.35;
   color: #a16207;
+  white-space: nowrap;
 }
 
 .game-lobby-rank-row {
