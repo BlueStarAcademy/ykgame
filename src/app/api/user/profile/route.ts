@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { GAMES } from "@/lib/games";
+import { GAMES, getSeasonKey } from "@/lib/games";
+import { getUserGameStats } from "@/lib/rankings";
 
 export async function GET() {
   const session = await auth();
@@ -25,30 +26,18 @@ export async function GET() {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const scores = await prisma.gameScore.findMany({
-    where: { userId: user.id },
-    orderBy: { score: "desc" },
-  });
-
-  const bestByGame = new Map<
-    string,
-    { score: number; stars: number; playTime: number }
-  >();
-  for (const s of scores) {
-    const existing = bestByGame.get(s.gameId);
-    if (!existing || s.score > existing.score) {
-      bestByGame.set(s.gameId, {
-        score: s.score,
-        stars: s.stars,
-        playTime: s.playTime,
-      });
-    }
-  }
-
-  const gameProgress = GAMES.map((game) => ({
-    gameId: game.id,
-    ...(bestByGame.get(game.id) ?? { score: 0, stars: 0, playTime: 0 }),
-  }));
+  const seasonKey = getSeasonKey();
+  const gameProgress = await Promise.all(
+    GAMES.map(async (game) => {
+      const stats = await getUserGameStats(game.id, user.id, seasonKey);
+      return {
+        gameId: game.id,
+        score: stats.bestScore,
+        stars: stats.bestStars,
+        playTime: stats.playTime,
+      };
+    }),
+  );
 
   const totalStars = gameProgress.reduce((sum, g) => sum + g.stars, 0);
 

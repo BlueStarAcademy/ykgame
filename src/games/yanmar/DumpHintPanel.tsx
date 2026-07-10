@@ -35,7 +35,7 @@ export function DumpHintPanel({
       label: raiseArmForDump
         ? "우조이스틱 뒤로 — 붐·암 들어 트럭 칸 위로"
         : inDumpZone
-          ? "트럭 칸 위 — 버킷 위치 맞춤"
+          ? "트럭 칸 위 — 버켓 위치 맞춤"
           : "트럭 쪽으로 스윙·주행",
     },
     {
@@ -46,10 +46,10 @@ export function DumpHintPanel({
           : !truckCanAccept
             ? "트럭 만차 — 출발 중"
             : canDump
-              ? "우조이스틱 오른쪽으로 버킷 펴기"
+              ? "우조이스틱 오른쪽으로 버켓 펴기"
               : raiseArmForDump
                 ? "먼저 붐·암을 들어올리세요"
-                : "트럭 칸 위로 버킷·차체를 더 올려주세요",
+                : "트럭 칸 위로 버켓·차체를 더 올려주세요",
     },
   ];
 

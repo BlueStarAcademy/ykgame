@@ -24,6 +24,9 @@ export const CRASH_ZONE_RESPAWN_MS = 10 * 60 * 1000;
 export const CRASH_TILE_MAX_HP = 1000;
 export const CRASH_HIT_DAMAGE = 10;
 export const HAUL_TRUCK_COOLDOWN_SEC = 10 * 60;
+/** 채취량은 유지하되 화면에 보이는 지형 침하는 완만하게 제한한다. */
+const DIG_TERRAIN_DEFORMATION_SCALE = 0.45;
+const DIG_TERRAIN_MAX_DEPTH = 0.7;
 
 export interface DigZone {
   id: string;
@@ -265,8 +268,13 @@ export function digAt(
       if (dist > radius) continue;
 
       const idx = gz * terrain.gridSizeX + gx;
-      const take = Math.min(amount * (1 - dist / radius), terrain.heights[idx]);
-      terrain.heights[idx] -= take;
+      const take = amount * (1 - dist / radius);
+      const minVisualHeight = terrain.baseHeights[idx] - DIG_TERRAIN_MAX_DEPTH;
+      const visualTake = Math.min(
+        take * DIG_TERRAIN_DEFORMATION_SCALE,
+        Math.max(0, terrain.heights[idx] - minVisualHeight),
+      );
+      terrain.heights[idx] -= visualTake;
       dug += take;
     }
   }

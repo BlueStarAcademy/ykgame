@@ -2,8 +2,11 @@ import {
   YANMAR_EQUIPMENT_CONFIG,
   YANMAR_REWARD_CONFIG,
   YANMAR_EQUIPMENT_RESET_REFUND_RATE,
+  YANMAR_SPECIAL_UPGRADE_COSTS,
   YANMAR_TRUCK_UPGRADE_COSTS,
   formatYanmarUpgradeCostSequence,
+  getYanmarBreakerDamage,
+  getYanmarHaulTruckCooldownSec,
   getYanmarTruckCapacityUnits,
   getYanmarTruckCooldownSec,
   type YanmarEquipmentPart,
@@ -155,6 +158,10 @@ export function getGameProbabilityReport() {
                   ? `+${YANMAR_EQUIPMENT_CONFIG.TRUCK_CAPACITY.capacityPerLevel * config.maxLevel}`
                   : part === "TRUCK_SPEED"
                     ? `${getYanmarTruckCooldownSec(0).toFixed(0)}초 → ${getYanmarTruckCooldownSec(config.maxLevel).toFixed(0)}초`
+                    : part === "CRASH_RESPAWN"
+                      ? `${getYanmarBreakerDamage(0)} → ${getYanmarBreakerDamage(config.maxLevel)}`
+                      : part === "HAUL_TRUCK_SPEED"
+                        ? `${getYanmarHaulTruckCooldownSec(0)}초 → ${getYanmarHaulTruckCooldownSec(config.maxLevel)}초`
                     : part === "ARM"
                       ? pctPoint(YANMAR_EQUIPMENT_CONFIG.ARM.effectPerLevel * config.maxLevel)
                       : part === "BOOM"
@@ -190,6 +197,11 @@ export function getGameProbabilityReport() {
               label: "덤프트럭",
               value: "고정 비용표",
               detail: YANMAR_TRUCK_UPGRADE_COSTS.join(" / "),
+            },
+            {
+              label: "브레이커 / 집게",
+              value: "고정 비용표",
+              detail: YANMAR_SPECIAL_UPGRADE_COSTS.join(" / "),
             },
             {
               label: "강화 초기화",

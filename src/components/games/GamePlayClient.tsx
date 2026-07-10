@@ -251,6 +251,8 @@ export function GamePlayClient({
   const [result, setResult] = useState<GameResult | null>(null);
   const [yanmarExitSignal, setYanmarExitSignal] = useState(0);
   const [yanmarResumeSignal, setYanmarResumeSignal] = useState(0);
+  /** Season total frozen at game start so stay/reload after save doesn't double-count. */
+  const [yanmarSeasonBaseScore, setYanmarSeasonBaseScore] = useState(0);
   const [myStats, setMyStats] = useState<MyStats>({
     rank: null,
     bestScore: 0,
@@ -284,6 +286,7 @@ export function GamePlayClient({
     void enterPlayingAfterGesture(() => {
       setResult(null);
       setPlayMode("practice");
+      setYanmarSeasonBaseScore(0);
       setYanmarExitSignal(0);
       setPhase("playing");
     });
@@ -294,6 +297,7 @@ export function GamePlayClient({
     void enterPlayingAfterGesture(() => {
       setResult(null);
       setPlayMode("game");
+      setYanmarSeasonBaseScore(myStats.bestScore);
       setYanmarExitSignal(0);
       setPhase("playing");
     });
@@ -392,6 +396,7 @@ export function GamePlayClient({
             immersive
             initialPlayMode={playMode ?? undefined}
             onShowRanking={() => setShowRanking(true)}
+            seasonScoreBase={yanmarSeasonBaseScore}
           />
         </GameImmersiveOverlay>
       ) : null}

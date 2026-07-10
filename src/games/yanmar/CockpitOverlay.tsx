@@ -14,7 +14,7 @@ import {
   BLADE_SPEED_PER_SECOND,
   COCKPIT_LAYOUT,
 } from "./controls";
-import type { TutorialStep } from "./tutorial";
+import type { GameMode, TutorialStep } from "./tutorial";
 import type { AttachmentType, AutoPoseSlotIndex, AutoPoseState } from "./types";
 import { AUTO_POSE_SLOT_COUNT } from "./types";
 import {
@@ -24,6 +24,7 @@ import {
 
 
 interface CockpitOverlayProps {
+  mode: GameMode;
   input: ExcavatorControlState;
   onInputChange: (
     input:
@@ -99,12 +100,13 @@ const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   left: { ...COCKPIT_LAYOUT.left, cx: 0.1, cy: 0.965 },
   right: { ...COCKPIT_LAYOUT.right, cx: 0.9, cy: 0.965 },
   safetyLever: { ...COCKPIT_LAYOUT.safetyLever, cx: 0.1, cy: 0.385 },
-  travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cx: 0.455, cy: 0.92 },
-  travelRight: { ...COCKPIT_LAYOUT.travelRight, cx: 0.545, cy: 0.92 },
-  travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cx: 0.5, cy: 0.92 },
+  travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cx: 0.455, cy: 0.79 },
+  travelRight: { ...COCKPIT_LAYOUT.travelRight, cx: 0.545, cy: 0.79 },
+  travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cx: 0.5, cy: 0.79 },
   rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.1, cy: 0.165 },
+  breakerPedal: { ...COCKPIT_LAYOUT.breakerPedal, cx: 0.275, cy: 0.86 },
   hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.1, cy: 0.275 },
-  blade: { ...COCKPIT_LAYOUT.blade, cx: 0.72, cy: 0.965 },
+  blade: { ...COCKPIT_LAYOUT.blade, cx: 0.695, cy: 0.79 },
   horn: { ...COCKPIT_LAYOUT.horn, cx: 0.9, cy: 0.495 },
 };
 
@@ -216,7 +218,7 @@ function VisualLever({
   compact = false,
 }: {
   cx: number;
-  cy: number;
+  cy: number | string;
   value: number;
   color?: "dark" | "red" | "blue";
   highlighted?: boolean;
@@ -230,9 +232,7 @@ function VisualLever({
   const isTravel = variant === "travel";
   const stickDrop = compact
     ? pullDepth * 0.1 - pushDepth * 0.04
-    : isTravel
-      ? pullDepth * 0.58 - pushDepth * 0.5
-      : pullDepth * 0.42 - pushDepth * 0.12;
+    : pullDepth * 0.42 - pushDepth * 0.12;
   const bendX = compact
     ? v >= 0
       ? v * -6
@@ -242,10 +242,13 @@ function VisualLever({
       : v >= 0
         ? v * -22
         : v * -48;
-  const travelDepth = isTravel ? pushDepth * 0.18 + pullDepth * 0.1 : 0;
+  const motionClass = v > 0.16 ? "is-pushed" : v < -0.16 ? "is-pulled" : "is-neutral";
   const stickTransform = isTravel
-    ? `translate3d(-50%, ${stickDrop}rem, ${travelDepth}rem) rotateX(${bendX}deg)`
+    ? `translate3d(-50%, 0, 0) rotateX(${v * -10}deg)`
     : `translate3d(-50%, ${stickDrop}rem, 0) rotateX(${bendX}deg)`;
+  const pivotTransform = isTravel
+    ? `translate3d(-50%, calc(-50% + ${v * -0.62}rem), 0) rotateX(18deg)`
+    : undefined;
   return (
     <div
       className={`yanmar-visual-part yanmar-visual-lever ${
@@ -254,18 +257,38 @@ function VisualLever({
         variant === "hydraulic" ? "yanmar-visual-lever-hydraulic" : ""
       } ${variant === "travel" ? "yanmar-visual-lever-travel" : ""} ${
         compact ? "yanmar-visual-lever-compact" : ""
-      }`}
+      } ${motionClass}`}
       style={
-        compact ? undefined : { left: `${cx * 100}%`, top: `${cy * 100}%` }
+        compact
+          ? undefined
+          : {
+              left: `${cx * 100}%`,
+              top: typeof cy === "number" ? `${cy * 100}%` : cy,
+            }
       }
     >
+      {isTravel ? (
+        <div className="yanmar-premium-lever-panel" aria-hidden>
+          <span className="yanmar-premium-lever-panel-inset" />
+          <span className="yanmar-premium-lever-status is-forward" />
+          <span className="yanmar-premium-lever-status is-reverse" />
+          <span className="yanmar-premium-lever-bolt bolt-tl" />
+          <span className="yanmar-premium-lever-bolt bolt-tr" />
+          <span className="yanmar-premium-lever-bolt bolt-bl" />
+          <span className="yanmar-premium-lever-bolt bolt-br" />
+        </div>
+      ) : null}
       <div className="yanmar-lever-mount" />
       <div className="yanmar-lever-slot" />
-      <div className="yanmar-lever-pivot">
+      <div
+        className="yanmar-lever-pivot"
+        style={pivotTransform ? { transform: pivotTransform } : undefined}
+      >
         <div
           className={`yanmar-lever-stick yanmar-lever-${color}`}
           style={{
             transform: stickTransform,
+            height: isTravel ? "0.22rem" : undefined,
           }}
         >
           <span />
@@ -288,9 +311,26 @@ function VisualTravelLevers({
 }) {
   return (
     <div className="yanmar-travel-cluster">
+      <div
+        className="yanmar-premium-dual-travel-panel"
+        style={{
+          left: `${layout.travelBoth.cx * 100}%`,
+          top: "calc(100% - 1.375rem)",
+        }}
+        aria-hidden
+      >
+        <span className="yanmar-premium-dual-travel-inset" />
+        <span className="yanmar-premium-dual-travel-lane is-left" />
+        <span className="yanmar-premium-dual-travel-lane is-right" />
+        <span className="yanmar-premium-dual-travel-divider" />
+        <span className="yanmar-premium-lever-bolt bolt-tl" />
+        <span className="yanmar-premium-lever-bolt bolt-tr" />
+        <span className="yanmar-premium-lever-bolt bolt-bl" />
+        <span className="yanmar-premium-lever-bolt bolt-br" />
+      </div>
       <VisualLever
         cx={layout.travelLeft.cx}
-        cy={layout.travelLeft.cy}
+        cy="calc(100% - 1.375rem)"
         value={left}
         color="dark"
         highlighted={highlighted}
@@ -298,7 +338,7 @@ function VisualTravelLevers({
       />
       <VisualLever
         cx={layout.travelRight.cx}
-        cy={layout.travelRight.cy}
+        cy="calc(100% - 1.375rem)"
         value={right}
         color="dark"
         highlighted={highlighted}
@@ -374,6 +414,210 @@ function VisualHydraulicSpeedStatus({
   );
 }
 
+function MainDPadVisual({
+  side,
+  value,
+  layout,
+  isPortrait,
+  screenOverlay = false,
+}: {
+  side: "left" | "right";
+  value: { x: number; y: number };
+  layout: JoystickLayout;
+  isPortrait: boolean;
+  screenOverlay?: boolean;
+}) {
+  const centerYOffset = isPortrait ? 0.095 : 0.08;
+  const accent = side === "left" ? "#38bdf8" : "#fbbf24";
+  const active = {
+    up: value.y > 0.5,
+    right: value.x > 0.5,
+    down: value.y < -0.5,
+    left: value.x < -0.5,
+  };
+  return (
+    <div
+      className={`yanmar-main-dpad-${side}`}
+      style={
+        screenOverlay
+          ? {
+              position: "absolute",
+              left: side === "left" ? "11.5%" : "88.5%",
+              top: "auto",
+              bottom: "0.1rem",
+              width: "clamp(5.4rem, 24vw, 6.8rem)",
+              aspectRatio: "1",
+              transform: "translate3d(-50%, 0, 0)",
+              zIndex: 70,
+              pointerEvents: "none",
+              filter: "drop-shadow(0 9px 7px rgba(2, 6, 23, 0.62))",
+            }
+          : {
+              position: "absolute",
+              left: `${layout.cx * 100}%`,
+              top: `${(layout.cy - centerYOffset) * 100}%`,
+              width: "clamp(5.4rem, 24vw, 6.8rem)",
+              aspectRatio: "1",
+              transform: "translate3d(-50%, -50%, 0)",
+              zIndex: 70,
+              pointerEvents: "none",
+            }
+      }
+      aria-hidden
+    >
+      <svg
+        viewBox="0 0 100 100"
+        width="100%"
+        height="100%"
+        role="presentation"
+        style={{ display: "block", overflow: "visible" }}
+      >
+        <defs>
+          <linearGradient id={`dpad-shell-${side}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#94a3b8" />
+            <stop offset="0.32" stopColor="#475569" />
+            <stop offset="0.7" stopColor="#111827" />
+            <stop offset="1" stopColor="#020617" />
+          </linearGradient>
+          <linearGradient id={`dpad-key-${side}`} x1="0" y1="0" x2="0.8" y2="1">
+            <stop offset="0" stopColor="#a8b4c3" />
+            <stop offset="0.16" stopColor="#64748b" />
+            <stop offset="0.48" stopColor="#334155" />
+            <stop offset="0.76" stopColor="#111827" />
+            <stop offset="1" stopColor="#080d14" />
+          </linearGradient>
+          <radialGradient id={`dpad-active-${side}`}>
+            <stop offset="0" stopColor={accent} stopOpacity="0.9" />
+            <stop offset="0.58" stopColor={accent} stopOpacity="0.45" />
+            <stop offset="1" stopColor="#0f172a" />
+          </radialGradient>
+          <radialGradient id={`dpad-center-${side}`} cx="35%" cy="28%">
+            <stop offset="0" stopColor="#64748b" />
+            <stop offset="0.46" stopColor="#1e293b" />
+            <stop offset="1" stopColor="#020617" />
+          </radialGradient>
+          <filter id={`dpad-shadow-${side}`} x="-30%" y="-30%" width="160%" height="180%">
+            <feDropShadow dx="0" dy="4" stdDeviation="3" floodColor="#020617" floodOpacity="0.85" />
+          </filter>
+          <filter id={`dpad-glow-${side}`} x="-60%" y="-60%" width="220%" height="220%">
+            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor={accent} floodOpacity="0.85" />
+          </filter>
+        </defs>
+
+        <rect
+          x="4"
+          y="4"
+          width="92"
+          height="92"
+          rx="27"
+          fill={`url(#dpad-shell-${side})`}
+          stroke="#cbd5e1"
+          strokeOpacity="0.58"
+          strokeWidth="1.4"
+          filter={`url(#dpad-shadow-${side})`}
+        />
+        <rect
+          x="8"
+          y="8"
+          width="84"
+          height="84"
+          rx="23"
+          fill="none"
+          stroke={accent}
+          strokeOpacity="0.42"
+          strokeWidth="1"
+        />
+
+        <g
+          fill={active.up ? `url(#dpad-active-${side})` : `url(#dpad-key-${side})`}
+          stroke={active.up ? accent : "#94a3b8"}
+          strokeWidth={active.up ? "1.8" : "1"}
+          filter={active.up ? `url(#dpad-glow-${side})` : undefined}
+          transform={active.up ? "translate(0 2)" : undefined}
+        >
+          <path d="M50 11 Q52 11 54 13 L65 24 Q67 26 67 29 V40 Q67 43 64 43 H36 Q33 43 33 40 V29 Q33 26 35 24 L46 13 Q48 11 50 11 Z" fill="#020617" stroke="#020617" transform="translate(0 3)" />
+          <path d="M50 11 Q52 11 54 13 L65 24 Q67 26 67 29 V40 Q67 43 64 43 H36 Q33 43 33 40 V29 Q33 26 35 24 L46 13 Q48 11 50 11 Z" />
+          <path d="M50 13 L64 28" fill="none" stroke="#fff" strokeOpacity="0.34" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M35 40 H65" fill="none" stroke="#020617" strokeOpacity="0.72" strokeWidth="1.5" strokeLinecap="round" />
+        </g>
+        <g
+          fill={active.right ? `url(#dpad-active-${side})` : `url(#dpad-key-${side})`}
+          stroke={active.right ? accent : "#94a3b8"}
+          strokeWidth={active.right ? "1.8" : "1"}
+          filter={active.right ? `url(#dpad-glow-${side})` : undefined}
+          transform={active.right ? "translate(0 2)" : undefined}
+        >
+          <path d="M60 33 H71 Q74 33 76 35 L87 46 Q89 48 89 50 Q89 52 87 54 L76 65 Q74 67 71 67 H60 Q57 67 57 64 V36 Q57 33 60 33 Z" fill="#020617" stroke="#020617" transform="translate(0 3)" />
+          <path d="M60 33 H71 Q74 33 76 35 L87 46 Q89 48 89 50 Q89 52 87 54 L76 65 Q74 67 71 67 H60 Q57 67 57 64 V36 Q57 33 60 33 Z" />
+          <path d="M60 35 H72 L86 49" fill="none" stroke="#fff" strokeOpacity="0.32" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M59 64 H72" fill="none" stroke="#020617" strokeOpacity="0.72" strokeWidth="1.5" strokeLinecap="round" />
+        </g>
+        <g
+          fill={active.down ? `url(#dpad-active-${side})` : `url(#dpad-key-${side})`}
+          stroke={active.down ? accent : "#94a3b8"}
+          strokeWidth={active.down ? "1.8" : "1"}
+          filter={active.down ? `url(#dpad-glow-${side})` : undefined}
+          transform={active.down ? "translate(0 2)" : undefined}
+        >
+          <path d="M36 57 H64 Q67 57 67 60 V71 Q67 74 65 76 L54 87 Q52 89 50 89 Q48 89 46 87 L35 76 Q33 74 33 71 V60 Q33 57 36 57 Z" fill="#020617" stroke="#020617" transform="translate(0 3)" />
+          <path d="M36 57 H64 Q67 57 67 60 V71 Q67 74 65 76 L54 87 Q52 89 50 89 Q48 89 46 87 L35 76 Q33 74 33 71 V60 Q33 57 36 57 Z" />
+          <path d="M35 59 H65" fill="none" stroke="#fff" strokeOpacity="0.32" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M35 72 L50 87 L65 72" fill="none" stroke="#020617" strokeOpacity="0.72" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+        <g
+          fill={active.left ? `url(#dpad-active-${side})` : `url(#dpad-key-${side})`}
+          stroke={active.left ? accent : "#94a3b8"}
+          strokeWidth={active.left ? "1.8" : "1"}
+          filter={active.left ? `url(#dpad-glow-${side})` : undefined}
+          transform={active.left ? "translate(0 2)" : undefined}
+        >
+          <path d="M11 50 Q11 48 13 46 L24 35 Q26 33 29 33 H40 Q43 33 43 36 V64 Q43 67 40 67 H29 Q26 67 24 65 L13 54 Q11 52 11 50 Z" fill="#020617" stroke="#020617" transform="translate(0 3)" />
+          <path d="M11 50 Q11 48 13 46 L24 35 Q26 33 29 33 H40 Q43 33 43 36 V64 Q43 67 40 67 H29 Q26 67 24 65 L13 54 Q11 52 11 50 Z" />
+          <path d="M13 49 L28 35 H40" fill="none" stroke="#fff" strokeOpacity="0.32" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M28 64 H40" fill="none" stroke="#020617" strokeOpacity="0.72" strokeWidth="1.5" strokeLinecap="round" />
+        </g>
+
+        <g transform={active.up ? "translate(0 2)" : undefined}>
+          <path d="M44 27 L50 21 L56 27" fill="none" stroke="#020617" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.82" transform="translate(0 1.5)" />
+          <path d="M44 27 L50 21 L56 27" fill="none" stroke="#f8fafc" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.94" />
+        </g>
+        <g transform={active.right ? "translate(0 2)" : undefined}>
+          <path d="M73 44 L79 50 L73 56" fill="none" stroke="#020617" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.82" transform="translate(0 1.5)" />
+          <path d="M73 44 L79 50 L73 56" fill="none" stroke="#f8fafc" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.94" />
+        </g>
+        <g transform={active.down ? "translate(0 2)" : undefined}>
+          <path d="M44 73 L50 79 L56 73" fill="none" stroke="#020617" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.82" transform="translate(0 1.5)" />
+          <path d="M44 73 L50 79 L56 73" fill="none" stroke="#f8fafc" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.94" />
+        </g>
+        <g transform={active.left ? "translate(0 2)" : undefined}>
+          <path d="M27 44 L21 50 L27 56" fill="none" stroke="#020617" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.82" transform="translate(0 1.5)" />
+          <path d="M27 44 L21 50 L27 56" fill="none" stroke="#f8fafc" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.94" />
+        </g>
+
+        <circle
+          cx="50"
+          cy="50"
+          r="15"
+          fill={`url(#dpad-center-${side})`}
+          stroke="#020617"
+          strokeWidth="5"
+        />
+        <circle
+          cx="50"
+          cy="50"
+          r="13.5"
+          fill="none"
+          stroke={accent}
+          strokeOpacity="0.82"
+          strokeWidth="1.5"
+        />
+        <circle cx="50" cy="50" r="4.2" fill={accent} opacity="0.9" />
+        <circle cx="48.7" cy="48.7" r="1.3" fill="#fff" opacity="0.65" />
+      </svg>
+    </div>
+  );
+}
+
 function VisualControlDeck({
   input,
   highlightLeft,
@@ -381,6 +625,7 @@ function VisualControlDeck({
   highlightTravel,
   layout,
   isPortrait,
+  useDPad,
 }: {
   input: ExcavatorControlState;
   highlightLeft: boolean;
@@ -388,22 +633,29 @@ function VisualControlDeck({
   highlightTravel: boolean;
   layout: CockpitLayout;
   isPortrait: boolean;
+  useDPad: boolean;
 }) {
   return (
     <div className="pointer-events-none absolute inset-0">
-      <div className="yanmar-control-rail">
-        <div className="yanmar-deck-brand-badge">YANMAR</div>
-        <div className="yanmar-deck-instrument-strip" />
-        <div className="yanmar-bottom-connector" />
-      </div>
-      <VisualJoystick side="left" value={input.left} highlighted={highlightLeft} layout={layout} isPortrait={isPortrait} />
+      {!useDPad ? (
+        <div className="yanmar-control-rail">
+          <div className="yanmar-deck-brand-badge">YANMAR</div>
+          <div className="yanmar-deck-instrument-strip" />
+          <div className="yanmar-bottom-connector" />
+        </div>
+      ) : null}
+      {!useDPad ? (
+        <VisualJoystick side="left" value={input.left} highlighted={highlightLeft} layout={layout} isPortrait={isPortrait} />
+      ) : null}
       <VisualTravelLevers
         left={input.travel.left}
         right={input.travel.right}
         highlighted={highlightTravel}
         layout={layout}
       />
-      <VisualJoystick side="right" value={input.right} highlighted={highlightRight} layout={layout} isPortrait={isPortrait} />
+      {!useDPad ? (
+        <VisualJoystick side="right" value={input.right} highlighted={highlightRight} layout={layout} isPortrait={isPortrait} />
+      ) : null}
     </div>
   );
 }
@@ -473,6 +725,7 @@ interface GameJoystickProps {
   highlighted: boolean;
   showTouchZone: boolean;
   isPortrait: boolean;
+  useDPad: boolean;
   onChange: (x: number, y: number) => void;
 }
 
@@ -483,6 +736,7 @@ function GameJoystick({
   highlighted,
   showTouchZone,
   isPortrait,
+  useDPad,
   onChange,
 }: GameJoystickProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
@@ -500,14 +754,18 @@ function GameJoystick({
       const halfH = rect.height / 2;
       const dx = Math.max(-halfW, Math.min(halfW, clientX - cx));
       const dy = Math.max(-halfH, Math.min(halfH, clientY - cy));
-      const rawX = enabled.x ? dx / halfW : 0;
-      const rawY = enabled.y ? -dy / halfH : 0;
+      const dPadRadius = Math.min(halfW, halfH);
+      const rawX = enabled.x ? dx / (useDPad ? dPadRadius : halfW) : 0;
+      const rawY = enabled.y ? -dy / (useDPad ? dPadRadius : halfH) : 0;
       const useX = Math.abs(rawX) >= Math.abs(rawY);
-      const nx = useX ? rawX : 0;
-      const ny = useX ? 0 : rawY;
+      const axisValue = useX ? rawX : rawY;
+      const digitalValue =
+        Math.abs(axisValue) < 0.18 ? 0 : axisValue > 0 ? 1 : -1;
+      const nx = useX ? (useDPad ? digitalValue : rawX) : 0;
+      const ny = useX ? 0 : useDPad ? digitalValue : rawY;
       onChange(nx, ny);
     },
-    [enabled.x, enabled.y, onChange],
+    [enabled.x, enabled.y, onChange, useDPad],
   );
 
   const handleStart = (e: React.PointerEvent) => {
@@ -538,11 +796,16 @@ function GameJoystick({
         ref={zoneRef}
         className={`absolute z-50 touch-none rounded-2xl ${isDisabled ? "pointer-events-none" : ""}`}
         style={{
-          left: `${layout.cx * 100}%`,
-          top: `${(layout.cy - joystickZone.centerYOffset) * 100}%`,
-          width: joystickZone.width,
-          height: joystickZone.height,
-          transform: "translate(-50%, -50%)",
+          left: useDPad
+            ? side === "left"
+              ? "11.5%"
+              : "88.5%"
+            : `${layout.cx * 100}%`,
+          top: useDPad ? "auto" : `${(layout.cy - joystickZone.centerYOffset) * 100}%`,
+          bottom: useDPad ? "0.1rem" : "auto",
+          width: useDPad ? "clamp(5rem, 24vw, 6.8rem)" : joystickZone.width,
+          height: useDPad ? "clamp(5rem, 24vw, 6.8rem)" : joystickZone.height,
+          transform: useDPad ? "translateX(-50%)" : "translate(-50%, -50%)",
         }}
         onPointerDown={handleStart}
         onPointerMove={handleMove}
@@ -690,7 +953,9 @@ function TravelLever({
         className={`absolute z-40 touch-none rounded-xl ${!enabled ? "pointer-events-none" : ""}`}
         style={{
           left: `calc(${layout.cx * 100}% + ${hitboxCenterOffset})`,
-          top: `calc(${layout.cy * 100}% + ${hitboxTopOffset})`,
+          top: isPortrait
+            ? "calc(100% - 1.375rem)"
+            : `calc(${layout.cy * 100}% + ${hitboxTopOffset})`,
           width: hitboxWidth,
           height: hitboxHeight,
           transform: "translate(-50%, -50%)",
@@ -797,7 +1062,9 @@ function DualTravelCenter({
       className={`absolute z-30 touch-none rounded-xl ${!enabled ? "pointer-events-none" : ""}`}
       style={{
         left: `${layout.cx * 100}%`,
-        top: `calc(${layout.cy * 100}% + ${isPortrait ? "-1%" : "0%"})`,
+        top: isPortrait
+          ? "calc(100% - 1.375rem)"
+          : `calc(${layout.cy * 100}% + 0%)`,
         width: isPortrait ? "12%" : "12.5%",
         height: isPortrait ? "48%" : "68%",
         transform: "translate(-50%, -50%)",
@@ -1071,14 +1338,14 @@ function BladeLever({
         }`}
         style={{
           left: `${blade.cx * 100}%`,
-          top: `${blade.cy * 100}%`,
+          top: "calc(100% - 1.375rem)",
           transform: "translate(-50%, -50%)",
         }}
         aria-hidden
       >
         <VisualLever
           cx={0.5}
-          cy={0.42}
+          cy={0.5}
           value={stick}
           color="dark"
           variant="travel"
@@ -1092,7 +1359,9 @@ function BladeLever({
         } ${isPortrait ? "yanmar-blade-lever-portrait" : ""}`}
         style={{
           left: `${blade.cx * 100}%`,
-          top: `calc(${blade.cy * 100}% + ${isPortrait ? "-2%" : "0%"})`,
+          top: isPortrait
+            ? "calc(100% - 1.375rem)"
+            : `${blade.cy * 100}%`,
           width: isPortrait ? "10%" : "6.6%",
           height: isPortrait ? "40%" : "58%",
           transform: "translate(-50%, -50%)",
@@ -1119,6 +1388,78 @@ function BladeLever({
         ) : null}
       </div>
     </>
+  );
+}
+
+function BreakerPedalControl({
+  pressed,
+  enabled,
+  showTouchZone,
+  onChange,
+  layout,
+  isPortrait,
+}: {
+  pressed: boolean;
+  enabled: boolean;
+  showTouchZone: boolean;
+  onChange: (pressed: boolean) => void;
+  layout: CockpitLayout;
+  isPortrait: boolean;
+}) {
+  const pedal = layout.breakerPedal;
+  const setPressed = (next: boolean) => {
+    if (!enabled && next) return;
+    onChange(next);
+  };
+
+  const press = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setPressed(true);
+  };
+
+  const release = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      /* already released */
+    }
+    setPressed(false);
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label="브레이커 발판"
+      aria-pressed={pressed}
+      disabled={!enabled}
+      className={`yanmar-breaker-pedal-button select-none absolute z-40 ${
+        pressed ? "is-active" : ""
+      } ${enabled ? "" : "is-disabled"} ${
+        isPortrait ? "yanmar-breaker-pedal-button-portrait" : ""
+      }`}
+      style={{
+        left: `${pedal.cx * 100}%`,
+        top: `${pedal.cy * 100}%`,
+        width: isPortrait ? "2.55rem" : "2.35rem",
+        height: isPortrait ? "2.55rem" : "2.35rem",
+        transform: "translate(-50%, -50%)",
+      }}
+      onPointerDown={press}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onLostPointerCapture={() => setPressed(false)}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <span className="yanmar-breaker-pedal-pad" aria-hidden />
+      <span className="yanmar-breaker-pedal-caption">발판</span>
+      {showTouchZone ? (
+        <span className="pointer-events-none absolute inset-0 rounded-[0.72rem] border border-amber-200/65" />
+      ) : null}
+    </button>
   );
 }
 
@@ -1692,6 +2033,7 @@ function AutoMenu({
 }
 
 export function CockpitOverlay({
+  mode,
   input,
   onInputChange,
   auxiliary,
@@ -1716,15 +2058,24 @@ export function CockpitOverlay({
   const highlightTravel = tutorialStep?.highlight === "travel";
   const layout = PORTRAIT_COCKPIT_LAYOUT;
   const isPortrait = true;
+  const useDPad = mode !== "intro";
   const [functionMenuExpanded, setFunctionMenuExpanded] = useState(false);
   const [autoMenuExpanded, setAutoMenuExpanded] = useState(false);
   /** 한쪽 주행 레버(또는 중앙 동시) 조작 중에는 다른 주행 입력을 잠근다. */
   const [travelLock, setTravelLock] = useState<"left" | "right" | "both" | null>(null);
   const travelEnabled = allowed.travel && !auxiliary.safetyLocked;
+  const breakerPedalEnabled =
+    attachmentType === "breaker" && !auxiliary.safetyLocked;
 
   useEffect(() => {
     if (!travelEnabled) setTravelLock(null);
   }, [travelEnabled]);
+
+  useEffect(() => {
+    if (breakerPedalEnabled) return;
+    if (!auxiliary.breakerPedal) return;
+    onAuxiliaryChange((current) => ({ ...current, breakerPedal: false }));
+  }, [auxiliary.breakerPedal, breakerPedalEnabled, onAuxiliaryChange]);
 
   return (
     <>
@@ -1738,10 +2089,30 @@ export function CockpitOverlay({
               highlightTravel={highlightTravel}
               layout={layout}
               isPortrait={isPortrait}
+              useDPad={useDPad}
             />
           ) : null}
         </div>
       </div>
+
+      {useDPad ? (
+        <div className="pointer-events-none absolute inset-0 z-[60]">
+          <MainDPadVisual
+            side="left"
+            value={input.left}
+            layout={layout.left}
+            isPortrait={isPortrait}
+            screenOverlay
+          />
+          <MainDPadVisual
+            side="right"
+            value={input.right}
+            layout={layout.right}
+            isPortrait={isPortrait}
+            screenOverlay
+          />
+        </div>
+      ) : null}
 
       <div className="yanmar-control-deck yanmar-control-touch-layer absolute inset-x-0 z-20 mx-auto touch-none">
         <div className="relative h-full w-full">
@@ -1814,6 +2185,18 @@ export function CockpitOverlay({
               }))
             }
           />
+          {attachmentType === "breaker" ? (
+            <BreakerPedalControl
+              pressed={auxiliary.breakerPedal}
+              enabled={breakerPedalEnabled}
+              showTouchZone={showTouchZones}
+              layout={layout}
+              isPortrait={isPortrait}
+              onChange={(breakerPedal) =>
+                onAuxiliaryChange((current) => ({ ...current, breakerPedal }))
+              }
+            />
+          ) : null}
           <FunctionMenu
             expanded={functionMenuExpanded}
             onToggle={() => setFunctionMenuExpanded((open) => !open)}
@@ -1848,6 +2231,7 @@ export function CockpitOverlay({
             highlighted={highlightLeft}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
+            useDPad={useDPad}
             onChange={(x, y) =>
               onInputChange((current) => ({ ...current, left: { x, y } }))
             }
@@ -1862,6 +2246,7 @@ export function CockpitOverlay({
             highlighted={highlightRight}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
+            useDPad={useDPad}
             onChange={(x, y) =>
               onInputChange((current) => ({ ...current, right: { x, y } }))
             }

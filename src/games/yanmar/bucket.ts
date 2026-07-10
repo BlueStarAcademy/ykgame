@@ -210,6 +210,12 @@ export interface DigFeedback {
   tipOnGround: boolean;
   bucketCurled: boolean;
   canLoad: boolean;
+  /** Breaker tip is on an active crash tile and ready to strike. */
+  canStrike: boolean;
+  /** Grapple is near a pickable boulder. */
+  canGrab: boolean;
+  /** Grapple is carrying a rock over the drop point. */
+  canDropRock: boolean;
   digging: boolean;
   groundDepth: number;
   bucketOpenReady: boolean;
@@ -241,6 +247,9 @@ export function createDigFeedback(): DigFeedback {
     tipOnGround: false,
     bucketCurled: false,
     canLoad: false,
+    canStrike: false,
+    canGrab: false,
+    canDropRock: false,
     digging: false,
     groundDepth: 0,
     bucketOpenReady: false,

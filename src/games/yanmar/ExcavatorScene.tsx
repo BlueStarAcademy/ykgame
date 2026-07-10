@@ -25,6 +25,7 @@ import {
   isInDumpZone,
   dumpTruckBedDeckWorldY,
   sampleHeight,
+  getCrashTileAt,
   type TerrainData,
   DIG_ZONE,
   DUMP_ZONE,
@@ -32,6 +33,7 @@ import {
   DUMP_TRUCK_BED,
 } from "./terrain";
 import type { DigFeedback } from "./bucket";
+import { getBucketTipWorld } from "./bucket";
 import {
   formatDumpTruckReturnTime,
   getDumpTruckFillRatio,
@@ -1698,11 +1700,23 @@ function ExcavatorArm({
       bucketVisualRef.current.visible = s.attachmentType === "bucket";
     }
     if (breakerVisualRef.current) {
-      breakerVisualRef.current.visible = s.attachmentType === "breaker";
-      breakerVisualRef.current.position.y =
-        s.attachmentType === "breaker"
-          ? Math.sin(performance.now() * 0.045) * 0.035
+      const isBreaker = s.attachmentType === "breaker";
+      breakerVisualRef.current.visible = isBreaker;
+      if (!isBreaker) {
+        breakerVisualRef.current.position.y = 0;
+      } else {
+        const boomSwing = aux?.boomSwing ?? DEFAULT_BOOM_SWING;
+        const tip = getBucketTipWorld(s, boomSwing);
+        const groundY = sampleHeight(terrainRef.current, tip.x, tip.z);
+        const onAsphalt =
+          tip.y - groundY < 0.32 &&
+          !!getCrashTileAt(terrainRef.current, tip.x, tip.z)?.active;
+        const hammering = (aux?.breakerPedal ?? false) && onAsphalt;
+        const t = performance.now();
+        breakerVisualRef.current.position.y = hammering
+          ? Math.sin(t * 0.14) * 0.11 + Math.sin(t * 0.31) * 0.035
           : 0;
+      }
     }
     if (grappleVisualRef.current) {
       grappleVisualRef.current.visible = s.attachmentType === "grapple";
@@ -2097,7 +2111,9 @@ function WaypointMarker({
 }
 
 function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<TerrainData> }) {
-  const [zones, setZones] = useState(() => getActiveDigZones(terrainRef.current));
+  const [zones, setZones] = useState(() =>
+    getActiveDigZones(terrainRef.current).map((zone) => ({ ...zone })),
+  );
   const [, setSpecialVersion] = useState(0);
   const signatureRef = useRef("");
 
@@ -2106,7 +2122,12 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
     const crash = terrainRef.current.crashZone;
     const hill = terrainRef.current.hillZone;
     const signature = nextZones
-      .map((zone) => `${zone.id}:${zone.x.toFixed(1)}:${zone.z.toFixed(1)}:${zone.active}`)
+      .map(
+        (zone) =>
+          `${zone.id}:${zone.x.toFixed(1)}:${zone.z.toFixed(1)}:${zone.active}:${
+            Math.floor(zone.remainingUnits / 25)
+          }`,
+      )
       .join("|") +
       `|crash:${crash?.active}:${crash?.tiles.map((tile) => tile.hp).join(",")}` +
       `|hill:${hill?.haulTruck.phase}:${hill?.haulTruck.loadCount}:${hill?.boulders
@@ -2114,7 +2135,7 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
         .join(",")}`;
     if (signature !== signatureRef.current) {
       signatureRef.current = signature;
-      setZones([...nextZones]);
+      setZones(nextZones.map((zone) => ({ ...zone })));
       setSpecialVersion((value) => value + 1);
     }
   });
@@ -2152,7 +2173,10 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
             outlineWidth={0.08}
             outlineColor="#6d3e00"
           >
-            {digZoneLabel(zone.id)}
+            {`${digZoneLabel(zone.id)} · 흙 ${Math.max(
+              0,
+              Math.ceil(zone.remainingUnits / 10) * 10,
+            ).toLocaleString("ko-KR")} / ${zone.capacityUnits.toLocaleString("ko-KR")}`}
           </Text>
         </group>
       ))}
@@ -2476,7 +2500,7 @@ function DumpTruckWorldHud({
     const state = stateRef.current;
     const stats = statsRef.current;
     const capacity = stats?.truckCapacityUnits ?? 3000;
-    const cooldownSec = stats?.truckCooldownSec ?? 600;
+    const cooldownSec = stats?.truckCooldownSec ?? 300;
     const pose = getDumpTruckPose(state);
     const group = groupRef.current;
     const label = labelRef.current;

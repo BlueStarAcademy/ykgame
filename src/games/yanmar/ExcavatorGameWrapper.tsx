@@ -128,6 +128,8 @@ interface ExcavatorGameWrapperProps {
   immersive?: boolean;
   initialPlayMode?: "practice" | "game" | "ride";
   onShowRanking?: () => void;
+  /** Season total before this session; HUD shows base + session score in game mode. */
+  seasonScoreBase?: number;
 }
 
 type DumpRewardApiEvent =
@@ -372,6 +374,7 @@ export function ExcavatorGameWrapper({
   immersive = false,
   initialPlayMode,
   onShowRanking,
+  seasonScoreBase = 0,
 }: ExcavatorGameWrapperProps) {
   const config = getMissionConfig("yanmar");
   const { data: session, status: sessionStatus, update } = useSession();
@@ -578,6 +581,9 @@ export function ExcavatorGameWrapper({
       prev.tipOnGround === fb.tipOnGround &&
       prev.bucketCurled === fb.bucketCurled &&
       prev.canLoad === fb.canLoad &&
+      prev.canStrike === fb.canStrike &&
+      prev.canGrab === fb.canGrab &&
+      prev.canDropRock === fb.canDropRock &&
       prev.digging === fb.digging &&
       Math.abs(prev.groundDepth - fb.groundDepth) < 0.05 &&
       prev.bucketOpenReady === fb.bucketOpenReady &&
@@ -935,7 +941,8 @@ export function ExcavatorGameWrapper({
         prev.highSpeed !== resolved.highSpeed ||
         prev.safetyLocked !== resolved.safetyLocked ||
         prev.blade !== resolved.blade ||
-        prev.throttle !== resolved.throttle
+        prev.throttle !== resolved.throttle ||
+        prev.breakerPedal !== resolved.breakerPedal
       ) {
         cancelAutoArmPose(autoPoseRef.current);
         setAutoPose({ ...autoPoseRef.current });
@@ -945,6 +952,11 @@ export function ExcavatorGameWrapper({
     setAuxiliary(resolved);
     if (resolved.safetyLocked) {
       clearAllInput();
+      if (resolved.breakerPedal) {
+        const unlocked = { ...resolved, breakerPedal: false };
+        auxiliaryRef.current = unlocked;
+        setAuxiliary(unlocked);
+      }
     }
   }, [clearAllInput, setAuxiliary]);
 
@@ -1887,16 +1899,39 @@ export function ExcavatorGameWrapper({
 
         {mode !== "intro" && mode !== "ride" && (
           <div className="pointer-events-none absolute left-1/2 top-2 z-50 flex -translate-x-1/2 flex-col items-center gap-1">
-            <div className="rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-[11px] font-black text-white shadow-lg backdrop-blur-sm">
-              점수 <span className="text-yellow-100">{hud.score.toLocaleString()}</span>
+            <div className="flex min-w-[5.5rem] flex-col items-center rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-white shadow-lg backdrop-blur-sm">
+              <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/70">
+                {mode === "game" ? "누적 점수" : "점수"}
+              </span>
+              <span className="mt-0.5 text-sm font-black tabular-nums text-yellow-100">
+                {(
+                  mode === "game" ? seasonScoreBase + hud.score : hud.score
+                ).toLocaleString()}
+              </span>
             </div>
             {digFeedback.canDump && hud.bucketLoad > 0.02 ? (
               <div className="rounded-xl border border-emerald-200/50 bg-emerald-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 하역가능
               </div>
+            ) : digFeedback.canLoad ? (
+              <div className="rounded-xl border border-orange-200/50 bg-orange-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                적재가능
+              </div>
+            ) : digFeedback.canStrike ? (
+              <div className="rounded-xl border border-amber-200/50 bg-amber-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                타격가능
+              </div>
+            ) : digFeedback.canGrab ? (
+              <div className="rounded-xl border border-sky-200/50 bg-sky-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                집게가능
+              </div>
+            ) : digFeedback.canDropRock ? (
+              <div className="rounded-xl border border-violet-200/50 bg-violet-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                투하가능
+              </div>
             ) : digFeedback.soilSpilling && hud.bucketLoad > 0.02 ? (
               <div className="rounded-xl border border-amber-200/50 bg-amber-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                흙 유실 — 버킷 말기
+                흙 유실 — 버켓 말기
               </div>
             ) : digFeedback.raiseArmForDump && hud.bucketLoad > 0.02 ? (
               <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
@@ -2167,6 +2202,7 @@ export function ExcavatorGameWrapper({
 
         {mode !== "intro" && (
           <CockpitOverlay
+            mode={mode}
             input={input}
             onInputChange={(next) => {
               touchInputRef.current =

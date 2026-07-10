@@ -57,15 +57,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "boom",
     title: "4. 붐",
-    instruction: "우 조이스틱 앞 — 붐 하강 (버킷을 아래로)",
+    instruction: "우 조이스틱 앞 — 붐 하강 (버켓을 아래로)",
     highlight: "right",
     allowed: { leftX: false, leftY: false, rightX: false, rightY: true, travel: false },
     boomMin: 0.75,
   },
   {
     id: "bucket",
-    title: "5. 버킷",
-    instruction: "우 조이스틱 좌 — 버킷 말기",
+    title: "5. 버켓",
+    instruction: "우 조이스틱 좌 — 버켓 말기",
     highlight: "right",
     allowed: { leftX: false, leftY: false, rightX: true, rightY: false, travel: false },
     bucketMax: 0.35,
@@ -73,7 +73,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "dig",
     title: "6. 굴착",
-    instruction: "버킷을 반쯤 열고 흙더미에 깊이 넣은 뒤, 버킷을 30도쯤 말며 암을 안쪽으로 당겨 적재 35% 이상",
+    instruction: "버켓을 반쯤 열고 흙더미에 깊이 넣은 뒤, 버켓을 30도쯤 말며 암을 안쪽으로 당겨 적재 35% 이상",
     highlight: "both",
     allowed: { ...ALL_CONTROLS },
     loadMin: 0.35,
@@ -81,7 +81,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "dump",
     title: "7. 하역",
-    instruction: "초록 구역에서 우 조이스틱 우측 — 버킷 펴기",
+    instruction: "초록 구역에서 우 조이스틱 우측 — 버켓 펴기",
     highlight: "both",
     allowed: { ...ALL_CONTROLS },
     dumpMin: 0.12,

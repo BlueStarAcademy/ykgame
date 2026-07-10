@@ -15,6 +15,8 @@ interface PhaserGameWrapperProps {
   immersive?: boolean;
   initialPlayMode?: "practice" | "game" | "ride";
   onShowRanking?: () => void;
+  /** Prior season total (excluded from this session's arcadeScore). */
+  seasonScoreBase?: number;
 }
 
 function PhaserMissionGame({ gameId, onEnd, immersive = false }: PhaserGameWrapperProps) {
@@ -104,6 +106,7 @@ export function PhaserGameWrapper({
   immersive = false,
   initialPlayMode,
   onShowRanking,
+  seasonScoreBase = 0,
 }: PhaserGameWrapperProps) {
   if (gameId === "yanmar") {
     return (
@@ -114,6 +117,7 @@ export function PhaserGameWrapper({
         immersive={immersive}
         initialPlayMode={initialPlayMode}
         onShowRanking={onShowRanking}
+        seasonScoreBase={seasonScoreBase}
       />
     );
   }

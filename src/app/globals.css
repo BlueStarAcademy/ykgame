@@ -634,7 +634,7 @@ body {
 .yanmar-realstick-boot-ring.ring-1 {
   top: 0;
   height: 0.52rem;
-  width: 2.35rem;
+  width: 1.85rem;
   z-index: 5;
 }
 
@@ -2384,6 +2384,89 @@ body {
     linear-gradient(180deg, rgba(14, 116, 144, 0.72), rgba(15, 23, 42, 0.94));
 }
 
+.yanmar-breaker-pedal-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  border-radius: 0.72rem;
+  border: 1px solid rgba(226, 232, 240, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(2, 6, 23, 0.96));
+  box-shadow:
+    inset 0 0.12rem 0.14rem rgba(255, 255, 255, 0.08),
+    inset 0 -0.18rem 0.22rem rgba(0, 0, 0, 0.44),
+    0 0.24rem 0.34rem rgba(0, 0, 0, 0.32);
+  padding: 0.28rem;
+  color: rgba(255, 255, 255, 0.88);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.yanmar-breaker-pedal-button.is-disabled {
+  opacity: 0.38;
+  filter: grayscale(0.35);
+}
+
+.yanmar-breaker-pedal-button.is-active {
+  border-color: rgba(251, 191, 36, 0.72);
+  box-shadow:
+    inset 0 0.12rem 0.14rem rgba(255, 255, 255, 0.12),
+    inset 0 -0.18rem 0.22rem rgba(0, 0, 0, 0.5),
+    0 0 0.55rem rgba(245, 158, 11, 0.45);
+}
+
+.yanmar-breaker-pedal-pad {
+  display: block;
+  width: 78%;
+  height: 58%;
+  border-radius: 0.42rem;
+  border: 0.1rem solid rgba(148, 163, 184, 0.55);
+  background:
+    radial-gradient(ellipse at 34% 18%, rgba(255, 255, 255, 0.2), transparent 28%),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 0.2rem,
+      rgba(148, 163, 184, 0.34) 0.2rem 0.28rem,
+      rgba(2, 6, 23, 0.82) 0.28rem 0.4rem
+    ),
+    linear-gradient(145deg, #374151 0%, #111827 52%, #030712 100%);
+  box-shadow:
+    inset 0 0.1rem 0.12rem rgba(255, 255, 255, 0.14),
+    inset 0 -0.2rem 0.28rem rgba(0, 0, 0, 0.68);
+  transform: translateY(0);
+  transition: transform 80ms ease-out;
+}
+
+.yanmar-breaker-pedal-button.is-active .yanmar-breaker-pedal-pad {
+  transform: translateY(0.14rem) scale(0.97);
+  border-color: rgba(251, 191, 36, 0.7);
+  background:
+    radial-gradient(ellipse at 35% 22%, rgba(255, 255, 255, 0.24), transparent 32%),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 0.2rem,
+      rgba(251, 191, 36, 0.42) 0.2rem 0.28rem,
+      rgba(2, 6, 23, 0.82) 0.28rem 0.4rem
+    ),
+    linear-gradient(145deg, #92400e 0%, #78350f 48%, #1c1917 100%);
+}
+
+.yanmar-breaker-pedal-caption {
+  font-size: 0.52rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  opacity: 0.82;
+}
+
+.yanmar-breaker-pedal-button.is-active .yanmar-breaker-pedal-caption {
+  color: #fde68a;
+  opacity: 1;
+}
+
 .yanmar-portrait-side-button {
   position: absolute;
   display: none;
@@ -2726,17 +2809,6 @@ body {
   white-space: nowrap;
   color: #f8fafc;
   text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.58);
-}
-
-.yanmar-layout-portrait .yanmar-visual-lever-travel .yanmar-lever-slot {
-  top: 73%;
-  height: 4.1rem;
-  width: 1.14rem;
-}
-
-.yanmar-layout-portrait .yanmar-visual-lever-travel .yanmar-lever-stick {
-  height: 3.45rem;
-  width: 0.54rem;
 }
 
 .yanmar-layout-portrait .yanmar-deck-brand-badge,
@@ -3197,6 +3269,623 @@ html.pwa-mode body {
   overscroll-behavior: contain;
   border-top: 1px solid rgba(226, 232, 240, 0.8);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, #f8fafc 16px);
+}
+
+/* Game-mode main controls: premium four-way 3D D-pads */
+.yanmar-main-dpad {
+  --dpad-accent: 56, 189, 248;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(100%, 6.8rem);
+  aspect-ratio: 1;
+  transform: translate3d(-50%, -50%, 0);
+  filter: drop-shadow(0 0.58rem 0.42rem rgba(2, 6, 23, 0.55));
+  pointer-events: none;
+  user-select: none;
+}
+
+.yanmar-main-dpad-right {
+  --dpad-accent: 251, 191, 36;
+}
+
+.yanmar-main-dpad-shadow {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -5%;
+  height: 24%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.7), transparent 72%);
+  filter: blur(0.18rem);
+}
+
+.yanmar-main-dpad-bezel {
+  position: absolute;
+  inset: 4%;
+  border: 1px solid rgba(203, 213, 225, 0.5);
+  border-radius: 30%;
+  background:
+    radial-gradient(circle at 34% 25%, rgba(255, 255, 255, 0.24), transparent 28%),
+    repeating-linear-gradient(
+      125deg,
+      rgba(255, 255, 255, 0.025) 0 1px,
+      transparent 1px 4px
+    ),
+    linear-gradient(145deg, #64748b 0%, #303b49 32%, #111827 72%, #020617 100%);
+  box-shadow:
+    inset 0.16rem 0.18rem 0.12rem rgba(255, 255, 255, 0.22),
+    inset -0.2rem -0.24rem 0.18rem rgba(0, 0, 0, 0.58),
+    0 0 0 0.08rem rgba(2, 6, 23, 0.82),
+    0 0 0 0.13rem rgba(148, 163, 184, 0.3),
+    0 0.34rem 0.18rem rgba(0, 0, 0, 0.58);
+}
+
+.yanmar-main-dpad-bezel::before {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border: 1px solid rgba(var(--dpad-accent), 0.34);
+  border-radius: 27%;
+  box-shadow:
+    inset 0 0 0.55rem rgba(var(--dpad-accent), 0.08),
+    0 0 0.45rem rgba(var(--dpad-accent), 0.1);
+}
+
+.yanmar-main-dpad-key {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34%;
+  height: 34%;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.38);
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.3), transparent 28%),
+    linear-gradient(145deg, #536171 0%, #202b38 46%, #080d14 100%);
+  color: rgba(241, 245, 249, 0.92);
+  box-shadow:
+    inset 0.09rem 0.1rem 0 rgba(255, 255, 255, 0.18),
+    inset -0.12rem -0.14rem 0 rgba(0, 0, 0, 0.52),
+    0 0.16rem 0 #05080d,
+    0 0.25rem 0.18rem rgba(0, 0, 0, 0.5);
+  transition:
+    transform 70ms ease,
+    filter 70ms ease,
+    box-shadow 70ms ease;
+}
+
+.yanmar-main-dpad-key::after {
+  content: "";
+  position: absolute;
+  inset: 0.18rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: inherit;
+}
+
+.yanmar-main-dpad-key.is-up {
+  left: 33%;
+  top: 7%;
+  border-radius: 0.7rem 0.7rem 0.3rem 0.3rem;
+  clip-path: polygon(50% 0, 100% 38%, 100% 100%, 0 100%, 0 38%);
+}
+
+.yanmar-main-dpad-key.is-right {
+  right: 7%;
+  top: 33%;
+  border-radius: 0.3rem 0.7rem 0.7rem 0.3rem;
+  clip-path: polygon(0 0, 62% 0, 100% 50%, 62% 100%, 0 100%);
+}
+
+.yanmar-main-dpad-key.is-down {
+  left: 33%;
+  bottom: 7%;
+  border-radius: 0.3rem 0.3rem 0.7rem 0.7rem;
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
+}
+
+.yanmar-main-dpad-key.is-left {
+  left: 7%;
+  top: 33%;
+  border-radius: 0.7rem 0.3rem 0.3rem 0.7rem;
+  clip-path: polygon(38% 0, 100% 0, 100% 100%, 38% 100%, 0 50%);
+}
+
+.yanmar-main-dpad-key.is-active {
+  transform: translateY(0.14rem) scale(0.96);
+  border-color: rgba(var(--dpad-accent), 0.92);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(var(--dpad-accent), 0.62), transparent 58%),
+    linear-gradient(145deg, #334155, #0f172a);
+  color: #fff;
+  box-shadow:
+    inset 0.08rem 0.08rem 0.14rem rgba(0, 0, 0, 0.5),
+    inset 0 0 0.6rem rgba(var(--dpad-accent), 0.38),
+    0 0.06rem 0 #020617,
+    0 0 0.72rem rgba(var(--dpad-accent), 0.58);
+  filter: brightness(1.15);
+}
+
+.yanmar-main-dpad-arrow {
+  position: absolute;
+  top: 22%;
+  font-size: clamp(0.58rem, 2.5vw, 0.78rem);
+  line-height: 1;
+  text-shadow:
+    0 0.06rem 0 rgba(0, 0, 0, 0.9),
+    0 0 0.35rem rgba(var(--dpad-accent), 0.34);
+}
+
+.yanmar-main-dpad-action {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 15%;
+  overflow: hidden;
+  padding: 0 0.08rem;
+  font-size: clamp(0.27rem, 1.35vw, 0.38rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.yanmar-main-dpad-key.is-left .yanmar-main-dpad-arrow,
+.yanmar-main-dpad-key.is-right .yanmar-main-dpad-arrow {
+  top: 30%;
+}
+
+.yanmar-main-dpad-key.is-left .yanmar-main-dpad-action,
+.yanmar-main-dpad-key.is-right .yanmar-main-dpad-action {
+  bottom: 10%;
+}
+
+.yanmar-main-dpad-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 4;
+  display: grid;
+  width: 29%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  place-items: center;
+  border: 1px solid rgba(226, 232, 240, 0.45);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.3), transparent 27%),
+    radial-gradient(circle, #334155 0%, #111827 58%, #020617 100%);
+  box-shadow:
+    inset 0.08rem 0.09rem 0 rgba(255, 255, 255, 0.16),
+    inset -0.1rem -0.12rem 0 rgba(0, 0, 0, 0.55),
+    0 0 0 0.12rem #0b111b,
+    0 0 0 0.16rem rgba(var(--dpad-accent), 0.58),
+    0 0.18rem 0.2rem rgba(0, 0, 0, 0.56);
+}
+
+.yanmar-main-dpad-center span {
+  font-size: clamp(0.56rem, 2.4vw, 0.78rem);
+  font-weight: 1000;
+  color: rgb(var(--dpad-accent));
+  text-shadow: 0 0 0.45rem rgba(var(--dpad-accent), 0.68);
+}
+
+.yanmar-main-dpad.is-disabled {
+  opacity: 0.42;
+  filter: grayscale(0.75) drop-shadow(0 0.4rem 0.3rem rgba(2, 6, 23, 0.4));
+}
+
+/* Match the remaining cockpit levers to the D-pad's machined-metal finish. */
+.yanmar-visual-lever-travel {
+  --lever-accent: 148, 163, 184;
+  filter: drop-shadow(0 0.34rem 0.26rem rgba(2, 6, 23, 0.58));
+}
+
+.yanmar-travel-cluster .yanmar-premium-lever-panel {
+  display: none;
+}
+
+.yanmar-travel-cluster
+  .yanmar-visual-lever-travel
+  .yanmar-lever-slot {
+  display: none;
+}
+
+.yanmar-premium-dual-travel-panel {
+  --lever-accent: 148, 163, 184;
+  position: absolute;
+  z-index: 7;
+  width: 4.55rem;
+  height: 2.75rem;
+  transform: translate(-50%, -50%) perspective(8rem) rotateX(13deg);
+  overflow: hidden;
+  border: 1px solid rgba(203, 213, 225, 0.5);
+  border-radius: 0.82rem 0.82rem 0.48rem 0.48rem;
+  background:
+    radial-gradient(ellipse at 28% 12%, rgba(255, 255, 255, 0.28), transparent 32%),
+    repeating-linear-gradient(
+      125deg,
+      rgba(255, 255, 255, 0.025) 0 1px,
+      transparent 1px 4px
+    ),
+    linear-gradient(145deg, #64748b 0%, #334155 30%, #111827 68%, #020617 100%);
+  box-shadow:
+    inset 0.14rem 0.16rem 0.12rem rgba(255, 255, 255, 0.2),
+    inset -0.18rem -0.22rem 0.18rem rgba(0, 0, 0, 0.58),
+    0 0 0 0.09rem #050911,
+    0 0 0 0.14rem rgba(148, 163, 184, 0.34),
+    0 0.34rem 0.32rem rgba(0, 0, 0, 0.62);
+}
+
+.yanmar-premium-dual-travel-inset {
+  position: absolute;
+  inset: 0.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 0.62rem 0.62rem 0.3rem 0.3rem;
+  box-shadow:
+    inset 0 0 0.6rem rgba(148, 163, 184, 0.08),
+    inset 0 -0.28rem 0.4rem rgba(0, 0, 0, 0.32);
+}
+
+.yanmar-premium-dual-travel-lane {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  width: 1.22rem;
+  height: 2.36rem;
+  transform: translate(-50%, -50%) rotateX(58deg);
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse at 50% 12%, rgba(148, 163, 184, 0.3), transparent 38%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 22% 78%, rgba(0, 0, 0, 0.42)),
+    linear-gradient(180deg, #334155 0%, #111827 42%, #020617 100%);
+  box-shadow:
+    inset 0 0 0 0.1rem rgba(255, 255, 255, 0.08),
+    inset 0 0 0.54rem rgba(148, 163, 184, 0.14),
+    inset 0 -0.4rem 0.48rem rgba(0, 0, 0, 0.72);
+}
+
+.yanmar-premium-dual-travel-lane::before {
+  content: "";
+  position: absolute;
+  inset: 0.24rem 0.14rem;
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 0.3rem,
+      rgba(226, 232, 240, 0.22) 0.3rem 0.34rem,
+      transparent 0.34rem 0.6rem
+    );
+  opacity: 0.72;
+}
+
+.yanmar-premium-dual-travel-lane.is-left {
+  left: 25%;
+}
+
+.yanmar-premium-dual-travel-lane.is-right {
+  left: 75%;
+}
+
+.yanmar-premium-dual-travel-divider {
+  position: absolute;
+  left: 50%;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(203, 213, 225, 0.4) 18% 82%,
+    transparent
+  );
+  box-shadow:
+    -1px 0 rgba(0, 0, 0, 0.5),
+    1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.yanmar-premium-lever-panel {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  z-index: 0;
+  width: 2.35rem;
+  height: 2.75rem;
+  transform: translate(-50%, -50%) perspective(8rem) rotateX(13deg);
+  overflow: hidden;
+  border: 1px solid rgba(203, 213, 225, 0.5);
+  border-radius: 0.7rem 0.7rem 0.44rem 0.44rem;
+  background:
+    radial-gradient(ellipse at 28% 12%, rgba(255, 255, 255, 0.28), transparent 32%),
+    repeating-linear-gradient(
+      125deg,
+      rgba(255, 255, 255, 0.025) 0 1px,
+      transparent 1px 4px
+    ),
+    linear-gradient(145deg, #64748b 0%, #334155 30%, #111827 68%, #020617 100%);
+  box-shadow:
+    inset 0.14rem 0.16rem 0.12rem rgba(255, 255, 255, 0.2),
+    inset -0.18rem -0.22rem 0.18rem rgba(0, 0, 0, 0.58),
+    0 0 0 0.09rem #050911,
+    0 0 0 0.14rem rgba(var(--lever-accent), 0.34),
+    0 0.34rem 0.32rem rgba(0, 0, 0, 0.62);
+}
+
+.yanmar-premium-lever-panel::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0.34rem;
+  bottom: 0.34rem;
+  width: 1.35rem;
+  transform: translateX(-50%);
+  border: 1px solid rgba(var(--lever-accent), 0.4);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 24% 76%, rgba(0, 0, 0, 0.35)),
+    linear-gradient(180deg, #1e293b, #030712);
+  box-shadow:
+    inset 0 0 0.48rem rgba(var(--lever-accent), 0.12),
+    inset 0 0.26rem 0.34rem rgba(0, 0, 0, 0.7);
+}
+
+.yanmar-premium-lever-panel-inset {
+  position: absolute;
+  inset: 0.22rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.72rem 0.72rem 0.42rem 0.42rem;
+  box-shadow: inset 0 0 0.55rem rgba(var(--lever-accent), 0.06);
+}
+
+.yanmar-premium-lever-status {
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  width: 0.58rem;
+  height: 0.18rem;
+  transform: translateX(-50%);
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border-radius: 999px;
+  background: #0f172a;
+  box-shadow: inset 0 0.05rem 0.07rem rgba(0, 0, 0, 0.68);
+  transition:
+    background 100ms ease,
+    box-shadow 100ms ease;
+}
+
+.yanmar-premium-lever-status.is-forward {
+  top: 0.28rem;
+}
+
+.yanmar-premium-lever-status.is-reverse {
+  bottom: 0.28rem;
+}
+
+.yanmar-visual-lever-travel.is-pushed
+  .yanmar-premium-lever-status.is-forward,
+.yanmar-visual-lever-travel.is-pulled
+  .yanmar-premium-lever-status.is-reverse {
+  border-color: rgba(var(--lever-accent), 0.92);
+  background: rgb(var(--lever-accent));
+  box-shadow:
+    0 0 0.28rem rgba(var(--lever-accent), 0.9),
+    0 0 0.62rem rgba(var(--lever-accent), 0.52);
+}
+
+.yanmar-premium-lever-bolt {
+  position: absolute;
+  z-index: 2;
+  width: 0.24rem;
+  height: 0.24rem;
+  border: 1px solid rgba(226, 232, 240, 0.44);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, #f8fafc 0%, #64748b 42%, #1e293b 100%);
+  box-shadow: inset -0.04rem -0.04rem 0.05rem rgba(0, 0, 0, 0.5);
+}
+
+.yanmar-premium-lever-bolt.bolt-tl {
+  left: 0.32rem;
+  top: 0.34rem;
+}
+
+.yanmar-premium-lever-bolt.bolt-tr {
+  right: 0.32rem;
+  top: 0.34rem;
+}
+
+.yanmar-premium-lever-bolt.bolt-bl {
+  left: 0.32rem;
+  bottom: 0.34rem;
+}
+
+.yanmar-premium-lever-bolt.bolt-br {
+  right: 0.32rem;
+  bottom: 0.34rem;
+}
+
+.yanmar-travel-cluster .yanmar-visual-lever-travel:nth-child(1) {
+  --lever-accent: 148, 163, 184;
+}
+
+.yanmar-travel-cluster .yanmar-visual-lever-travel:nth-child(2),
+.yanmar-blade-lever-visual .yanmar-visual-lever-travel {
+  --lever-accent: 148, 163, 184;
+}
+
+.yanmar-visual-lever-travel .yanmar-lever-slot {
+  z-index: 1;
+  top: 52%;
+  height: 2.36rem;
+  width: 1.22rem;
+  transform: translate3d(-50%, -50%, -0.12rem) rotateX(58deg);
+  border: 1px solid rgba(var(--lever-accent), 0.5);
+  background:
+    radial-gradient(ellipse at 50% 12%, rgba(var(--lever-accent), 0.3), transparent 38%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 22% 78%, rgba(0, 0, 0, 0.42)),
+    linear-gradient(180deg, #334155 0%, #111827 42%, #020617 100%);
+  box-shadow:
+    inset 0 0 0 0.1rem rgba(255, 255, 255, 0.08),
+    inset 0 0 0.65rem rgba(var(--lever-accent), 0.14),
+    inset 0 -0.45rem 0.52rem rgba(0, 0, 0, 0.72),
+    0 0 0.48rem rgba(var(--lever-accent), 0.12);
+}
+
+.yanmar-visual-lever-travel .yanmar-lever-slot::before {
+  content: "";
+  position: absolute;
+  inset: 0.3rem 0.14rem;
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 0.34rem,
+      rgba(226, 232, 240, 0.2) 0.34rem 0.38rem,
+      transparent 0.38rem 0.68rem
+    );
+  opacity: 0.72;
+}
+
+.yanmar-visual-lever-travel .yanmar-lever-slot::after {
+  display: none;
+}
+
+.yanmar-visual-lever-travel .yanmar-lever-pivot {
+  z-index: 3;
+  /* Neutral is defined by the lever root sitting at the rail center. */
+  top: 52%;
+  height: 0.92rem;
+  width: 0.92rem;
+  border: 1px solid rgba(var(--lever-accent), 0.72);
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.42), transparent 22%),
+    radial-gradient(circle, #64748b 0%, #1e293b 48%, #020617 100%);
+  box-shadow:
+    inset 0.08rem 0.08rem 0 rgba(255, 255, 255, 0.14),
+    inset -0.1rem -0.12rem 0 rgba(0, 0, 0, 0.56),
+    0 0 0 0.1rem #080d14,
+    0 0 0.48rem rgba(var(--lever-accent), 0.34);
+  transition: transform 95ms cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+.yanmar-visual-lever-travel .yanmar-lever-stick {
+  z-index: 4;
+  bottom: 0.14rem;
+  height: 0.22rem;
+  width: 0.54rem;
+  border: 1px solid rgba(203, 213, 225, 0.28);
+  background:
+    linear-gradient(90deg, #1e293b, #94a3b8 48%, #475569 62%, #111827);
+  box-shadow:
+    inset 0.05rem 0 0.05rem rgba(255, 255, 255, 0.12),
+    0 0.1rem 0.12rem rgba(0, 0, 0, 0.38);
+  transition: transform 95ms cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+.yanmar-visual-lever-travel .yanmar-lever-stick > span {
+  top: -0.48rem;
+  height: 1.18rem;
+  width: 1.18rem;
+  transform: translateX(-50%) perspective(4rem) rotateX(18deg);
+  transform-origin: 50% 82%;
+  overflow: visible;
+  border: 1px solid rgba(203, 213, 225, 0.48);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 30% 18%, rgba(255, 255, 255, 0.38), transparent 27%),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.025) 0 1px,
+      transparent 1px 4px
+    ),
+    linear-gradient(105deg, #1e293b 0%, #64748b 35%, #94a3b8 49%, #475569 63%, #111827 100%);
+  box-shadow:
+    inset 0.1rem 0.1rem 0 rgba(255, 255, 255, 0.14),
+    inset -0.12rem -0.18rem 0 rgba(0, 0, 0, 0.48),
+    0 0.18rem 0 #111827,
+    0 0.28rem 0.2rem rgba(0, 0, 0, 0.5);
+  transition:
+    filter 95ms ease,
+    box-shadow 95ms ease;
+}
+
+.yanmar-visual-lever-travel.is-pushed .yanmar-lever-stick > span {
+  filter: brightness(1.12) translateY(0.05rem);
+  box-shadow:
+    inset 0.12rem 0.12rem 0 rgba(255, 255, 255, 0.18),
+    inset -0.14rem -0.16rem 0 rgba(0, 0, 0, 0.52),
+    0 0 0 0.09rem #070b12,
+    0 0 0.78rem rgba(var(--lever-accent), 0.58);
+}
+
+.yanmar-visual-lever-travel.is-pulled .yanmar-lever-stick > span {
+  filter: brightness(1.08) translateY(-0.05rem);
+  box-shadow:
+    inset 0.12rem 0.12rem 0 rgba(255, 255, 255, 0.18),
+    inset -0.14rem -0.16rem 0 rgba(0, 0, 0, 0.52),
+    0 0 0 0.09rem #070b12,
+    0 0 0.72rem rgba(var(--lever-accent), 0.5);
+}
+
+.yanmar-visual-lever-travel .yanmar-lever-stick > span::before {
+  content: "";
+  position: absolute;
+  inset: 0.12rem;
+  border: 1px solid rgba(226, 232, 240, 0.12);
+  border-radius: 50%;
+}
+
+.yanmar-visual-lever-travel .yanmar-lever-stick > span::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.12rem;
+  z-index: -1;
+  width: 0.44rem;
+  height: 0.18rem;
+  transform: translateX(-50%) perspective(3rem) rotateX(-18deg);
+  border: 1px solid rgba(203, 213, 225, 0.32);
+  border-radius: 0 0 45% 45%;
+  background:
+    linear-gradient(90deg, #1e293b, #94a3b8 48%, #475569 62%, #111827);
+  box-shadow:
+    inset 0.05rem 0 0.05rem rgba(255, 255, 255, 0.14),
+    0 0.12rem 0.14rem rgba(0, 0, 0, 0.4);
+}
+
+.yanmar-aux-lever-well .yanmar-visual-lever-safety {
+  --lever-accent: 148, 163, 184;
+}
+
+.yanmar-aux-lever-well .yanmar-visual-lever-hydraulic {
+  --lever-accent: 148, 163, 184;
+}
+
+.yanmar-aux-lever-well .yanmar-lever-pivot {
+  border: 1px solid rgba(var(--lever-accent), 0.62);
+  box-shadow:
+    inset 0.06rem 0.06rem 0 rgba(255, 255, 255, 0.14),
+    0 0 0 0.08rem #080d14,
+    0 0 0.42rem rgba(var(--lever-accent), 0.34);
+}
+
+.yanmar-aux-lever-well .yanmar-lever-stick > span {
+  border: 1px solid rgba(var(--lever-accent), 0.62);
+  background:
+    radial-gradient(ellipse at 30% 18%, rgba(255, 255, 255, 0.34), transparent 28%),
+    linear-gradient(105deg, #1e293b 0%, #64748b 36%, #94a3b8 49%, #475569 64%, #111827 100%);
+  box-shadow:
+    inset 0.1rem 0.1rem 0.12rem rgba(255, 255, 255, 0.2),
+    inset -0.12rem -0.14rem 0.16rem rgba(0, 0, 0, 0.5),
+    0 0 0.44rem rgba(var(--lever-accent), 0.34);
 }
 
 @keyframes yanmar-joystick-pulse {

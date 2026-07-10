@@ -13,23 +13,6 @@ export default async function HomePage() {
   if (!session?.user) redirect("/login");
   if (!session.user.nickname) redirect("/nickname");
 
-  const scores = await prisma.gameScore.findMany({
-    where: { userId: session.user.id },
-    orderBy: { score: "desc" },
-  });
-
-  const bestByGame = new Map<string, { score: number; stars: number; playTime: number }>();
-  for (const s of scores) {
-    const existing = bestByGame.get(s.gameId);
-    if (!existing || s.score > existing.score) {
-      bestByGame.set(s.gameId, {
-        score: s.score,
-        stars: s.stars,
-        playTime: s.playTime,
-      });
-    }
-  }
-
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { currency: true, nickname: true, totalXp: true },
@@ -42,9 +25,19 @@ export default async function HomePage() {
 
   const gameStatsList = await Promise.all(
     GAMES.map(async (game) => {
-      const stats = await getUserGameStats(game.id, session.user.id);
+      const stats = await getUserGameStats(game.id, session.user.id, season.key);
       return { gameId: game.id, ...stats };
     }),
+  );
+  const progressByGame = new Map(
+    gameStatsList.map((stats) => [
+      stats.gameId,
+      {
+        score: stats.bestScore,
+        stars: stats.bestStars,
+        playTime: stats.playTime,
+      },
+    ]),
   );
   const rankByGame = new Map(gameStatsList.map((stats) => [stats.gameId, stats.rank]));
 
@@ -99,7 +92,7 @@ export default async function HomePage() {
               <GameCard
                 key={game.id}
                 game={game}
-                progress={bestByGame.get(game.id)}
+                progress={progressByGame.get(game.id)}
                 rank={rankByGame.get(game.id) ?? null}
               />
             ))}

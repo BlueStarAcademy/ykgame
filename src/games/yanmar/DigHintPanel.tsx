@@ -14,10 +14,10 @@ interface DigHintPanelProps {
 }
 
 function boomHint(boom: number, tipOnGround: boolean) {
-  if (tipOnGround) return "버킷이 땅에 닿음";
+  if (tipOnGround) return "버켓이 땅에 닿음";
   if (boom < 0.7) return "우레버 앞으로 밀기 — 붐 하강";
   if (boom < 1.05) return "우레버 더 앞으로 — 붐 계속 내리기";
-  return "좌레버 뒤+앞으로 암 조절하며 버킷을 땅에";
+  return "좌레버 뒤+앞으로 암 조절하며 버켓을 땅에";
 }
 
 interface DigHintContentProps {
@@ -47,8 +47,8 @@ export function DigHintContent({
     {
       ok: feedback.bucketOpenReady,
       label: feedback.bucketOpenReady
-        ? "버킷 반쯤 열림"
-        : "우조이스틱 오른쪽 — 버킷을 절반 이하로 열기",
+        ? "버켓 반쯤 열림"
+        : "우조이스틱 오른쪽 — 버켓을 절반 이하로 열기",
     },
     {
       ok: feedback.insertedDeepEnough,
@@ -58,7 +58,7 @@ export function DigHintContent({
     },
     {
       ok: feedback.bucketCurlReady,
-      label: feedback.bucketCurlReady ? "버킷 30도 말기" : "우조이스틱 왼쪽 — 버킷을 안으로 말기",
+      label: feedback.bucketCurlReady ? "버켓 30도 말기" : "우조이스틱 왼쪽 — 버켓을 안으로 말기",
     },
     {
       ok: feedback.armPulling,
@@ -67,10 +67,10 @@ export function DigHintContent({
     {
       ok: feedback.soilRetention >= 0.45,
       label: feedback.soilSpilling
-        ? "자세가 열려 흙이 쏟아짐 — 버킷을 말아 올리기"
+        ? "자세가 열려 흙이 쏟아짐 — 버켓을 말아 올리기"
         : feedback.soilRetention >= 0.45
-          ? "버킷이 흙을 담는 자세"
-          : "버킷을 말아 올려 흙이 떨어지지 않게",
+          ? "버켓이 흙을 담는 자세"
+          : "버켓을 말아 올려 흙이 떨어지지 않게",
     },
     {
       ok: bucketLoad >= 0.35,
@@ -87,7 +87,7 @@ export function DigHintContent({
     <div className={compact ? "text-white" : "rounded-lg bg-black/70 px-2 py-1.5 text-white"}>
       <p className="text-[10px] font-bold text-orange-300">굴착 방법</p>
       <p className="mt-0.5 text-[8px] text-white/50">
-        우레버 앞=붐↓ · 뒤=붐↑ · 좌=버킷말기
+        우레버 앞=붐↓ · 뒤=붐↑ · 좌=버켓말기
       </p>
       <ul className="mt-1.5 space-y-1">
         {steps.map((s, i) => (
@@ -221,7 +221,7 @@ export function DigPoseGraph({
       </div>
       <div className="space-y-px">
         <GraphRow
-          label="버킷"
+          label="버켓"
           value={bucket}
           min={0.35}
           max={3.6}

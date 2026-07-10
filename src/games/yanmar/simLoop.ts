@@ -430,7 +430,11 @@ export function tickExcavatorSim(params: SimTickParams) {
     vel.travel = 0;
   }
   const bodyGround = sampleHeight(terrain, sim.posX, sim.posZ);
-  sim.posY += (bodyGround - 0.72 - sim.posY) * Math.min(1, dt * 18);
+  const targetPosY = bodyGround - 0.72;
+  const verticalFollow = (targetPosY - sim.posY) * Math.min(1, dt * 18);
+  // 굴착지 복구로 차체 아래 지면이 갑자기 높아져도 기체가 공중으로
+  // 발사되듯 따라가지 않게 상승만 궤도 주행 수준의 속도로 제한한다.
+  sim.posY += Math.min(verticalFollow, dt * 1.2);
   if (constrainExcavatorToDumpTruck(sim, beforeTravel, truckPose)) {
     vel.travel = 0;
   }
@@ -445,7 +449,16 @@ export function tickExcavatorSim(params: SimTickParams) {
   const minBucketClearance = bucketContactInDigZone
     ? MIN_BUCKET_DIG_ZONE_CLEARANCE
     : MIN_BUCKET_GROUND_CLEARANCE;
-  if (clearance < minBucketClearance - 0.02) {
+  const wasAlreadyBelowGround =
+    beforeControlBucket.clearance < minBucketClearance - 0.02;
+  const worsenedGroundPenetration =
+    clearance < beforeControlBucket.clearance - 0.002;
+  // 굴착지 소진으로 지면이 복구되어 버킷이 순간적으로 묻힌 경우,
+  // 더 깊게 파고드는 조작만 막고 지면에서 빠져나오는 조작은 허용한다.
+  if (
+    clearance < minBucketClearance - 0.02 &&
+    (!wasAlreadyBelowGround || worsenedGroundPenetration)
+  ) {
     sim.boom = beforeGroundContact.boom;
     sim.arm = beforeGroundContact.arm;
     sim.bucket = beforeGroundContact.bucket;
@@ -481,15 +494,16 @@ export function tickExcavatorSim(params: SimTickParams) {
     onAttachmentWarning(message);
   };
 
-  if (sim.attachmentType === "breaker" && toolInputActive && toolTouchesGround) {
+  if (sim.attachmentType === "breaker" && (auxiliary?.breakerPedal ?? false)) {
     const permission = checkAttachmentUse("breaker", toolZone, "strike");
     if (!permission.allowed) {
-      warnAttachment(permission.message);
-    } else if (runtime.attachmentActionCooldown <= 0) {
+      if (toolTouchesGround) warnAttachment(permission.message);
+    } else if (toolTouchesGround && runtime.attachmentActionCooldown <= 0) {
       const tile = getCrashTileAt(terrain, bucketTip.x, bucketTip.z);
       if (tile?.active) {
-        const result = damageCrashTile(terrain, tile.id);
-        runtime.attachmentActionCooldown = 0.3;
+        const result = damageCrashTile(terrain, tile.id, stats.breakerDamage);
+        // Hold-to-hammer: rapid ticks while the foot pedal stays down.
+        runtime.attachmentActionCooldown = 0.11;
         runtime.digDust.active = true;
         runtime.digDust.x = bucketTip.x;
         runtime.digDust.y = toolGround + 0.08;
@@ -605,17 +619,56 @@ export function tickExcavatorSim(params: SimTickParams) {
   const poseReadiness = isAutoArm
     ? Math.max(manualDigPoseScore / 4, autoDigPoseScore)
     : manualDigPoseScore / 4;
+  // Position-ready for dig loading (marker); actual fill still needs curling motion.
   const canLoad =
+    sim.attachmentType === "bucket" &&
+    inZone &&
     bucketInWorkRange &&
+    sim.bucketLoad < 0.98 &&
     soilRetention >= BUCKET_SOIL_HOLD_MIN &&
-    (poseReadiness >= 0.5 || (isAutoArm && autoDigPoseScore >= 0.25)) &&
-    (bucketCurlingInward || autoActiveJoint != null);
+    (poseReadiness >= 0.5 || (isAutoArm && autoDigPoseScore >= 0.25));
+
+  const crashTileAtTip =
+    sim.attachmentType === "breaker"
+      ? getCrashTileAt(terrain, bucketTip.x, bucketTip.z)
+      : null;
+  const canStrike =
+    sim.attachmentType === "breaker" &&
+    toolZone === "crash" &&
+    toolTouchesGround &&
+    !!crashTileAtTip?.active;
+
+  const hillZone = terrain.hillZone;
+  const nearestHillRock =
+    sim.attachmentType === "grapple" && hillZone && !sim.carriedBoulderId
+      ? hillZone.boulders
+          .filter((item) => item.active && !item.delivered)
+          .map((item) => ({
+            item,
+            distance: Math.hypot(item.x - bucketTip.x, item.z - bucketTip.z),
+          }))
+          .sort((a, b) => a.distance - b.distance)[0]
+      : null;
+  const canGrab =
+    sim.attachmentType === "grapple" &&
+    toolZone === "hill" &&
+    !sim.carriedBoulderId &&
+    !!nearestHillRock &&
+    nearestHillRock.distance <= 2.6;
+  const canDropRock =
+    sim.attachmentType === "grapple" &&
+    !!sim.carriedBoulderId &&
+    !!hillZone &&
+    Math.hypot(bucketTip.x - hillZone.dropX, bucketTip.z - hillZone.dropZ) <= 5;
 
   fb.inDigZone = inZone;
   fb.inDumpZone = inDump;
   fb.tipOnGround = tipOnGround;
   fb.bucketCurled = curled;
   fb.canLoad = canLoad;
+  fb.canStrike = canStrike;
+  fb.canGrab = canGrab;
+  fb.canDropRock = canDropRock;
   fb.groundDepth = scraperDepthBelow;
   fb.digging = false;
   fb.bucketOpenReady = bucketOpenReady;
@@ -666,7 +719,7 @@ export function tickExcavatorSim(params: SimTickParams) {
 
   if (
     sim.attachmentType === "bucket" &&
-    inZone &&
+    (scraperInDigZone || tipInDigZone) &&
     bucketInWorkRange &&
     sim.bucketLoad < 1 &&
     soilRetention >= BUCKET_SOIL_HOLD_MIN

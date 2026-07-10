@@ -16,8 +16,11 @@ import {
 } from "./equipment";
 import type { GameMode } from "./tutorial";
 import {
+  EXCAVATOR_BODY_PARTS,
+  YANMAR_UPGRADE_ATTACHMENT_TABS,
   YANMAR_UPGRADE_VISUALS,
-  type UpgradeExcavatorPart,
+  getUpgradeAttachmentTab,
+  type UpgradeAttachmentTab,
 } from "./upgradeVisualConfig";
 
 interface EquipmentUpgradePanelProps {
@@ -32,10 +35,6 @@ interface EquipmentUpgradePanelProps {
   onUpgrade: (part: YanmarEquipmentPart) => void;
   onResetEquipment: (part: YanmarEquipmentPart) => void;
 }
-
-const EXCAVATOR_PARTS = Object.keys(
-  YANMAR_UPGRADE_VISUALS.excavatorHotspots,
-) as UpgradeExcavatorPart[];
 
 const HOTSPOT_WRAPPER_SIZE = { width: "4.1rem", height: "3.75rem" };
 const UPGRADE_BAR_DURATION_MS = 2000;
@@ -224,6 +223,7 @@ export function EquipmentUpgradePanel({
   onResetEquipment,
 }: EquipmentUpgradePanelProps) {
   const [selected, setSelected] = useState<YanmarEquipmentPart>("BOOM");
+  const [attachmentTab, setAttachmentTab] = useState<UpgradeAttachmentTab>("bucket");
   const [pendingUpgrade, setPendingUpgrade] = useState<PendingUpgrade | null>(null);
   const [upgradeBarKey, setUpgradeBarKey] = useState(0);
   const [activeUpgradeBarPart, setActiveUpgradeBarPart] =
@@ -236,7 +236,18 @@ export function EquipmentUpgradePanel({
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const upgradeSessionRef = useRef<UpgradeSession | null>(null);
   const levelsRef = useRef(levels);
-  levelsRef.current = levels;
+
+  const activeAttachment = getUpgradeAttachmentTab(attachmentTab);
+  const showHaulTruckPanel = attachmentTab === "grapple";
+  const truckUpgrades = showHaulTruckPanel
+    ? YANMAR_UPGRADE_VISUALS.haulTruckUpgrades
+    : YANMAR_UPGRADE_VISUALS.dumpTruckUpgrades;
+  const truckDiagram = showHaulTruckPanel
+    ? YANMAR_UPGRADE_VISUALS.haulTruckDiagram
+    : YANMAR_UPGRADE_VISUALS.dumpTruckDiagram;
+  const truckPanelTitle = showHaulTruckPanel ? "돌트럭 강화" : "덤프트럭 강화";
+  const truckPanelAlt = showHaulTruckPanel ? "돌트럭" : "덤프트럭";
+  const attachmentSpot = YANMAR_UPGRADE_VISUALS.excavatorHotspots.ATTACHMENT;
 
   const clearUpgradeTimers = useCallback(() => {
     if (barTimerRef.current) {
@@ -273,6 +284,10 @@ export function EquipmentUpgradePanel({
   useEffect(() => {
     return () => clearUpgradeTimers();
   }, [clearUpgradeTimers]);
+
+  useEffect(() => {
+    levelsRef.current = levels;
+  }, [levels]);
 
   useEffect(() => {
     tryShowUpgradeSuccess();
@@ -314,9 +329,16 @@ export function EquipmentUpgradePanel({
       levels[pendingUpgrade.part] < pendingUpgrade.toLevel;
 
     if (synced || failed) {
-      setPendingUpgrade(null);
+      const timer = setTimeout(() => setPendingUpgrade(null), 0);
+      return () => clearTimeout(timer);
     }
   }, [levels, pendingUpgrade, upgradingPart, activeUpgradeBarPart]);
+
+  const handleAttachmentTabChange = useCallback((tab: UpgradeAttachmentTab) => {
+    const next = getUpgradeAttachmentTab(tab);
+    setAttachmentTab(tab);
+    setSelected(next.part);
+  }, []);
 
   const handleUpgradeClick = useCallback(() => {
     const part = selected;
@@ -372,6 +394,8 @@ export function EquipmentUpgradePanel({
     levels[selected] <= 0 || resettingEquipment || isUpgradingSelected;
   const resetRefundStars = getYanmarPartResetRefundStars(selected, levels[selected]);
   const refundRateLabel = `${Math.round(YANMAR_EQUIPMENT_RESET_REFUND_RATE * 100)}%`;
+  const attachmentPartLevel = getDisplayLevel(activeAttachment.part);
+  const attachmentPartConfig = YANMAR_EQUIPMENT_CONFIG[activeAttachment.part];
 
   return (
     <div className="absolute inset-0 z-[80] flex flex-col bg-black/65 backdrop-blur-sm">
@@ -407,13 +431,35 @@ export function EquipmentUpgradePanel({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch]">
           <div className="relative mb-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 pb-[5.35rem]">
             <img
-              src={YANMAR_UPGRADE_VISUALS.excavatorDiagram}
-              alt="굴착기 부품 diagram"
+              key={activeAttachment.id}
+              src={activeAttachment.diagram}
+              alt={`${activeAttachment.label} 장착 굴착기`}
               className="block w-full object-contain"
               draggable={false}
             />
 
-            {EXCAVATOR_PARTS.map((part) => {
+            <div className="absolute left-2 top-2 z-30 flex gap-1">
+              {YANMAR_UPGRADE_ATTACHMENT_TABS.map((tab) => {
+                const active = attachmentTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => handleAttachmentTabChange(tab.id)}
+                    aria-pressed={active}
+                    className={`rounded-md border px-2 py-1 text-[10px] font-black shadow-md transition ${
+                      active
+                        ? "border-amber-300 bg-red-600 text-white"
+                        : "border-white/70 bg-slate-950/70 text-white/90 hover:border-amber-200 hover:bg-slate-900/80"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {EXCAVATOR_BODY_PARTS.map((part) => {
               const spot = YANMAR_UPGRADE_VISUALS.excavatorHotspots[part];
               const partLevel = getDisplayLevel(part);
               const partConfig = YANMAR_EQUIPMENT_CONFIG[part];
@@ -443,21 +489,42 @@ export function EquipmentUpgradePanel({
               );
             })}
 
+            <div
+              className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
+              style={{
+                left: `${attachmentSpot.x * 100}%`,
+                top: `${attachmentSpot.y * 100}%`,
+                width: HOTSPOT_WRAPPER_SIZE.width,
+                height: HOTSPOT_WRAPPER_SIZE.height,
+              }}
+            >
+              <UpgradePartButton
+                part={activeAttachment.part}
+                label={activeAttachment.label}
+                level={attachmentPartLevel}
+                maxLevel={attachmentPartConfig.maxLevel}
+                isSelected={selected === activeAttachment.part}
+                levelBump={bumpPart === activeAttachment.part}
+                onClick={() => setSelected(activeAttachment.part)}
+                ariaLabel={`${activeAttachment.label} 강화 +${attachmentPartLevel}`}
+              />
+            </div>
+
             <div className="absolute inset-x-0 bottom-0 z-10 border-t border-white/15 bg-gradient-to-t from-slate-950/92 via-slate-900/88 to-slate-900/55 px-2.5 pb-2.5 pt-2">
               <div className="flex items-stretch gap-2">
                 <div className="flex w-[4.75rem] shrink-0 flex-col items-center gap-1">
                   <img
-                    src={YANMAR_UPGRADE_VISUALS.dumpTruckDiagram}
-                    alt="덤프트럭"
+                    src={truckDiagram}
+                    alt={truckPanelAlt}
                     className="h-[4.25rem] w-full object-contain object-left drop-shadow-xl"
                     draggable={false}
                   />
                   <p className="text-center text-[9px] font-bold leading-tight tracking-wide text-amber-200/90">
-                    덤프트럭 강화
+                    {truckPanelTitle}
                   </p>
                 </div>
                 <div className="flex min-w-0 flex-1 items-center gap-2 self-center">
-                  {YANMAR_UPGRADE_VISUALS.truckUpgrades.map(({ part, label }) => {
+                  {truckUpgrades.map(({ part, label }) => {
                     const partLevel = getDisplayLevel(part);
                     const partConfig = YANMAR_EQUIPMENT_CONFIG[part];
                     return (

@@ -17,6 +17,8 @@ export const COCKPIT_LAYOUT = {
   travelBoth: { cx: 0.5, cy: 0.75, radius: 0.052, travel: 0.062 },
   hydraulicSpeed: { cx: 0.665, cy: 0.77, radius: 0.038, travel: 0.032 },
   rightPedal: { cx: 0.735, cy: 0.68, width: 0.052, height: 0.62 },
+  /** 좌측 패드와 주행 레버 사이 — 브레이커 타격 발판(1칸) */
+  breakerPedal: { cx: 0.28, cy: 0.76, width: 0.048, height: 0.28 },
   boomSwing: { cx: 0.34, cy: 0.45, radius: 0.04, travel: 0.045 },
   /** 우측 조이스틱과 우측 주행 레버 사이 */
   blade: { cx: 0.72, cy: 0.76, radius: 0.038, travel: 0.055 },
@@ -46,6 +48,8 @@ export interface AuxiliaryControlState {
   throttle: number;
   highSpeed: boolean;
   safetyLocked: boolean;
+  /** Hold to hammer with breaker attachment. */
+  breakerPedal: boolean;
 }
 
 export interface ControlMask {
@@ -66,8 +70,8 @@ export const CONTROL_LABELS = {
   right: {
     yPos: "붐 하강",
     yNeg: "붐 상승",
-    xNeg: "버킷 말기",
-    xPos: "버킷 펴기",
+    xNeg: "버켓 말기",
+    xPos: "버켓 펴기",
   },
   travel: {
     forward: "주행 전진",
@@ -108,6 +112,7 @@ export function createAuxiliaryControls(): AuxiliaryControlState {
     throttle: 0,
     highSpeed: false,
     safetyLocked: false,
+    breakerPedal: false,
   };
 }
 

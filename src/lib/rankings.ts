@@ -25,15 +25,38 @@ type ScoreWithUser = {
   user: { nickname: string | null; loginId: string };
 };
 
-function dedupeBestPerUser(scores: ScoreWithUser[]): ScoreWithUser[] {
-  const bestByUser = new Map<string, ScoreWithUser>();
+type AggregateMode = "best" | "sum";
+
+function rankingModeForGame(gameId: string): AggregateMode {
+  // Yanmar arcade ranks by season-long cumulative score across plays.
+  return gameId === "yanmar" ? "sum" : "best";
+}
+
+function aggregateScoresPerUser(
+  scores: ScoreWithUser[],
+  mode: AggregateMode,
+): ScoreWithUser[] {
+  const byUser = new Map<string, ScoreWithUser>();
   for (const s of scores) {
-    const existing = bestByUser.get(s.userId);
-    if (!existing || s.score > existing.score) {
-      bestByUser.set(s.userId, s);
+    const existing = byUser.get(s.userId);
+    if (!existing) {
+      byUser.set(s.userId, { ...s });
+      continue;
+    }
+    if (mode === "sum") {
+      byUser.set(s.userId, {
+        ...existing,
+        score: existing.score + s.score,
+        stars: existing.stars + s.stars,
+        playTime: existing.playTime + s.playTime,
+      });
+      continue;
+    }
+    if (s.score > existing.score) {
+      byUser.set(s.userId, s);
     }
   }
-  return Array.from(bestByUser.values()).sort((a, b) => b.score - a.score);
+  return Array.from(byUser.values()).sort((a, b) => b.score - a.score);
 }
 
 export async function getMonthlyRankings(
@@ -49,7 +72,7 @@ export async function getMonthlyRankings(
     },
   });
 
-  return dedupeBestPerUser(scores)
+  return aggregateScoresPerUser(scores, rankingModeForGame(gameId))
     .slice(0, limit)
     .map((s, index) => ({
       rank: index + 1,
@@ -74,7 +97,7 @@ export async function getUserGameStats(
     },
   });
 
-  const ranked = dedupeBestPerUser(scores);
+  const ranked = aggregateScoresPerUser(scores, rankingModeForGame(gameId));
   const userEntry = ranked.find((s) => s.userId === userId);
 
   if (!userEntry) {

@@ -39,6 +39,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
   const { data: session, update } = useSession();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [myRank, setMyRank] = useState<number | null>(null);
+  const [myTotalScore, setMyTotalScore] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
   const savedRef = useRef(false);
@@ -81,6 +82,11 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
         const data = await res.json();
         setRankings(data.rankings ?? []);
         setMyRank(data.myStats?.rank ?? null);
+        setMyTotalScore(
+          typeof data.myStats?.bestScore === "number"
+            ? data.myStats.bestScore
+            : null,
+        );
       } catch {
         savedRef.current = false;
       }
@@ -105,10 +111,9 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
         ? "미션 완료!"
         : "시간 종료";
   const homeLabel = isRide ? "탑승 홈으로" : isYanmar ? "나가기" : "홈으로";
-  const myRankingEntry = myRank
-    ? rankings.find((entry) => entry.rank === myRank) ?? null
-    : null;
   const yRankingRows = rankings.slice(0, 10);
+  const yanmarDisplayScore =
+    myTotalScore ?? result.arcadeScore ?? 0;
   const resultCard = (
     <div
       className="mx-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg"
@@ -130,7 +135,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
         ) : null}
         <p className="mt-2 text-2xl font-bold text-gray-800">
           {isYanmarArcade
-            ? `누적 점수 ${(result.arcadeScore ?? 0).toLocaleString()}`
+            ? `누적 점수 ${yanmarDisplayScore.toLocaleString()}`
             : `${result.progress}%`}
         </p>
         <p className="text-sm text-gray-500">
@@ -170,7 +175,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
                   나의 순위 {myRank ? `#${myRank}` : "기록 없음"}
                 </span>
                 <span className="shrink-0 font-black text-blue-900">
-                  {(myRankingEntry?.score ?? result.arcadeScore ?? 0).toLocaleString()}점
+                  {yanmarDisplayScore.toLocaleString()}점
                 </span>
               </div>
             </div>

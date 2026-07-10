@@ -1,7 +1,7 @@
 export const YANMAR_REWARD_CONFIG = {
   baseMaxLoadUnits: 1000,
   baseTruckCapacityUnits: 3000,
-  baseTruckCooldownSec: 600,
+  baseTruckCooldownSec: 300,
   scoreChunkUnits: 200,
   baseScorePerChunkMin: 80,
   baseScorePerChunkMax: 100,
@@ -24,6 +24,13 @@ export const YANMAR_REWARD_CONFIG = {
 export const YANMAR_TRUCK_UPGRADE_COSTS = [
   50, 100, 150, 200, 250, 300, 400, 500, 750, 1000,
 ] as const;
+
+export const YANMAR_SPECIAL_UPGRADE_COSTS = [
+  50, 100, 150, 200, 250, 300, 350, 400, 450, 500,
+] as const;
+
+export const YANMAR_BASE_BREAKER_DAMAGE = 10;
+export const YANMAR_BASE_HAUL_TRUCK_COOLDOWN_SEC = 10 * 60;
 
 export const YANMAR_EQUIPMENT_CONFIG = {
   ARM: {
@@ -63,16 +70,16 @@ export const YANMAR_EQUIPMENT_CONFIG = {
     description: "복귀 대기 5% 단축",
   },
   CRASH_RESPAWN: {
-    label: "[브레이커] Crash 재생성",
+    label: "브레이커",
     maxLevel: 10,
-    cooldownReductionPerLevel: 0.1,
-    description: "Crash 재생성 대기 10% 단축",
+    damagePerLevel: 5,
+    description: "콘크리트 데미지 +5",
   },
   HAUL_TRUCK_SPEED: {
-    label: "[집게] 운반 트럭 속도",
+    label: "집게",
     maxLevel: 10,
-    cooldownReductionPerLevel: 0.1,
-    description: "돌 운반 트럭 복귀 10% 단축",
+    cooldownReductionSecPerLevel: 30,
+    description: "돌지역 회복시간 -30초",
   },
 } as const;
 
@@ -88,6 +95,7 @@ export interface YanmarEquipmentStats {
   criticalChance: number;
   criticalMultiplier: number;
   travelSpeedMultiplier: number;
+  breakerDamage: number;
   crashRespawnSec: number;
   haulTruckCooldownSec: number;
 }
@@ -110,8 +118,8 @@ export const YANMAR_UPGRADE_COSTS = {
   ENGINE: [20, 50, 100, 200, 500],
   TRUCK_CAPACITY: YANMAR_TRUCK_UPGRADE_COSTS,
   TRUCK_SPEED: YANMAR_TRUCK_UPGRADE_COSTS,
-  CRASH_RESPAWN: YANMAR_TRUCK_UPGRADE_COSTS,
-  HAUL_TRUCK_SPEED: YANMAR_TRUCK_UPGRADE_COSTS,
+  CRASH_RESPAWN: YANMAR_SPECIAL_UPGRADE_COSTS,
+  HAUL_TRUCK_SPEED: YANMAR_SPECIAL_UPGRADE_COSTS,
 } as const satisfies Record<YanmarEquipmentPart, readonly number[]>;
 
 export const YANMAR_EQUIPMENT_RESET_REFUND_RATE = 0.7;
@@ -238,27 +246,34 @@ export function calculateYanmarEquipmentStats(
       safeLevels.BOOM * YANMAR_EQUIPMENT_CONFIG.BOOM.effectPerLevel,
     travelSpeedMultiplier:
       1 + safeLevels.ENGINE * YANMAR_EQUIPMENT_CONFIG.ENGINE.effectPerLevel,
-    crashRespawnSec: getYanmarSpecialCooldownSec(
-      safeLevels.CRASH_RESPAWN,
-      "CRASH_RESPAWN",
-    ),
-    haulTruckCooldownSec: getYanmarSpecialCooldownSec(
-      safeLevels.HAUL_TRUCK_SPEED,
-      "HAUL_TRUCK_SPEED",
-    ),
+    breakerDamage: getYanmarBreakerDamage(safeLevels.CRASH_RESPAWN),
+    crashRespawnSec: 10 * 60,
+    haulTruckCooldownSec: getYanmarHaulTruckCooldownSec(safeLevels.HAUL_TRUCK_SPEED),
   };
 }
 
-export function getYanmarSpecialCooldownSec(
-  level = 0,
-  part: "CRASH_RESPAWN" | "HAUL_TRUCK_SPEED" = "CRASH_RESPAWN",
-) {
+export function getYanmarBreakerDamage(level = 0) {
   const safeLevel = Math.max(
     0,
-    Math.min(YANMAR_EQUIPMENT_CONFIG[part].maxLevel, Math.floor(level)),
+    Math.min(YANMAR_EQUIPMENT_CONFIG.CRASH_RESPAWN.maxLevel, Math.floor(level)),
   );
-  const factor = 1 - YANMAR_EQUIPMENT_CONFIG[part].cooldownReductionPerLevel;
-  return Math.max(90, 600 * factor ** safeLevel);
+  return (
+    YANMAR_BASE_BREAKER_DAMAGE +
+    safeLevel * YANMAR_EQUIPMENT_CONFIG.CRASH_RESPAWN.damagePerLevel
+  );
+}
+
+export function getYanmarHaulTruckCooldownSec(level = 0) {
+  const safeLevel = Math.max(
+    0,
+    Math.min(YANMAR_EQUIPMENT_CONFIG.HAUL_TRUCK_SPEED.maxLevel, Math.floor(level)),
+  );
+  return Math.max(
+    0,
+    YANMAR_BASE_HAUL_TRUCK_COOLDOWN_SEC -
+      safeLevel *
+        YANMAR_EQUIPMENT_CONFIG.HAUL_TRUCK_SPEED.cooldownReductionSecPerLevel,
+  );
 }
 
 export function getYanmarTruckCapacityUnits(capacityLevel = 0) {
@@ -300,9 +315,9 @@ export function getYanmarUpgradePartStatLabel(part: YanmarEquipmentPart): string
     case "TRUCK_SPEED":
       return "트럭복귀";
     case "CRASH_RESPAWN":
-      return "Crash복귀";
+      return "데미지";
     case "HAUL_TRUCK_SPEED":
-      return "돌트럭복귀";
+      return "돌지역 회복";
     default:
       return "";
   }
@@ -342,8 +357,9 @@ export function getYanmarUpgradePartStatText(
     case "TRUCK_SPEED":
       return `${label}${Math.round(getYanmarTruckCooldownSec(safeLevel))}초`;
     case "CRASH_RESPAWN":
+      return `${label}${getYanmarBreakerDamage(safeLevel)}`;
     case "HAUL_TRUCK_SPEED":
-      return `${label}${Math.round(getYanmarSpecialCooldownSec(safeLevel, part))}초`;
+      return `${label}${getYanmarHaulTruckCooldownSec(safeLevel)}초`;
     default:
       return "";
   }
@@ -381,16 +397,12 @@ export function getYanmarUpgradePartGainText(
       const saved = Math.round(
         getYanmarTruckCooldownSec(safeLevel) - getYanmarTruckCooldownSec(safeLevel + 1),
       );
-      return `(+${saved}초)`;
+      return `(-${saved}초)`;
     }
     case "CRASH_RESPAWN":
-    case "HAUL_TRUCK_SPEED": {
-      const saved = Math.round(
-        getYanmarSpecialCooldownSec(safeLevel, part) -
-          getYanmarSpecialCooldownSec(safeLevel + 1, part),
-      );
-      return `(+${saved}초)`;
-    }
+      return `(+${YANMAR_EQUIPMENT_CONFIG.CRASH_RESPAWN.damagePerLevel})`;
+    case "HAUL_TRUCK_SPEED":
+      return `(-${YANMAR_EQUIPMENT_CONFIG.HAUL_TRUCK_SPEED.cooldownReductionSecPerLevel}초)`;
     default:
       return "";
   }

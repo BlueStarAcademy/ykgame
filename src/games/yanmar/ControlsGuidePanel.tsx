@@ -52,7 +52,7 @@ export function ControlsGuidePanel({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={YANMAR_ASSETS.controlsGuide}
-          alt="얀마 SV08-1 굴착기 조작 도면 — 조이스틱, 주행 레버, 붐·버킷·암 기능"
+          alt="얀마 SV08-1 굴착기 조작 도면 — 조이스틱, 주행 레버, 붐·버켓·암 기능"
           className="mx-auto w-full max-w-lg rounded-lg shadow-2xl"
           draggable={false}
         />
