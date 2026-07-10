@@ -11,7 +11,10 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
-import { GAME_IMMERSIVE_HEADER_RIGHT_ID } from "@/components/games/GameImmersiveOverlay";
+import {
+  GAME_IMMERSIVE_HEADER_LEFT_ID,
+  GAME_IMMERSIVE_HEADER_RIGHT_ID,
+} from "@/components/games/GameImmersiveOverlay";
 import { StarAmount } from "@/components/StarAmount";
 import type { GameResult } from "@/games/shared/types";
 import { getMissionConfig } from "@/games/registry";
@@ -33,7 +36,12 @@ import {
 } from "./ExcavatorScene";
 import type { CameraMode, CouponDiscoveryState, DumpScorePopup, DumpScorePanelState, ExcavatorSimState, AutoPoseState } from "./types";
 import { EquipmentUpgradePanel } from "./EquipmentUpgradePanel";
-import { createHydraulicVelocity, createAutoPoseState, type HydraulicVelocity } from "./controls";
+import {
+  createHydraulicVelocity,
+  createAutoPoseState,
+  startAutoArmPose,
+  type HydraulicVelocity,
+} from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
 import { DigPoseGraph } from "./DigHintPanel";
 import { DumpHintPanel } from "./DumpHintPanel";
@@ -41,15 +49,25 @@ import { ControlsGuidePanel } from "./ControlsGuidePanel";
 import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
 import { createDigFeedback, type DigFeedback } from "./bucket";
 import {
+  loadDumpTruckCooldown,
+  saveDumpTruckCooldown,
+} from "./dumpTruckPersistence";
+import {
+  applyGameSessionTerrain,
+  loadYanmarGameSession,
+  saveYanmarGameSession,
+  type YanmarGameSessionSnapshot,
+} from "./gameSessionPersistence";
+import {
+  loadSavedArmPose,
+  saveSavedArmPose,
+} from "./autoPosePersistence";
+import {
   createDumpTruckState,
   formatDumpTruckReturnTime,
   getDumpTruckPose,
   type DumpTruckPose,
 } from "./dumpTruckState";
-import {
-  loadDumpTruckCooldown,
-  saveDumpTruckCooldown,
-} from "./dumpTruckPersistence";
 import type { TerrainData } from "./terrain";
 import {
   DEFAULT_YANMAR_EQUIPMENT_LEVELS,
@@ -83,6 +101,8 @@ import {
   getYanmarCouponImage,
   getYanmarCouponLabel,
 } from "./rewardVisualConfig";
+import { XpProgressBar } from "@/components/ui/XpProgressBar";
+import { getPlayerLevelProgress } from "@/lib/playerLevel";
 
 interface ExcavatorGameWrapperProps {
   onEnd: (result: GameResult) => void;
@@ -307,6 +327,12 @@ export function ExcavatorGameWrapper({
   );
   const autoPoseRef = useRef<AutoPoseState>(createAutoPoseState());
   const [autoPose, setAutoPose] = useState<AutoPoseState>(autoPoseRef.current);
+  const [poseSaveToastKey, setPoseSaveToastKey] = useState(0);
+  const [poseSaveToastVisible, setPoseSaveToastVisible] = useState(false);
+  const [savePoseCooldownUntil, setSavePoseCooldownUntil] = useState(0);
+  const [executePoseCooldownUntil, setExecutePoseCooldownUntil] = useState(0);
+  const poseSaveToastTimerRef = useRef<number | null>(null);
+  const poseActionCooldownMs = 5000;
   const [hud, setHud] = useState({
     progress: 0,
     timeLeft: config.duration,
@@ -326,6 +352,7 @@ export function ExcavatorGameWrapper({
   const [equipmentStats, setEquipmentStats] =
     useState<YanmarEquipmentStats>(defaultEquipmentStats);
   const [currency, setCurrency] = useState(0);
+  const [totalXp, setTotalXp] = useState(0);
   const [previewStars, setPreviewStars] = useState(0);
   const [stepCompleteFlash, setStepCompleteFlash] = useState(false);
   const [showControlsGuide, setShowControlsGuide] = useState(false);
@@ -369,12 +396,17 @@ export function ExcavatorGameWrapper({
   const equipmentStatsRef = useRef<YanmarEquipmentStats>(defaultEquipmentStats);
   const dumpTruckUserIdRef = useRef<string | null>(null);
   const dumpTruckLastSavedAtRef = useRef(0);
+  const gameSessionUserIdRef = useRef<string | null>(null);
+  const gameSessionLastSavedAtRef = useRef(0);
+  const gameSessionRestoredRef = useRef(false);
   const updateSessionRef = useRef(update);
   updateSessionRef.current = update;
 
   const persistDumpTruckCooldown = useCallback((force = false) => {
     const userId = dumpTruckUserIdRef.current;
     if (!userId) return;
+    // Ranked game sessions own truck state via full session persistence.
+    if (modeRef.current === "game") return;
 
     const now = Date.now();
     if (!force && now - dumpTruckLastSavedAtRef.current < 1000) return;
@@ -387,29 +419,61 @@ export function ExcavatorGameWrapper({
     );
   }, []);
 
-  useEffect(() => {
-    if (sessionStatus === "loading") return;
-    const userId = session?.user?.id;
-    if (!userId) return;
+  const persistGameSession = useCallback((force = false) => {
+    const userId = gameSessionUserIdRef.current;
+    if (!userId || modeRef.current !== "game") return;
 
-    dumpTruckUserIdRef.current = userId;
-    const restored = loadDumpTruckCooldown(userId);
-    if (restored) {
-      Object.assign(dumpTruckStateRef.current, restored);
-      dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
-    }
+    const now = Date.now();
+    if (!force && now - gameSessionLastSavedAtRef.current < 1000) return;
+    gameSessionLastSavedAtRef.current = now;
+    const terrain = terrainRef.current;
+    const truckState = dumpTruckStateRef.current;
+    const cooldownSec = equipmentStatsRef.current.truckCooldownSec;
+    saveYanmarGameSession(
+      userId,
+      {
+        sim: { ...simRef.current },
+        dumpTruck: { ...truckState },
+        dumpTruckCooldownSec: cooldownSec,
+        digZones: terrain.digZones,
+        heights: Array.from(terrain.heights),
+        baseHeights: Array.from(terrain.baseHeights),
+        arcadeScore: arcadeScoreRef.current,
+        dumped: scoreRef.current.dumped,
+        rewardStars: rewardStarsRef.current,
+      },
+      now,
+    );
+    saveDumpTruckCooldown(userId, truckState, cooldownSec, now);
+  }, []);
 
-    return () => {
-      persistDumpTruckCooldown(true);
-      dumpTruckUserIdRef.current = null;
-    };
-  }, [persistDumpTruckCooldown, session?.user?.id, sessionStatus]);
-
-  useEffect(() => {
-    const saveBeforeLeaving = () => persistDumpTruckCooldown(true);
-    window.addEventListener("pagehide", saveBeforeLeaving);
-    return () => window.removeEventListener("pagehide", saveBeforeLeaving);
-  }, [persistDumpTruckCooldown]);
+  const applyGameSnapshot = useCallback((snapshot: YanmarGameSessionSnapshot) => {
+    Object.assign(simRef.current, snapshot.sim);
+    Object.assign(velRef.current, createHydraulicVelocity());
+    Object.assign(dumpTruckStateRef.current, snapshot.dumpTruck);
+    dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
+    terrainRef.current = applyGameSessionTerrain(snapshot);
+    arcadeScoreRef.current = snapshot.arcadeScore;
+    rewardStarsRef.current = snapshot.rewardStars;
+    scoreRef.current = createScoreState(config.target, config.duration);
+    scoreRef.current.dumped = snapshot.dumped;
+    endedRef.current = false;
+    elapsedRef.current = 0;
+    lastHudProgressRef.current = -1;
+    setHud((h) => ({
+      ...h,
+      boom: snapshot.sim.boom,
+      arm: snapshot.sim.arm,
+      bucket: snapshot.sim.bucket,
+      bucketLoad: snapshot.sim.bucketLoad,
+      score: snapshot.arcadeScore,
+      dumpedUnits: Math.round(
+        Math.max(0, snapshot.dumped) * equipmentStatsRef.current.maxLoadUnits,
+      ),
+      progress: getProgress(scoreRef.current),
+      timeLeft: config.duration,
+    }));
+  }, [config.duration, config.target, setHud]);
 
   const syncDigHud = useCallback(() => {
     digHudTickRef.current += 1;
@@ -435,9 +499,17 @@ export function ExcavatorGameWrapper({
       Math.abs(prev.truckCooldownRemaining - fb.truckCooldownRemaining) < 0.15 &&
       prev.raiseArmForDump === fb.raiseArmForDump &&
       prev.travelBlockedRaiseArm === fb.travelBlockedRaiseArm &&
-      Math.abs(prev.digPoseScore - fb.digPoseScore) < 0.01
+      Math.abs(prev.digPoseScore - fb.digPoseScore) < 0.01 &&
+      Math.abs(prev.soilRetention - fb.soilRetention) < 0.02 &&
+      prev.soilSpilling === fb.soilSpilling &&
+      prev.digCooldowns.length === fb.digCooldowns.length &&
+      prev.digCooldowns.every(
+        (item, i) =>
+          item.id === fb.digCooldowns[i]?.id &&
+          Math.abs(item.etaSec - (fb.digCooldowns[i]?.etaSec ?? 0)) < 0.15,
+      )
         ? prev
-        : { ...fb },
+        : { ...fb, digCooldowns: fb.digCooldowns.map((item) => ({ ...item })) },
     );
     setHud((h) => {
       const boom = simRef.current.boom;
@@ -458,6 +530,55 @@ export function ExcavatorGameWrapper({
       prev.executing === autoPoseRef.current.executing ? prev : { ...autoPoseRef.current },
     );
   }, [setDigFeedback, setHud]);
+
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    dumpTruckUserIdRef.current = userId;
+    gameSessionUserIdRef.current = userId;
+
+    const savedPose = loadSavedArmPose(userId);
+    if (savedPose) {
+      autoPoseRef.current.saved = savedPose;
+      setAutoPose({ ...autoPoseRef.current });
+    }
+
+    if (modeRef.current === "game" && !gameSessionRestoredRef.current) {
+      const snapshot = loadYanmarGameSession(userId);
+      gameSessionRestoredRef.current = true;
+      if (snapshot) applyGameSnapshot(snapshot);
+    } else if (modeRef.current !== "game" && !gameSessionRestoredRef.current) {
+      const restored = loadDumpTruckCooldown(userId);
+      if (restored) {
+        Object.assign(dumpTruckStateRef.current, restored);
+        dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
+      }
+    }
+
+    return () => {
+      persistGameSession(true);
+      persistDumpTruckCooldown(true);
+      dumpTruckUserIdRef.current = null;
+      gameSessionUserIdRef.current = null;
+    };
+  }, [
+    applyGameSnapshot,
+    persistDumpTruckCooldown,
+    persistGameSession,
+    session?.user?.id,
+    sessionStatus,
+  ]);
+
+  useEffect(() => {
+    const saveBeforeLeaving = () => {
+      persistGameSession(true);
+      persistDumpTruckCooldown(true);
+    };
+    window.addEventListener("pagehide", saveBeforeLeaving);
+    return () => window.removeEventListener("pagehide", saveBeforeLeaving);
+  }, [persistDumpTruckCooldown, persistGameSession]);
 
   const syncMergedInput = useCallback(() => {
     setInput(
@@ -536,10 +657,20 @@ export function ExcavatorGameWrapper({
           setPreviewStars(data.currency);
         }
       }
+      if (typeof data.totalXp === "number") {
+        setTotalXp(data.totalXp);
+      }
     } catch {
       // Equipment data is optional for unauthenticated previews.
     }
   }, []);
+
+  useEffect(() => {
+    const sessionXp = session?.user?.totalXp;
+    if (typeof sessionXp === "number" && sessionXp >= 0) {
+      setTotalXp((prev) => (prev > 0 ? prev : sessionXp));
+    }
+  }, [session?.user?.totalXp]);
 
   useEffect(() => {
     if (mode === "ride") return;
@@ -590,21 +721,50 @@ export function ExcavatorGameWrapper({
     }
   }, [clearAllInput, setAuxiliary]);
 
+  const showPoseSaveToast = useCallback(() => {
+    if (poseSaveToastTimerRef.current != null) {
+      window.clearTimeout(poseSaveToastTimerRef.current);
+    }
+    setPoseSaveToastKey((key) => key + 1);
+    setPoseSaveToastVisible(true);
+    poseSaveToastTimerRef.current = window.setTimeout(() => {
+      setPoseSaveToastVisible(false);
+      poseSaveToastTimerRef.current = null;
+    }, 2100);
+  }, []);
+
   const handleSavePose = useCallback(() => {
+    const now = Date.now();
+    if (now < savePoseCooldownUntil) return;
+
     const sim = simRef.current;
-    autoPoseRef.current.saved = {
+    const pose = {
       boom: sim.boom,
       arm: sim.arm,
       bucket: sim.bucket,
     };
+    autoPoseRef.current.saved = pose;
+    if (autoPoseRef.current.executing) {
+      cancelAutoArmPose(autoPoseRef.current);
+    }
     setAutoPose({ ...autoPoseRef.current });
-  }, []);
+
+    const userId = session?.user?.id ?? gameSessionUserIdRef.current;
+    if (userId) {
+      saveSavedArmPose(userId, pose, now);
+    }
+
+    setSavePoseCooldownUntil(now + poseActionCooldownMs);
+    showPoseSaveToast();
+  }, [poseActionCooldownMs, savePoseCooldownUntil, session?.user?.id, showPoseSaveToast]);
 
   const handleExecutePose = useCallback(() => {
-    if (!autoPoseRef.current.saved) return;
-    autoPoseRef.current.executing = true;
+    const now = Date.now();
+    if (now < executePoseCooldownUntil) return;
+    if (!startAutoArmPose(autoPoseRef.current)) return;
     setAutoPose({ ...autoPoseRef.current });
-  }, []);
+    setExecutePoseCooldownUntil(now + poseActionCooldownMs);
+  }, [executePoseCooldownUntil, poseActionCooldownMs]);
 
   const resetYanmarSession = useCallback(() => {
     resetSim(simRef.current, velRef.current);
@@ -622,8 +782,14 @@ export function ExcavatorGameWrapper({
     const nextAuxiliary = createAuxiliaryControls();
     auxiliaryRef.current = nextAuxiliary;
     setAuxiliary(nextAuxiliary);
+    // 저장된 자세는 세션 리셋 후에도 유지 (종료 후 재입장 시 실행 가능)
+    const userId = session?.user?.id ?? gameSessionUserIdRef.current;
+    const persistedPose = userId ? loadSavedArmPose(userId) : null;
     autoPoseRef.current = createAutoPoseState();
-    setAutoPose(autoPoseRef.current);
+    if (persistedPose) {
+      autoPoseRef.current.saved = persistedPose;
+    }
+    setAutoPose({ ...autoPoseRef.current });
     clearAllInput();
     if (dumpScoreHideTimerRef.current != null) {
       window.clearTimeout(dumpScoreHideTimerRef.current);
@@ -648,7 +814,30 @@ export function ExcavatorGameWrapper({
       score: 0,
       dumpedUnits: 0,
     });
-  }, [clearAllInput, config.duration, config.target, setAuxiliary, setHud]);
+  }, [clearAllInput, config.duration, config.target, session?.user?.id, setAuxiliary, setHud]);
+
+  useEffect(() => {
+    return () => {
+      if (poseSaveToastTimerRef.current != null) {
+        window.clearTimeout(poseSaveToastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const savePoseOnCooldown = Date.now() < savePoseCooldownUntil;
+  const executePoseOnCooldown = Date.now() < executePoseCooldownUntil;
+
+  useEffect(() => {
+    const until = Math.max(savePoseCooldownUntil, executePoseCooldownUntil);
+    const remaining = until - Date.now();
+    if (remaining <= 0) return;
+    const timer = window.setTimeout(() => {
+      // 쿨다운 만료 시 버튼 재활성화를 위해 리렌더
+      setSavePoseCooldownUntil((value) => (Date.now() >= value ? 0 : value));
+      setExecutePoseCooldownUntil((value) => (Date.now() >= value ? 0 : value));
+    }, remaining + 16);
+    return () => window.clearTimeout(timer);
+  }, [executePoseCooldownUntil, savePoseCooldownUntil]);
 
   const enterRideMode = useCallback(() => {
     resetYanmarSession();
@@ -670,21 +859,51 @@ export function ExcavatorGameWrapper({
   }, [resetYanmarSession, setMode, setShowTutorialMenu, setTutorialIndex]);
 
   const startGameDirect = useCallback(() => {
-    resetYanmarSession();
     tutorialStepRef.current = null;
     setShowTouchZones(false);
     setShowTutorialMenu(false);
     endedRef.current = false;
     elapsedRef.current = 0;
+
+    const userId = session?.user?.id ?? gameSessionUserIdRef.current;
+    if (userId) {
+      const snapshot = loadYanmarGameSession(userId);
+      gameSessionRestoredRef.current = true;
+      if (snapshot) {
+        applyGameSnapshot(snapshot);
+        setMode("game");
+        return;
+      }
+    }
+
+    resetYanmarSession();
+    terrainRef.current = createInitialTerrain(true);
+    if (userId) {
+      const truck = loadDumpTruckCooldown(userId);
+      if (truck) {
+        Object.assign(dumpTruckStateRef.current, truck);
+      }
+    }
+    dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
     scoreRef.current.timeLeft = config.duration;
     setHud((h) => ({ ...h, progress: 0, timeLeft: config.duration }));
     setMode("game");
-  }, [config.duration, resetYanmarSession, setHud, setMode, setShowTouchZones, setShowTutorialMenu]);
+  }, [
+    applyGameSnapshot,
+    config.duration,
+    resetYanmarSession,
+    session?.user?.id,
+    setHud,
+    setMode,
+    setShowTouchZones,
+    setShowTutorialMenu,
+  ]);
 
   const finishCurrentRun = useCallback(() => {
     if (endedRef.current) return;
     endedRef.current = true;
     clearAllInput();
+    persistGameSession(true);
     persistDumpTruckCooldown(true);
 
     const currentMode = modeRef.current;
@@ -711,6 +930,7 @@ export function ExcavatorGameWrapper({
     equipmentStats.maxLoadUnits,
     onEnd,
     persistDumpTruckCooldown,
+    persistGameSession,
   ]);
 
   useEffect(() => {
@@ -761,6 +981,7 @@ export function ExcavatorGameWrapper({
 
   const handleSimTick = useCallback(() => {
     syncDigHud();
+    persistGameSession();
     persistDumpTruckCooldown();
 
     if (modeRef.current !== "tutorial") return;
@@ -785,6 +1006,7 @@ export function ExcavatorGameWrapper({
     setHud((h) => (h.goalDist === goalDist ? h : { ...h, goalDist }));
   }, [
     persistDumpTruckCooldown,
+    persistGameSession,
     syncDigHud,
     setHud,
     setMode,
@@ -941,6 +1163,10 @@ export function ExcavatorGameWrapper({
           currencyRef.current = data.currency;
           setCurrency(data.currency);
           await updateSessionRef.current({ user: { currency: data.currency } });
+        }
+        if (typeof data.totalXp === "number") {
+          setTotalXp(data.totalXp);
+          await updateSessionRef.current({ user: { totalXp: data.totalXp } });
         }
         if (!event) {
           adjustDumpScorePanel(0, {
@@ -1328,6 +1554,10 @@ export function ExcavatorGameWrapper({
               <div className="rounded-xl border border-emerald-200/50 bg-emerald-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 하역가능
               </div>
+            ) : digFeedback.soilSpilling && hud.bucketLoad > 0.02 ? (
+              <div className="rounded-xl border border-amber-200/50 bg-amber-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                흙 유실 — 버킷 말기
+              </div>
             ) : digFeedback.raiseArmForDump && hud.bucketLoad > 0.02 ? (
               <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 붐·암 들기
@@ -1341,33 +1571,70 @@ export function ExcavatorGameWrapper({
                 </span>
               </div>
             ) : null}
+            {digFeedback.digCooldowns.map((zone) => (
+              <div
+                key={zone.id}
+                className="rounded-xl border border-amber-300/25 bg-black/50 px-3 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm"
+              >
+                {zone.label}{" "}
+                <span className="tabular-nums text-amber-200">
+                  ({Math.ceil(zone.etaSec)}초)
+                </span>
+              </div>
+            ))}
           </div>
         )}
 
         {headerHudReady && mode !== "intro" && mode !== "ride"
           ? (() => {
-              const target = document.getElementById(GAME_IMMERSIVE_HEADER_RIGHT_ID);
-              if (!target) return null;
+              const leftTarget = document.getElementById(GAME_IMMERSIVE_HEADER_LEFT_ID);
+              const rightTarget = document.getElementById(GAME_IMMERSIVE_HEADER_RIGHT_ID);
+              if (!leftTarget && !rightTarget) return null;
               const ownedStars = mode === "game" ? currency : previewStars;
-              return createPortal(
-                <div className="flex items-center gap-2 text-[10px] font-black text-white">
-                  {mode === "game" ? (
-                    <span className="rounded-lg border border-white/15 bg-black/25 px-2 py-1">
-                      하역량{" "}
-                      <span className="text-emerald-100">
-                        {hud.dumpedUnits.toLocaleString()}
-                      </span>
-                    </span>
-                  ) : null}
-                  <span className="inline-flex items-center rounded-lg border border-white/15 bg-black/25 px-2.5 py-1">
-                    <StarAmount
-                      value={ownedStars}
-                      size={16}
-                      valueClassName="text-[11px] font-black text-amber-100"
-                    />
-                  </span>
-                </div>,
-                target,
+              const xpProgress = getPlayerLevelProgress(
+                mode === "game" ? totalXp : session?.user?.totalXp ?? totalXp,
+              );
+              const nickname =
+                session?.user?.nickname ?? session?.user?.loginId ?? "PLAYER";
+              return (
+                <>
+                  {leftTarget && mode === "game"
+                    ? createPortal(
+                        <div className="flex max-w-[min(42vw,12rem)] min-w-0 items-center text-white">
+                          <div className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/25 px-2 py-1">
+                            <div className="flex items-baseline gap-1">
+                              <p className="truncate text-[10px] font-black leading-none">
+                                {nickname}
+                              </p>
+                              <span className="shrink-0 text-[9px] font-black text-amber-200">
+                                Lv.{xpProgress.level}
+                              </span>
+                            </div>
+                            <XpProgressBar
+                              progress={xpProgress}
+                              compact
+                              showLabel={false}
+                              className="mt-0.5"
+                              barClassName="bg-white/20"
+                            />
+                          </div>
+                        </div>,
+                        leftTarget,
+                      )
+                    : null}
+                  {rightTarget
+                    ? createPortal(
+                        <span className="inline-flex shrink-0 items-center rounded-lg border border-white/15 bg-black/25 px-2.5 py-1">
+                          <StarAmount
+                            value={ownedStars}
+                            size={16}
+                            valueClassName="text-[11px] font-black text-amber-100"
+                          />
+                        </span>,
+                        rightTarget,
+                      )
+                    : null}
+                </>
               );
             })()
           : null}
@@ -1461,6 +1728,11 @@ export function ExcavatorGameWrapper({
 
         {mode !== "intro" && <RewardPopupOverlay panel={dumpScorePanel} />}
         {mode !== "intro" && <CouponDiscoveryOverlay discovery={couponDiscovery} />}
+        {mode !== "intro" && poseSaveToastVisible ? (
+          <div key={poseSaveToastKey} className="yanmar-pose-save-toast" role="status">
+            현재 자세가 저장되었습니다.
+          </div>
+        ) : null}
 
         <YanmarGameSettingsMenu
           immersive={immersive}
@@ -1538,6 +1810,8 @@ export function ExcavatorGameWrapper({
             autoPose={autoPose}
             onSavePose={handleSavePose}
             onExecutePose={handleExecutePose}
+            savePoseDisabled={savePoseOnCooldown}
+            executePoseDisabled={executePoseOnCooldown}
             allowed={allowed}
             tutorialStep={tutorialStep}
             showTouchZones={showTouchZones}

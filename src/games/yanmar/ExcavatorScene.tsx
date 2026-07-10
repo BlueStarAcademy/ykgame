@@ -10,6 +10,7 @@ import type { AuxiliaryControlState, ExcavatorControlState, ControlMask, Hydraul
 import { ExcavatorBucket } from "./ExcavatorBucket";
 import {
   createTerrain,
+  digZoneLabel,
   getActiveDigZones,
   isInDumpZone,
   dumpTruckBedDeckWorldY,
@@ -1796,7 +1797,7 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
             outlineWidth={0.08}
             outlineColor="#6d3e00"
           >
-            DIG
+            {digZoneLabel(zone.id)}
           </Text>
         </group>
       ))}

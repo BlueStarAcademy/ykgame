@@ -33,6 +33,8 @@ interface CockpitOverlayProps {
   autoPose: AutoPoseState;
   onSavePose: () => void;
   onExecutePose: () => void;
+  savePoseDisabled?: boolean;
+  executePoseDisabled?: boolean;
 }
 
 interface JoystickLayout {
@@ -1246,6 +1248,8 @@ interface AutoMenuProps {
   autoPose: AutoPoseState;
   onSavePose: () => void;
   onExecutePose: () => void;
+  savePoseDisabled?: boolean;
+  executePoseDisabled?: boolean;
 }
 
 function AutoMenu({
@@ -1257,6 +1261,8 @@ function AutoMenu({
   autoPose,
   onSavePose,
   onExecutePose,
+  savePoseDisabled = false,
+  executePoseDisabled = false,
 }: AutoMenuProps) {
   const anchorCx = layout.horn.cx;
   const toggleCy = AUX_MENU_TOGGLE_CY;
@@ -1291,19 +1297,32 @@ function AutoMenu({
                 <AutoMenuActionButton
                   variant="save"
                   active={hasSavedPose}
+                  disabled={savePoseDisabled}
                   onClick={onSavePose}
                   showTouchZone={showTouchZones}
-                  ariaLabel={hasSavedPose ? "자세 저장됨" : "현재 자세 저장"}
+                  ariaLabel={
+                    savePoseDisabled
+                      ? "자세 저장 대기 중"
+                      : hasSavedPose
+                        ? "자세 저장됨"
+                        : "현재 자세 저장"
+                  }
                 />
               ) : null}
               {key === "execute" ? (
                 <AutoMenuActionButton
                   variant="execute"
                   active={autoPose.executing}
-                  disabled={!hasSavedPose || autoPose.executing}
+                  disabled={!hasSavedPose || autoPose.executing || executePoseDisabled}
                   onClick={onExecutePose}
                   showTouchZone={showTouchZones}
-                  ariaLabel={autoPose.executing ? "자동 자세 실행 중" : "저장된 자세 실행"}
+                  ariaLabel={
+                    executePoseDisabled
+                      ? "자세 실행 대기 중"
+                      : autoPose.executing
+                        ? "자동 자세 실행 중"
+                        : "저장된 자세 실행"
+                  }
                 />
               ) : null}
             </div>
@@ -1346,6 +1365,8 @@ export function CockpitOverlay({
   autoPose,
   onSavePose,
   onExecutePose,
+  savePoseDisabled = false,
+  executePoseDisabled = false,
 }: CockpitOverlayProps) {
   const highlightLeft =
     tutorialStep?.highlight === "left" || tutorialStep?.highlight === "both";
@@ -1435,6 +1456,8 @@ export function CockpitOverlay({
             autoPose={autoPose}
             onSavePose={onSavePose}
             onExecutePose={onExecutePose}
+            savePoseDisabled={savePoseDisabled}
+            executePoseDisabled={executePoseDisabled}
           />
           <GameJoystick
             side="left"

@@ -16,6 +16,7 @@ export async function GET() {
       loginId: true,
       nickname: true,
       currency: true,
+      totalXp: true,
       role: true,
     },
   });
@@ -90,7 +91,7 @@ export async function PATCH(request: Request) {
   const user = await prisma.user.update({
     where: { id: session.user.id },
     data: { nickname },
-    select: { nickname: true, currency: true },
+    select: { nickname: true, currency: true, totalXp: true },
   });
 
   return NextResponse.json(user);

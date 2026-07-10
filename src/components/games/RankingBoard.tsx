@@ -130,7 +130,7 @@ function RankingRow({
           </p>
           <p className="mt-0.5 text-[10px] text-slate-500">
             {isYanmar ? (
-              "누적 하역량"
+              "누적 점수"
             ) : (
               <>
                 <span className="text-amber-500">
@@ -146,7 +146,7 @@ function RankingRow({
       </div>
       <span className="shrink-0 text-sm font-black text-slate-900">
         {entry.score > 0 ? entry.score.toLocaleString() : "-"}
-        {!isYanmar && entry.score > 0 ? (
+        {entry.score > 0 ? (
           <span className="ml-0.5 text-[10px] font-semibold text-slate-400">점</span>
         ) : null}
       </span>

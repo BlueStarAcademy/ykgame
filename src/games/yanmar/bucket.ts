@@ -8,6 +8,31 @@ const BOOM_OFFSET = 0.8;
 const VISUAL_ARM_ROTATION_SCALE = 1.18;
 const VISUAL_BUCKET_ROTATION_SCALE = 1.02;
 
+/** 이 비율 미만이면 적재 불가·급격 유실 */
+export const BUCKET_SOIL_HOLD_MIN = 0.16;
+/** 유지율: 버킷 말림(curl) × 월드 바가지 자세(cup) */
+const SOIL_CURL_FULL = 0.55;
+const SOIL_CURL_EMPTY = 1.62;
+const SOIL_CUP_CENTER = 1.4;
+const SOIL_CUP_HALF_WIDTH = 1.6;
+
+function clamp01(v: number) {
+  return Math.max(0, Math.min(1, v));
+}
+
+/** 붐·암·버킷 월드 자세 기준 흙 유지 가능 비율 (0=전부 유실, 1=만재 유지) */
+export function getBucketSoilRetention(boom: number, arm: number, bucket: number): number {
+  const visualArmAngle = boom - arm * VISUAL_ARM_ROTATION_SCALE;
+  const visualBucketAngle = visualArmAngle - bucket * VISUAL_BUCKET_ROTATION_SCALE;
+
+  // 버킷 관절이 말릴수록 담김 (펴질수록 0)
+  const curl = clamp01((SOIL_CURL_EMPTY - bucket) / (SOIL_CURL_EMPTY - SOIL_CURL_FULL));
+  // 바가지가 위를 받치는 월드 자세 (너무 펼치거나 뒤집히면 0)
+  const cup = clamp01(1 - Math.abs(visualBucketAngle - SOIL_CUP_CENTER) / SOIL_CUP_HALF_WIDTH);
+
+  return clamp01(curl * (0.12 + 0.88 * cup));
+}
+
 export interface BucketTip {
   x: number;
   y: number;
@@ -153,6 +178,10 @@ export interface DigFeedback {
   armPulling: boolean;
   optimalDigPose: boolean;
   digPoseScore: number;
+  /** 현재 자세에서 버킷이 흙을 담을 수 있는 비율 (0~1) */
+  soilRetention: number;
+  /** 자세 때문에 흙이 쏟아지는 중 */
+  soilSpilling: boolean;
   canDump: boolean;
   /** 하역 구역인데 붐·암을 더 들어올려야 함 */
   raiseArmForDump: boolean;
@@ -162,6 +191,7 @@ export interface DigFeedback {
   truckCanAccept: boolean;
   truckFillRatio: number;
   truckCooldownRemaining: number;
+  digCooldowns: { id: string; label: string; etaSec: number }[];
 }
 
 export function createDigFeedback(): DigFeedback {
@@ -179,6 +209,8 @@ export function createDigFeedback(): DigFeedback {
     armPulling: false,
     optimalDigPose: false,
     digPoseScore: 0,
+    soilRetention: 1,
+    soilSpilling: false,
     canDump: false,
     raiseArmForDump: false,
     travelBlockedRaiseArm: false,
@@ -186,5 +218,6 @@ export function createDigFeedback(): DigFeedback {
     truckCanAccept: true,
     truckFillRatio: 0,
     truckCooldownRemaining: 0,
+    digCooldowns: [],
   };
 }

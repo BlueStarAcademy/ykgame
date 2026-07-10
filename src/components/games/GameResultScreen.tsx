@@ -67,7 +67,6 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
             playTime: result.playTime,
             timeLeft: result.timeLeft,
             arcadeScore: result.arcadeScore,
-            dumpUnits: result.dumpUnits,
             mode: result.mode,
           }),
         });
@@ -90,7 +89,6 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
   }, [
     gameId,
     result.arcadeScore,
-    result.dumpUnits,
     result.mode,
     result.progress,
     result.playTime,
@@ -132,7 +130,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
         ) : null}
         <p className="mt-2 text-2xl font-bold text-gray-800">
           {isYanmarArcade
-            ? `누적 하역량 ${(result.dumpUnits ?? 0).toLocaleString()}`
+            ? `누적 점수 ${(result.arcadeScore ?? 0).toLocaleString()}`
             : `${result.progress}%`}
         </p>
         <p className="text-sm text-gray-500">
@@ -153,7 +151,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
       <div className="mb-4 rounded-xl bg-gray-50 p-4">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-bold text-gray-700">
-            {isYanmar ? "누적 하역량 Top 10" : "이번 달 Top 10"}
+            {isYanmar ? "누적 점수 Top 10" : "이번 달 Top 10"}
           </h3>
           {!isYanmar ? (
             <button
@@ -172,7 +170,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
                   나의 순위 {myRank ? `#${myRank}` : "기록 없음"}
                 </span>
                 <span className="shrink-0 font-black text-blue-900">
-                  {(myRankingEntry?.score ?? result.dumpUnits ?? 0).toLocaleString()}
+                  {(myRankingEntry?.score ?? result.arcadeScore ?? 0).toLocaleString()}점
                 </span>
               </div>
             </div>
@@ -190,7 +188,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
                     <span className="min-w-0 truncate">
                       {medal(r.rank)} {r.nickname}
                     </span>
-                    <span className="shrink-0 font-semibold">{r.score.toLocaleString()}</span>
+                    <span className="shrink-0 font-semibold">{r.score.toLocaleString()}점</span>
                   </li>
                 ))}
               </ul>

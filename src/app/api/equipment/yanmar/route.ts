@@ -17,7 +17,7 @@ export async function GET() {
   const [user, rows] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { currency: true },
+      select: { currency: true, totalXp: true },
     }),
     prisma.userEquipmentUpgrade.findMany({
       where: { userId: session.user.id, gameId: "yanmar" },
@@ -29,6 +29,7 @@ export async function GET() {
 
   return NextResponse.json({
     currency: user?.currency ?? 0,
+    totalXp: user?.totalXp ?? 0,
     levels,
     stats: calculateYanmarEquipmentStats(levels),
     costs: Object.fromEntries(

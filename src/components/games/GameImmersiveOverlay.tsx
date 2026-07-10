@@ -3,8 +3,13 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useGameFullscreen } from "@/hooks/useGameFullscreen";
+import {
+  enableInGamePortrait,
+  isApiFullscreenActive,
+} from "@/lib/fullscreen";
 import { enablePwaMode } from "@/lib/pwa-mode";
 
+export const GAME_IMMERSIVE_HEADER_LEFT_ID = "game-immersive-header-left";
 export const GAME_IMMERSIVE_HEADER_RIGHT_ID = "game-immersive-header-right";
 
 const PRACTICE_TICKER_MESSAGE = "연습모드에서는 재화나 점수가 누적되지 않습니다.";
@@ -25,7 +30,6 @@ function PracticeModeTicker() {
 interface GameImmersiveOverlayProps {
   active: boolean;
   headerColor: string;
-  brandKo: string;
   onExit: () => void;
   onShowRanking: () => void;
   myRank: number | null;
@@ -39,7 +43,6 @@ interface GameImmersiveOverlayProps {
 export function GameImmersiveOverlay({
   active,
   headerColor,
-  brandKo,
   onExit,
   onShowRanking,
   myRank,
@@ -50,20 +53,27 @@ export function GameImmersiveOverlay({
   children,
 }: GameImmersiveOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { immersive, canFullscreen, apiFullscreen, isStandalone, enter, leave } =
+  const { canFullscreen, apiFullscreen, isStandalone, enter, leave } =
     useGameFullscreen({ active, containerRef });
 
   useEffect(() => {
-    if (active) {
-      enablePwaMode();
-      document.documentElement.classList.add("pwa-mode");
-      enter();
-    } else {
-      leave();
+    if (!active) {
+      void leave();
+      return;
     }
-    return () => {
-      leave();
-    };
+
+    enablePwaMode();
+    document.documentElement.classList.add("pwa-mode");
+
+    // 모드 버튼/탑승 카드 클릭에서 이미 Fullscreen 진입한 경우:
+    // 제스처 없이 재요청하지 않고 세로 강제만 유지한다.
+    // Strict Mode remount 시 cleanup에서 exitFullscreen 하면 제스처가 사라져
+    // 재진입이 실패하므로, FS 해제는 active=false / 종료 버튼에서만 한다.
+    if (isApiFullscreenActive()) {
+      void enableInGamePortrait();
+    } else {
+      void enter();
+    }
   }, [active, enter, leave]);
 
   useEffect(() => {
@@ -93,18 +103,18 @@ export function GameImmersiveOverlay({
         className="flex shrink-0 items-center justify-between px-3 py-2 text-white"
         style={{ backgroundColor: headerColor }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             type="button"
             onClick={() => {
-              leave();
+              void leave();
               onExit();
             }}
-            className="rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold"
+            className="shrink-0 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold"
           >
             ✕ 종료
           </button>
-          <span className="text-xs font-medium opacity-90">{brandKo}</span>
+          <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 items-center" />
         </div>
         <div className="flex items-center gap-2">
           <div id={GAME_IMMERSIVE_HEADER_RIGHT_ID} className="flex items-center gap-3" />
@@ -116,7 +126,9 @@ export function GameImmersiveOverlay({
           {canFullscreen && !apiFullscreen && !isStandalone && (
             <button
               type="button"
-              onClick={() => enter()}
+              onClick={() => {
+                void enter();
+              }}
               className="rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
             >
               ⛶ 전체화면

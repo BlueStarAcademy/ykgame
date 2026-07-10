@@ -1,6 +1,6 @@
 /** 얀마 SV08-1 조작 매핑 — YK건기 조작 도면 기준 */
 
-import type { AutoPoseState, SavedArmPose } from "./types";
+import type { AutoPoseState } from "./types";
 
 export const YANMAR_ASSETS = {
   controlsGuide: "/images/yanmar/controls-guide.webp",
@@ -59,8 +59,8 @@ export const CONTROL_LABELS = {
   left: {
     xNeg: "스윙 좌",
     xPos: "스윙 우",
-    yPos: "암 당김",
-    yNeg: "암 뻗음",
+    yPos: "암 뻗음",
+    yNeg: "암 당김",
   },
   right: {
     yPos: "붐 하강",
@@ -222,9 +222,10 @@ export function applyControls(
     DAMPING.swing,
     dt,
   );
+  // 좌 조이스틱 앞=암 뻗음(각도↑), 뒤=암 당김 — 위/아래 매핑 반전 반영
   vel.arm = approach(
     vel.arm,
-    -left.y * speedProfile.arm * hydraulicSpeedScale,
+    left.y * speedProfile.arm * hydraulicSpeedScale,
     ACCEL.arm,
     DAMPING.arm,
     dt,
@@ -304,8 +305,11 @@ export function canDumpBucket(bucket: number) {
 
 export const AUTO_ARM_POSE_ARRIVE_EPS = 0.012;
 
+/** 암 → 붐 → 버킷 고정 순서 */
+export const AUTO_POSE_JOINT_ORDER = ["arm", "boom", "bucket"] as const;
+
 export function createAutoPoseState(): AutoPoseState {
-  return { saved: null, executing: false };
+  return { saved: null, executing: false, phase: null };
 }
 
 function autoStickToward(current: number, goal: number) {
@@ -318,29 +322,44 @@ function isAutoPoseJointSettled(current: number, goal: number) {
   return Math.abs(current - goal) <= AUTO_ARM_POSE_ARRIVE_EPS;
 }
 
-/** 적재 자세 그래프와 같이 암 → 붐 → 버킷 순으로 한 축씩만 이동한다. */
-export function getActiveAutoPoseJoint(
+function holdAutoPoseJoint(
   sim: { boom: number; arm: number; bucket: number },
-  saved: SavedArmPose,
-): "arm" | "boom" | "bucket" | null {
-  if (!isAutoPoseJointSettled(sim.arm, saved.arm)) return "arm";
-  if (!isAutoPoseJointSettled(sim.boom, saved.boom)) return "boom";
-  if (!isAutoPoseJointSettled(sim.bucket, saved.bucket)) return "bucket";
-  return null;
+  vel: HydraulicVelocity,
+  joint: (typeof AUTO_POSE_JOINT_ORDER)[number],
+  target: number,
+) {
+  sim[joint] = target;
+  vel[joint] = 0;
 }
 
-/** 저장 자세까지 수동 조이스틱과 동일한 축 입력을 합성한다. */
+/** 적재 자세처럼 암 → 붐 → 버킷 순으로 한 축씩만 이동한다. */
+export function getActiveAutoPoseJoint(
+  autoPose: AutoPoseState,
+): (typeof AUTO_POSE_JOINT_ORDER)[number] | null {
+  if (!autoPose.executing || autoPose.saved == null || autoPose.phase == null) {
+    return null;
+  }
+  return AUTO_POSE_JOINT_ORDER[autoPose.phase] ?? null;
+}
+
+/**
+ * 저장 자세까지 수동 조이스틱과 동일한 축 입력을 합성한다.
+ * applyControls의 부호(암: -left.y, 붐: +right.y, 버킷: +right.x)에 맞춘다.
+ */
 export function buildAutoArmControlInput(
   sim: { boom: number; arm: number; bucket: number },
-  saved: SavedArmPose,
+  autoPose: AutoPoseState,
 ): Pick<ExcavatorControlState, "left" | "right"> {
   const idle = {
     left: { x: 0, y: 0 },
     right: { x: 0, y: 0 },
   } as const;
+  const saved = autoPose.saved;
+  if (!saved) return idle;
 
-  switch (getActiveAutoPoseJoint(sim, saved)) {
+  switch (getActiveAutoPoseJoint(autoPose)) {
     case "arm":
+      // left.y > 0 = 암 당김(각도↓), applyControls에서 vel.arm = -left.y
       return {
         ...idle,
         left: { x: 0, y: -autoStickToward(sim.arm, saved.arm) },
@@ -360,10 +379,47 @@ export function buildAutoArmControlInput(
   }
 }
 
+/** 완료된 축은 잠그고, 현재 phase 관절이 목표에 닿으면 다음 축으로 넘긴다. */
+export function advanceAutoArmPose(
+  sim: { boom: number; arm: number; bucket: number },
+  vel: HydraulicVelocity,
+  autoPose: AutoPoseState,
+) {
+  if (!autoPose.executing || !autoPose.saved || autoPose.phase == null) return;
+
+  const target = autoPose.saved;
+
+  while (autoPose.phase != null) {
+    const phase = autoPose.phase;
+
+    for (let i = 0; i < phase; i += 1) {
+      const joint = AUTO_POSE_JOINT_ORDER[i];
+      holdAutoPoseJoint(sim, vel, joint, target[joint]);
+    }
+
+    const active = AUTO_POSE_JOINT_ORDER[phase];
+    if (!isAutoPoseJointSettled(sim[active], target[active])) return;
+
+    holdAutoPoseJoint(sim, vel, active, target[active]);
+
+    if (phase < 2) {
+      autoPose.phase = (phase + 1) as 1 | 2;
+      continue;
+    }
+
+    holdAutoPoseJoint(sim, vel, "arm", target.arm);
+    holdAutoPoseJoint(sim, vel, "boom", target.boom);
+    holdAutoPoseJoint(sim, vel, "bucket", target.bucket);
+    autoPose.executing = false;
+    autoPose.phase = null;
+    return;
+  }
+}
+
 /** 자동 실행 중 굴착 구역에서 순차 이동·저장 자세 도달 시 흙 적재를 허용한다. */
 export function isAutoPoseDigLoadingActive(
   sim: { boom: number; arm: number; bucket: number },
-  saved: SavedArmPose,
+  autoPose: AutoPoseState,
   env: {
     inZone: boolean;
     bucketInWorkRange: boolean;
@@ -373,10 +429,12 @@ export function isAutoPoseDigLoadingActive(
   if (!env.inZone || !env.bucketInWorkRange || env.scrapeMotion < 0.01) {
     return false;
   }
+  if (!autoPose.executing || !autoPose.saved) return false;
 
-  const activeJoint = getActiveAutoPoseJoint(sim, saved);
+  const activeJoint = getActiveAutoPoseJoint(autoPose);
   if (activeJoint !== null) return true;
 
+  const saved = autoPose.saved;
   return (
     isAutoPoseJointSettled(sim.arm, saved.arm) &&
     isAutoPoseJointSettled(sim.boom, saved.boom) &&
@@ -386,11 +444,14 @@ export function isAutoPoseDigLoadingActive(
 
 export function getAutoDigPoseReadiness(
   sim: { boom: number; arm: number; bucket: number },
-  saved: SavedArmPose,
+  autoPose: AutoPoseState,
   insertedDeepEnough: boolean,
   bucketOpenReady: boolean,
 ): number {
-  const activeJoint = getActiveAutoPoseJoint(sim, saved);
+  const saved = autoPose.saved;
+  if (!saved) return 0;
+
+  const activeJoint = getActiveAutoPoseJoint(autoPose);
   let score = 0;
   if (bucketOpenReady) score += 1;
   if (insertedDeepEnough) score += 1;
@@ -403,34 +464,13 @@ export function getAutoDigPoseReadiness(
   return score / 4;
 }
 
-export function finishAutoArmPoseIfComplete(
-  sim: { boom: number; arm: number; bucket: number },
-  vel: HydraulicVelocity,
-  autoPose: AutoPoseState,
-) {
-  if (!autoPose.executing || !autoPose.saved) return;
-
-  const target = autoPose.saved;
-  const settled = (["arm", "boom", "bucket"] as const).every((key) =>
-    isAutoPoseJointSettled(sim[key], target[key]),
-  );
-  if (!settled) return;
-
-  sim.boom = target.boom;
-  sim.arm = target.arm;
-  sim.bucket = target.bucket;
-  vel.boom = 0;
-  vel.arm = 0;
-  vel.bucket = 0;
-  autoPose.executing = false;
-}
-
 const MANUAL_INPUT_THRESHOLD = 0.08;
 
+/** 조이스틱·주행만 — 보조 레버(붐스윙 등)는 클릭 잔여값으로 실행을 끊지 않는다. */
 export function hasManualControlInput(
   input: ExcavatorControlState,
   allowed: ControlMask,
-  auxiliary?: AuxiliaryControlState,
+  _auxiliary?: AuxiliaryControlState,
 ) {
   if (allowed.leftX && Math.abs(input.left.x) > MANUAL_INPUT_THRESHOLD) return true;
   if (allowed.leftY && Math.abs(input.left.y) > MANUAL_INPUT_THRESHOLD) return true;
@@ -443,12 +483,19 @@ export function hasManualControlInput(
   ) {
     return true;
   }
-  if (auxiliary && Math.abs(auxiliary.boomSwing) > MANUAL_INPUT_THRESHOLD) return true;
   return false;
+}
+
+export function startAutoArmPose(autoPose: AutoPoseState) {
+  if (!autoPose.saved) return false;
+  autoPose.executing = true;
+  autoPose.phase = 0;
+  return true;
 }
 
 export function cancelAutoArmPose(autoPose: AutoPoseState) {
   autoPose.executing = false;
+  autoPose.phase = null;
 }
 
 export const ALL_CONTROLS: ControlMask = {

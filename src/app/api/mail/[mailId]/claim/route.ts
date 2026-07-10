@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createBarcodeCode } from "@/lib/coupon";
-import { YANMAR_REWARD_CONFIG } from "@/games/yanmar/equipment";
+import { createBarcodeCode, getCouponExpiresAt } from "@/lib/coupon";
+import { getSeasonKey } from "@/lib/games";
 
 export async function POST(
   _request: Request,
@@ -38,8 +38,8 @@ export async function POST(
     return NextResponse.json({ currency: session.user.currency, claimed: true });
   }
 
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + YANMAR_REWARD_CONFIG.couponExpiresInDays);
+  const expiresAt = getCouponExpiresAt();
+  const seasonKey = getSeasonKey();
 
   const result = await prisma.$transaction(async (tx) => {
     if (mail.currencyAmount > 0) {
@@ -56,6 +56,8 @@ export async function POST(
           type: mail.couponType,
           discountPct: mail.couponDiscountPct,
           barcodeCode: createBarcodeCode(),
+          seasonKey,
+          fromGameDrop: false,
           expiresAt,
         },
       });

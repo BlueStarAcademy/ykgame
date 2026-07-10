@@ -49,7 +49,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "arm",
     title: "3. 암",
-    instruction: "좌 조이스틱 뒤 — 암 뻗기",
+    instruction: "좌 조이스틱 앞 — 암 뻗기",
     highlight: "left",
     allowed: { leftX: false, leftY: true, rightX: false, rightY: false, travel: false },
     armMax: -0.35,

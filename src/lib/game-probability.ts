@@ -59,12 +59,12 @@ export function getGameProbabilityReport() {
             {
               label: "YK건기 부품 할인 쿠폰",
               value: pct(partsChance),
-              detail: `할인율 ${PARTS_DISCOUNTS.join("% / ")}% 중 랜덤`,
+              detail: `할인율 ${PARTS_DISCOUNTS.join("% / ")}% 중 랜덤 · 시즌 한도 ${YANMAR_REWARD_CONFIG.partsCouponSeasonLimit}장`,
             },
             {
               label: "중장비 대여 할인 쿠폰",
               value: pct(rentalChance),
-              detail: `할인율 ${RENTAL_DISCOUNTS.join("% / ")}% 중 랜덤`,
+              detail: `할인율 ${RENTAL_DISCOUNTS.join("% / ")}% 중 랜덤 · 시즌 한도 ${YANMAR_REWARD_CONFIG.rentalCouponSeasonLimit}장`,
             },
             {
               label: "스타 보상",
@@ -74,6 +74,12 @@ export function getGameProbabilityReport() {
             {
               label: "쿠폰 유효기간",
               value: `${YANMAR_REWARD_CONFIG.couponExpiresInDays}일`,
+            },
+            {
+              label: "시즌 쿠폰 한도",
+              value: "종류별 고정",
+              detail:
+                "시즌이 바뀌면 한도가 다시 채워집니다. 한도 소진 시 쿠폰 대신 스타가 지급됩니다.",
             },
           ],
         },

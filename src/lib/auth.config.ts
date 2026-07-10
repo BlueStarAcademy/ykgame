@@ -25,10 +25,12 @@ export const authConfig = {
         token.nickname = user.nickname;
         token.role = user.role;
         token.currency = user.currency;
+        token.totalXp = user.totalXp;
       }
       if (trigger === "update" && session?.user) {
         token.nickname = session.user.nickname ?? token.nickname;
         token.currency = session.user.currency ?? token.currency;
+        token.totalXp = session.user.totalXp ?? token.totalXp;
       }
       return token;
     },
@@ -43,6 +45,7 @@ export const authConfig = {
           nickname: token.nickname as string | null,
           role: token.role as "USER" | "ADMIN",
           currency: token.currency as number,
+          totalXp: (token.totalXp as number | undefined) ?? 0,
         },
       };
     },

@@ -15,84 +15,17 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-@keyframes game-card-sprite {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: -256px 0;
-  }
-}
-
-.game-card-sprite {
-  image-rendering: pixelated;
-  animation: game-card-sprite 0.8s steps(4) infinite;
+.game-card-equipment-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .game-card-sprite-locked {
-  animation-play-state: paused;
-}
-
-@keyframes yanmar-card-flip {
-  0%,
-  49.9% {
-    transform: scaleX(1);
-  }
-  50%,
-  99.9% {
-    transform: scaleX(-1);
-  }
-  100% {
-    transform: scaleX(1);
-  }
-}
-
-@keyframes yanmar-card-bob {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-
-.game-card-hero-wrap {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.game-card-yanmar-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-}
-
-.game-card-yanmar-flip {
-  transform-origin: center center;
-  animation: yanmar-card-flip 4.8s linear infinite;
-}
-
-.game-card-yanmar-image {
-  height: 4.5rem;
-  width: auto;
-  max-width: none;
-  object-fit: contain;
-  background: transparent;
-  transform-origin: center center;
-  animation: yanmar-card-bob 2.4s ease-in-out infinite;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
-}
-
-.game-card-yanmar-wrap.game-card-sprite-locked .game-card-yanmar-flip,
-.game-card-yanmar-wrap.game-card-sprite-locked .game-card-yanmar-image {
-  animation-play-state: paused;
+  filter: saturate(0.45) contrast(0.9);
 }
 
 @keyframes yanmar-score-panel-enter {
@@ -250,6 +183,48 @@ body {
 
 .yanmar-upgrade-success-toast {
   animation: yanmar-upgrade-success-fade 3s ease-out forwards;
+  will-change: opacity, transform;
+}
+
+@keyframes yanmar-pose-save-toast-fade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.yanmar-pose-save-toast {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  z-index: 80;
+  max-width: min(86vw, 18rem);
+  padding: 0.7rem 1.1rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(196, 181, 253, 0.45);
+  background: linear-gradient(180deg, rgba(46, 16, 101, 0.92) 0%, rgba(24, 16, 48, 0.94) 100%);
+  box-shadow:
+    0 0.45rem 1.4rem rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: #f5f3ff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-align: center;
+  pointer-events: none;
+  animation: yanmar-pose-save-toast-fade 2.1s ease-out forwards;
   will-change: opacity, transform;
 }
 
@@ -2600,30 +2575,30 @@ body {
 
 .game-card-active .game-card-surface {
   overflow: hidden;
-  border-radius: 1rem;
-  background: white;
+  border-radius: 1.05rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #f8f7f5;
   transform-style: preserve-3d;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 1px 2px rgba(0, 0, 0, 0.06),
-    0 4px 8px -2px rgba(0, 0, 0, 0.08),
-    0 12px 24px -6px rgba(0, 0, 0, 0.14),
-    0 20px 40px -12px rgba(0, 0, 0, 0.1);
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 18px -8px rgba(15, 23, 42, 0.16),
+    0 18px 34px -16px rgba(15, 23, 42, 0.14);
 }
 
 .game-card-active:hover .game-card-surface {
-  transform: translateY(-5px) rotateX(3deg);
+  transform: translateY(-4px) rotateX(2deg);
+  border-color: rgba(15, 23, 42, 0.12);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 2px 4px rgba(0, 0, 0, 0.06),
-    0 8px 16px -4px rgba(0, 0, 0, 0.12),
-    0 20px 36px -8px rgba(0, 0, 0, 0.18),
-    0 32px 56px -16px rgba(0, 0, 0, 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    0 2px 4px rgba(15, 23, 42, 0.05),
+    0 12px 24px -10px rgba(15, 23, 42, 0.2),
+    0 28px 48px -18px rgba(15, 23, 42, 0.18);
 }
 
 .game-card-active:active .game-card-surface {
-  transform: translateY(-1px) rotateX(1deg) scale(0.98);
+  transform: translateY(-1px) rotateX(1deg) scale(0.985);
   transition-duration: 0.1s;
 }
 
@@ -2632,39 +2607,41 @@ body {
   display: block;
   cursor: not-allowed;
   user-select: none;
-  opacity: 0.88;
+  opacity: 0.9;
 }
 
 .game-card-locked .game-card-surface {
   overflow: hidden;
-  border-radius: 1rem;
-  background: white;
+  border-radius: 1.05rem;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: #f3f2f0;
   box-shadow:
-    inset 0 2px 8px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(0, 0, 0, 0.04),
-    0 2px 6px rgba(0, 0, 0, 0.06);
+    inset 0 2px 8px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 2px 6px rgba(15, 23, 42, 0.04);
 }
 
 /* ── Header depth ── */
 .game-card-badge {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.12));
   box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 2px 6px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.28);
 }
 
 /* ── Preview: lighting & vignette ── */
-.game-card-preview::before {
-  content: "";
-  position: absolute;
-  inset: 0;
+.game-card-preview-wash {
   background:
-    radial-gradient(ellipse 80% 60% at 15% 10%, rgba(255, 255, 255, 0.28) 0%, transparent 60%),
-    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.1) 1px, transparent 0),
-    linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.25) 100%);
-  background-size: auto, 12px 12px, auto;
+    radial-gradient(ellipse 85% 55% at 18% 8%, rgba(255, 255, 255, 0.34) 0%, transparent 58%),
+    radial-gradient(ellipse 70% 50% at 85% 95%, rgba(0, 0, 0, 0.22) 0%, transparent 55%),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 0%, transparent 42%, rgba(0, 0, 0, 0.18) 100%);
   pointer-events: none;
   z-index: 1;
+}
+
+.game-card-preview::before {
+  content: none;
 }
 
 .game-card-active:hover .game-card-preview::after {
@@ -2675,7 +2652,7 @@ body {
   background: linear-gradient(
     105deg,
     transparent 35%,
-    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.16) 50%,
     transparent 65%
   );
   animation: card-shimmer 1.2s ease-in-out;
@@ -2691,12 +2668,11 @@ body {
 
 /* ── Sprite: lifted off the ground ── */
 .game-card-sprite-wrap {
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+  transition: transform 0.25s ease;
 }
 
-.game-card-active:hover .game-card-sprite-wrap:not(.game-card-hero-wrap) {
-  transform: translateY(-2px);
-  transition: transform 0.25s ease;
+.game-card-active:hover .game-card-equipment-image {
+  transform: scale(1.035);
 }
 
 /* ── Coming Soon badge: embossed pill ── */
@@ -2708,7 +2684,8 @@ body {
 
 /* ── Footer: inset tray ── */
 .game-card-footer {
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.04);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 247, 245, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 /* ── PWA 전체화면 체험 모드 ── */
@@ -2888,6 +2865,27 @@ html.pwa-mode body {
   animation: yanmar-joystick-pulse 1.6s ease-in-out infinite;
 }
 
+/* ── Home profile ── */
+.home-profile-xp-fill {
+  box-shadow: 0 0 10px rgba(198, 40, 40, 0.35);
+  transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.home-profile-panel {
+  animation: home-profile-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes home-profile-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ── Home hero ── */
 .home-hero {
   background: linear-gradient(165deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%);
@@ -2959,21 +2957,12 @@ html.pwa-mode body {
   height: 3.5rem;
 }
 
-.game-lobby-hero-art .game-card-yanmar-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.game-lobby-hero-art .game-card-yanmar-image {
-  height: 3.6rem;
-  width: auto;
-  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.38));
-}
-
-.game-lobby-hero-art .game-card-sprite {
-  transform: scale(1.35);
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3));
+.game-lobby-hero-art .game-card-equipment-image {
+  width: 4.75rem;
+  height: 3.5rem;
+  border-radius: 0.7rem;
+  object-fit: cover;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
 }
 
 .game-lobby-hero::before {

@@ -1,33 +1,42 @@
-import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  canIssueSeasonGameDropCoupon,
+  createBarcodeCode,
+  getCouponExpiresAt,
+} from "@/lib/coupon";
+import { getSeasonKey } from "@/lib/games";
 import {
   mergeYanmarEquipmentLevelsFromDb,
   YANMAR_REWARD_CONFIG,
   calculateYanmarEquipmentStats,
   calculateYanmarChunkScore,
 } from "@/games/yanmar/equipment";
+import type { CouponType } from "@/generated/prisma/client";
 
 const PARTS_DISCOUNTS = [10, 15, 20] as const;
 const RENTAL_DISCOUNTS = [10, 20, 30] as const;
 
-type DumpRewardEvent =
-  | {
-      kind: "coupon";
-      score: number;
-      critical: boolean;
-      couponType: "YK_PARTS_DISCOUNT" | "EQUIPMENT_RENTAL_DISCOUNT";
-      discountPct: number;
-      barcodeCode: string;
-      expiresAt: Date;
-    }
-  | {
-      kind: "stars";
-      score: number;
-      critical: boolean;
-      stars: number;
-    };
+type DumpStarEvent = {
+  kind: "stars";
+  score: number;
+  critical: boolean;
+  stars: number;
+};
+
+type DumpCouponEvent = {
+  kind: "coupon";
+  score: number;
+  critical: boolean;
+  couponType: CouponType;
+  discountPct: number;
+  barcodeCode: string;
+  expiresAt: Date;
+  seasonKey: string;
+};
+
+type DumpRewardEvent = DumpCouponEvent | DumpStarEvent;
 
 function randomInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -37,43 +46,7 @@ function pick<T>(items: readonly T[]) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-function createBarcodeCode() {
-  return `YK-${randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()}`;
-}
-
-function createRewardEvent(score: number, critical: boolean): DumpRewardEvent {
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + YANMAR_REWARD_CONFIG.couponExpiresInDays);
-
-  const roll = Math.random();
-  if (roll < YANMAR_REWARD_CONFIG.partsCouponChance) {
-    return {
-      kind: "coupon",
-      score,
-      critical,
-      couponType: "YK_PARTS_DISCOUNT",
-      discountPct: pick(PARTS_DISCOUNTS),
-      barcodeCode: createBarcodeCode(),
-      expiresAt,
-    };
-  }
-
-  if (
-    roll <
-    YANMAR_REWARD_CONFIG.partsCouponChance +
-      YANMAR_REWARD_CONFIG.rentalCouponChance
-  ) {
-    return {
-      kind: "coupon",
-      score,
-      critical,
-      couponType: "EQUIPMENT_RENTAL_DISCOUNT",
-      discountPct: pick(RENTAL_DISCOUNTS),
-      barcodeCode: createBarcodeCode(),
-      expiresAt,
-    };
-  }
-
+function createStarEvent(score: number, critical: boolean): DumpStarEvent {
   return {
     kind: "stars",
     score,
@@ -83,6 +56,51 @@ function createRewardEvent(score: number, critical: boolean): DumpRewardEvent {
       YANMAR_REWARD_CONFIG.maxStarReward,
     ),
   };
+}
+
+function rollRewardEvent(
+  score: number,
+  critical: boolean,
+  remaining: { parts: number; rental: number },
+  seasonKey: string,
+): DumpRewardEvent {
+  const roll = Math.random();
+
+  if (roll < YANMAR_REWARD_CONFIG.partsCouponChance) {
+    if (remaining.parts <= 0) return createStarEvent(score, critical);
+    remaining.parts -= 1;
+    return {
+      kind: "coupon",
+      score,
+      critical,
+      couponType: "YK_PARTS_DISCOUNT",
+      discountPct: pick(PARTS_DISCOUNTS),
+      barcodeCode: createBarcodeCode(),
+      expiresAt: getCouponExpiresAt(),
+      seasonKey,
+    };
+  }
+
+  if (
+    roll <
+    YANMAR_REWARD_CONFIG.partsCouponChance +
+      YANMAR_REWARD_CONFIG.rentalCouponChance
+  ) {
+    if (remaining.rental <= 0) return createStarEvent(score, critical);
+    remaining.rental -= 1;
+    return {
+      kind: "coupon",
+      score,
+      critical,
+      couponType: "EQUIPMENT_RENTAL_DISCOUNT",
+      discountPct: pick(RENTAL_DISCOUNTS),
+      barcodeCode: createBarcodeCode(),
+      expiresAt: getCouponExpiresAt(),
+      seasonKey,
+    };
+  }
+
+  return createStarEvent(score, critical);
 }
 
 export async function POST(request: Request) {
@@ -103,36 +121,85 @@ export async function POST(request: Request) {
   });
   const levels = mergeYanmarEquipmentLevelsFromDb(rows);
   const stats = calculateYanmarEquipmentStats(levels);
+  const seasonKey = getSeasonKey();
 
-  const events = Array.from({ length: safeChunkCount }, () => {
+  const [partsIssued, rentalIssued] = await Promise.all([
+    prisma.userCoupon.count({
+      where: {
+        type: "YK_PARTS_DISCOUNT",
+        seasonKey,
+        fromGameDrop: true,
+      },
+    }),
+    prisma.userCoupon.count({
+      where: {
+        type: "EQUIPMENT_RENTAL_DISCOUNT",
+        seasonKey,
+        fromGameDrop: true,
+      },
+    }),
+  ]);
+
+  const remaining = {
+    parts: Math.max(0, YANMAR_REWARD_CONFIG.partsCouponSeasonLimit - partsIssued),
+    rental: Math.max(
+      0,
+      YANMAR_REWARD_CONFIG.rentalCouponSeasonLimit - rentalIssued,
+    ),
+  };
+
+  const plannedEvents = Array.from({ length: safeChunkCount }, () => {
     const critical = Math.random() < stats.criticalChance;
     const score = calculateYanmarChunkScore(stats, critical);
-    return createRewardEvent(score, critical);
+    return rollRewardEvent(score, critical, remaining, seasonKey);
   });
 
-  const totalStars = events.reduce(
-    (sum, event) => sum + (event.kind === "stars" ? event.stars : 0),
-    0,
-  );
-  const totalScore = events.reduce((sum, event) => sum + event.score, 0);
+  /** 1 dump score chunk ≈ scoreChunkUnits of soil → same amount of lifetime XP */
+  const xpGained = stats.scoreChunkUnits * safeChunkCount;
 
   const result = await prisma.$transaction(async (tx) => {
-    if (totalStars > 0) {
-      await tx.user.update({
-        where: { id: session.user.id },
-        data: { currency: { increment: totalStars } },
-      });
-    }
+    const responseEvents: DumpRewardEvent[] = [];
+    let totalStars = 0;
+    let totalScore = 0;
 
-    for (const event of events) {
-      if (event.kind === "coupon") {
+    for (const planned of plannedEvents) {
+      totalScore += planned.score;
+
+      if (planned.kind === "coupon") {
+        const allowed = await canIssueSeasonGameDropCoupon(
+          tx,
+          planned.couponType,
+          seasonKey,
+        );
+        if (!allowed) {
+          const fallback = createStarEvent(planned.score, planned.critical);
+          totalStars += fallback.stars;
+          responseEvents.push(fallback);
+          await tx.userRewardInventory.create({
+            data: {
+              userId: session.user.id,
+              gameId: "yanmar",
+              type: "STAR",
+              amount: fallback.stars,
+              metadata: {
+                score: planned.score,
+                critical: planned.critical,
+                fallbackFromCoupon: true,
+              },
+            },
+          });
+          continue;
+        }
+
         await tx.userCoupon.create({
           data: {
             userId: session.user.id,
-            type: event.couponType,
-            discountPct: event.discountPct,
-            barcodeCode: event.barcodeCode,
-            expiresAt: event.expiresAt,
+            type: planned.couponType,
+            discountPct: planned.discountPct,
+            barcodeCode: planned.barcodeCode,
+            seasonKey: planned.seasonKey,
+            fromGameDrop: true,
+            expiresAt: planned.expiresAt,
           },
         });
         await tx.userRewardInventory.create({
@@ -140,43 +207,60 @@ export async function POST(request: Request) {
             userId: session.user.id,
             gameId: "yanmar",
             type: "COUPON",
-            amount: event.discountPct,
+            amount: planned.discountPct,
             metadata: {
-              couponType: event.couponType,
-              barcodeCode: event.barcodeCode,
-              score: event.score,
-              critical: event.critical,
+              couponType: planned.couponType,
+              barcodeCode: planned.barcodeCode,
+              score: planned.score,
+              critical: planned.critical,
+              seasonKey: planned.seasonKey,
             },
           },
         });
+        responseEvents.push(planned);
       } else {
+        totalStars += planned.stars;
+        responseEvents.push(planned);
         await tx.userRewardInventory.create({
           data: {
             userId: session.user.id,
             gameId: "yanmar",
             type: "STAR",
-            amount: event.stars,
+            amount: planned.stars,
             metadata: {
-              score: event.score,
-              critical: event.critical,
+              score: planned.score,
+              critical: planned.critical,
             },
           },
         });
       }
     }
 
-    const user = await tx.user.findUnique({
+    const updated = await tx.user.update({
       where: { id: session.user.id },
-      select: { currency: true },
+      data: {
+        ...(totalStars > 0 ? { currency: { increment: totalStars } } : {}),
+        totalXp: { increment: xpGained },
+      },
+      select: { currency: true, totalXp: true },
     });
-    return { currency: user?.currency ?? 0 };
+
+    return {
+      events: responseEvents,
+      totalStars,
+      totalScore,
+      currency: updated.currency,
+      totalXp: updated.totalXp,
+    };
   });
 
   return NextResponse.json({
-    events,
-    totalStars,
-    totalScore,
+    events: result.events,
+    totalStars: result.totalStars,
+    totalScore: result.totalScore,
+    xpGained,
     currency: result.currency,
+    totalXp: result.totalXp,
     stats,
   });
 }

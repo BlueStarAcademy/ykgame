@@ -7,7 +7,10 @@ export const YANMAR_REWARD_CONFIG = {
   baseScorePerChunkMax: 100,
   baseCriticalChance: 0.25,
   baseCriticalMultiplier: 2,
-  couponExpiresInDays: 90,
+  couponExpiresInDays: 365,
+  /** Max game-drop coupons of each type per season (resets when a new season starts). */
+  partsCouponSeasonLimit: 50,
+  rentalCouponSeasonLimit: 50,
   partsCouponChance: 0.005,
   rentalCouponChance: 0.005,
   minStarReward: 1,

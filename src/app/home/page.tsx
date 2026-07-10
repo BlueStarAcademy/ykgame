@@ -1,7 +1,7 @@
 import { GameCard } from "@/components/home/GameCard";
 import { HomeProfilePanel } from "@/components/home/HomeProfilePanel";
 import { AppShell } from "@/components/layout/AppShell";
-import { GAMES } from "@/lib/games";
+import { GAMES, getSeasonInfo } from "@/lib/games";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getUserGameStats } from "@/lib/rankings";
@@ -32,11 +32,13 @@ export default async function HomePage() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { currency: true, nickname: true },
+    select: { currency: true, nickname: true, totalXp: true },
   });
 
   const nickname = user?.nickname ?? session.user.nickname ?? "";
   const currency = user?.currency ?? 0;
+  const totalXp = user?.totalXp ?? 0;
+  const season = getSeasonInfo();
 
   const gameStatsList = await Promise.all(
     GAMES.map(async (game) => {
@@ -45,12 +47,20 @@ export default async function HomePage() {
     }),
   );
   const rankByGame = new Map(gameStatsList.map((stats) => [stats.gameId, stats.rank]));
-  const yanmarStats =
-    gameStatsList.find((stats) => stats.gameId === "yanmar") ?? {
-      rank: null,
-      bestScore: 0,
-      bestStars: 0,
-    };
+
+  const rankedGames = gameStatsList
+    .map((stats) => {
+      const game = GAMES.find((item) => item.id === stats.gameId);
+      return game ? { ...stats, brandKo: game.brandKo } : null;
+    })
+    .filter((item): item is NonNullable<typeof item> => item != null && item.rank != null)
+    .sort((a, b) => {
+      const rankDiff = (a.rank ?? Number.POSITIVE_INFINITY) - (b.rank ?? Number.POSITIVE_INFINITY);
+      if (rankDiff !== 0) return rankDiff;
+      return b.bestScore - a.bestScore;
+    });
+
+  const highlightStats = rankedGames[0] ?? null;
 
   return (
     <AppShell
@@ -70,16 +80,21 @@ export default async function HomePage() {
 
         <HomeProfilePanel
           nickname={nickname}
-          cumulativeScore={yanmarStats.bestScore}
-          rank={yanmarStats.rank}
+          totalXp={totalXp}
+          rank={highlightStats?.rank ?? null}
+          seasonScore={highlightStats?.bestScore ?? 0}
+          highlightGameName={highlightStats?.brandKo ?? null}
+          seasonLabel={season.label}
         />
       </div>
 
       <div className="mt-3 flex min-h-0 flex-1 flex-col">
-        <h2 className="mb-2 shrink-0 px-0.5 text-sm font-black text-slate-800">장비 선택</h2>
+        <h2 className="mb-2.5 shrink-0 px-0.5 text-[13px] font-bold tracking-tight text-slate-700">
+          장비 선택
+        </h2>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="grid grid-cols-2 gap-4 pb-2">
+          <div className="grid grid-cols-2 gap-3.5 pb-2">
             {GAMES.map((game) => (
               <GameCard
                 key={game.id}

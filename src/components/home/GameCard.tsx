@@ -1,6 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { GameConfig } from "@/lib/games";
 import { isGameAvailable } from "@/lib/games";
+import { prepareInGameFullscreen } from "@/lib/fullscreen";
+import { enablePwaMode } from "@/lib/pwa-mode";
 import { GameCardSprite } from "@/components/home/GameCardSprite";
 
 interface GameCardProps {
@@ -19,7 +24,7 @@ interface CardInnerProps {
 }
 
 function formatScore(score: number) {
-  return score > 0 ? `${score.toLocaleString()}점` : "—";
+  return score > 0 ? score.toLocaleString() : "—";
 }
 
 function formatRank(rank?: number | null) {
@@ -33,71 +38,82 @@ function CardInner({ game, progress, rank, locked, playMode }: CardInnerProps) {
   return (
     <>
       <div
-        className="game-card-header relative flex items-center gap-2.5 px-3 py-2 text-white"
-        style={{ backgroundColor: game.headerColor }}
-      >
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/20 via-white/5 to-black/10" />
-        <span className="game-card-badge relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-white/40 to-white/15 text-xs font-bold">
-          {game.number}
-        </span>
-        <p className="relative truncate text-sm font-bold tracking-wide drop-shadow-sm">
-          {game.brandKo}
-        </p>
-      </div>
-
-      <div
-        className={`game-card-preview relative flex h-28 flex-col items-center justify-center ${
+        className={`game-card-preview relative flex h-[8.5rem] flex-col overflow-hidden ${
           locked ? "grayscale brightness-75" : ""
         }`}
-        style={{
-          background: `linear-gradient(160deg, ${game.color} 0%, ${game.headerColor} 55%, ${game.headerColor} 100%)`,
-        }}
       >
-        <div className="game-card-sprite-wrap relative z-10">
+        <div className="game-card-sprite-wrap absolute inset-0">
           <GameCardSprite
             gameId={game.id}
-            className={
-              game.id === "yanmar"
-                ? locked
-                  ? "game-card-sprite-locked"
-                  : ""
-                : `scale-[1.75] ${locked ? "game-card-sprite-locked" : ""}`
-            }
+            className={locked ? "game-card-sprite-locked" : ""}
           />
         </div>
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-14 bg-gradient-to-b from-white/95 via-white/65 to-transparent"
+          aria-hidden
+        />
 
-        {!locked ? (
-          <div className="relative z-10 mt-2 flex w-full flex-col items-center gap-1 px-2">
-            {isRide ? (
-              <span className="game-card-stat-pill rounded-full bg-black/25 px-2.5 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
-                탑승 체험
-              </span>
-            ) : (
-              <>
-                <span className="game-card-stat-pill max-w-full truncate rounded-full bg-black/25 px-2.5 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
-                  {formatScore(score)}
-                </span>
-                <span className="game-card-stat-pill rounded-full bg-black/25 px-2.5 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
-                  랭킹 {formatRank(rank)}
-                </span>
-              </>
-            )}
+        <div className="relative z-10 flex items-start justify-between gap-2 px-2.5 pt-2">
+          <div className="min-w-0">
+            <p className="truncate text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              {game.brandEn}
+            </p>
+            <p className="mt-0.5 truncate text-[13px] font-bold leading-tight tracking-tight text-slate-900">
+              {game.brandKo}
+            </p>
           </div>
-        ) : null}
+          <span
+            className="game-card-badge flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white"
+            style={{ backgroundColor: game.headerColor }}
+          >
+            {game.number}
+          </span>
+        </div>
 
         {locked ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 backdrop-blur-sm">
-            <span className="rounded-full bg-black/70 px-3 py-1 text-[10px] font-bold text-white">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/50 backdrop-blur-[2px]">
+            <span className="rounded-full border border-white/15 bg-black/65 px-3 py-1 text-[10px] font-bold tracking-wide text-white">
               준비 중
             </span>
           </div>
         ) : null}
+      </div>
+
+      <div className="game-card-footer relative z-10 px-2.5 py-2">
+        {isRide ? (
+          <p className="text-center text-[11px] font-bold tracking-wide text-slate-600">
+            탑승 체험
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="text-center">
+              <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                시즌 점수
+              </p>
+              <p className="mt-0.5 text-[12px] font-bold tabular-nums leading-none text-slate-800">
+                {formatScore(score)}
+                {score > 0 ? (
+                  <span className="ml-0.5 text-[9px] font-semibold text-slate-400">점</span>
+                ) : null}
+              </p>
+            </div>
+            <div className="border-l border-slate-200/90 text-center">
+              <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                랭킹
+              </p>
+              <p className="mt-0.5 text-[12px] font-bold tabular-nums leading-none text-slate-800">
+                {formatRank(rank)}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
 }
 
 export function GameCard({ game, progress, rank, playMode }: GameCardProps) {
+  const router = useRouter();
   const available = isGameAvailable(game.id);
   const inner = (
     <CardInner
@@ -112,6 +128,26 @@ export function GameCard({ game, progress, rank, playMode }: GameCardProps) {
   if (available) {
     const href =
       playMode === "ride" ? `/games/${game.id}?play=ride` : `/games/${game.id}`;
+
+    if (playMode === "ride") {
+      return (
+        <a
+          href={href}
+          className="game-card-active"
+          onClick={(e) => {
+            e.preventDefault();
+            void (async () => {
+              enablePwaMode();
+              await prepareInGameFullscreen();
+              router.push(href);
+            })();
+          }}
+        >
+          <div className="game-card-surface">{inner}</div>
+        </a>
+      );
+    }
+
     return (
       <Link href={href} className="game-card-active">
         <div className="game-card-surface">{inner}</div>

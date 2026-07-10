@@ -12,6 +12,13 @@ const MENU_ITEMS = [
     color: "border-blue-200 bg-gradient-to-br from-blue-50 to-white",
   },
   {
+    href: "/admin/coupons",
+    emoji: "🎟️",
+    title: "쿠폰 관리",
+    desc: "시즌별 쿠폰 잔여 수량 및 획득 내역",
+    color: "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white",
+  },
+  {
     href: "/admin/probability",
     emoji: "🎲",
     title: "확률정보",

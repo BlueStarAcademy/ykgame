@@ -156,13 +156,29 @@ export interface SeasonInfo {
   endsAt: Date;
 }
 
+/** Asia/Seoul (KST, UTC+9). All season boundaries use KST midnight. */
+export const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+export function getKstParts(date = new Date()) {
+  const kst = new Date(date.getTime() + KST_OFFSET_MS);
+  return {
+    year: kst.getUTCFullYear(),
+    /** 0–11 */
+    month: kst.getUTCMonth(),
+    day: kst.getUTCDate(),
+    hours: kst.getUTCHours(),
+    minutes: kst.getUTCMinutes(),
+    seconds: kst.getUTCSeconds(),
+  };
+}
+
 function getSeasonNumber(month: number): number {
   return Math.floor(month / 3) + 1;
 }
 
 export function getSeasonKey(date = new Date()): string {
-  const year = date.getFullYear();
-  const season = getSeasonNumber(date.getMonth());
+  const { year, month } = getKstParts(date);
+  const season = getSeasonNumber(month);
   return `${year}-${season}`;
 }
 
@@ -198,7 +214,22 @@ export function legacyMonthKeyToSeasonKey(monthKey: string): string | null {
 export function getSeasonEndDate(seasonKey: string): Date {
   const parsed = parseSeasonKey(seasonKey);
   if (!parsed) return new Date();
-  return new Date(parsed.year, parsed.season * 3, 0, 23, 59, 59, 999);
+  let nextYear = parsed.year;
+  let nextSeasonStartMonth = parsed.season * 3;
+  if (nextSeasonStartMonth >= 12) {
+    nextYear += 1;
+    nextSeasonStartMonth = 0;
+  }
+  // Next season starts at KST 00:00 → end of current season is 1ms before that.
+  return new Date(
+    Date.UTC(nextYear, nextSeasonStartMonth, 1, 0, 0, 0, 0) - KST_OFFSET_MS - 1,
+  );
+}
+
+export function formatSeasonLabel(seasonKey: string): string {
+  const parsed = parseSeasonKey(seasonKey);
+  if (!parsed) return seasonKey;
+  return `${parsed.year}년 ${parsed.season}시즌`;
 }
 
 export function getSeasonInfo(date = new Date()): SeasonInfo {
@@ -208,9 +239,28 @@ export function getSeasonInfo(date = new Date()): SeasonInfo {
     key,
     year: parsed.year,
     season: parsed.season,
-    label: `${parsed.year}년 ${parsed.season}시즌`,
+    label: formatSeasonLabel(key),
     endsAt: getSeasonEndDate(key),
   };
+}
+
+/** Previous seasons going backward from `fromKey` (inclusive of fromKey). */
+export function listRecentSeasonKeys(fromKey: string, count: number): string[] {
+  const parsed = parseSeasonKey(fromKey);
+  if (!parsed || count < 1) return [];
+
+  const keys: string[] = [];
+  let year = parsed.year;
+  let season = parsed.season;
+  for (let i = 0; i < count; i++) {
+    keys.push(`${year}-${season}`);
+    season -= 1;
+    if (season < 1) {
+      season = 4;
+      year -= 1;
+    }
+  }
+  return keys;
 }
 
 export function formatSeasonRemaining(endsAt: Date, now = new Date()): string {

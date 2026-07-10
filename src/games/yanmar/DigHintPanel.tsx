@@ -62,7 +62,15 @@ export function DigHintContent({
     },
     {
       ok: feedback.armPulling,
-      label: feedback.armPulling ? "암 당김 중" : "좌조이스틱 앞 — 암을 안쪽으로 당기기",
+      label: feedback.armPulling ? "암 당김 중" : "좌조이스틱 뒤 — 암을 안쪽으로 당기기",
+    },
+    {
+      ok: feedback.soilRetention >= 0.45,
+      label: feedback.soilSpilling
+        ? "자세가 열려 흙이 쏟아짐 — 버킷을 말아 올리기"
+        : feedback.soilRetention >= 0.45
+          ? "버킷이 흙을 담는 자세"
+          : "버킷을 말아 올려 흙이 떨어지지 않게",
     },
     {
       ok: bucketLoad >= 0.35,

@@ -27,9 +27,13 @@ export interface SavedArmPose {
   bucket: number;
 }
 
+export type AutoPoseJoint = "arm" | "boom" | "bucket";
+
 export interface AutoPoseState {
   saved: SavedArmPose | null;
   executing: boolean;
+  /** 암 → 붐 → 버킷 순차 실행 인덱스 (0~2). 완료 시 null */
+  phase: 0 | 1 | 2 | null;
 }
 
 export interface DumpScorePanelState {

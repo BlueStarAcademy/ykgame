@@ -10,9 +10,20 @@ import { GameImmersiveOverlay } from "@/components/games/GameImmersiveOverlay";
 import { RankingBoard, RankingBoardPanel } from "@/components/games/RankingBoard";
 import type { GameConfig, GameId } from "@/lib/games";
 import { getGameById } from "@/lib/games";
+import { prepareInGameFullscreen } from "@/lib/fullscreen";
+import { enablePwaMode } from "@/lib/pwa-mode";
 import type { GameResult } from "@/games/shared/types";
 import { YANMAR_REWARD_CONFIG } from "@/games/yanmar/equipment";
 import { GameResultScreen } from "./GameResultScreen";
+
+/** 모드 버튼 클릭(사용자 제스처)에서 전체화면 + 세로 고정 후 인게임 진입 */
+async function enterPlayingAfterGesture(
+  start: () => void,
+): Promise<void> {
+  enablePwaMode();
+  await prepareInGameFullscreen();
+  start();
+}
 
 interface GamePlayClientProps {
   gameId: GameId;
@@ -319,24 +330,30 @@ export function GamePlayClient({
   }, [gameId, initialPlay]);
 
   const handleStartPractice = () => {
-    setResult(null);
-    setPlayMode("practice");
-    setYanmarExitSignal(0);
-    setPhase("playing");
+    void enterPlayingAfterGesture(() => {
+      setResult(null);
+      setPlayMode("practice");
+      setYanmarExitSignal(0);
+      setPhase("playing");
+    });
   };
 
   const handleStartGame = () => {
-    setResult(null);
-    setPlayMode("game");
-    setYanmarExitSignal(0);
-    setPhase("playing");
+    void enterPlayingAfterGesture(() => {
+      setResult(null);
+      setPlayMode("game");
+      setYanmarExitSignal(0);
+      setPhase("playing");
+    });
   };
 
   const handleStart = () => {
-    setResult(null);
-    setPlayMode(null);
-    setYanmarExitSignal(0);
-    setPhase("playing");
+    void enterPlayingAfterGesture(() => {
+      setResult(null);
+      setPlayMode(null);
+      setYanmarExitSignal(0);
+      setPhase("playing");
+    });
   };
 
   const handleExitGame = () => {
@@ -431,7 +448,6 @@ export function GamePlayClient({
         <GameImmersiveOverlay
           active
           headerColor={game.headerColor}
-          brandKo={game.brandKo}
           onExit={handleExitGame}
           onShowRanking={() => setShowRanking(true)}
           myRank={myStats.rank}

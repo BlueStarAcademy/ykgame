@@ -40,6 +40,8 @@ model User {
   nickname             String?                @unique
   role                 Role                   @default(USER)
   currency             Int                    @default(0)
+  /** Lifetime dump XP — never reset by season */
+  totalXp              Int                    @default(0)
   isActive             Boolean                @default(true)
   createdAt            DateTime               @default(now())
   gameScores           GameScore[]
@@ -84,6 +86,10 @@ model UserCoupon {
   type        CouponType
   discountPct Int
   barcodeCode String     @unique
+  /** Season key when issued (e.g. 2026-3). Used for per-season drop quotas. */
+  seasonKey   String
+  /** true = game dump drop (counts toward season quota); false = mail/admin */
+  fromGameDrop Boolean   @default(true)
   expiresAt   DateTime
   usedAt      DateTime?
   createdAt   DateTime   @default(now())
@@ -91,6 +97,7 @@ model UserCoupon {
 
   @@index([userId, expiresAt])
   @@index([userId, type])
+  @@index([seasonKey, type, fromGameDrop])
 }
 
 model UserEquipmentUpgrade {

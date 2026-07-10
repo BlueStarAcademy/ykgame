@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { gameId, progress, playTime, timeLeft, arcadeScore, dumpUnits, mode } = body;
+  const { gameId, progress, playTime, timeLeft, arcadeScore, mode } = body;
 
   const game = getGameById(gameId);
   if (!game) {
@@ -29,8 +29,8 @@ export async function POST(request: Request) {
   const isYanmarArcade =
     gameId === "yanmar" &&
     mode === "game" &&
-    ((typeof dumpUnits === "number" && dumpUnits >= 0) ||
-      (typeof arcadeScore === "number" && arcadeScore >= 0));
+    typeof arcadeScore === "number" &&
+    arcadeScore >= 0;
   if (gameId === "yanmar" && mode !== "game") {
     return NextResponse.json(
       { error: "Yanmar practice results are not saved" },
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   }
   const stars = isYanmarArcade ? 0 : calculateStars(progress);
   const score = isYanmarArcade
-    ? Math.round(typeof dumpUnits === "number" ? dumpUnits : arcadeScore)
+    ? Math.round(arcadeScore)
     : calculateScore(progress, timeLeft ?? 0);
   const seasonKey = getSeasonKey();
 

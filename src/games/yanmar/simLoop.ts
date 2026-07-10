@@ -1,9 +1,9 @@
 import type { AuxiliaryControlState, ControlMask, ExcavatorControlState, HydraulicVelocity } from "./controls";
 import {
+  advanceAutoArmPose,
   applyControls,
   buildAutoArmControlInput,
   cancelAutoArmPose,
-  finishAutoArmPoseIfComplete,
   getActiveAutoPoseJoint,
   getAutoDigPoseReadiness,
   hasManualControlInput,
@@ -23,6 +23,8 @@ import {
   dumpTruckBedCenterWorld,
   dumpTruckBedDeckWorldY,
   getMapWorldBounds,
+  digZoneLabel,
+  getDigZoneRespawnEtaSec,
   sampleHeight,
   updateDigZoneRespawns,
   worldToDumpTruckLocal,
@@ -32,8 +34,10 @@ import {
   DUMP_TRUCK_BED,
 } from "./terrain";
 import {
+  BUCKET_SOIL_HOLD_MIN,
   getBucketBodyContactWorld,
   getBucketScraperContactWorld,
+  getBucketSoilRetention,
   getBucketTipWorld,
   type DigFeedback,
 } from "./bucket";
@@ -153,6 +157,79 @@ function constrainExcavatorToMap(sim: ExcavatorSimState, terrain: TerrainData) {
   return blocked;
 }
 
+function applyTruckDump(
+  amount: number,
+  params: {
+    isGame: boolean;
+    score: DiggingScoreState;
+    stats: YanmarEquipmentStats;
+    truckState: DumpTruckRuntimeState;
+    truckPose: DumpTruckPose;
+    tutorialDump: { current: number };
+    runtime: SimLoopRuntime;
+    bedDeckY: number;
+    bucketReachY: number;
+    mouth: { x: number; z: number };
+    onProgress: (dumped: number, progress: number) => void;
+    onDumpScore: (popup: Omit<DumpScorePopup, "id">) => void;
+  },
+) {
+  if (amount <= 0) return;
+  const {
+    isGame,
+    score,
+    stats,
+    truckState,
+    truckPose,
+    tutorialDump,
+    runtime,
+    bedDeckY,
+    bucketReachY,
+    mouth,
+    onProgress,
+    onDumpScore,
+  } = params;
+  addDumpTruckLoad(truckState, amount * stats.maxLoadUnits, stats.truckCapacityUnits);
+  runtime.dumpSoilVisual.active = true;
+  runtime.dumpSoilVisual.intensity = Math.min(
+    1.2,
+    runtime.dumpSoilVisual.intensity + amount * 6.5,
+  );
+  runtime.dumpSoilVisual.spawnX = mouth.x;
+  runtime.dumpSoilVisual.spawnY = Math.max(bucketReachY, bedDeckY + 0.35);
+  runtime.dumpSoilVisual.spawnZ = mouth.z;
+  if (isGame) {
+    score.dumped += amount;
+    const progress = Math.min(100, Math.round((score.dumped / score.target) * 100));
+    if (progress !== runtime.lastReportedProgress) {
+      runtime.lastReportedProgress = progress;
+      onProgress(score.dumped, progress);
+    }
+  } else {
+    tutorialDump.current += amount;
+  }
+  const chunkRatio = stats.scoreChunkUnits / stats.maxLoadUnits;
+  runtime.dumpScoreRemainder += amount;
+  while (runtime.dumpScoreRemainder >= chunkRatio) {
+    runtime.dumpScoreRemainder -= chunkRatio;
+    const critical = Math.random() < stats.criticalChance;
+    const dropPoint = clampToDumpTruckBed(
+      mouth.x,
+      mouth.z,
+      0.08,
+      truckPose.groupX,
+      truckPose.groupZ,
+    );
+    onDumpScore({
+      score: calculateYanmarChunkScore(stats, critical),
+      critical,
+      x: dropPoint.x,
+      y: bedDeckY + 0.22,
+      z: dropPoint.z,
+    });
+  }
+}
+
 function isExcavatorCollidingWithDumpTruck(x: number, z: number, pose?: DumpTruckPose) {
   if (pose && !pose.present) return false;
   const local = worldToDumpTruckLocal(x, z, pose?.groupX, pose?.groupZ);
@@ -260,7 +337,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     };
     let stepInput = filtered;
     if (isAutoArm && autoPose.saved) {
-      const autoInput = buildAutoArmControlInput(sim, autoPose.saved);
+      const autoInput = buildAutoArmControlInput(sim, autoPose);
       stepInput = {
         ...filtered,
         left: { x: 0, y: autoInput.left.y },
@@ -276,17 +353,10 @@ export function tickExcavatorSim(params: SimTickParams) {
       travelSpeedScale,
       speedProfile,
     );
+    if (isAutoArm) {
+      advanceAutoArmPose(sim, vel, autoPose);
+    }
     constrainArmFromDumpTruck(sim, vel, boomSwing, subBefore, truckPose);
-  }
-
-  if (isAutoArm) {
-    const autoBefore = {
-      boom: sim.boom,
-      arm: sim.arm,
-      bucket: sim.bucket,
-    };
-    finishAutoArmPoseIfComplete(sim, vel, autoPose);
-    constrainArmFromDumpTruck(sim, vel, boomSwing, autoBefore, truckPose);
   }
   if (constrainExcavatorToMap(sim, terrain)) {
     vel.travel = 0;
@@ -314,6 +384,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     if (vel.bucket > 0) vel.bucket = 0;
     bucketContact = bucketClearance(sim, terrain, boomSwing);
     ({ clearance } = bucketContact);
+  }
+  if (isAutoArm) {
+    advanceAutoArmPose(sim, vel, autoPose);
   }
   const scraper = getBucketScraperContactWorld(sim, boomSwing);
   const bucketTip = getBucketTipWorld(sim, boomSwing);
@@ -362,10 +435,11 @@ export function tickExcavatorSim(params: SimTickParams) {
   const bucketInWorkRange = scraperDepthBelow > -1.4 && scraperDepthBelow < 2.6;
   const tipOnGround = scraperDepthBelow > -1.2 && scraperDepthBelow < 2.6;
   const curled = isBucketCurled(sim.boom, sim.bucket);
+  const soilRetention = getBucketSoilRetention(sim.boom, sim.arm, sim.bucket);
   const bucketOpenReady = sim.bucket >= 0.35 && sim.bucket <= 1.85;
   const insertedDeepEnough = scraperDepthBelow >= -0.15 && scraperDepthBelow <= 2.75;
   const autoSaved = isAutoArm ? autoPose.saved : null;
-  const autoActiveJoint = autoSaved ? getActiveAutoPoseJoint(sim, autoSaved) : null;
+  const autoActiveJoint = isAutoArm ? getActiveAutoPoseJoint(autoPose) : null;
   const bucketCurlingInward =
     filtered.right.x < -0.08 ||
     (autoActiveJoint === "bucket" && autoSaved != null);
@@ -390,12 +464,13 @@ export function tickExcavatorSim(params: SimTickParams) {
   const autoDigPoseScore =
     autoSaved == null
       ? 0
-      : getAutoDigPoseReadiness(sim, autoSaved, insertedDeepEnough, bucketOpenReady);
+      : getAutoDigPoseReadiness(sim, autoPose, insertedDeepEnough, bucketOpenReady);
   const poseReadiness = isAutoArm
     ? Math.max(manualDigPoseScore / 4, autoDigPoseScore)
     : manualDigPoseScore / 4;
   const canLoad =
     bucketInWorkRange &&
+    soilRetention >= BUCKET_SOIL_HOLD_MIN &&
     (poseReadiness >= 0.5 || (isAutoArm && autoDigPoseScore >= 0.25)) &&
     (bucketCurlingInward || autoActiveJoint != null);
 
@@ -412,12 +487,23 @@ export function tickExcavatorSim(params: SimTickParams) {
   fb.armPulling = armPulling;
   fb.optimalDigPose = naturalDigPose;
   fb.digPoseScore = poseReadiness;
+  fb.soilRetention = soilRetention;
+  fb.soilSpilling = false;
   const truckCanAccept = canDumpTruckAcceptDump(truckState, stats.truckCapacityUnits);
   const truckFillRatio = getDumpTruckFillRatio(truckState, stats.truckCapacityUnits);
   fb.truckPresent = isDumpTruckVisible(truckState);
   fb.truckCanAccept = truckCanAccept;
   fb.truckFillRatio = truckFillRatio;
   fb.truckCooldownRemaining = getDumpTruckReturnEtaSec(truckState, stats.truckCooldownSec);
+  fb.digCooldowns = terrain.dynamicDigZones
+    ? terrain.digZones
+        .map((zone, index) => ({
+          id: zone.id,
+          label: digZoneLabel(zone.id, index),
+          etaSec: getDigZoneRespawnEtaSec(zone),
+        }))
+        .filter((zone) => zone.etaSec > 0)
+    : [];
   fb.canDump = inTruckDumpTarget && sim.bucketLoad > 0.02 && truckCanAccept;
   fb.raiseArmForDump =
     inDump && sim.bucketLoad > 0.02 && bucketOverTruck && !bucketAboveBed && !bucketOpening;
@@ -428,7 +514,7 @@ export function tickExcavatorSim(params: SimTickParams) {
   const digRate = isTutorial ? 9.5 : 7.2;
   const loadRate = isTutorial ? 7.0 : 5.4;
 
-  if (inZone && bucketInWorkRange && sim.bucketLoad < 1) {
+  if (inZone && bucketInWorkRange && sim.bucketLoad < 1 && soilRetention >= BUCKET_SOIL_HOLD_MIN) {
     const scrape = Math.max(0.38, scraperDepthBelow + 0.9);
     const digX = scraperInDigZone ? scraper.x : tipInDigZone ? bucketTip.x : scraper.x;
     const digZ = scraperInDigZone ? scraper.z : tipInDigZone ? bucketTip.z : scraper.z;
@@ -446,7 +532,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     const autoDigLoadingActive =
       isAutoArm &&
       autoSaved != null &&
-      isAutoPoseDigLoadingActive(sim, autoSaved, {
+      isAutoPoseDigLoadingActive(sim, autoPose, {
         inZone,
         bucketInWorkRange,
         scrapeMotion,
@@ -480,7 +566,8 @@ export function tickExcavatorSim(params: SimTickParams) {
         Math.max(dug * loadRate * 0.45 + scrapeLoad, minimumLoad),
         maxLoadDelta,
       );
-      sim.bucketLoad = Math.min(1, sim.bucketLoad + loadDelta);
+      // 자세가 담을 수 있는 양까지만 적재 (열린/뒤집힌 버킷에 흙이 쌓이지 않음)
+      sim.bucketLoad = Math.min(1, soilRetention, sim.bucketLoad + loadDelta);
     }
 
     if (fb.digging) {
@@ -495,6 +582,43 @@ export function tickExcavatorSim(params: SimTickParams) {
     runtime.digDust.active = false;
   }
 
+  // 트럭 하역이 아니어도, 유지 가능량보다 많으면 자세 때문에 흙이 쏟아짐
+  const dumpParams = {
+    isGame,
+    score,
+    stats,
+    truckState,
+    truckPose,
+    tutorialDump,
+    runtime,
+    bedDeckY,
+    bucketReachY,
+    mouth: bucketMouthCenter,
+    onProgress,
+    onDumpScore,
+  };
+  if (sim.bucketLoad > soilRetention + 0.002) {
+    const excess = sim.bucketLoad - soilRetention;
+    const spillRate = soilRetention < BUCKET_SOIL_HOLD_MIN ? 2.4 : 1.35;
+    const spillAmount =
+      excess < 0.02 ? excess : Math.min(excess, Math.max(excess * spillRate * dt, 0.35 * dt));
+    sim.bucketLoad = Math.max(0, sim.bucketLoad - spillAmount);
+    fb.soilSpilling = spillAmount > 0.001;
+
+    if (fb.soilSpilling && inTruckDumpTarget && truckCanAccept) {
+      applyTruckDump(spillAmount, dumpParams);
+    } else if (fb.soilSpilling) {
+      runtime.dumpSoilVisual.active = true;
+      runtime.dumpSoilVisual.intensity = Math.min(
+        1.2,
+        runtime.dumpSoilVisual.intensity + spillAmount * 5.2,
+      );
+      runtime.dumpSoilVisual.spawnX = bucketMouthCenter.x;
+      runtime.dumpSoilVisual.spawnY = Math.max(bucketReachY - 0.15, scraper.y);
+      runtime.dumpSoilVisual.spawnZ = bucketMouthCenter.z;
+    }
+  }
+
   const bucketDumpOpen = sim.bucket > 1.35;
   if (sim.bucketLoad > 0 && bucketDumpOpen && inTruckDumpTarget && truckCanAccept) {
     const spillRate = 1.65;
@@ -504,46 +628,7 @@ export function tickExcavatorSim(params: SimTickParams) {
         ? remainingLoad
         : Math.min(remainingLoad, remainingLoad * spillRate * dt);
     sim.bucketLoad = Math.max(0, sim.bucketLoad - dumpAmount);
-    addDumpTruckLoad(truckState, dumpAmount * stats.maxLoadUnits, stats.truckCapacityUnits);
-    runtime.dumpSoilVisual.active = true;
-    runtime.dumpSoilVisual.intensity = Math.min(
-      1.2,
-      runtime.dumpSoilVisual.intensity + dumpAmount * 6.5,
-    );
-    runtime.dumpSoilVisual.spawnX = bucketMouthCenter.x;
-    runtime.dumpSoilVisual.spawnY = Math.max(bucketReachY, bedDeckY + 0.35);
-    runtime.dumpSoilVisual.spawnZ = bucketMouthCenter.z;
-    if (isGame) {
-      score.dumped += dumpAmount;
-      const progress = Math.min(100, Math.round((score.dumped / score.target) * 100));
-      if (progress !== runtime.lastReportedProgress) {
-        runtime.lastReportedProgress = progress;
-        onProgress(score.dumped, progress);
-      }
-    } else {
-      tutorialDump.current += dumpAmount;
-    }
-
-    const chunkRatio = stats.scoreChunkUnits / stats.maxLoadUnits;
-    runtime.dumpScoreRemainder += dumpAmount;
-    while (runtime.dumpScoreRemainder >= chunkRatio) {
-      runtime.dumpScoreRemainder -= chunkRatio;
-      const critical = Math.random() < stats.criticalChance;
-      const dropPoint = clampToDumpTruckBed(
-        bucketMouthCenter.x,
-        bucketMouthCenter.z,
-        0.08,
-        truckPose.groupX,
-        truckPose.groupZ,
-      );
-      onDumpScore({
-        score: calculateYanmarChunkScore(stats, critical),
-        critical,
-        x: dropPoint.x,
-        y: bedDeckY + 0.22,
-        z: dropPoint.z,
-      });
-    }
+    applyTruckDump(dumpAmount, dumpParams);
   }
 
   runtime.dumpSoilVisual.intensity = Math.max(0, runtime.dumpSoilVisual.intensity - dt * 2.8);

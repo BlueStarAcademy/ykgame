@@ -21,6 +21,7 @@ declare module "next-auth" {
       nickname: string | null;
       role: Role;
       currency: number;
+      totalXp: number;
     };
   }
 
@@ -31,6 +32,7 @@ declare module "next-auth" {
     nickname: string | null;
     role: Role;
     currency: number;
+    totalXp: number;
   }
 
   interface JWT {
@@ -40,6 +42,7 @@ declare module "next-auth" {
     nickname: string | null;
     role: Role;
     currency: number;
+    totalXp: number;
   }
 }
 
@@ -97,6 +100,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           nickname: user.nickname,
           role: user.role,
           currency: user.currency,
+          totalXp: user.totalXp,
         };
       },
     }),
