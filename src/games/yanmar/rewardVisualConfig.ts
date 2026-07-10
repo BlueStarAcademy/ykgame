@@ -1,4 +1,7 @@
-export type YanmarCouponType = "YK_PARTS_DISCOUNT" | "EQUIPMENT_RENTAL_DISCOUNT";
+export type YanmarCouponType =
+  | "YK_PARTS_DISCOUNT"
+  | "EQUIPMENT_RENTAL_DISCOUNT"
+  | "FILTER_SET_EXCHANGE";
 
 export const YANMAR_COUPON_VISUALS: Record<
   YanmarCouponType,
@@ -13,6 +16,11 @@ export const YANMAR_COUPON_VISUALS: Record<
     label: "중장비 대여 할인권",
     image: "/images/coupon-equipment-rental.svg",
     accent: "#38bdf8",
+  },
+  FILTER_SET_EXCHANGE: {
+    label: "필터세트 교환쿠폰",
+    image: "/images/coupon-filter-set.svg",
+    accent: "#22c55e",
   },
 };
 

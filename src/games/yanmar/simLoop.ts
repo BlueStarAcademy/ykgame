@@ -9,6 +9,7 @@ import {
   hasManualControlInput,
   isAutoPoseDigLoadingActive,
   CONTROL_SPEED,
+  DEFAULT_BOOM_SWING,
   RIDE_CONTROL_SPEED,
   canLoadBucket as isBucketCurled,
   filterInput,
@@ -39,6 +40,8 @@ import {
   getBucketScraperContactWorld,
   getBucketSoilRetention,
   getBucketTipWorld,
+  getDozerBladeContactWorld,
+  getMaxDozerBladeFromGround,
   type DigFeedback,
 } from "./bucket";
 import { constrainArmFromDumpTruck, isDumpTruckArmCollisionActive } from "./dumpTruckCollision";
@@ -80,11 +83,21 @@ export interface DigDustVisual {
   z: number;
 }
 
+export interface BladeSprayVisual {
+  active: boolean;
+  x: number;
+  y: number;
+  z: number;
+  heading: number;
+  intensity: number;
+}
+
 export interface SimLoopRuntime {
   lastReportedProgress: number;
   dumpScoreRemainder: number;
   dumpSoilVisual: DumpSoilVisual;
   digDust: DigDustVisual;
+  bladeSpray: BladeSprayVisual;
 }
 
 export function createSimLoopRuntime(): SimLoopRuntime {
@@ -99,6 +112,14 @@ export function createSimLoopRuntime(): SimLoopRuntime {
       intensity: 0,
     },
     digDust: { active: false, x: 0, y: 0, z: 0 },
+    bladeSpray: {
+      active: false,
+      x: 0,
+      y: 0,
+      z: 0,
+      heading: 0,
+      intensity: 0,
+    },
   };
 }
 
@@ -295,7 +316,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       : 0.25;
   const speedProfile = isRide ? RIDE_CONTROL_SPEED : CONTROL_SPEED;
   const travelSpeedScale = isRide ? 1 : stats.travelSpeedMultiplier;
-  const boomSwing = auxiliary?.boomSwing ?? 0;
+  const boomSwing = auxiliary?.boomSwing ?? DEFAULT_BOOM_SWING;
   const beforeControlBucket = bucketClearance(sim, terrain, boomSwing);
   const bucketTipInDigZone = isInDigZone(
     beforeControlBucket.tip.x,
@@ -619,8 +640,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     }
   }
 
+  // 하역 자세(버킷 펴기)면 장소와 무관하게 흙이 쏟아짐 — 트럭 위만 점수 반영
   const bucketDumpOpen = sim.bucket > 1.35;
-  if (sim.bucketLoad > 0 && bucketDumpOpen && inTruckDumpTarget && truckCanAccept) {
+  if (sim.bucketLoad > 0 && bucketDumpOpen) {
     const spillRate = 1.65;
     const remainingLoad = sim.bucketLoad;
     const dumpAmount =
@@ -628,12 +650,55 @@ export function tickExcavatorSim(params: SimTickParams) {
         ? remainingLoad
         : Math.min(remainingLoad, remainingLoad * spillRate * dt);
     sim.bucketLoad = Math.max(0, sim.bucketLoad - dumpAmount);
-    applyTruckDump(dumpAmount, dumpParams);
+    fb.soilSpilling = dumpAmount > 0.001;
+
+    if (inTruckDumpTarget && truckCanAccept) {
+      applyTruckDump(dumpAmount, dumpParams);
+    } else if (dumpAmount > 0.001) {
+      runtime.dumpSoilVisual.active = true;
+      runtime.dumpSoilVisual.intensity = Math.min(
+        1.2,
+        runtime.dumpSoilVisual.intensity + dumpAmount * 5.2,
+      );
+      runtime.dumpSoilVisual.spawnX = bucketMouthCenter.x;
+      runtime.dumpSoilVisual.spawnY = Math.max(bucketReachY - 0.15, scraper.y);
+      runtime.dumpSoilVisual.spawnZ = bucketMouthCenter.z;
+    }
   }
 
   runtime.dumpSoilVisual.intensity = Math.max(0, runtime.dumpSoilVisual.intensity - dt * 2.8);
   if (runtime.dumpSoilVisual.intensity <= 0.02) {
     runtime.dumpSoilVisual.active = false;
+  }
+
+  const bladeAmount = auxiliary?.blade ?? 0;
+  const bladeGroundProbe = getDozerBladeContactWorld(sim, Math.min(1, Math.max(0, bladeAmount)));
+  const bladeGroundY = sampleHeight(terrain, bladeGroundProbe.x, bladeGroundProbe.z);
+  const effectiveBlade = Math.min(bladeAmount, getMaxDozerBladeFromGround(sim, bladeGroundY));
+  const bladeContact = getDozerBladeContactWorld(sim, effectiveBlade);
+  const bladeClearance = bladeContact.y - bladeGroundY;
+  const forwardTravel = Math.max(0, vel.travel);
+  const bladeInSoilField = isInDigZone(bladeContact.x, bladeContact.z, terrain);
+  const bladeScraping =
+    effectiveBlade > 0.55 &&
+    bladeClearance < 0.12 &&
+    forwardTravel > 0.35 &&
+    bladeInSoilField;
+  if (bladeScraping) {
+    runtime.bladeSpray.active = true;
+    runtime.bladeSpray.intensity = Math.min(
+      1.35,
+      runtime.bladeSpray.intensity + forwardTravel * dt * 1.8,
+    );
+    runtime.bladeSpray.x = bladeContact.x;
+    runtime.bladeSpray.y = bladeGroundY + 0.06;
+    runtime.bladeSpray.z = bladeContact.z;
+    runtime.bladeSpray.heading = sim.heading + sim.swing;
+  } else {
+    runtime.bladeSpray.intensity = Math.max(0, runtime.bladeSpray.intensity - dt * 3.2);
+    if (runtime.bladeSpray.intensity <= 0.03) {
+      runtime.bladeSpray.active = false;
+    }
   }
 
   onSimTick();

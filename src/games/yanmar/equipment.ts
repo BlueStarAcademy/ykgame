@@ -11,8 +11,12 @@ export const YANMAR_REWARD_CONFIG = {
   /** Max game-drop coupons of each type per season (resets when a new season starts). */
   partsCouponSeasonLimit: 50,
   rentalCouponSeasonLimit: 50,
+  /** 필터세트 교환쿠폰 — 시즌당 1장 */
+  filterSetCouponSeasonLimit: 1,
   partsCouponChance: 0.005,
   rentalCouponChance: 0.005,
+  /** 0.0001% = 1e-6 */
+  filterSetCouponChance: 0.000001,
   minStarReward: 1,
   maxStarReward: 3,
 } as const;

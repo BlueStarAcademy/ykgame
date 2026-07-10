@@ -9,7 +9,8 @@ import { PhaserGameWrapper } from "@/components/games/PhaserGameWrapper";
 import { GameImmersiveOverlay } from "@/components/games/GameImmersiveOverlay";
 import { RankingBoard, RankingBoardPanel } from "@/components/games/RankingBoard";
 import type { GameConfig, GameId } from "@/lib/games";
-import { getGameById } from "@/lib/games";
+import { getGameById, isGameAvailable } from "@/lib/games";
+import { BRAND_PROFILES } from "@/lib/landing-content";
 import { prepareInGameFullscreen } from "@/lib/fullscreen";
 import { enablePwaMode } from "@/lib/pwa-mode";
 import type { GameResult } from "@/games/shared/types";
@@ -17,9 +18,7 @@ import { YANMAR_REWARD_CONFIG } from "@/games/yanmar/equipment";
 import { GameResultScreen } from "./GameResultScreen";
 
 /** 모드 버튼 클릭(사용자 제스처)에서 전체화면 + 세로 고정 후 인게임 진입 */
-async function enterPlayingAfterGesture(
-  start: () => void,
-): Promise<void> {
+async function enterPlayingAfterGesture(start: () => void): Promise<void> {
   enablePwaMode();
   await prepareInGameFullscreen();
   start();
@@ -37,20 +36,7 @@ interface MyStats {
 
 type GamePhase = "lobby" | "playing" | "result";
 type PlayMode = "practice" | "game" | "ride";
-
-function controlLabel(type: string) {
-  if (type === "excavator") return "듀얼 조이스틱";
-  if (type === "dpad") return "D-pad 조작";
-  if (type === "steering") return "조향 휠 조작";
-  return "버튼 조작";
-}
-
-function formatDuration(seconds: number) {
-  if (seconds <= 0) return "무제한";
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}분 ${s > 0 ? `${s}초` : ""}`;
-}
+type LobbyTab = "guide" | "rewards" | "ranking";
 
 const YANMAR_LOBBY_TITLE = "굴착 하역 챌린지";
 
@@ -69,24 +55,47 @@ const YANMAR_REWARDS = [
   },
   { icon: "🎟️", label: "YK 부품 할인권", desc: "10 / 15 / 20%" },
   { icon: "🎟️", label: "장비 대여 할인권", desc: "10 / 20 / 30%" },
+  {
+    icon: "🎟️",
+    label: "필터 세트 교환 쿠폰",
+    desc: `시즌 ${YANMAR_REWARD_CONFIG.filterSetCouponSeasonLimit}장`,
+  },
 ];
 
-type YanmarLobbyTab = "guide" | "rewards" | "ranking";
+const DEFAULT_REWARDS = [
+  { icon: "⭐", label: "스타", desc: "미션 완료 시 획득" },
+  { icon: "🎟️", label: "쿠폰", desc: "랜덤 할인 보상" },
+  { icon: "🏆", label: "랭킹", desc: "시즌 기록 경쟁" },
+];
 
-function YanmarGuideLobby({
+function BrandGuideLobby({
   game,
   highlightNickname,
+  playable,
   onStartPractice,
   onStartGame,
 }: {
   game: GameConfig;
   highlightNickname: string;
+  playable: boolean;
   onStartPractice: () => void;
   onStartGame: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<YanmarLobbyTab>("guide");
+  const [activeTab, setActiveTab] = useState<LobbyTab>("guide");
+  const profile = BRAND_PROFILES[game.id];
+  const isYanmar = game.id === "yanmar";
+  const title = isYanmar ? YANMAR_LOBBY_TITLE : game.mission;
+  const steps = isYanmar
+    ? YANMAR_STEPS
+    : [
+        { icon: "🎯", title: "미션", desc: game.mission },
+        { icon: "🕹️", title: "조작", desc: profile.category },
+        { icon: "✨", title: "포인트", desc: profile.highlight },
+        { icon: "📖", title: "소개", desc: profile.description },
+      ];
+  const rewards = isYanmar ? YANMAR_REWARDS : DEFAULT_REWARDS;
 
-  const tabs: { id: YanmarLobbyTab; label: string }[] = [
+  const tabs: { id: LobbyTab; label: string }[] = [
     { id: "guide", label: "게임방법" },
     { id: "rewards", label: "보상" },
     { id: "ranking", label: "랭킹" },
@@ -103,7 +112,7 @@ function YanmarGuideLobby({
         <div className="game-lobby-hero-inner">
           <div className="game-lobby-hero-copy">
             <p className="game-lobby-brand">{game.brandEn}</p>
-            <h2 className="game-lobby-title">{YANMAR_LOBBY_TITLE}</h2>
+            <h2 className="game-lobby-title">{title}</h2>
           </div>
           <div className="game-lobby-hero-art" aria-hidden>
             <GameCardSprite gameId={game.id} />
@@ -131,7 +140,7 @@ function YanmarGuideLobby({
           {activeTab === "guide" ? (
             <section className="game-lobby-section game-lobby-section-fill">
               <div className="game-lobby-guide-grid">
-                {YANMAR_STEPS.map((step) => (
+                {steps.map((step) => (
                   <div key={step.title} className="game-lobby-guide-card">
                     <p className="game-lobby-guide-card-title">
                       {step.icon} {step.title}
@@ -146,7 +155,7 @@ function YanmarGuideLobby({
           {activeTab === "rewards" ? (
             <section className="game-lobby-section game-lobby-section-fill">
               <div className="game-lobby-reward-grid">
-                {YANMAR_REWARDS.map((reward) => (
+                {rewards.map((reward) => (
                   <div key={reward.label} className="game-lobby-reward-card">
                     <p className="game-lobby-reward-label">
                       {reward.icon} {reward.label}
@@ -161,7 +170,7 @@ function YanmarGuideLobby({
           {activeTab === "ranking" ? (
             <section className="game-lobby-section game-lobby-section-fill">
               <RankingBoardPanel
-                gameId="yanmar"
+                gameId={game.id}
                 highlightNickname={highlightNickname}
                 active={activeTab === "ranking"}
                 embedded
@@ -172,23 +181,36 @@ function YanmarGuideLobby({
       </div>
 
       <div className="game-lobby-footer">
+        {!playable ? (
+          <p className="game-lobby-mode-locked-note">
+            이 장비의 연습·게임 모드는 준비 중입니다
+          </p>
+        ) : null}
         <div className="game-lobby-mode-grid">
           <button
             type="button"
             onClick={onStartPractice}
-            className="game-lobby-mode game-lobby-mode-card game-lobby-mode-practice"
+            disabled={!playable}
+            className={`game-lobby-mode game-lobby-mode-card game-lobby-mode-practice${
+              playable ? "" : " is-locked"
+            }`}
           >
             <span className="game-lobby-mode-icon game-lobby-mode-icon-practice">🎓</span>
             <span className="game-lobby-mode-card-copy">
               <span className="game-lobby-mode-copy-title">연습모드</span>
-              <span className="game-lobby-mode-copy-desc">점수/보상/랭킹 없음</span>
+              <span className="game-lobby-mode-copy-desc">
+                {playable ? "점수/보상/랭킹 없음" : "준비 중"}
+              </span>
             </span>
           </button>
 
           <button
             type="button"
             onClick={onStartGame}
-            className="game-lobby-mode game-lobby-mode-card game-lobby-mode-game"
+            disabled={!playable}
+            className={`game-lobby-mode game-lobby-mode-card game-lobby-mode-game${
+              playable ? "" : " is-locked"
+            }`}
           >
             <span
               className="game-lobby-mode-icon"
@@ -200,84 +222,10 @@ function YanmarGuideLobby({
             </span>
             <span className="game-lobby-mode-card-copy">
               <span className="game-lobby-mode-copy-title">게임모드</span>
-              <span className="game-lobby-mode-copy-desc">점수 · 보상 도전</span>
+              <span className="game-lobby-mode-copy-desc">
+                {playable ? "점수 · 보상 도전" : "준비 중"}
+              </span>
             </span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DefaultGameLobby({
-  game,
-  myStats,
-  onStart,
-  onShowRanking,
-}: {
-  game: GameConfig;
-  myStats: MyStats;
-  onStart: () => void;
-  onShowRanking: () => void;
-}) {
-  return (
-    <div className="game-guide-card overflow-hidden rounded-2xl border border-slate-200/80">
-      <div
-        className="px-5 py-4 text-white"
-        style={{ backgroundColor: game.headerColor }}
-      >
-        <p className="text-xs opacity-90">{game.brandKo}</p>
-        <h2 className="text-xl font-bold tracking-wide">{game.brandEn}</h2>
-        <p className="mt-1 text-sm opacity-90">🎯 {game.mission}</p>
-      </div>
-
-      <div className="space-y-4 p-5">
-        <div>
-          <h3 className="text-sm font-bold text-gray-800">게임 설명</h3>
-          <p className="mt-1 text-sm leading-relaxed text-gray-600">{game.description}</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-gray-50 p-3 text-center">
-            <p className="text-xs text-gray-500">제한 시간</p>
-            <p className="text-sm font-bold text-gray-800">⏱ {formatDuration(game.duration)}</p>
-          </div>
-          <div className="rounded-xl bg-gray-50 p-3 text-center">
-            <p className="text-xs text-gray-500">조작 방식</p>
-            <p className="text-sm font-bold text-gray-800">{controlLabel(game.controlType)}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-blue-50 p-3 text-center">
-            <p className="text-xs text-blue-600">내 순위</p>
-            <p className="text-lg font-bold text-blue-800">
-              {myStats.rank ? `#${myStats.rank}` : "-"}
-            </p>
-          </div>
-          <div className="rounded-xl bg-amber-50 p-3 text-center">
-            <p className="text-xs text-amber-600">최고 점수</p>
-            <p className="text-lg font-bold text-amber-800">
-              {myStats.bestScore > 0 ? `${myStats.bestScore}점` : "-"}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex gap-2 pt-1">
-          <button
-            type="button"
-            onClick={onShowRanking}
-            className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            📊 랭킹보드
-          </button>
-          <button
-            type="button"
-            onClick={onStart}
-            className="flex-[2] rounded-xl py-3 text-sm font-bold text-white shadow-md hover:opacity-90"
-            style={{ backgroundColor: game.color }}
-          >
-            ▶ 시작하기
           </button>
         </div>
       </div>
@@ -296,6 +244,7 @@ export function GamePlayClient({
   const game = getGameById(gameId);
   const router = useRouter();
   const { data: session } = useSession();
+  const playable = isGameAvailable(gameId);
   const [phase, setPhase] = useState<GamePhase>("lobby");
   const [playMode, setPlayMode] = useState<PlayMode | null>(null);
   const [result, setResult] = useState<GameResult | null>(null);
@@ -321,15 +270,16 @@ export function GamePlayClient({
   }, [loadStats]);
 
   useEffect(() => {
-    if (gameId === "yanmar" && initialPlay === "ride") {
+    if (gameId === "yanmar" && initialPlay === "ride" && playable) {
       setResult(null);
       setPlayMode("ride");
       setYanmarExitSignal(0);
       setPhase("playing");
     }
-  }, [gameId, initialPlay]);
+  }, [gameId, initialPlay, playable]);
 
   const handleStartPractice = () => {
+    if (!playable) return;
     void enterPlayingAfterGesture(() => {
       setResult(null);
       setPlayMode("practice");
@@ -339,18 +289,10 @@ export function GamePlayClient({
   };
 
   const handleStartGame = () => {
+    if (!playable) return;
     void enterPlayingAfterGesture(() => {
       setResult(null);
       setPlayMode("game");
-      setYanmarExitSignal(0);
-      setPhase("playing");
-    });
-  };
-
-  const handleStart = () => {
-    void enterPlayingAfterGesture(() => {
-      setResult(null);
-      setPlayMode(null);
       setYanmarExitSignal(0);
       setPhase("playing");
     });
@@ -411,40 +353,24 @@ export function GamePlayClient({
 
   return (
     <>
-      {phase === "lobby" && gameId === "yanmar" ? (
+      {phase === "lobby" ? (
         <div className="game-lobby-page flex min-h-0 flex-1 flex-col overflow-hidden">
           {!standalone ? (
             <Link href="/home" className="game-page-back shrink-0">
               <span aria-hidden>←</span> 홈으로
             </Link>
           ) : null}
-          <YanmarGuideLobby
+          <BrandGuideLobby
             game={game}
             highlightNickname={nickname}
+            playable={playable}
             onStartPractice={handleStartPractice}
             onStartGame={handleStartGame}
           />
         </div>
-      ) : (
-        <>
-          {!standalone ? (
-            <Link href="/home" className="game-page-back">
-              <span aria-hidden>←</span> 홈으로
-            </Link>
-          ) : null}
+      ) : null}
 
-          {phase === "lobby" ? (
-            <DefaultGameLobby
-              game={game}
-              myStats={myStats}
-              onStart={handleStart}
-              onShowRanking={() => setShowRanking(true)}
-            />
-          ) : null}
-        </>
-      )}
-
-      {phase === "playing" && (
+      {phase === "playing" && playable ? (
         <GameImmersiveOverlay
           active
           headerColor={game.headerColor}
@@ -454,6 +380,7 @@ export function GamePlayClient({
           bestScore={myStats.bestScore}
           hideHeaderStats={gameId === "yanmar"}
           hideRankingButton={gameId === "yanmar"}
+          hideFullscreenButton={gameId === "yanmar"}
           showPracticeTicker={playMode === "practice"}
         >
           <PhaserGameWrapper
@@ -464,20 +391,18 @@ export function GamePlayClient({
             immersive
             initialPlayMode={playMode ?? undefined}
             onShowRanking={() => setShowRanking(true)}
-            myRank={myStats.rank}
-            bestScore={myStats.bestScore}
           />
         </GameImmersiveOverlay>
-      )}
+      ) : null}
 
-      {gameId === "yanmar" && phase === "playing" && result && (
+      {gameId === "yanmar" && phase === "playing" && result ? (
         <GameResultScreen
           gameId={gameId}
           result={result}
           onStay={handleStay}
           onExit={handleExitHome}
         />
-      )}
+      ) : null}
 
       <RankingBoard
         gameId={gameId}

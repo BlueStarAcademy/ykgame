@@ -18,7 +18,8 @@ export const COCKPIT_LAYOUT = {
   hydraulicSpeed: { cx: 0.665, cy: 0.77, radius: 0.038, travel: 0.032 },
   rightPedal: { cx: 0.735, cy: 0.68, width: 0.052, height: 0.62 },
   boomSwing: { cx: 0.34, cy: 0.45, radius: 0.04, travel: 0.045 },
-  blade: { cx: 0.63, cy: 0.45, radius: 0.04, travel: 0.045 },
+  /** 우측 조이스틱과 우측 주행 레버 사이 */
+  blade: { cx: 0.72, cy: 0.76, radius: 0.038, travel: 0.055 },
   throttle: { cx: 0.39, cy: 0.45, radius: 0.038, travel: 0.04 },
   horn: { cx: 0.905, cy: 0.2, radius: 0.014 },
 } as const;
@@ -91,9 +92,18 @@ export function filterInput(
   };
 }
 
+/** 카메라3(1인칭) 기준: 암을 약간 오른쪽에서 중앙 쪽으로 기울인 기본 자세 */
+export const DEFAULT_BOOM_SWING = 0.28;
+
+/** 블레이드: 0=상승(기본), 1=하강(접지) */
+export const BLADE_RAISED = 0;
+export const BLADE_LOWERED = 1;
+/** 레버를 끝까지 밀었을 때 0↔1 왕복에 약 2.5초 */
+export const BLADE_SPEED_PER_SECOND = 0.4;
+
 export function createAuxiliaryControls(): AuxiliaryControlState {
   return {
-    boomSwing: 0,
+    boomSwing: DEFAULT_BOOM_SWING,
     blade: 0,
     throttle: 0,
     highSpeed: false,
@@ -309,7 +319,13 @@ export const AUTO_ARM_POSE_ARRIVE_EPS = 0.012;
 export const AUTO_POSE_JOINT_ORDER = ["arm", "boom", "bucket"] as const;
 
 export function createAutoPoseState(): AutoPoseState {
-  return { saved: null, executing: false, phase: null };
+  return {
+    slots: [null, null],
+    activeSlot: 0,
+    saved: null,
+    executing: false,
+    phase: null,
+  };
 }
 
 function autoStickToward(current: number, goal: number) {
@@ -486,8 +502,14 @@ export function hasManualControlInput(
   return false;
 }
 
-export function startAutoArmPose(autoPose: AutoPoseState) {
-  if (!autoPose.saved) return false;
+export function startAutoArmPose(
+  autoPose: AutoPoseState,
+  slot: 0 | 1 = autoPose.activeSlot,
+) {
+  const pose = autoPose.slots[slot];
+  if (!pose) return false;
+  autoPose.activeSlot = slot;
+  autoPose.saved = { ...pose };
   autoPose.executing = true;
   autoPose.phase = 0;
   return true;

@@ -30,7 +30,11 @@ export async function POST(request: Request) {
     }
 
     const safeCurrency = Math.max(0, Math.floor(currencyAmount ?? 0));
-    const hasCoupon = Boolean(couponType && couponDiscountPct && couponDiscountPct > 0);
+    const isExchangeCoupon = couponType === "FILTER_SET_EXCHANGE";
+    const hasCoupon = Boolean(
+      couponType &&
+        (isExchangeCoupon || (couponDiscountPct != null && couponDiscountPct > 0)),
+    );
 
     if (safeCurrency === 0 && !hasCoupon && !mailBody?.trim()) {
       return NextResponse.json({ error: "No mail content" }, { status: 400 });
@@ -55,7 +59,11 @@ export async function POST(request: Request) {
         body: mailBody?.trim() || null,
         currencyAmount: safeCurrency,
         couponType: hasCoupon ? couponType : null,
-        couponDiscountPct: hasCoupon ? Math.min(100, Math.floor(couponDiscountPct!)) : null,
+        couponDiscountPct: hasCoupon
+          ? isExchangeCoupon
+            ? 0
+            : Math.min(100, Math.floor(couponDiscountPct!))
+          : null,
       })),
     });
 

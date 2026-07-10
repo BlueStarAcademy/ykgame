@@ -26,19 +26,32 @@ function pctPoint(value: number, digits = 1) {
 }
 
 export function getGameProbabilityReport() {
+  const filterChance = YANMAR_REWARD_CONFIG.filterSetCouponChance;
   const partsChance = YANMAR_REWARD_CONFIG.partsCouponChance;
   const rentalChance = YANMAR_REWARD_CONFIG.rentalCouponChance;
-  const starChance = 1 - partsChance - rentalChance;
+  const starChance = 1 - filterChance - partsChance - rentalChance;
   const capacityConfig = YANMAR_EQUIPMENT_CONFIG.TRUCK_CAPACITY;
   const speedConfig = YANMAR_EQUIPMENT_CONFIG.TRUCK_SPEED;
   const maxTruckCapacity = getYanmarTruckCapacityUnits(capacityConfig.maxLevel);
   const minTruckCooldown = getYanmarTruckCooldownSec(speedConfig.maxLevel);
-  const truckCapacityTable = Array.from({ length: capacityConfig.maxLevel + 1 }, (_, level) => {
-    return `+${level}: 하역량 ${getYanmarTruckCapacityUnits(level)}`;
-  }).join(" · ");
-  const truckSpeedTable = Array.from({ length: speedConfig.maxLevel + 1 }, (_, level) => {
-    return `+${level}: 재도착 ${getYanmarTruckCooldownSec(level).toFixed(0)}초`;
-  }).join(" · ");
+  const truckCapacityRows = Array.from(
+    { length: capacityConfig.maxLevel + 1 },
+    (_, level) => ({
+      level: `+${level}`,
+      value: `${getYanmarTruckCapacityUnits(level).toLocaleString()}`,
+    }),
+  );
+  const truckSpeedRows = Array.from(
+    { length: speedConfig.maxLevel + 1 },
+    (_, level) => ({
+      level: `+${level}`,
+      value: `${getYanmarTruckCooldownSec(level).toFixed(0)}초`,
+    }),
+  );
+  const truckCostRows = YANMAR_TRUCK_UPGRADE_COSTS.map((cost, index) => ({
+    level: `+${index} → +${index + 1}`,
+    value: `${cost.toLocaleString()} 스타`,
+  }));
 
   return {
     yanmar: {
@@ -56,6 +69,11 @@ export function getGameProbabilityReport() {
         {
           title: "하역 보상 확률 (1회 롤)",
           items: [
+            {
+              label: "필터세트 교환쿠폰",
+              value: pct(filterChance, 4),
+              detail: `교환권 · 시즌 한도 ${YANMAR_REWARD_CONFIG.filterSetCouponSeasonLimit}장`,
+            },
             {
               label: "YK건기 부품 할인 쿠폰",
               value: pct(partsChance),
@@ -88,13 +106,13 @@ export function getGameProbabilityReport() {
           items: [
             {
               label: "동작 흐름",
-              value: "적재 → 만차 출발 → 쿨타임 → 신규 트럭 도착",
+              value: "적재 → 만차 → 출발 → 대기 → 도착",
               detail: `만차 시 하역 불가 · 시동 ${DUMP_TRUCK_ENGINE_START_DURATION_SEC}초 · 출발 ${DUMP_TRUCK_DEPART_DURATION_SEC}초 · 복귀 ${DUMP_TRUCK_ARRIVE_DURATION_SEC}초`,
             },
             {
               label: "기본 최대 하역량",
-              value: `${YANMAR_REWARD_CONFIG.baseTruckCapacityUnits} 적재량`,
-              detail: `강화 최대 +${capacityConfig.capacityPerLevel * capacityConfig.maxLevel} → ${maxTruckCapacity} 적재량`,
+              value: `${YANMAR_REWARD_CONFIG.baseTruckCapacityUnits.toLocaleString()}`,
+              detail: `강화 최대 +${capacityConfig.capacityPerLevel * capacityConfig.maxLevel} → ${maxTruckCapacity.toLocaleString()}`,
             },
             {
               label: "기본 재도착 대기",
@@ -102,19 +120,28 @@ export function getGameProbabilityReport() {
               detail: `속도 강화 최소 ${minTruckCooldown.toFixed(0)}초 (레벨당 5% 단축)`,
             },
             {
-              label: "하역량 강화 레벨표",
+              label: "하역량 강화",
               value: `+0 ~ +${capacityConfig.maxLevel}`,
-              detail: truckCapacityTable,
+              table: {
+                columns: ["레벨", "하역량"],
+                rows: truckCapacityRows,
+              },
             },
             {
-              label: "속도 강화 레벨표",
+              label: "속도 강화",
               value: `+0 ~ +${speedConfig.maxLevel}`,
-              detail: truckSpeedTable,
+              table: {
+                columns: ["레벨", "재도착"],
+                rows: truckSpeedRows,
+              },
             },
             {
-              label: "덤프트럭 강화 비용",
+              label: "강화 비용",
               value: "고정 비용표",
-              detail: `${YANMAR_TRUCK_UPGRADE_COSTS.join(" / ")} 스타`,
+              table: {
+                columns: ["단계", "비용"],
+                rows: truckCostRows,
+              },
             },
           ],
         },

@@ -7,7 +7,15 @@ import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { RoundedBox, Text, Billboard } from "@react-three/drei";
 import * as THREE from "three";
 import type { AuxiliaryControlState, ExcavatorControlState, ControlMask, HydraulicVelocity } from "./controls";
+import { DEFAULT_BOOM_SWING } from "./controls";
 import { ExcavatorBucket } from "./ExcavatorBucket";
+import {
+  PremiumDozerBlade,
+  PremiumExcavatorBody,
+  PremiumExcavatorLink,
+} from "./ExcavatorModel";
+import { PremiumDumpTruckModel } from "./DumpTruckModel";
+import { YANMAR_MACHINE_RIG } from "./machineVisualTheme";
 import {
   createTerrain,
   digZoneLabel,
@@ -51,6 +59,7 @@ import {
   createSimLoopRuntime,
   tickExcavatorSim,
   type DumpSoilVisual,
+  type BladeSprayVisual,
 } from "./simLoop";
 
 export type { CameraMode, DumpScorePopup, ExcavatorSimState };
@@ -238,6 +247,120 @@ function TerrainRockScatter({ terrainRef }: { terrainRef: React.MutableRefObject
   );
 }
 
+type DumpSoilVisualState = DumpSoilVisual;
+type BladeSprayVisualState = BladeSprayVisual;
+
+function BladeSoilSpray({
+  visualRef,
+}: {
+  visualRef: React.MutableRefObject<BladeSprayVisualState>;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const particleStates = useRef(
+    Array.from({ length: 28 }, () => ({
+      active: false,
+      x: 0,
+      y: 0,
+      z: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      life: 0,
+      maxLife: 1,
+      size: 0.1,
+    })),
+  );
+
+  useFrame((_, dt) => {
+    const group = groupRef.current;
+    if (!group) return;
+
+    const visual = visualRef.current;
+    visual.intensity = Math.max(0, visual.intensity - dt * 2.4);
+    const spraying = visual.active && visual.intensity > 0.04;
+    if (!spraying) {
+      visual.active = false;
+    }
+
+    if (spraying) {
+      const forwardX = Math.sin(visual.heading);
+      const forwardZ = Math.cos(visual.heading);
+      const sideX = Math.cos(visual.heading);
+      const sideZ = -Math.sin(visual.heading);
+      const spawnBudget = Math.ceil(visual.intensity * 7);
+      for (let i = 0; i < spawnBudget; i += 1) {
+        const slot = particleStates.current.find((particle) => !particle.active);
+        if (!slot) break;
+        const side = (Math.random() - 0.5) * 1.7;
+        const forward = 0.15 + Math.random() * 0.35;
+        slot.active = true;
+        slot.x = visual.x + forwardX * forward + sideX * side;
+        slot.z = visual.z + forwardZ * forward + sideZ * side;
+        slot.y = visual.y + Math.random() * 0.12;
+        const speed = 1.4 + Math.random() * 2.6 * visual.intensity;
+        slot.vx = forwardX * speed + sideX * (Math.random() - 0.5) * 1.1;
+        slot.vz = forwardZ * speed + sideZ * (Math.random() - 0.5) * 1.1;
+        slot.vy = 1.1 + Math.random() * 2.4;
+        slot.maxLife = 0.35 + Math.random() * 0.45;
+        slot.life = slot.maxLife;
+        slot.size = 0.07 + Math.random() * 0.1;
+      }
+    }
+
+    let anyVisible = false;
+    particleStates.current.forEach((particle, index) => {
+      const mesh = group.children[index] as THREE.Mesh | undefined;
+      if (!mesh) return;
+      if (!particle.active) {
+        mesh.visible = false;
+        return;
+      }
+      particle.life -= dt;
+      if (particle.life <= 0) {
+        particle.active = false;
+        mesh.visible = false;
+        return;
+      }
+      particle.vy -= 14 * dt;
+      particle.x += particle.vx * dt;
+      particle.y += particle.vy * dt;
+      particle.z += particle.vz * dt;
+      if (particle.y < visual.y - 0.05) {
+        particle.active = false;
+        mesh.visible = false;
+        return;
+      }
+      mesh.visible = true;
+      anyVisible = true;
+      const lifeT = particle.life / particle.maxLife;
+      mesh.position.set(particle.x, particle.y, particle.z);
+      mesh.scale.setScalar(particle.size * (0.65 + lifeT * 0.7));
+      mesh.rotation.x += dt * 5.5;
+      mesh.rotation.z += dt * 4.2;
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      mat.opacity = 0.25 + lifeT * 0.55;
+    });
+    group.visible = anyVisible;
+  });
+
+  return (
+    <group ref={groupRef} visible={false}>
+      {Array.from({ length: 28 }, (_, index) => (
+        <mesh key={index} visible={false}>
+          <sphereGeometry args={[1, 5, 5]} />
+          <meshStandardMaterial
+            color={index % 2 ? "#8a5a32" : "#b07a48"}
+            roughness={0.95}
+            metalness={0.02}
+            transparent
+            opacity={0.7}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function DigDustCloud({
   dustRef,
   digFeedbackRef,
@@ -286,8 +409,6 @@ function DigDustCloud({
     </group>
   );
 }
-
-type DumpSoilVisualState = DumpSoilVisual;
 
 function DumpSoilParticles({
   visualRef,
@@ -414,7 +535,6 @@ function LinkPin({
 const YANMAR_LOGO_ASPECT = 512 / 62;
 const YK_LABEL_ASPECT = 512 / 160;
 const YANMAR_LOGO_WIDTH = 1.24;
-const YK_LOGO_WIDTH = 0.96;
 const REAR_BODY_PANEL_X = -1.715;
 const REAR_BODY_PANEL_Z = -0.36;
 const YANMAR_REAR_BODY_Z = -0.24;
@@ -425,7 +545,7 @@ const YANMAR_REAR_LOGO_ASPECT = 640 / 160;
 const YANMAR_REAR_BODY_WIDTH = 1.0;
 const MINI_EXCAVATOR_BODY_LENGTH_SCALE = 0.58;
 const MINI_EXCAVATOR_BODY_WIDTH_SCALE = 0.82;
-const EXCAVATOR_FIXED_VISUAL_Y = 0.68;
+const EXCAVATOR_FIXED_VISUAL_Y = YANMAR_MACHINE_RIG.excavatorVisualY;
 
 function configureDecalTexture(texture: THREE.Texture, anisotropy = 16) {
   texture.generateMipmaps = false;
@@ -757,7 +877,7 @@ function MachineCockpit({
     const aux = auxiliaryRef.current;
     if (safetyRef.current) safetyRef.current.rotation.z = aux?.safetyLocked ? -0.32 : 0.18;
     if (hydraulicRef.current) hydraulicRef.current.rotation.z = aux?.highSpeed ? -0.22 : 0.16;
-    if (pedalRef.current) pedalRef.current.rotation.x = (aux?.boomSwing ?? 0) * 0.16;
+    if (pedalRef.current) pedalRef.current.rotation.x = (aux?.boomSwing ?? DEFAULT_BOOM_SWING) * 0.16;
   });
 
   return (
@@ -1450,9 +1570,9 @@ function ExcavatorArm({
     return () => texture.dispose();
   }, []);
 
-  const boomLen = 3;
-  const armLen = 2.5;
-  const bucketLen = 1.2;
+  const boomLen = YANMAR_MACHINE_RIG.boomLength;
+  const armLen = YANMAR_MACHINE_RIG.armLength;
+  const bucketLen = YANMAR_MACHINE_RIG.bucketLength;
   const armRootY = showBody ? 1.0 : 0.92;
 
   useFrame(() => {
@@ -1463,12 +1583,19 @@ function ExcavatorArm({
     g.position.set(s.posX, terrainY, s.posZ);
     g.rotation.y = s.heading + s.swing;
     const aux = auxiliaryRef.current;
-    if (boomSwingRef.current) boomSwingRef.current.rotation.y = (aux?.boomSwing ?? 0) * 0.38;
+    if (boomSwingRef.current) {
+      boomSwingRef.current.rotation.y = (aux?.boomSwing ?? DEFAULT_BOOM_SWING) * 0.38;
+    }
     // Match the visual pivots to bucket.ts: segment direction is (sin(theta), cos(theta)).
     if (boomRef.current) boomRef.current.rotation.z = Math.PI / 2 - s.boom;
-    if (armRef.current) armRef.current.rotation.z = s.arm * 1.18;
-    if (bucketRef.current) bucketRef.current.rotation.z = s.bucket * 1.02;
-    if (bladeRef.current) bladeRef.current.position.y = 0.25 + (aux?.blade ?? 0) * 0.36;
+    if (armRef.current) armRef.current.rotation.z = s.arm * YANMAR_MACHINE_RIG.armRotationScale;
+    if (bucketRef.current) bucketRef.current.rotation.z = s.bucket * YANMAR_MACHINE_RIG.bucketRotationScale;
+    if (bladeRef.current) {
+      // 시각은 레버 명령값을 그대로 반영. 지면 클램프는 흙 튀김 판정에만 사용.
+      const blade = Math.max(0, Math.min(1, aux?.blade ?? 0));
+      bladeRef.current.position.y =
+        YANMAR_MACHINE_RIG.dozerBladeGroupBaseY - blade * YANMAR_MACHINE_RIG.dozerBladeDrop;
+    }
     if (dirtRef.current) {
       const load = s.bucketLoad;
       dirtRef.current.visible = load > 0.03;
@@ -1488,8 +1615,9 @@ function ExcavatorArm({
     if (tipRef.current) {
       const boomEndX = Math.sin(s.boom) * boomLen;
       const boomEndY = Math.cos(s.boom) * boomLen;
-      const visualArmAngle = s.boom - s.arm * 1.18;
-      const visualBucketAngle = visualArmAngle - s.bucket * 1.02;
+      const visualArmAngle = s.boom - s.arm * YANMAR_MACHINE_RIG.armRotationScale;
+      const visualBucketAngle =
+        visualArmAngle - s.bucket * YANMAR_MACHINE_RIG.bucketRotationScale;
       const armEndX = boomEndX + Math.sin(visualArmAngle) * armLen;
       const armEndY = boomEndY + Math.cos(visualArmAngle) * armLen;
       const tipX = armEndX - Math.sin(visualBucketAngle) * bucketLen;
@@ -1503,9 +1631,19 @@ function ExcavatorArm({
       {/* 모델 전방(+X)을 주행·시선 방향(+Z)과 일치 */}
       <group rotation={[0, -Math.PI / 2, 0]}>
         <group visible={showBody}>
-          <ExcavatorBodyAssembly velRef={velRef} />
+          <PremiumExcavatorBody
+            velRef={velRef}
+            yanmarLogo={yanmarLogo}
+            ykLogo={ykBoomLogo ?? undefined}
+          />
         </group>
-        <group ref={bladeRef} visible={showBody} position={[-0.75, 0.25, 0]} />
+        <group
+          ref={bladeRef}
+          visible={showBody}
+          position={[-0.75, YANMAR_MACHINE_RIG.dozerBladeGroupBaseY, 0]}
+        >
+          <PremiumDozerBlade />
+        </group>
 
         <group ref={boomSwingRef} position={[0.8, armRootY, 0]}>
         <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
@@ -1513,16 +1651,14 @@ function ExcavatorArm({
           <meshStandardMaterial color="#2b3139" roughness={0.38} metalness={0.32} />
         </mesh>
         <group ref={boomRef}>
-          <RedLinkPanel
+          <PremiumExcavatorLink
             length={boomLen}
             height={0.42}
             sideDepth={0.155}
             logo={ykBoomLogo ?? undefined}
-            logoWidth={YK_LOGO_WIDTH}
-            logoHeight={logoHeightForWidth(YK_LOGO_WIDTH, YK_LABEL_ASPECT)}
+            logoWidth={0.96}
+            logoHeight={logoHeightForWidth(0.96, YK_LABEL_ASPECT)}
             logoX={boomLen * 0.48}
-            coreStartRatio={0.24}
-            rootReliefScale={1.55}
           />
           <LinkPin x={0} y={0} radius={0.21} width={0.58} />
           <LinkPin x={boomLen} y={0} radius={0.19} width={0.54} />
@@ -1534,7 +1670,7 @@ function ExcavatorArm({
           </mesh>
 
           <group ref={armRef} position={[boomLen, 0, 0]}>
-            <RedLinkPanel
+            <PremiumExcavatorLink
               length={armLen}
               height={0.36}
               sideDepth={0.135}
@@ -1661,6 +1797,7 @@ function SimLoop({
   const runtimeRef = useRef(createSimLoopRuntime());
   const dustRef = useRef<THREE.Group>(null);
   const dumpSoilVisualRef = useRef<DumpSoilVisualState>(runtimeRef.current.dumpSoilVisual);
+  const bladeSprayVisualRef = useRef<BladeSprayVisualState>(runtimeRef.current.bladeSpray);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
@@ -1696,12 +1833,14 @@ function SimLoop({
       }
     }
     dumpSoilVisualRef.current = runtimeRef.current.dumpSoilVisual;
+    bladeSprayVisualRef.current = runtimeRef.current.bladeSpray;
   });
 
   return (
     <>
       <DigDustCloud dustRef={dustRef} digFeedbackRef={digFeedbackRef} />
       <DumpSoilParticles visualRef={dumpSoilVisualRef} />
+      <BladeSoilSpray visualRef={bladeSprayVisualRef} />
     </>
   );
 }
@@ -2149,9 +2288,13 @@ function DumpTruck({
     }
   });
 
+  const legacyModelEnabled = false as boolean;
+
   return (
     <group ref={groupRef}>
-      <group ref={bodyRef} position={[0.3, 0.78, 0]}>
+      {legacyModelEnabled ? (
+        <>
+      <group ref={bodyRef} position={[0.3, 0.78, 0]} visible={false}>
         <RoundedBox args={[5.45, 0.32, 2.72]} radius={0.08} smoothness={6} position={[-0.65, 0.05, 0]}>
           <meshStandardMaterial color="#171c22" roughness={0.38} metalness={0.48} />
         </RoundedBox>
@@ -2284,6 +2427,7 @@ function DumpTruck({
         <group
           key={`${x}:${z}`}
           position={[x, 0.4, z]}
+          visible={false}
         >
           <group
             ref={(node) => {
@@ -2318,6 +2462,7 @@ function DumpTruck({
       ))}
 
       <Text
+        visible={false}
         position={[0.05, 2.65, -1.88]}
         rotation={[0, 0, 0]}
         fontSize={0.72}
@@ -2329,6 +2474,14 @@ function DumpTruck({
       >
         DUMP HERE
       </Text>
+        </>
+      ) : null}
+      <PremiumDumpTruckModel
+        bodyRef={bodyRef}
+        fillMeshRef={fillMeshRef}
+        exhaustRef={exhaustRef}
+        wheelRefs={wheelRefs}
+      />
     </group>
   );
 }
@@ -2435,15 +2588,24 @@ function SceneContent(props: ExcavatorSceneProps) {
     <>
       <color attach="background" args={["#9fd2f2"]} />
       <fog attach="fog" args={["#b8dcf1", 110, 320]} />
-      <hemisphereLight args={["#e8f7ff", "#c58b54", 0.78]} />
-      <ambientLight intensity={0.48} />
+      <hemisphereLight args={["#eef9ff", "#b97b48", 0.72]} />
+      <ambientLight intensity={0.36} />
       <directionalLight
         position={[22, 34, -28]}
-        intensity={2.45}
-        color="#fff2c1"
-        castShadow={false}
+        intensity={2.7}
+        color="#fff4d2"
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-left={-72}
+        shadow-camera-right={72}
+        shadow-camera-top={72}
+        shadow-camera-bottom={-72}
+        shadow-camera-near={1}
+        shadow-camera-far={140}
+        shadow-bias={-0.00035}
       />
-      <directionalLight position={[-18, 22, 36]} intensity={0.42} color="#b8d4f0" />
+      <directionalLight position={[-18, 22, 36]} intensity={0.5} color="#bddcff" />
       <pointLight position={[34, 31, -56]} intensity={0.62} color="#ffe28a" distance={95} />
       <SunnySky />
       <TerrainMesh terrainRef={props.terrainRef} />
@@ -2476,15 +2638,20 @@ function SceneContent(props: ExcavatorSceneProps) {
 export function ExcavatorScene(props: ExcavatorSceneProps) {
   return (
     <Canvas
+      shadows="basic"
       gl={{
         antialias: true,
         powerPreference: "high-performance",
         alpha: false,
         stencil: false,
       }}
-      dpr={[1, 2]}
+      dpr={[1, 1.5]}
       camera={{ fov: 58, near: 0.1, far: 180 }}
       style={{ width: "100%", height: "100%" }}
+      onCreated={({ gl }) => {
+        gl.toneMapping = THREE.ACESFilmicToneMapping;
+        gl.toneMappingExposure = 1.05;
+      }}
     >
       <SceneContent {...props} />
     </Canvas>

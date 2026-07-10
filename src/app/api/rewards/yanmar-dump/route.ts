@@ -61,12 +61,31 @@ function createStarEvent(score: number, critical: boolean): DumpStarEvent {
 function rollRewardEvent(
   score: number,
   critical: boolean,
-  remaining: { parts: number; rental: number },
+  remaining: { parts: number; rental: number; filterSet: number },
   seasonKey: string,
 ): DumpRewardEvent {
   const roll = Math.random();
+  const filterChance = YANMAR_REWARD_CONFIG.filterSetCouponChance;
+  const partsChance = YANMAR_REWARD_CONFIG.partsCouponChance;
+  const rentalChance = YANMAR_REWARD_CONFIG.rentalCouponChance;
 
-  if (roll < YANMAR_REWARD_CONFIG.partsCouponChance) {
+  // 희귀 쿠폰을 먼저 판정 (0.0001%)
+  if (roll < filterChance) {
+    if (remaining.filterSet <= 0) return createStarEvent(score, critical);
+    remaining.filterSet -= 1;
+    return {
+      kind: "coupon",
+      score,
+      critical,
+      couponType: "FILTER_SET_EXCHANGE",
+      discountPct: 0,
+      barcodeCode: createBarcodeCode(),
+      expiresAt: getCouponExpiresAt(),
+      seasonKey,
+    };
+  }
+
+  if (roll < filterChance + partsChance) {
     if (remaining.parts <= 0) return createStarEvent(score, critical);
     remaining.parts -= 1;
     return {
@@ -81,11 +100,7 @@ function rollRewardEvent(
     };
   }
 
-  if (
-    roll <
-    YANMAR_REWARD_CONFIG.partsCouponChance +
-      YANMAR_REWARD_CONFIG.rentalCouponChance
-  ) {
+  if (roll < filterChance + partsChance + rentalChance) {
     if (remaining.rental <= 0) return createStarEvent(score, critical);
     remaining.rental -= 1;
     return {
@@ -123,7 +138,7 @@ export async function POST(request: Request) {
   const stats = calculateYanmarEquipmentStats(levels);
   const seasonKey = getSeasonKey();
 
-  const [partsIssued, rentalIssued] = await Promise.all([
+  const [partsIssued, rentalIssued, filterSetIssued] = await Promise.all([
     prisma.userCoupon.count({
       where: {
         type: "YK_PARTS_DISCOUNT",
@@ -138,6 +153,13 @@ export async function POST(request: Request) {
         fromGameDrop: true,
       },
     }),
+    prisma.userCoupon.count({
+      where: {
+        type: "FILTER_SET_EXCHANGE",
+        seasonKey,
+        fromGameDrop: true,
+      },
+    }),
   ]);
 
   const remaining = {
@@ -145,6 +167,10 @@ export async function POST(request: Request) {
     rental: Math.max(
       0,
       YANMAR_REWARD_CONFIG.rentalCouponSeasonLimit - rentalIssued,
+    ),
+    filterSet: Math.max(
+      0,
+      YANMAR_REWARD_CONFIG.filterSetCouponSeasonLimit - filterSetIssued,
     ),
   };
 

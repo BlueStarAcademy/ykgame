@@ -5,7 +5,7 @@ import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 
 interface InventoryCoupon {
   id: string;
-  type: "YK_PARTS_DISCOUNT" | "EQUIPMENT_RENTAL_DISCOUNT";
+  type: "YK_PARTS_DISCOUNT" | "EQUIPMENT_RENTAL_DISCOUNT" | "FILTER_SET_EXCHANGE";
   discountPct: number;
   barcodeCode: string;
   expiresAt: string;
@@ -13,9 +13,19 @@ interface InventoryCoupon {
 }
 
 function couponTitle(type: InventoryCoupon["type"]) {
-  return type === "YK_PARTS_DISCOUNT"
-    ? "YK건기 부품 할인권"
-    : "중장비 대여 할인권";
+  switch (type) {
+    case "YK_PARTS_DISCOUNT":
+      return "YK건기 부품 할인권";
+    case "EQUIPMENT_RENTAL_DISCOUNT":
+      return "중장비 대여 할인권";
+    case "FILTER_SET_EXCHANGE":
+      return "필터세트 교환쿠폰";
+  }
+}
+
+function couponBadge(coupon: InventoryCoupon) {
+  if (coupon.type === "FILTER_SET_EXCHANGE") return "교환";
+  return `${coupon.discountPct}%`;
 }
 
 function formatDate(value: string) {
@@ -226,7 +236,7 @@ export function InventoryModal({ open, onClose }: InventoryModalProps) {
                           {couponTitle(coupon.type)}
                         </span>
                         <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
-                          {coupon.discountPct}%
+                          {couponBadge(coupon)}
                         </span>
                       </div>
                       <div className="mt-1.5 flex items-center justify-between gap-2">

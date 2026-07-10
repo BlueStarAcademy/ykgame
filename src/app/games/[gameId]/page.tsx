@@ -20,14 +20,14 @@ export default async function GamePage({
   const { gameId } = await params;
   const { play } = await searchParams;
   if (!isValidGameId(gameId)) notFound();
-  if (!isGameAvailable(gameId)) redirect("/home");
-
+  // 로비(게임방법/보상/랭킹)는 모든 브랜드 진입 가능. 플레이 잠금은 클라이언트에서 처리.
   getGameById(gameId);
 
   const initialPlay = play === "ride" ? "ride" : undefined;
   const isRideEntry = gameId === "yanmar" && initialPlay === "ride";
 
   if (isRideEntry) {
+    if (!isGameAvailable(gameId)) redirect("/ride");
     return <GamePlayClient gameId={gameId} initialPlay="ride" standalone />;
   }
 

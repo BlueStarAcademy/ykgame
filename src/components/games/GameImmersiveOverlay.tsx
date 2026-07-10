@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useGameFullscreen } from "@/hooks/useGameFullscreen";
 import {
@@ -13,6 +13,19 @@ export const GAME_IMMERSIVE_HEADER_LEFT_ID = "game-immersive-header-left";
 export const GAME_IMMERSIVE_HEADER_RIGHT_ID = "game-immersive-header-right";
 
 const PRACTICE_TICKER_MESSAGE = "연습모드에서는 재화나 점수가 누적되지 않습니다.";
+
+interface ImmersiveFullscreenControl {
+  canFullscreen: boolean;
+  apiFullscreen: boolean;
+  isStandalone: boolean;
+  enter: () => Promise<void>;
+}
+
+const ImmersiveFullscreenContext = createContext<ImmersiveFullscreenControl | null>(null);
+
+export function useImmersiveFullscreenControl() {
+  return useContext(ImmersiveFullscreenContext);
+}
 
 function PracticeModeTicker() {
   return (
@@ -36,6 +49,7 @@ interface GameImmersiveOverlayProps {
   bestScore: number;
   hideHeaderStats?: boolean;
   hideRankingButton?: boolean;
+  hideFullscreenButton?: boolean;
   showPracticeTicker?: boolean;
   children: React.ReactNode;
 }
@@ -49,6 +63,7 @@ export function GameImmersiveOverlay({
   bestScore,
   hideHeaderStats = false,
   hideRankingButton = false,
+  hideFullscreenButton = false,
   showPracticeTicker = false,
   children,
 }: GameImmersiveOverlayProps) {
@@ -88,17 +103,20 @@ export function GameImmersiveOverlay({
   if (!active) return <>{children}</>;
 
   return createPortal(
-    <div
-      ref={containerRef}
-      data-game-immersive=""
-      className="fixed inset-0 z-[200] flex flex-col bg-black"
-      style={{
-        paddingTop: "env(safe-area-inset-top)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-        paddingLeft: "env(safe-area-inset-left)",
-        paddingRight: "env(safe-area-inset-right)",
-      }}
+    <ImmersiveFullscreenContext.Provider
+      value={{ canFullscreen, apiFullscreen, isStandalone, enter }}
     >
+      <div
+        ref={containerRef}
+        data-game-immersive=""
+        className="fixed inset-0 z-[200] flex flex-col bg-black"
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingLeft: "env(safe-area-inset-left)",
+          paddingRight: "env(safe-area-inset-right)",
+        }}
+      >
       <div
         className="flex shrink-0 items-center justify-between px-3 py-2 text-white"
         style={{ backgroundColor: headerColor }}
@@ -123,7 +141,7 @@ export function GameImmersiveOverlay({
               {myRank ? `#${myRank}` : "-"} · {bestScore > 0 ? `${bestScore}점` : "0점"}
             </span>
           )}
-          {canFullscreen && !apiFullscreen && !isStandalone && (
+          {!hideFullscreenButton && canFullscreen && !apiFullscreen && !isStandalone && (
             <button
               type="button"
               onClick={() => {
@@ -147,7 +165,8 @@ export function GameImmersiveOverlay({
       </div>
       {showPracticeTicker ? <PracticeModeTicker /> : null}
       <div className="relative min-h-0 flex-1 overflow-hidden">{children}</div>
-    </div>,
+      </div>
+    </ImmersiveFullscreenContext.Provider>,
     document.body,
   );
 }

@@ -20,6 +20,8 @@ enum RewardType {
 enum CouponType {
   YK_PARTS_DISCOUNT
   EQUIPMENT_RENTAL_DISCOUNT
+  /** 필터세트 교환권 — 시즌 드롭 1장 */
+  FILTER_SET_EXCHANGE
 }
 
 enum EquipmentPart {

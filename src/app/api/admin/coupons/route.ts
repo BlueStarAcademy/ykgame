@@ -14,6 +14,7 @@ import type { CouponType } from "@/generated/prisma/client";
 const COUPON_TYPES: CouponType[] = [
   "YK_PARTS_DISCOUNT",
   "EQUIPMENT_RENTAL_DISCOUNT",
+  "FILTER_SET_EXCHANGE",
 ];
 
 export async function GET(request: Request) {

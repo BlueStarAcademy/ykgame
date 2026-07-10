@@ -298,7 +298,11 @@ export function AdminCouponsPanel() {
                         <div className="min-w-0">
                           <p className="text-xs font-black text-slate-800">
                             {coupon.typeLabel}{" "}
-                            <span className="text-red-600">{coupon.discountPct}%</span>
+                            <span className="text-red-600">
+                              {coupon.type === "FILTER_SET_EXCHANGE"
+                                ? "교환"
+                                : `${coupon.discountPct}%`}
+                            </span>
                           </p>
                           <Link
                             href={`/admin/users/${coupon.user.id}`}

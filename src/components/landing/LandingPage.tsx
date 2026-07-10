@@ -79,7 +79,7 @@ export function LandingPage({ rideHref, gameHref }: LandingPageProps) {
               YK건기가 수입·판매하는 8개 브랜드 중장비
             </p>
           </div>
-          <div className="space-y-4">
+          <div className="landing-equipment-grid">
             {GAMES.map((game) => (
               <LandingEquipmentCard key={game.id} game={game} />
             ))}

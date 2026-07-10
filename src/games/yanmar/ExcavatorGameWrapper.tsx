@@ -34,7 +34,7 @@ import {
   createInitialSim,
   createInitialTerrain,
 } from "./ExcavatorScene";
-import type { CameraMode, CouponDiscoveryState, DumpScorePopup, DumpScorePanelState, ExcavatorSimState, AutoPoseState } from "./types";
+import type { CameraMode, CouponDiscoveryState, DumpScorePopup, DumpScorePanelState, ExcavatorSimState, AutoPoseSlotIndex, AutoPoseState } from "./types";
 import { EquipmentUpgradePanel } from "./EquipmentUpgradePanel";
 import {
   createHydraulicVelocity,
@@ -59,8 +59,8 @@ import {
   type YanmarGameSessionSnapshot,
 } from "./gameSessionPersistence";
 import {
-  loadSavedArmPose,
-  saveSavedArmPose,
+  loadSavedArmPoseSlots,
+  saveSavedArmPoseSlot,
 } from "./autoPosePersistence";
 import {
   createDumpTruckState,
@@ -73,6 +73,7 @@ import {
   DEFAULT_YANMAR_EQUIPMENT_LEVELS,
   YANMAR_EQUIPMENT_RESET_REFUND_RATE,
   YANMAR_EQUIPMENT_CONFIG,
+  YANMAR_REWARD_CONFIG,
   calculateYanmarEquipmentStats,
   getLoadUnits,
   getYanmarPartResetRefundStars,
@@ -111,8 +112,6 @@ interface ExcavatorGameWrapperProps {
   immersive?: boolean;
   initialPlayMode?: "practice" | "game" | "ride";
   onShowRanking?: () => void;
-  myRank?: number | null;
-  bestScore?: number;
 }
 
 type DumpRewardApiEvent =
@@ -120,7 +119,7 @@ type DumpRewardApiEvent =
       kind: "coupon";
       score: number;
       critical: boolean;
-      couponType: "YK_PARTS_DISCOUNT" | "EQUIPMENT_RENTAL_DISCOUNT";
+      couponType: "YK_PARTS_DISCOUNT" | "EQUIPMENT_RENTAL_DISCOUNT" | "FILTER_SET_EXCHANGE";
       discountPct: number;
     }
   | {
@@ -218,18 +217,17 @@ function appendRewardText(previous: string, next: string) {
 function formatDumpScorePanelReward(panel: DumpScorePanelState) {
   const starSummary =
     panel.earnedStars > 0 ? `⭐ ${panel.earnedStars.toLocaleString()}` : "";
-  if (panel.pendingRewards > 0) {
-    if (starSummary && panel.rewardText) {
-      return `${starSummary} · ${panel.rewardText} · 보상 확인중`;
-    }
-    if (starSummary) return `${starSummary} · 보상 확인중`;
-    if (panel.rewardText) return `${panel.rewardText} · 보상 확인중`;
-    return "보상 확인중";
-  }
   if (starSummary && panel.rewardText) {
     return `${starSummary} · ${panel.rewardText}`;
   }
   return starSummary || panel.rewardText;
+}
+
+function rollOptimisticStarReward() {
+  const { minStarReward, maxStarReward } = YANMAR_REWARD_CONFIG;
+  return (
+    Math.floor(Math.random() * (maxStarReward - minStarReward + 1)) + minStarReward
+  );
 }
 
 function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
@@ -285,7 +283,9 @@ function CouponDiscoveryOverlay({ discovery }: { discovery: CouponDiscoveryState
         />
         <p className="mt-2 text-sm font-black tracking-tight text-yellow-50">축하합니다!</p>
         <p className="mt-1 text-[11px] font-bold leading-snug text-white">
-          {label} {discovery.discountPct}% 할인 쿠폰을 발견했습니다!!
+          {discovery.couponType === "FILTER_SET_EXCHANGE"
+            ? `${label}을 발견했습니다!!`
+            : `${label} ${discovery.discountPct}% 할인 쿠폰을 발견했습니다!!`}
         </p>
       </div>
     </div>
@@ -299,8 +299,6 @@ export function ExcavatorGameWrapper({
   immersive = false,
   initialPlayMode,
   onShowRanking,
-  myRank = null,
-  bestScore = 0,
 }: ExcavatorGameWrapperProps) {
   const config = getMissionConfig("yanmar");
   const { data: session, status: sessionStatus, update } = useSession();
@@ -539,9 +537,10 @@ export function ExcavatorGameWrapper({
     dumpTruckUserIdRef.current = userId;
     gameSessionUserIdRef.current = userId;
 
-    const savedPose = loadSavedArmPose(userId);
-    if (savedPose) {
-      autoPoseRef.current.saved = savedPose;
+    const savedSlots = loadSavedArmPoseSlots(userId);
+    if (savedSlots[0] || savedSlots[1]) {
+      autoPoseRef.current.slots = savedSlots;
+      autoPoseRef.current.saved = savedSlots[autoPoseRef.current.activeSlot];
       setAutoPose({ ...autoPoseRef.current });
     }
 
@@ -733,7 +732,7 @@ export function ExcavatorGameWrapper({
     }, 2100);
   }, []);
 
-  const handleSavePose = useCallback(() => {
+  const handleSavePose = useCallback((slot: AutoPoseSlotIndex) => {
     const now = Date.now();
     if (now < savePoseCooldownUntil) return;
 
@@ -743,25 +742,34 @@ export function ExcavatorGameWrapper({
       arm: sim.arm,
       bucket: sim.bucket,
     };
-    autoPoseRef.current.saved = pose;
-    if (autoPoseRef.current.executing) {
+    autoPoseRef.current.slots = [
+      slot === 0 ? pose : autoPoseRef.current.slots[0],
+      slot === 1 ? pose : autoPoseRef.current.slots[1],
+    ];
+    if (autoPoseRef.current.executing && autoPoseRef.current.activeSlot === slot) {
       cancelAutoArmPose(autoPoseRef.current);
+      autoPoseRef.current.saved = { ...pose };
+    } else if (!autoPoseRef.current.executing && autoPoseRef.current.activeSlot === slot) {
+      autoPoseRef.current.saved = { ...pose };
     }
-    setAutoPose({ ...autoPoseRef.current });
+    setAutoPose({
+      ...autoPoseRef.current,
+      slots: [...autoPoseRef.current.slots],
+    });
 
     const userId = session?.user?.id ?? gameSessionUserIdRef.current;
     if (userId) {
-      saveSavedArmPose(userId, pose, now);
+      saveSavedArmPoseSlot(userId, slot, pose, now);
     }
 
     setSavePoseCooldownUntil(now + poseActionCooldownMs);
     showPoseSaveToast();
   }, [poseActionCooldownMs, savePoseCooldownUntil, session?.user?.id, showPoseSaveToast]);
 
-  const handleExecutePose = useCallback(() => {
+  const handleExecutePose = useCallback((slot: AutoPoseSlotIndex) => {
     const now = Date.now();
     if (now < executePoseCooldownUntil) return;
-    if (!startAutoArmPose(autoPoseRef.current)) return;
+    if (!startAutoArmPose(autoPoseRef.current, slot)) return;
     setAutoPose({ ...autoPoseRef.current });
     setExecutePoseCooldownUntil(now + poseActionCooldownMs);
   }, [executePoseCooldownUntil, poseActionCooldownMs]);
@@ -784,11 +792,10 @@ export function ExcavatorGameWrapper({
     setAuxiliary(nextAuxiliary);
     // 저장된 자세는 세션 리셋 후에도 유지 (종료 후 재입장 시 실행 가능)
     const userId = session?.user?.id ?? gameSessionUserIdRef.current;
-    const persistedPose = userId ? loadSavedArmPose(userId) : null;
+    const persistedSlots = userId ? loadSavedArmPoseSlots(userId) : ([null, null] as const);
     autoPoseRef.current = createAutoPoseState();
-    if (persistedPose) {
-      autoPoseRef.current.saved = persistedPose;
-    }
+    autoPoseRef.current.slots = [persistedSlots[0], persistedSlots[1]];
+    autoPoseRef.current.saved = persistedSlots[0];
     setAutoPose({ ...autoPoseRef.current });
     clearAllInput();
     if (dumpScoreHideTimerRef.current != null) {
@@ -1128,7 +1135,7 @@ export function ExcavatorGameWrapper({
   const handleDumpScore = useCallback((popup: Omit<DumpScorePopup, "id">) => {
     if (modeRef.current === "ride") return;
     if (modeRef.current !== "game") {
-      const stars = Math.floor(Math.random() * 3) + 1;
+      const stars = rollOptimisticStarReward();
       setPreviewStars((value) => value + stars);
       accumulateDumpScore(popup.score, popup.critical);
       const panel = dumpScorePanelRef.current;
@@ -1141,12 +1148,22 @@ export function ExcavatorGameWrapper({
       return;
     }
 
+    // 낙관적 업데이트: API 응답 전에 별·점수를 바로 표시
+    const optimisticStars = rollOptimisticStarReward();
     accumulateDumpScore(popup.score, popup.critical);
+    rewardStarsRef.current += optimisticStars;
+    currencyRef.current += optimisticStars;
+    setCurrency(currencyRef.current);
     const panel = dumpScorePanelRef.current;
     if (panel) {
-      panel.pendingRewards += 1;
-      dumpScorePanelRef.current = { ...panel };
-      setDumpScorePanel({ ...panel });
+      const next = {
+        ...panel,
+        earnedStars: rewardStarsRef.current,
+        pendingRewards: panel.pendingRewards + 1,
+      };
+      dumpScorePanelRef.current = next;
+      setDumpScorePanel(next);
+      scheduleHideDumpScorePanel();
     }
 
     void (async () => {
@@ -1159,36 +1176,54 @@ export function ExcavatorGameWrapper({
         if (!res.ok) throw new Error("Reward failed");
         const data = await res.json();
         const event = data.events?.[0] as DumpRewardApiEvent | undefined;
+
         if (typeof data.currency === "number") {
           currencyRef.current = data.currency;
           setCurrency(data.currency);
-          await updateSessionRef.current({ user: { currency: data.currency } });
+          void updateSessionRef.current({ user: { currency: data.currency } });
         }
         if (typeof data.totalXp === "number") {
           setTotalXp(data.totalXp);
-          await updateSessionRef.current({ user: { totalXp: data.totalXp } });
+          void updateSessionRef.current({ user: { totalXp: data.totalXp } });
         }
-        if (!event) {
-          adjustDumpScorePanel(0, {
-            rewardText: appendRewardText(dumpScorePanelRef.current?.rewardText ?? "", "보상 완료"),
-          });
-          return;
-        }
-        if (event.kind === "stars") {
-          rewardStarsRef.current += event.stars;
-          adjustDumpScorePanel(event.score - popup.score, {
-            critical: event.critical || dumpScorePanelRef.current?.critical,
+
+        if (!event || event.kind === "stars") {
+          const actualStars = event?.kind === "stars" ? event.stars : optimisticStars;
+          const starDelta = actualStars - optimisticStars;
+          rewardStarsRef.current += starDelta;
+          if (typeof data.currency !== "number") {
+            currencyRef.current += starDelta;
+            setCurrency(currencyRef.current);
+          }
+          adjustDumpScorePanel(event ? event.score - popup.score : 0, {
+            critical:
+              (event?.critical ?? false) || dumpScorePanelRef.current?.critical,
             earnedStars: rewardStarsRef.current,
           });
           return;
         }
+
+        // 쿠폰이면 낙관적 별 회수 후 쿠폰 UI
+        rewardStarsRef.current -= optimisticStars;
+        if (typeof data.currency !== "number") {
+          currencyRef.current = Math.max(0, currencyRef.current - optimisticStars);
+          setCurrency(currencyRef.current);
+        }
         showCouponDiscovery(event.couponType, event.discountPct);
         adjustDumpScorePanel(event.score - popup.score, {
           critical: true,
+          earnedStars: rewardStarsRef.current,
         });
       } catch {
+        rewardStarsRef.current = Math.max(0, rewardStarsRef.current - optimisticStars);
+        currencyRef.current = Math.max(0, currencyRef.current - optimisticStars);
+        setCurrency(currencyRef.current);
         adjustDumpScorePanel(0, {
-          rewardText: appendRewardText(dumpScorePanelRef.current?.rewardText ?? "", "저장 실패"),
+          earnedStars: rewardStarsRef.current,
+          rewardText: appendRewardText(
+            dumpScorePanelRef.current?.rewardText ?? "",
+            "저장 실패",
+          ),
         });
       }
     })();
@@ -1385,15 +1420,18 @@ export function ExcavatorGameWrapper({
       if (keys.has("w") || keys.has("arrowup")) {
         travel.left = 1;
         travel.right = 1;
-      }
-      if (keys.has("s") || keys.has("arrowdown")) {
+      } else if (keys.has("s") || keys.has("arrowdown")) {
         travel.left = -1;
         travel.right = -1;
+      } else if (keys.has("z")) {
+        travel.left = 1;
+      } else if (keys.has("c")) {
+        travel.left = -1;
+      } else if (keys.has("x")) {
+        travel.right = 1;
+      } else if (keys.has("v")) {
+        travel.right = -1;
       }
-      if (keys.has("z")) travel.left = 1;
-      if (keys.has("x")) travel.right = 1;
-      if (keys.has("c")) travel.left = -1;
-      if (keys.has("v")) travel.right = -1;
       if (keys.has("j")) right.x = -1;
       if (keys.has("l")) right.x = 1;
       if (keys.has("i")) right.y = 1;
@@ -1748,8 +1786,6 @@ export function ExcavatorGameWrapper({
           touchZonesAvailable={mode !== "gameReady"}
           onOpenControlsGuide={() => setShowControlsGuide(true)}
           onShowRanking={onShowRanking}
-          myRank={myRank}
-          bestScore={bestScore}
         />
 
         {stepCompleteFlash && (

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { GameConfig } from "@/lib/games";
-import { isGameAvailable } from "@/lib/games";
 import { prepareInGameFullscreen } from "@/lib/fullscreen";
 import { enablePwaMode } from "@/lib/pwa-mode";
 import { GameCardSprite } from "@/components/home/GameCardSprite";
@@ -19,7 +18,6 @@ interface CardInnerProps {
   game: GameConfig;
   progress?: { score: number; stars: number; playTime: number };
   rank?: number | null;
-  locked: boolean;
   playMode?: "ride";
 }
 
@@ -31,22 +29,15 @@ function formatRank(rank?: number | null) {
   return rank ? `#${rank}` : "—";
 }
 
-function CardInner({ game, progress, rank, locked, playMode }: CardInnerProps) {
+function CardInner({ game, progress, rank, playMode }: CardInnerProps) {
   const score = progress?.score ?? 0;
   const isRide = playMode === "ride";
 
   return (
     <>
-      <div
-        className={`game-card-preview relative flex h-[8.5rem] flex-col overflow-hidden ${
-          locked ? "grayscale brightness-75" : ""
-        }`}
-      >
+      <div className="game-card-preview relative flex h-[8.5rem] flex-col overflow-hidden">
         <div className="game-card-sprite-wrap absolute inset-0">
-          <GameCardSprite
-            gameId={game.id}
-            className={locked ? "game-card-sprite-locked" : ""}
-          />
+          <GameCardSprite gameId={game.id} />
         </div>
         <div
           className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-14 bg-gradient-to-b from-white/95 via-white/65 to-transparent"
@@ -69,14 +60,6 @@ function CardInner({ game, progress, rank, locked, playMode }: CardInnerProps) {
             {game.number}
           </span>
         </div>
-
-        {locked ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/50 backdrop-blur-[2px]">
-            <span className="rounded-full border border-white/15 bg-black/65 px-3 py-1 text-[10px] font-bold tracking-wide text-white">
-              준비 중
-            </span>
-          </div>
-        ) : null}
       </div>
 
       <div className="game-card-footer relative z-10 px-2.5 py-2">
@@ -114,50 +97,34 @@ function CardInner({ game, progress, rank, locked, playMode }: CardInnerProps) {
 
 export function GameCard({ game, progress, rank, playMode }: GameCardProps) {
   const router = useRouter();
-  const available = isGameAvailable(game.id);
+  const href =
+    playMode === "ride" ? `/games/${game.id}?play=ride` : `/games/${game.id}`;
   const inner = (
-    <CardInner
-      game={game}
-      progress={progress}
-      rank={rank}
-      locked={!available}
-      playMode={playMode}
-    />
+    <CardInner game={game} progress={progress} rank={rank} playMode={playMode} />
   );
 
-  if (available) {
-    const href =
-      playMode === "ride" ? `/games/${game.id}?play=ride` : `/games/${game.id}`;
-
-    if (playMode === "ride") {
-      return (
-        <a
-          href={href}
-          className="game-card-active"
-          onClick={(e) => {
-            e.preventDefault();
-            void (async () => {
-              enablePwaMode();
-              await prepareInGameFullscreen();
-              router.push(href);
-            })();
-          }}
-        >
-          <div className="game-card-surface">{inner}</div>
-        </a>
-      );
-    }
-
+  if (playMode === "ride") {
     return (
-      <Link href={href} className="game-card-active">
+      <a
+        href={href}
+        className="game-card-active"
+        onClick={(e) => {
+          e.preventDefault();
+          void (async () => {
+            enablePwaMode();
+            await prepareInGameFullscreen();
+            router.push(href);
+          })();
+        }}
+      >
         <div className="game-card-surface">{inner}</div>
-      </Link>
+      </a>
     );
   }
 
   return (
-    <div aria-disabled="true" className="game-card-locked pointer-events-none">
+    <Link href={href} className="game-card-active">
       <div className="game-card-surface">{inner}</div>
-    </div>
+    </Link>
   );
 }

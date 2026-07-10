@@ -29,7 +29,9 @@ export async function GET() {
   const unclaimedCount = mails.filter(
     (mail) =>
       !mail.claimedAt &&
-      (mail.currencyAmount > 0 || (mail.couponType && mail.couponDiscountPct)),
+      (mail.currencyAmount > 0 ||
+        mail.couponType === "FILTER_SET_EXCHANGE" ||
+        (mail.couponType && mail.couponDiscountPct)),
   ).length;
 
   return NextResponse.json({ mails, unreadCount, unclaimedCount });

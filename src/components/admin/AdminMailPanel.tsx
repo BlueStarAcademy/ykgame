@@ -4,7 +4,11 @@ import { useState } from "react";
 import { AdminShell } from "./AdminShell";
 
 type MailTarget = "all" | "active";
-type CouponType = "YK_PARTS_DISCOUNT" | "EQUIPMENT_RENTAL_DISCOUNT" | "";
+type CouponType =
+  | "YK_PARTS_DISCOUNT"
+  | "EQUIPMENT_RENTAL_DISCOUNT"
+  | "FILTER_SET_EXCHANGE"
+  | "";
 
 export function AdminMailPanel() {
   const [target, setTarget] = useState<MailTarget>("active");
@@ -141,15 +145,22 @@ export function AdminMailPanel() {
                 >
                   <option value="YK_PARTS_DISCOUNT">YK 부품 할인</option>
                   <option value="EQUIPMENT_RENTAL_DISCOUNT">장비 대여 할인</option>
+                  <option value="FILTER_SET_EXCHANGE">필터세트 교환</option>
                 </select>
-                <input
-                  type="number"
-                  value={couponDiscountPct}
-                  onChange={(e) => setCouponDiscountPct(Number(e.target.value))}
-                  min={1}
-                  max={100}
-                  className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
-                />
+                {couponType === "FILTER_SET_EXCHANGE" ? (
+                  <div className="flex items-center rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-500">
+                    교환권 (할인율 없음)
+                  </div>
+                ) : (
+                  <input
+                    type="number"
+                    value={couponDiscountPct}
+                    onChange={(e) => setCouponDiscountPct(Number(e.target.value))}
+                    min={1}
+                    max={100}
+                    className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                  />
+                )}
               </div>
             ) : null}
           </div>

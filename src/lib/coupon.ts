@@ -17,9 +17,16 @@ export function getCouponExpiresAt(from = new Date()) {
 }
 
 export function getSeasonCouponLimit(type: CouponType): number {
-  return type === "YK_PARTS_DISCOUNT"
-    ? YANMAR_REWARD_CONFIG.partsCouponSeasonLimit
-    : YANMAR_REWARD_CONFIG.rentalCouponSeasonLimit;
+  switch (type) {
+    case "YK_PARTS_DISCOUNT":
+      return YANMAR_REWARD_CONFIG.partsCouponSeasonLimit;
+    case "EQUIPMENT_RENTAL_DISCOUNT":
+      return YANMAR_REWARD_CONFIG.rentalCouponSeasonLimit;
+    case "FILTER_SET_EXCHANGE":
+      return YANMAR_REWARD_CONFIG.filterSetCouponSeasonLimit;
+    default:
+      return 0;
+  }
 }
 
 export async function countSeasonGameDropCoupons(
@@ -62,7 +69,19 @@ export async function canIssueSeasonGameDropCoupon(
 }
 
 export function couponTypeLabel(type: CouponType) {
-  return type === "YK_PARTS_DISCOUNT"
-    ? "YK건기 부품 할인권"
-    : "중장비 대여 할인권";
+  switch (type) {
+    case "YK_PARTS_DISCOUNT":
+      return "YK건기 부품 할인권";
+    case "EQUIPMENT_RENTAL_DISCOUNT":
+      return "중장비 대여 할인권";
+    case "FILTER_SET_EXCHANGE":
+      return "필터세트 교환쿠폰";
+    default:
+      return type;
+  }
+}
+
+/** 교환권 등 할인율이 없는 쿠폰 */
+export function isExchangeCoupon(type: CouponType) {
+  return type === "FILTER_SET_EXCHANGE";
 }

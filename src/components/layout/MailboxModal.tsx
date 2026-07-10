@@ -9,7 +9,7 @@ interface UserMail {
   title: string;
   body: string | null;
   currencyAmount: number;
-  couponType: "YK_PARTS_DISCOUNT" | "EQUIPMENT_RENTAL_DISCOUNT" | null;
+  couponType: "YK_PARTS_DISCOUNT" | "EQUIPMENT_RENTAL_DISCOUNT" | "FILTER_SET_EXCHANGE" | null;
   couponDiscountPct: number | null;
   readAt: string | null;
   claimedAt: string | null;
@@ -25,11 +25,22 @@ function formatDate(value: string) {
 }
 
 function couponLabel(type: NonNullable<UserMail["couponType"]>) {
-  return type === "YK_PARTS_DISCOUNT" ? "YK건기 부품 할인권" : "중장비 대여 할인권";
+  switch (type) {
+    case "YK_PARTS_DISCOUNT":
+      return "YK건기 부품 할인권";
+    case "EQUIPMENT_RENTAL_DISCOUNT":
+      return "중장비 대여 할인권";
+    case "FILTER_SET_EXCHANGE":
+      return "필터세트 교환쿠폰";
+  }
 }
 
 function hasAttachment(mail: UserMail) {
-  return mail.currencyAmount > 0 || (mail.couponType && mail.couponDiscountPct);
+  return (
+    mail.currencyAmount > 0 ||
+    mail.couponType === "FILTER_SET_EXCHANGE" ||
+    (mail.couponType && mail.couponDiscountPct)
+  );
 }
 
 interface MailboxModalProps {
@@ -162,9 +173,12 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
                           ⭐ 스타 {selectedMail.currencyAmount.toLocaleString()}
                         </p>
                       ) : null}
-                      {selectedMail.couponType && selectedMail.couponDiscountPct ? (
+                      {selectedMail.couponType ? (
                         <p className="font-bold text-purple-700">
-                          🎟️ {couponLabel(selectedMail.couponType)} {selectedMail.couponDiscountPct}%
+                          🎟️ {couponLabel(selectedMail.couponType)}
+                          {selectedMail.couponType === "FILTER_SET_EXCHANGE"
+                            ? ""
+                            : ` ${selectedMail.couponDiscountPct ?? 0}%`}
                         </p>
                       ) : null}
                     </div>

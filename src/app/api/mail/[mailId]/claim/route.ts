@@ -28,7 +28,9 @@ export async function POST(
   }
 
   const hasReward =
-    mail.currencyAmount > 0 || (mail.couponType && mail.couponDiscountPct);
+    mail.currencyAmount > 0 ||
+    mail.couponType === "FILTER_SET_EXCHANGE" ||
+    (mail.couponType != null && mail.couponDiscountPct != null);
 
   if (!hasReward) {
     await prisma.userMail.update({
@@ -49,12 +51,15 @@ export async function POST(
       });
     }
 
-    if (mail.couponType && mail.couponDiscountPct) {
+    if (mail.couponType) {
       await tx.userCoupon.create({
         data: {
           userId: session.user.id,
           type: mail.couponType,
-          discountPct: mail.couponDiscountPct,
+          discountPct:
+            mail.couponType === "FILTER_SET_EXCHANGE"
+              ? 0
+              : (mail.couponDiscountPct ?? 0),
           barcodeCode: createBarcodeCode(),
           seasonKey,
           fromGameDrop: false,

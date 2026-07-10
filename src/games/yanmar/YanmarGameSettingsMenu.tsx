@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { GAME_IMMERSIVE_HEADER_RIGHT_ID } from "@/components/games/GameImmersiveOverlay";
+import {
+  GAME_IMMERSIVE_HEADER_RIGHT_ID,
+  useImmersiveFullscreenControl,
+} from "@/components/games/GameImmersiveOverlay";
 
 function GearIcon() {
   return (
@@ -57,8 +60,6 @@ interface YanmarGameSettingsMenuProps {
   touchZonesAvailable: boolean;
   onOpenControlsGuide: () => void;
   onShowRanking?: () => void;
-  myRank?: number | null;
-  bestScore?: number;
 }
 
 export function YanmarGameSettingsMenu({
@@ -75,10 +76,9 @@ export function YanmarGameSettingsMenu({
   touchZonesAvailable,
   onOpenControlsGuide,
   onShowRanking,
-  myRank = null,
-  bestScore = 0,
 }: YanmarGameSettingsMenuProps) {
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
+  const fullscreen = useImmersiveFullscreenControl();
 
   useEffect(() => {
     if (!immersive) {
@@ -110,15 +110,6 @@ export function YanmarGameSettingsMenu({
             onClick={() => onOpenChange(false)}
           />
           <div className="absolute right-0 top-full z-[260] mt-1 w-40 overflow-hidden rounded-xl border border-white/15 bg-black/90 py-1 shadow-2xl backdrop-blur-md">
-            <div className="border-b border-white/10 px-2.5 py-2">
-              <p className="text-[10px] font-bold text-white/55">내 랭킹</p>
-              <p className="mt-0.5 text-[11px] font-black text-white">
-                {myRank ? `#${myRank}` : "순위 없음"}
-              </p>
-              <p className="mt-0.5 text-[10px] font-semibold text-amber-200">
-                최고 {bestScore > 0 ? `${bestScore.toLocaleString()}점` : "0점"}
-              </p>
-            </div>
             <ToggleRow label="미니맵" on={showMinimap} onToggle={onToggleMinimap} />
             <ToggleRow label="적재자세" on={showDigPose} onToggle={onToggleDigPose} />
             {touchZonesAvailable ? (
@@ -134,6 +125,20 @@ export function YanmarGameSettingsMenu({
             >
               기능정보
             </button>
+            {fullscreen?.canFullscreen &&
+            !fullscreen.apiFullscreen &&
+            !fullscreen.isStandalone ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenChange(false);
+                  void fullscreen.enter();
+                }}
+                className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10"
+              >
+                전체화면
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => {

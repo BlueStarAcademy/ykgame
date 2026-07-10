@@ -8,9 +8,15 @@ import type {
   ControlMask,
   ExcavatorControlState,
 } from "./controls";
-import { COCKPIT_LAYOUT } from "./controls";
+import {
+  BLADE_LOWERED,
+  BLADE_RAISED,
+  BLADE_SPEED_PER_SECOND,
+  COCKPIT_LAYOUT,
+} from "./controls";
 import type { TutorialStep } from "./tutorial";
-import type { AutoPoseState } from "./types";
+import type { AutoPoseSlotIndex, AutoPoseState } from "./types";
+import { AUTO_POSE_SLOT_COUNT } from "./types";
 
 
 interface CockpitOverlayProps {
@@ -31,8 +37,8 @@ interface CockpitOverlayProps {
   showTouchZones: boolean;
   hideVisualDeck?: boolean;
   autoPose: AutoPoseState;
-  onSavePose: () => void;
-  onExecutePose: () => void;
+  onSavePose: (slot: AutoPoseSlotIndex) => void;
+  onExecutePose: (slot: AutoPoseSlotIndex) => void;
   savePoseDisabled?: boolean;
   executePoseDisabled?: boolean;
 }
@@ -91,13 +97,16 @@ const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cx: 0.5, cy: 0.92 },
   rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.1, cy: 0.165 },
   hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.1, cy: 0.275 },
+  blade: { ...COCKPIT_LAYOUT.blade, cx: 0.72, cy: 0.965 },
   horn: { ...COCKPIT_LAYOUT.horn, cx: 0.9, cy: 0.495 },
 };
 
 const FUNCTION_MENU_ITEM_ORDER = ["safety", "rpm", "pedal"] as const;
 
-/** column-reverse 기준: 토글 바로 위 실행 → 그 위 저장 */
-const AUTO_MENU_ITEM_ORDER = ["execute", "save"] as const;
+const AUTO_POSE_SLOT_ORDER = Array.from(
+  { length: AUTO_POSE_SLOT_COUNT },
+  (_, i) => i as AutoPoseSlotIndex,
+);
 
 function VisualJoystick({
   side,
@@ -591,6 +600,7 @@ interface TravelLeverProps {
   showTouchZone: boolean;
   isPortrait: boolean;
   onChange: (value: number) => void;
+  onDragActiveChange?: (active: boolean) => void;
 }
 
 function TravelLever({
@@ -601,9 +611,14 @@ function TravelLever({
   showTouchZone,
   isPortrait,
   onChange,
+  onDragActiveChange,
 }: TravelLeverProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
-  const pointer = usePointerRelease(() => onChange(0));
+  const releaseTravel = useCallback(() => {
+    onChange(0);
+    onDragActiveChange?.(false);
+  }, [onChange, onDragActiveChange]);
+  const pointer = usePointerRelease(releaseTravel);
 
   const updateFromEvent = useCallback(
     (clientY: number) => {
@@ -625,6 +640,7 @@ function TravelLever({
     e.preventDefault();
     pointer.dragging.current = true;
     pointer.pointerIdRef.current = e.pointerId;
+    onDragActiveChange?.(true);
     zoneRef.current?.setPointerCapture(e.pointerId);
     updateFromEvent(e.clientY);
   };
@@ -670,7 +686,7 @@ function TravelLever({
         onLostPointerCapture={() => {
           pointer.dragging.current = false;
           pointer.pointerIdRef.current = null;
-          onChange(0);
+          releaseTravel();
         }}
         aria-label="주행 레버"
       >
@@ -705,6 +721,7 @@ interface DualTravelCenterProps {
   showTouchZone: boolean;
   isPortrait: boolean;
   onChange: (value: number) => void;
+  onDragActiveChange?: (active: boolean) => void;
 }
 
 function DualTravelCenter({
@@ -714,9 +731,14 @@ function DualTravelCenter({
   showTouchZone,
   isPortrait,
   onChange,
+  onDragActiveChange,
 }: DualTravelCenterProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
-  const pointer = usePointerRelease(() => onChange(0));
+  const releaseTravel = useCallback(() => {
+    onChange(0);
+    onDragActiveChange?.(false);
+  }, [onChange, onDragActiveChange]);
+  const pointer = usePointerRelease(releaseTravel);
 
   const updateFromEvent = useCallback(
     (clientY: number) => {
@@ -737,6 +759,7 @@ function DualTravelCenter({
     e.preventDefault();
     pointer.dragging.current = true;
     pointer.pointerIdRef.current = e.pointerId;
+    onDragActiveChange?.(true);
     zoneRef.current?.setPointerCapture(e.pointerId);
     updateFromEvent(e.clientY);
   };
@@ -770,7 +793,7 @@ function DualTravelCenter({
       onLostPointerCapture={() => {
         pointer.dragging.current = false;
         pointer.pointerIdRef.current = null;
-        onChange(0);
+        releaseTravel();
       }}
       aria-label="좌우 주행 레버 동시 조작"
     >
@@ -826,7 +849,7 @@ function RpmLever({
       }
       onClick={onToggle}
       aria-pressed={active}
-      aria-label={active ? "RPM x2" : "RPM x1"}
+      aria-label={active ? "RPM(x2)" : "RPM(x1)"}
     >
       <span className="yanmar-aux-lever-well" aria-hidden>
         <VisualLever
@@ -838,7 +861,7 @@ function RpmLever({
           compact
         />
       </span>
-      <span className="yanmar-aux-button-label">{isPortrait ? (active ? "x2" : "x1") : "RPM"}</span>
+      <span className="yanmar-aux-button-label">{active ? "RPM(x2)" : "RPM(x1)"}</span>
       {showTouchZone && (
         <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-sky-200/65 bg-transparent" />
       )}
@@ -882,7 +905,7 @@ function SafetyLever({
       }
       onClick={onToggle}
       aria-pressed={active}
-      aria-label={active ? "안전레버 잠김" : "안전레버 해제"}
+      aria-label={active ? "안전(잠금)" : "안전(해제)"}
     >
       <span className="yanmar-aux-lever-well" aria-hidden>
         <VisualLever
@@ -894,11 +917,192 @@ function SafetyLever({
           compact
         />
       </span>
-      <span className="yanmar-aux-button-label">{isPortrait ? (active ? "잠김" : "해제") : "안전"}</span>
+      <span className="yanmar-aux-button-label">{active ? "안전(잠금)" : "안전(해제)"}</span>
       {showTouchZone && (
         <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-slate-200/65 bg-transparent" />
       )}
     </button>
+  );
+}
+
+function BladeLever({
+  value,
+  enabled,
+  showTouchZone,
+  layout,
+  isPortrait,
+  onChange,
+}: {
+  value: number;
+  enabled: boolean;
+  showTouchZone: boolean;
+  layout: CockpitLayout;
+  isPortrait: boolean;
+  onChange: (value: number) => void;
+}) {
+  const blade = layout.blade;
+  const zoneRef = useRef<HTMLDivElement>(null);
+  const valueRef = useRef(value);
+  const stickRef = useRef(0);
+  const frameRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef<number | null>(null);
+  const [stick, setStick] = useState(0);
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  const stopMotion = useCallback(() => {
+    stickRef.current = 0;
+    setStick(0);
+    lastFrameTimeRef.current = null;
+    if (frameRef.current != null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+  }, []);
+
+  const animate = useCallback(
+    (time: number) => {
+      const rate = stickRef.current;
+      if (Math.abs(rate) < 0.04) {
+        frameRef.current = null;
+        lastFrameTimeRef.current = null;
+        return;
+      }
+
+      const previousTime = lastFrameTimeRef.current ?? time;
+      const deltaSeconds = Math.min((time - previousTime) / 1000, 0.05);
+      lastFrameTimeRef.current = time;
+
+      const current = valueRef.current;
+      // rate > 0(밀기)=하강, rate < 0(당기기)=상승
+      let next = current + rate * BLADE_SPEED_PER_SECOND * deltaSeconds;
+      next = Math.max(BLADE_RAISED, Math.min(BLADE_LOWERED, next));
+
+      if (next !== current) {
+        valueRef.current = next;
+        onChange(next);
+      }
+
+      if (
+        (rate > 0 && next >= BLADE_LOWERED - 1e-4) ||
+        (rate < 0 && next <= BLADE_RAISED + 1e-4)
+      ) {
+        stopMotion();
+        return;
+      }
+
+      frameRef.current = requestAnimationFrame(animate);
+    },
+    [onChange, stopMotion],
+  );
+
+  useEffect(() => stopMotion, [stopMotion]);
+
+  useEffect(() => {
+    if (!enabled) stopMotion();
+  }, [enabled, stopMotion]);
+
+  const updateFromEvent = useCallback(
+    (clientY: number) => {
+      const zone = zoneRef.current;
+      if (!zone) return;
+      const rect = zone.getBoundingClientRect();
+      const cy = rect.top + rect.height / 2;
+      const maxR = Math.max(rect.height / 2, 1);
+      const dy = Math.max(-maxR, Math.min(maxR, clientY - cy));
+      // 위(+)=하강, 아래(-)=상승. 중앙 근처는 중립.
+      let nextStick = Math.max(-1, Math.min(1, -dy / maxR));
+      if (Math.abs(nextStick) < 0.18) nextStick = 0;
+      stickRef.current = nextStick;
+      setStick(nextStick);
+      if (nextStick !== 0 && frameRef.current == null) {
+        lastFrameTimeRef.current = null;
+        frameRef.current = requestAnimationFrame(animate);
+      }
+    },
+    [animate],
+  );
+
+  const pointer = usePointerRelease(stopMotion);
+
+  const handleStart = (e: React.PointerEvent) => {
+    if (!enabled) return;
+    e.preventDefault();
+    pointer.dragging.current = true;
+    pointer.pointerIdRef.current = e.pointerId;
+    zoneRef.current?.setPointerCapture(e.pointerId);
+    updateFromEvent(e.clientY);
+  };
+
+  const handleMove = (e: React.PointerEvent) => {
+    if (!pointer.dragging.current || pointer.pointerIdRef.current !== e.pointerId) return;
+    updateFromEvent(e.clientY);
+  };
+
+  const handleEnd = (e: React.PointerEvent) => {
+    if (pointer.pointerIdRef.current !== e.pointerId) return;
+    pointer.releaseCapture(zoneRef.current);
+    pointer.onRelease();
+  };
+
+  return (
+    <>
+      <div
+        className={`yanmar-blade-lever-visual pointer-events-none absolute z-30 ${
+          !enabled ? "is-disabled" : ""
+        }`}
+        style={{
+          left: `${blade.cx * 100}%`,
+          top: `${blade.cy * 100}%`,
+          transform: "translate(-50%, -50%)",
+        }}
+        aria-hidden
+      >
+        <VisualLever
+          cx={0.5}
+          cy={0.42}
+          value={stick}
+          color="dark"
+          variant="travel"
+        />
+        <span className="yanmar-blade-lever-label">블레이드</span>
+      </div>
+      <div
+        ref={zoneRef}
+        className={`yanmar-blade-lever absolute z-50 touch-none rounded-xl ${
+          !enabled ? "pointer-events-none is-disabled" : ""
+        } ${isPortrait ? "yanmar-blade-lever-portrait" : ""}`}
+        style={{
+          left: `${blade.cx * 100}%`,
+          top: `calc(${blade.cy * 100}% + ${isPortrait ? "-2%" : "0%"})`,
+          width: isPortrait ? "10%" : "6.6%",
+          height: isPortrait ? "40%" : "58%",
+          transform: "translate(-50%, -50%)",
+          WebkitTouchCallout: "none",
+        }}
+        onPointerDown={handleStart}
+        onPointerMove={handleMove}
+        onPointerUp={handleEnd}
+        onPointerCancel={handleEnd}
+        onLostPointerCapture={() => {
+          pointer.dragging.current = false;
+          pointer.pointerIdRef.current = null;
+          stopMotion();
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+        aria-label="블레이드 레버"
+      >
+        {showTouchZone ? (
+          <>
+            <div className="pointer-events-none absolute inset-0 rounded-xl border border-amber-200/65 bg-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 top-1/3 border-t border-white/25" />
+            <div className="pointer-events-none absolute inset-x-0 top-2/3 border-t border-white/25" />
+          </>
+        ) : null}
+      </div>
+    </>
   );
 }
 
@@ -1202,6 +1406,7 @@ function FunctionMenu({
 
 function AutoMenuActionButton({
   variant,
+  slot,
   active = false,
   disabled = false,
   onClick,
@@ -1209,13 +1414,14 @@ function AutoMenuActionButton({
   ariaLabel,
 }: {
   variant: "save" | "execute";
+  slot: AutoPoseSlotIndex;
   active?: boolean;
   disabled?: boolean;
   onClick: () => void;
   showTouchZone: boolean;
   ariaLabel: string;
 }) {
-  const label = variant === "save" ? "저장" : "실행";
+  const label = variant === "save" ? `저장${slot + 1}` : `실행${slot + 1}`;
 
   return (
     <button
@@ -1246,8 +1452,8 @@ interface AutoMenuProps {
   isPortrait: boolean;
   showTouchZones: boolean;
   autoPose: AutoPoseState;
-  onSavePose: () => void;
-  onExecutePose: () => void;
+  onSavePose: (slot: AutoPoseSlotIndex) => void;
+  onExecutePose: (slot: AutoPoseSlotIndex) => void;
   savePoseDisabled?: boolean;
   executePoseDisabled?: boolean;
 }
@@ -1267,7 +1473,6 @@ function AutoMenu({
   const anchorCx = layout.horn.cx;
   const toggleCy = AUX_MENU_TOGGLE_CY;
   const buttonSize = isPortrait ? "2.85rem" : "2.75rem";
-  const hasSavedPose = autoPose.saved != null;
 
   return (
     <div
@@ -1278,53 +1483,63 @@ function AutoMenu({
       }}
     >
       <div className={`yanmar-auto-menu-items ${expanded ? "is-expanded" : ""}`}>
-        {AUTO_MENU_ITEM_ORDER.map((key, index) => {
+        {AUTO_POSE_SLOT_ORDER.map((slot, index) => {
           const openDelayMs = index * 50;
-          const closeDelayMs = (AUTO_MENU_ITEM_ORDER.length - 1 - index) * 35;
+          const closeDelayMs = (AUTO_POSE_SLOT_ORDER.length - 1 - index) * 35;
+          const hasSavedPose = autoPose.slots[slot] != null;
+          const isExecutingThis =
+            autoPose.executing && autoPose.activeSlot === slot;
 
           return (
             <div
-              key={key}
+              key={slot}
               className="yanmar-auto-menu-item"
               style={{
-                width: buttonSize,
-                height: buttonSize,
                 transitionDelay: `${expanded ? openDelayMs : closeDelayMs}ms`,
               }}
               aria-hidden={!expanded}
             >
-              {key === "save" ? (
-                <AutoMenuActionButton
-                  variant="save"
-                  active={hasSavedPose}
-                  disabled={savePoseDisabled}
-                  onClick={onSavePose}
-                  showTouchZone={showTouchZones}
-                  ariaLabel={
-                    savePoseDisabled
-                      ? "자세 저장 대기 중"
-                      : hasSavedPose
-                        ? "자세 저장됨"
-                        : "현재 자세 저장"
-                  }
-                />
-              ) : null}
-              {key === "execute" ? (
-                <AutoMenuActionButton
-                  variant="execute"
-                  active={autoPose.executing}
-                  disabled={!hasSavedPose || autoPose.executing || executePoseDisabled}
-                  onClick={onExecutePose}
-                  showTouchZone={showTouchZones}
-                  ariaLabel={
-                    executePoseDisabled
-                      ? "자세 실행 대기 중"
-                      : autoPose.executing
-                        ? "자동 자세 실행 중"
-                        : "저장된 자세 실행"
-                  }
-                />
-              ) : null}
+              <div
+                className="yanmar-auto-menu-slot-row"
+                style={{
+                  height: buttonSize,
+                }}
+              >
+                <div style={{ width: buttonSize, height: buttonSize }}>
+                  <AutoMenuActionButton
+                    variant="execute"
+                    slot={slot}
+                    active={isExecutingThis}
+                    disabled={!hasSavedPose || autoPose.executing || executePoseDisabled}
+                    onClick={() => onExecutePose(slot)}
+                    showTouchZone={showTouchZones}
+                    ariaLabel={
+                      executePoseDisabled
+                        ? `슬롯 ${slot + 1} 자세 실행 대기 중`
+                        : isExecutingThis
+                          ? `슬롯 ${slot + 1} 자동 자세 실행 중`
+                          : `슬롯 ${slot + 1} 저장된 자세 실행`
+                    }
+                  />
+                </div>
+                <div style={{ width: buttonSize, height: buttonSize }}>
+                  <AutoMenuActionButton
+                    variant="save"
+                    slot={slot}
+                    active={hasSavedPose}
+                    disabled={savePoseDisabled}
+                    onClick={() => onSavePose(slot)}
+                    showTouchZone={showTouchZones}
+                    ariaLabel={
+                      savePoseDisabled
+                        ? `슬롯 ${slot + 1} 자세 저장 대기 중`
+                        : hasSavedPose
+                          ? `슬롯 ${slot + 1} 자세 저장됨`
+                          : `슬롯 ${slot + 1}에 현재 자세 저장`
+                    }
+                  />
+                </div>
+              </div>
             </div>
           );
         })}
@@ -1377,6 +1592,13 @@ export function CockpitOverlay({
   const isPortrait = true;
   const [functionMenuExpanded, setFunctionMenuExpanded] = useState(false);
   const [autoMenuExpanded, setAutoMenuExpanded] = useState(false);
+  /** 한쪽 주행 레버(또는 중앙 동시) 조작 중에는 다른 주행 입력을 잠근다. */
+  const [travelLock, setTravelLock] = useState<"left" | "right" | "both" | null>(null);
+  const travelEnabled = allowed.travel && !auxiliary.safetyLocked;
+
+  useEffect(() => {
+    if (!travelEnabled) setTravelLock(null);
+  }, [travelEnabled]);
 
   return (
     <>
@@ -1400,37 +1622,65 @@ export function CockpitOverlay({
           <TravelLever
             side="left"
             layout={layout.travelLeft}
-            enabled={allowed.travel && !auxiliary.safetyLocked}
+            enabled={travelEnabled && (travelLock === null || travelLock === "left")}
             highlighted={highlightTravel}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
+            onDragActiveChange={(active) =>
+              setTravelLock((current) => {
+                if (active) return "left";
+                return current === "left" ? null : current;
+              })
+            }
             onChange={(left) =>
               onInputChange((current) => ({
                 ...current,
-                travel: { ...current.travel, left },
+                travel: { left, right: 0 },
               }))
             }
           />
           <TravelLever
             side="right"
             layout={layout.travelRight}
-            enabled={allowed.travel && !auxiliary.safetyLocked}
+            enabled={travelEnabled && (travelLock === null || travelLock === "right")}
             highlighted={highlightTravel}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
+            onDragActiveChange={(active) =>
+              setTravelLock((current) => {
+                if (active) return "right";
+                return current === "right" ? null : current;
+              })
+            }
             onChange={(right) =>
               onInputChange((current) => ({
                 ...current,
-                travel: { ...current.travel, right },
+                travel: { left: 0, right },
               }))
+            }
+          />
+          <BladeLever
+            value={auxiliary.blade}
+            enabled={!auxiliary.safetyLocked}
+            showTouchZone={showTouchZones}
+            layout={layout}
+            isPortrait={isPortrait}
+            onChange={(blade) =>
+              onAuxiliaryChange((current) => ({ ...current, blade }))
             }
           />
           <DualTravelCenter
             layout={layout.travelBoth}
-            enabled={allowed.travel && !auxiliary.safetyLocked}
+            enabled={travelEnabled && (travelLock === null || travelLock === "both")}
             highlighted={highlightTravel}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
+            onDragActiveChange={(active) =>
+              setTravelLock((current) => {
+                if (active) return "both";
+                return current === "both" ? null : current;
+              })
+            }
             onChange={(value) =>
               onInputChange((current) => ({
                 ...current,

@@ -1950,13 +1950,12 @@ body {
 
 .yanmar-auto-menu-items {
   position: absolute;
-  left: 50%;
+  right: 0;
   bottom: calc(100% + 0.42rem);
   display: flex;
   flex-direction: column-reverse;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.42rem;
-  transform: translateX(-50%);
   pointer-events: none;
 }
 
@@ -1985,6 +1984,13 @@ body {
   pointer-events: auto;
 }
 
+.yanmar-auto-menu-slot-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.38rem;
+}
+
 .yanmar-auto-menu-action {
   border-color: rgba(196, 181, 253, 0.34);
   background:
@@ -2006,11 +2012,11 @@ body {
   left: 50%;
   bottom: 0.22rem;
   transform: translateX(-50%);
-  font-size: 0.46rem;
+  font-size: 0.42rem;
   font-weight: 900;
   line-height: 1;
   white-space: nowrap;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   color: rgba(255, 255, 255, 0.92);
   text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.58);
 }
@@ -2459,7 +2465,61 @@ body {
   border-radius: 999px;
   background: rgba(2, 6, 23, 0.62);
   padding: 0.08rem 0.22rem;
-  font-size: 0.46rem;
+  font-size: 0.42rem;
+}
+
+.yanmar-blade-lever {
+  background: transparent;
+}
+
+.yanmar-blade-lever.is-disabled {
+  opacity: 0.45;
+}
+
+.yanmar-blade-lever-visual {
+  position: absolute;
+  width: 2.85rem;
+  height: 4.6rem;
+}
+
+.yanmar-blade-lever-visual.is-disabled {
+  opacity: 0.45;
+}
+
+.yanmar-blade-lever-visual .yanmar-visual-lever-travel {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%);
+}
+
+.yanmar-blade-lever-visual .yanmar-visual-lever-travel .yanmar-lever-slot {
+  top: 58%;
+  height: 3.4rem;
+  width: 0.95rem;
+}
+
+.yanmar-blade-lever-visual .yanmar-visual-lever-travel .yanmar-lever-stick {
+  height: 2.85rem;
+  width: 0.48rem;
+}
+
+.yanmar-blade-lever-label {
+  position: absolute;
+  left: 50%;
+  bottom: 0.02rem;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.62);
+  padding: 0.08rem 0.22rem;
+  font-size: 0.42rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  color: #f8fafc;
+  text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.58);
 }
 
 .yanmar-layout-portrait .yanmar-visual-lever-travel .yanmar-lever-slot {
@@ -2774,21 +2834,70 @@ html.pwa-mode body {
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 
+.landing-equipment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
 .landing-equipment-card {
+  display: flex;
+  flex-direction: column;
   border-radius: 1rem;
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
-    0 4px 16px rgba(15, 23, 42, 0.03);
-  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+    0 6px 18px rgba(15, 23, 42, 0.04);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
 }
 
 .landing-equipment-card:hover {
-  border-color: rgba(203, 213, 225, 0.9);
+  border-color: rgba(203, 213, 225, 1);
+  transform: translateY(-2px);
   box-shadow:
     0 2px 4px rgba(15, 23, 42, 0.05),
-    0 8px 24px rgba(15, 23, 42, 0.06);
+    0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.landing-equipment-card-soon {
+  filter: saturate(0.88);
+}
+
+.landing-equipment-visual {
+  aspect-ratio: 4 / 3;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 100%, rgba(148, 163, 184, 0.16), transparent 70%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+}
+
+.landing-equipment-art {
+  position: absolute;
+  inset: 0.55rem 0.35rem 0.2rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.landing-equipment-art .game-card-equipment-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 10px 18px rgba(15, 23, 42, 0.18));
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-equipment-card:hover .landing-equipment-art .game-card-equipment-image {
+  transform: scale(1.04) translateY(-2px);
+}
+
+.landing-equipment-copy {
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .landing-stats {
@@ -3278,7 +3387,32 @@ html.pwa-mode body {
 }
 
 .game-lobby-mode:active {
-  transform: translateY(0) scale(0.99);
+  transform: translateY(0);
+}
+
+.game-lobby-mode.is-locked,
+.game-lobby-mode:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  filter: grayscale(0.35);
+  box-shadow: none;
+  transform: none;
+}
+
+.game-lobby-mode.is-locked:hover,
+.game-lobby-mode:disabled:hover,
+.game-lobby-mode.is-locked:active,
+.game-lobby-mode:disabled:active {
+  transform: none;
+}
+
+.game-lobby-mode-locked-note {
+  margin: 0 0 0.45rem;
+  text-align: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #94a3b8;
 }
 
 .game-lobby-mode-practice {
