@@ -33,7 +33,11 @@ import {
   DUMP_TRUCK_BED,
 } from "./terrain";
 import type { DigFeedback } from "./bucket";
-import { getBucketTipWorld } from "./bucket";
+import {
+  getBreakerGroundAngleDeg,
+  getBreakerTipWorld,
+  MIN_BREAKER_GROUND_ANGLE_DEG,
+} from "./bucket";
 import {
   formatDumpTruckReturnTime,
   getDumpTruckFillRatio,
@@ -634,36 +638,48 @@ function createYkGeongiLabelTexture(orientation: "horizontal" | "vertical" = "ho
 
   ctx.scale(scale, scale);
   ctx.clearRect(0, 0, baseWidth, baseHeight);
-  ctx.font = '900 72px "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
+  ctx.font = '900 84px "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
+  ctx.shadowColor = "rgba(0,0,0,0.72)";
+  ctx.shadowBlur = 3;
+  ctx.shadowOffsetY = 2;
 
   const drawGeongi = (x: number, y: number) => {
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "rgba(255,255,255,0.98)";
-    ctx.fillStyle = "#111827";
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = "rgba(15,23,42,0.96)";
+    ctx.fillStyle = "#ffffff";
     ctx.strokeText("건기", x, y);
     ctx.fillText("건기", x, y);
   };
 
+  const drawBrandLetter = (letter: string, x: number, y: number, color: string) => {
+    ctx.lineWidth = 11;
+    ctx.strokeStyle = "rgba(15,23,42,0.92)";
+    ctx.strokeText(letter, x, y);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeText(letter, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(letter, x, y);
+  };
+
   if (horizontal) {
-    ctx.fillStyle = "#1565C0";
-    ctx.fillText("Y", 168, 82);
-    ctx.fillStyle = "#C62828";
-    ctx.fillText("K", 228, 82);
-    drawGeongi(332, 82);
+    drawBrandLetter("Y", 150, 82, "#1976d2");
+    drawBrandLetter("K", 220, 82, "#e3262e");
+    drawGeongi(350, 82);
   } else {
-    ctx.fillStyle = "#1565C0";
-    ctx.fillText("Y", baseWidth / 2, 96);
-    ctx.fillStyle = "#C62828";
-    ctx.fillText("K", baseWidth / 2, 168);
+    drawBrandLetter("Y", baseWidth / 2, 96, "#1976d2");
+    drawBrandLetter("K", baseWidth / 2, 178, "#e3262e");
     drawGeongi(baseWidth / 2, 268);
   }
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
   configureDecalTexture(texture);
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
   return texture;
 }
 
@@ -1610,6 +1626,7 @@ function ExcavatorArm({
   showBody: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
+  const machineBodyRef = useRef<THREE.Group>(null);
   const boomSwingRef = useRef<THREE.Group>(null);
   const boomRef = useRef<THREE.Group>(null);
   const armRef = useRef<THREE.Group>(null);
@@ -1689,8 +1706,24 @@ function ExcavatorArm({
     g.rotation.y = facing;
     g.rotation.z += (targetRoll - g.rotation.z) * terrainFollow;
     const aux = auxiliaryRef.current;
+    const blade = Math.max(0, Math.min(1, aux?.blade ?? 0));
+    const bladeSupportProgress = THREE.MathUtils.smoothstep(blade, 0.8, 1);
+    const targetChassisLift = bladeSupportProgress * 0.035;
+    const targetChassisTilt = bladeSupportProgress * 0.035;
+    const bladeSupportFollow = 1 - Math.exp(-delta * 8);
+    if (machineBodyRef.current) {
+      machineBodyRef.current.position.y +=
+        (targetChassisLift - machineBodyRef.current.position.y) * bladeSupportFollow;
+      machineBodyRef.current.rotation.z +=
+        (targetChassisTilt - machineBodyRef.current.rotation.z) * bladeSupportFollow;
+    }
     if (boomSwingRef.current) {
       boomSwingRef.current.rotation.y = (aux?.boomSwing ?? DEFAULT_BOOM_SWING) * 0.38;
+      boomSwingRef.current.position.y +=
+        (armRootY + targetChassisLift - boomSwingRef.current.position.y) *
+        bladeSupportFollow;
+      boomSwingRef.current.rotation.z +=
+        (targetChassisTilt - boomSwingRef.current.rotation.z) * bladeSupportFollow;
     }
     // Match the visual pivots to bucket.ts: segment direction is (sin(theta), cos(theta)).
     if (boomRef.current) boomRef.current.rotation.z = Math.PI / 2 - s.boom;
@@ -1706,10 +1739,11 @@ function ExcavatorArm({
         breakerVisualRef.current.position.y = 0;
       } else {
         const boomSwing = aux?.boomSwing ?? DEFAULT_BOOM_SWING;
-        const tip = getBucketTipWorld(s, boomSwing);
+        const tip = getBreakerTipWorld(s, boomSwing);
         const groundY = sampleHeight(terrainRef.current, tip.x, tip.z);
         const onAsphalt =
-          tip.y - groundY < 0.32 &&
+          tip.y - groundY <= 0.12 &&
+          getBreakerGroundAngleDeg(s, boomSwing) >= MIN_BREAKER_GROUND_ANGLE_DEG &&
           !!getCrashTileAt(terrainRef.current, tip.x, tip.z)?.active;
         const hammering = (aux?.breakerPedal ?? false) && onAsphalt;
         const t = performance.now();
@@ -1727,7 +1761,6 @@ function ExcavatorArm({
     }
     if (bladeRef.current) {
       // 시각은 레버 명령값을 그대로 반영. 지면 클램프는 흙 튀김 판정에만 사용.
-      const blade = Math.max(0, Math.min(1, aux?.blade ?? 0));
       bladeRef.current.position.y =
         YANMAR_MACHINE_RIG.dozerBladeGroupBaseY - blade * YANMAR_MACHINE_RIG.dozerBladeDrop;
     }
@@ -1765,7 +1798,7 @@ function ExcavatorArm({
     <group ref={groupRef}>
       {/* 모델 전방(+X)을 주행·시선 방향(+Z)과 일치 */}
       <group rotation={[0, -Math.PI / 2, 0]}>
-        <group visible={showBody}>
+        <group ref={machineBodyRef} visible={showBody}>
           <PremiumExcavatorBody
             velRef={velRef}
             yanmarLogo={yanmarLogo}

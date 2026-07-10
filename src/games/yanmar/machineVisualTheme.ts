@@ -8,11 +8,14 @@ export const YANMAR_MACHINE_RIG = {
   boomOffset: 0.8,
   armRotationScale: 1.18,
   bucketRotationScale: 1.02,
+  breakerRotationZ: -0.08,
+  breakerTipLocalX: -2.18,
+  breakerTipLocalY: -0.15,
   /** 블레이드 0=상승, 1=하강 시 그룹 Y 하강량 */
   dozerBladeDrop: 0.55,
   dozerBladeGroupBaseY: 0.72,
   dozerBladeMeshLocalY: -0.08,
-  dozerBladeHalfHeight: 0.31,
+  dozerBladeHalfHeight: 0.285,
   /** 모델 로컬 +X (회전 후 전방) 기준 블레이드 접촉점 */
   dozerBladeReach: 1.05,
   excavatorVisualY: 0.68,
@@ -27,8 +30,12 @@ export const YANMAR_MACHINE_COLORS = {
   frameLight: "#2b353e",
   rubber: "#090d10",
   rubberHighlight: "#1d282f",
+  trackChain: "#626b72",
   steel: "#788894",
   steelBright: "#dce5eb",
+  dozerBlade: "#555d63",
+  dozerBladeEdge: "#939ba1",
+  dozerBladeArm: "#3f474d",
   chrome: "#edf4f7",
   glass: "#17323a",
   interior: "#242b32",
@@ -67,7 +74,7 @@ export const YANMAR_MACHINE_MATERIALS = {
   },
 } as const;
 
-export function createYkGeongiMarkTexture() {
+export function createYkGeongiMarkTexture(displayText?: string) {
   if (typeof document === "undefined") return null;
 
   const canvas = document.createElement("canvas");
@@ -122,6 +129,41 @@ export function createYkGeongiMarkTexture() {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
+  if (displayText) {
+    const numberPlateFace = ctx.createLinearGradient(0, 30, 0, 390);
+    numberPlateFace.addColorStop(0, "#ffffff");
+    numberPlateFace.addColorStop(0.55, "#f4f6f7");
+    numberPlateFace.addColorStop(1, "#e5e9ec");
+    roundedRect(30, 30, 1140, 360, 48);
+    ctx.fillStyle = numberPlateFace;
+    ctx.fill();
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "#c4cbd0";
+    ctx.stroke();
+
+    let fontSize = 214;
+    do {
+      ctx.font = `900 ${fontSize}px "Arial Black", Arial, sans-serif`;
+      fontSize -= 4;
+    } while (ctx.measureText(displayText).width > 1040 && fontSize > 120);
+    ctx.fillStyle = "#626a71";
+    ctx.shadowColor = "rgba(0,0,0,0.18)";
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetY = 3;
+    ctx.fillText(displayText, 600, 216);
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.anisotropy = 16;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
   ctx.font = '900 210px "Arial Black", Arial, sans-serif';
   ctx.lineWidth = 7;
   ctx.strokeStyle = "rgba(255,255,255,0.92)";

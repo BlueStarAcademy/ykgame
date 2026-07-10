@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import type { GameId } from "@/lib/games";
 import { getGameById, calculateStars } from "@/lib/games";
 import type { GameResult } from "@/games/shared/types";
+import { commitYanmarGameSessionScore } from "@/games/yanmar/gameSessionPersistence";
 import { RankingBoard } from "./RankingBoard";
 
 interface RankingEntry {
@@ -22,6 +23,7 @@ interface GameResultScreenProps {
   onRetry?: () => void;
   onStay?: () => void;
   onExit?: () => void;
+  onScoreSaved?: (score: number) => void;
 }
 
 function medal(rank: number) {
@@ -31,7 +33,14 @@ function medal(rank: number) {
   return `${rank}`;
 }
 
-export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: GameResultScreenProps) {
+export function GameResultScreen({
+  gameId,
+  result,
+  onRetry,
+  onStay,
+  onExit,
+  onScoreSaved,
+}: GameResultScreenProps) {
   const game = getGameById(gameId);
   const isYanmar = gameId === "yanmar";
   const isYanmarArcade = gameId === "yanmar" && typeof result.arcadeScore === "number";
@@ -41,13 +50,19 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
   const [myRank, setMyRank] = useState<number | null>(null);
   const [myTotalScore, setMyTotalScore] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
   const savedRef = useRef(false);
   const updateRef = useRef(update);
+  const onScoreSavedRef = useRef(onScoreSaved);
 
   useEffect(() => {
     updateRef.current = update;
   }, [update]);
+
+  useEffect(() => {
+    onScoreSavedRef.current = onScoreSaved;
+  }, [onScoreSaved]);
 
   useEffect(() => {
     if (savedRef.current) return;
@@ -59,6 +74,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
           setSaved(true);
           return;
         }
+        setSaveFailed(false);
         const saveRes = await fetch("/api/scores", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -72,23 +88,39 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
           }),
         });
         const saveData = await saveRes.json();
+        if (!saveRes.ok) {
+          throw new Error(saveData.error ?? "Failed to save score");
+        }
+
+        if (gameId === "yanmar" && typeof result.arcadeScore === "number") {
+          const userId = session?.user?.id;
+          if (userId) {
+            commitYanmarGameSessionScore(userId, result.arcadeScore);
+          }
+          onScoreSavedRef.current?.(result.arcadeScore);
+        }
         setSaved(true);
 
         if (saveData.currency !== undefined) {
           await updateRef.current({ user: { currency: saveData.currency } });
         }
 
-        const res = await fetch(`/api/rankings/${gameId}`);
-        const data = await res.json();
-        setRankings(data.rankings ?? []);
-        setMyRank(data.myStats?.rank ?? null);
-        setMyTotalScore(
-          typeof data.myStats?.bestScore === "number"
-            ? data.myStats.bestScore
-            : null,
-        );
+        try {
+          const res = await fetch(`/api/rankings/${gameId}`);
+          const data = await res.json();
+          setRankings(data.rankings ?? []);
+          setMyRank(data.myStats?.rank ?? null);
+          setMyTotalScore(
+            typeof data.myStats?.bestScore === "number"
+              ? data.myStats.bestScore
+              : null,
+          );
+        } catch {
+          // 점수 저장은 완료됐으므로 랭킹 조회 실패로 재저장하지 않는다.
+        }
       } catch {
         savedRef.current = false;
+        setSaveFailed(true);
       }
     }
     void saveAndLoad();
@@ -99,6 +131,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
     result.progress,
     result.playTime,
     result.timeLeft,
+    session?.user?.id,
   ]);
 
   const nickname = session?.user?.nickname ?? "";
@@ -111,6 +144,7 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
         ? "미션 완료!"
         : "시간 종료";
   const homeLabel = isRide ? "탑승 홈으로" : isYanmar ? "나가기" : "홈으로";
+  const savePending = isYanmarArcade && !saved && !saveFailed;
   const yRankingRows = rankings.slice(0, 10);
   const yanmarDisplayScore =
     myTotalScore ?? result.arcadeScore ?? 0;
@@ -219,7 +253,8 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
         {isYanmar && onStay ? (
           <button
             onClick={onStay}
-            className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300"
+            disabled={savePending}
+            className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300 disabled:cursor-wait disabled:opacity-50"
           >
             머무르기
           </button>
@@ -242,7 +277,8 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
           <button
             type="button"
             onClick={onExit}
-            className="flex-1 rounded-lg py-3 text-center font-medium text-white hover:opacity-90"
+            disabled={savePending}
+            className="flex-1 rounded-lg py-3 text-center font-medium text-white hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
             style={{ backgroundColor: game?.color }}
           >
             {homeLabel}
@@ -258,7 +294,9 @@ export function GameResultScreen({ gameId, result, onRetry, onStay, onExit }: Ga
         )}
       </div>
       {!saved && (
-        <p className="mt-2 text-center text-xs text-gray-400">점수 저장 중...</p>
+        <p className={`mt-2 text-center text-xs ${saveFailed ? "text-red-500" : "text-gray-400"}`}>
+          {saveFailed ? "점수를 저장하지 못했습니다. 나중에 다시 시도해 주세요." : "점수 저장 중..."}
+        </p>
       )}
     </div>
   );

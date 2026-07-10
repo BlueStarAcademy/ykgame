@@ -77,6 +77,29 @@ export function getBucketTipWorld(sim: ExcavatorSimState, boomSwing = 0): Bucket
   return bucketPointWorld(sim, boomSwing, -BUCKET_LEN, 0);
 }
 
+export const MIN_BREAKER_GROUND_ANGLE_DEG = 70;
+
+/** 시각 모델의 실제 정 끝점과 동일한 브레이커 접촉점. */
+export function getBreakerTipWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {
+  const rotation = YANMAR_MACHINE_RIG.breakerRotationZ;
+  const localX = YANMAR_MACHINE_RIG.breakerTipLocalX;
+  const localY = YANMAR_MACHINE_RIG.breakerTipLocalY;
+  const rotatedX = Math.cos(rotation) * localX - Math.sin(rotation) * localY;
+  const rotatedY = Math.sin(rotation) * localX + Math.cos(rotation) * localY;
+  return bucketPointWorld(sim, boomSwing, rotatedX, rotatedY);
+}
+
+/** 지면(수평) 기준 브레이커 축 각도. 수직일 때 90도다. */
+export function getBreakerGroundAngleDeg(
+  sim: ExcavatorSimState,
+  boomSwing = 0,
+): number {
+  const pivot = getArmPivotWorld(sim, boomSwing);
+  const tip = getBreakerTipWorld(sim, boomSwing);
+  const horizontal = Math.hypot(tip.x - pivot.x, tip.z - pivot.z);
+  return Math.atan2(Math.abs(tip.y - pivot.y), horizontal) * (180 / Math.PI);
+}
+
 export function getBoomPivotWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {
   const facing = sim.heading + sim.swing + boomSwing * 0.38;
   return {
@@ -212,6 +235,14 @@ export interface DigFeedback {
   canLoad: boolean;
   /** Breaker tip is on an active crash tile and ready to strike. */
   canStrike: boolean;
+  /** Breaker touches an active crash tile but is below the safe strike angle. */
+  breakerNeedsVertical: boolean;
+  /** Active asphalt tile under the breaker tip (0 when none). */
+  crashTileHp: number;
+  crashTileMaxHp: number;
+  /** Increments on each breaker hit for UI pulse / damage float. */
+  crashHitTick: number;
+  crashHitDamage: number;
   /** Grapple is near a pickable boulder. */
   canGrab: boolean;
   /** Grapple is carrying a rock over the drop point. */
@@ -237,6 +268,8 @@ export interface DigFeedback {
   truckCanAccept: boolean;
   truckFillRatio: number;
   truckCooldownRemaining: number;
+  /** Active Dig zone remaining soil units (0 when not in a dig zone). */
+  digZoneRemainingUnits: number;
   digCooldowns: { id: string; label: string; etaSec: number }[];
 }
 
@@ -248,6 +281,11 @@ export function createDigFeedback(): DigFeedback {
     bucketCurled: false,
     canLoad: false,
     canStrike: false,
+    breakerNeedsVertical: false,
+    crashTileHp: 0,
+    crashTileMaxHp: 0,
+    crashHitTick: 0,
+    crashHitDamage: 0,
     canGrab: false,
     canDropRock: false,
     digging: false,
@@ -267,6 +305,7 @@ export function createDigFeedback(): DigFeedback {
     truckCanAccept: true,
     truckFillRatio: 0,
     truckCooldownRemaining: 0,
+    digZoneRemainingUnits: 0,
     digCooldowns: [],
   };
 }

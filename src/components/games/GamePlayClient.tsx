@@ -251,7 +251,11 @@ export function GamePlayClient({
   const [result, setResult] = useState<GameResult | null>(null);
   const [yanmarExitSignal, setYanmarExitSignal] = useState(0);
   const [yanmarResumeSignal, setYanmarResumeSignal] = useState(0);
-  /** Season total frozen at game start so stay/reload after save doesn't double-count. */
+  const [yanmarScoreCommit, setYanmarScoreCommit] = useState<{
+    id: number;
+    score: number;
+  } | null>(null);
+  /** DB에 반영된 시즌 점수. HUD에서는 아직 저장하지 않은 세션 점수만 더한다. */
   const [yanmarSeasonBaseScore, setYanmarSeasonBaseScore] = useState(0);
   const [myStats, setMyStats] = useState<MyStats>({
     rank: null,
@@ -338,6 +342,15 @@ export function GamePlayClient({
     loadStats();
   };
 
+  const handleYanmarScoreSaved = useCallback((score: number) => {
+    setYanmarSeasonBaseScore((total) => total + score);
+    setYanmarScoreCommit((commit) => ({
+      id: (commit?.id ?? 0) + 1,
+      score,
+    }));
+    void loadStats();
+  }, [loadStats]);
+
   const handleExitHome = () => {
     router.push(playMode === "ride" || initialPlay === "ride" ? "/ride" : "/home");
   };
@@ -393,6 +406,7 @@ export function GamePlayClient({
             onEnd={handleGameEnd}
             exitSignal={yanmarExitSignal}
             resumeSignal={yanmarResumeSignal}
+            scoreCommit={yanmarScoreCommit}
             immersive
             initialPlayMode={playMode ?? undefined}
             onShowRanking={() => setShowRanking(true)}
@@ -407,6 +421,7 @@ export function GamePlayClient({
           result={result}
           onStay={handleStay}
           onExit={handleExitHome}
+          onScoreSaved={handleYanmarScoreSaved}
         />
       ) : null}
 

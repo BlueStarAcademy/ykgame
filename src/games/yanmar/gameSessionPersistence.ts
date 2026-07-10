@@ -139,6 +139,36 @@ export function clearYanmarGameSession(userId: string) {
   }
 }
 
+/**
+ * DB에 반영된 점수를 로컬 세션의 미저장 점수에서 제거한다.
+ * 지형과 장비 상태는 유지해 재입장 시 이어서 플레이할 수 있게 한다.
+ */
+export function commitYanmarGameSessionScore(userId: string, committedScore: number) {
+  if (!Number.isFinite(committedScore) || committedScore < 0) return;
+
+  try {
+    const key = storageKey(userId);
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return;
+
+    const parsed: unknown = JSON.parse(raw);
+    if (!isValidSnapshot(parsed)) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({
+        ...parsed,
+        arcadeScore: Math.max(0, parsed.arcadeScore - committedScore),
+      } satisfies YanmarGameSessionSnapshot),
+    );
+  } catch {
+    // 저장 공간이 차단되더라도 서버의 점수 저장 결과는 유지한다.
+  }
+}
+
 export function saveYanmarGameSession(
   userId: string,
   snapshot: Omit<YanmarGameSessionSnapshot, "version" | "seasonKey" | "savedAtMs">,

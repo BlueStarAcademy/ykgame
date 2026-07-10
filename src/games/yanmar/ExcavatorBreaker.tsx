@@ -4,6 +4,7 @@ import { RoundedBox } from "@react-three/drei";
 import {
   YANMAR_MACHINE_COLORS as COLOR,
   YANMAR_MACHINE_MATERIALS as MATERIAL,
+  YANMAR_MACHINE_RIG,
 } from "./machineVisualTheme";
 
 const FRAME = {
@@ -94,7 +95,7 @@ export function ExcavatorBreaker() {
       <PivotPin x={-0.28} y={-0.12} radius={0.105} width={0.58} />
 
       {/* Breaker body follows the bucket's local -X working direction. */}
-      <group rotation={[0, 0, -0.08]}>
+      <group rotation={[0, 0, YANMAR_MACHINE_RIG.breakerRotationZ]}>
         <RoundedBox
           args={[0.88, 0.48, 0.5]}
           radius={0.105}
@@ -144,7 +145,15 @@ export function ExcavatorBreaker() {
           <cylinderGeometry args={[0.082, 0.105, 0.55, 20]} />
           <meshStandardMaterial {...BRIGHT_STEEL} />
         </mesh>
-        <mesh position={[-2.08, -0.15, 0]} rotation={[0, 0, -Math.PI / 2]} castShadow>
+        <mesh
+          position={[
+            YANMAR_MACHINE_RIG.breakerTipLocalX + 0.1,
+            YANMAR_MACHINE_RIG.breakerTipLocalY,
+            0,
+          ]}
+          rotation={[0, 0, -Math.PI / 2]}
+          castShadow
+        >
           <coneGeometry args={[0.105, 0.2, 20]} />
           <meshStandardMaterial color={COLOR.chrome} roughness={0.2} metalness={0.86} />
         </mesh>

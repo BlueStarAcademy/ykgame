@@ -3,27 +3,26 @@
 import { useLayoutEffect, useMemo, type RefObject } from "react";
 import * as THREE from "three";
 import { createBucketDirtTexture } from "./proceduralTextures";
-import {
-  YANMAR_MACHINE_COLORS as COLOR,
-  YANMAR_MACHINE_MATERIALS as MATERIAL,
-} from "./machineVisualTheme";
 
 const STEEL = {
-  color: COLOR.steel,
-  ...MATERIAL.steel,
+  color: "#3f4b55",
+  metalness: 0.62,
+  roughness: 0.26,
 } as const;
 const STEEL_DARK = {
-  color: COLOR.frameLight,
-  ...MATERIAL.frame,
+  color: "#202a33",
+  metalness: 0.58,
+  roughness: 0.36,
 } as const;
 const EDGE = {
-  color: COLOR.chrome,
+  color: "#d8e0e8",
+  metalness: 0.78,
   roughness: 0.18,
-  metalness: 0.82,
 } as const;
 const LINK = {
-  color: COLOR.frame,
-  ...MATERIAL.frame,
+  color: "#151d25",
+  metalness: 0.54,
+  roughness: 0.26,
 } as const;
 
 function LinkPin({
@@ -222,14 +221,6 @@ export function ExcavatorBucket({
             <meshStandardMaterial color="#8fa0ad" roughness={0.22} metalness={0.62} />
           </mesh>
         ))}
-        {[1, -1].map((side) =>
-          [0.2, 0.48, 0.76].map((x) => (
-            <mesh key={`bucket-bolt-${side}-${x}`} position={[x, -0.2 - x * 0.22, side * 0.478]}>
-              <cylinderGeometry args={[0.035, 0.035, 0.025, 12]} />
-              <meshStandardMaterial color={COLOR.steelBright} {...MATERIAL.steel} />
-            </mesh>
-          )),
-        )}
 
         {/* 앞 커팅엣지 + 긁개형 이빨 */}
         <mesh position={[0.95, -0.36, 0]} rotation={[0, 0, -0.08]}>

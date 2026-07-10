@@ -14,12 +14,12 @@ import {
 
 export const GRID_SIZE = 64;
 export const CELL_SIZE = 2;
-export const DIG_ZONE_CAPACITY_UNITS = 3000;
-export const DIG_ZONE_CAPACITY_MIN = 3000;
+export const DIG_ZONE_CAPACITY_UNITS = 4000;
+export const DIG_ZONE_CAPACITY_MIN = 4000;
 export const DIG_ZONE_CAPACITY_MAX = 5000;
 export const DIG_ZONE_CAPACITY_STEP = 100;
 export const DIG_ZONE_COUNT = 2;
-export const DIG_ZONE_RESPAWN_MS = 5 * 60 * 1000;
+export const DIG_ZONE_RESPAWN_MS = 10 * 1000;
 export const CRASH_ZONE_RESPAWN_MS = 10 * 60 * 1000;
 export const CRASH_TILE_MAX_HP = 1000;
 export const CRASH_HIT_DAMAGE = 10;
@@ -278,13 +278,25 @@ export function digAt(
       dug += take;
     }
   }
-  if (terrain.dynamicDigZones && dug > 0) {
-    activeZone.remainingUnits = Math.max(0, activeZone.remainingUnits - dug * 95);
-    if (activeZone.remainingUnits <= 0 && activeZone.active) {
-      depleteDigZone(terrain, activeZone);
-    }
-  }
   return dug;
+}
+
+/** Consume Dig zone soil in the same units as bucket/truck load. */
+export function consumeDigZoneUnits(
+  terrain: TerrainData,
+  wx: number,
+  wz: number,
+  units: number,
+): number {
+  if (!terrain.dynamicDigZones || units <= 0) return 0;
+  const zone = getActiveDigZoneAt(terrain, wx, wz);
+  if (!zone) return 0;
+  const consumed = Math.min(zone.remainingUnits, units);
+  zone.remainingUnits = Math.max(0, zone.remainingUnits - consumed);
+  if (zone.remainingUnits <= 0 && zone.active) {
+    depleteDigZone(terrain, zone);
+  }
+  return consumed;
 }
 
 export function sampleHeight(terrain: TerrainData, wx: number, wz: number): number {

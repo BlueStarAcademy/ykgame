@@ -17,6 +17,8 @@ import {
 import type { AutoPoseState } from "./types";
 import {
   digAt,
+  consumeDigZoneUnits,
+  getActiveDigZoneAt,
   getActiveDigZones,
   isInDigZone,
   isInDumpZone,
@@ -40,12 +42,15 @@ import {
 import { checkAttachmentUse, getZoneAt } from "./attachmentZones";
 import {
   BUCKET_SOIL_HOLD_MIN,
+  getBreakerGroundAngleDeg,
+  getBreakerTipWorld,
   getBucketBodyContactWorld,
   getBucketScraperContactWorld,
   getBucketSoilRetention,
   getBucketTipWorld,
   getDozerBladeContactWorld,
   getMaxDozerBladeFromGround,
+  MIN_BREAKER_GROUND_ANGLE_DEG,
   type DigFeedback,
 } from "./bucket";
 import { constrainArmFromDumpTruck, isDumpTruckArmCollisionActive } from "./dumpTruckCollision";
@@ -161,7 +166,10 @@ function clampControl(value: number, min = -1, max = 1) {
 }
 
 function bucketClearance(sim: ExcavatorSimState, terrain: TerrainData, boomSwing: number) {
-  const tip = getBucketBodyContactWorld(sim, boomSwing);
+  const tip =
+    sim.attachmentType === "breaker"
+      ? getBreakerTipWorld(sim, boomSwing)
+      : getBucketBodyContactWorld(sim, boomSwing);
   const groundH = sampleHeight(terrain, tip.x, tip.z);
   return {
     tip,
@@ -473,6 +481,10 @@ export function tickExcavatorSim(params: SimTickParams) {
   }
   const scraper = getBucketScraperContactWorld(sim, boomSwing);
   const bucketTip = getBucketTipWorld(sim, boomSwing);
+  const toolTip =
+    sim.attachmentType === "breaker"
+      ? getBreakerTipWorld(sim, boomSwing)
+      : bucketTip;
   const bedDeckY = dumpTruckBedDeckWorldY();
   const minDumpHeight = bedDeckY + DUMP_TRUCK.dumpMinHeightAboveDeck;
   const truckBedCenter = dumpTruckBedCenterWorld(truckPose.groupX, truckPose.groupZ);
@@ -483,9 +495,15 @@ export function tickExcavatorSim(params: SimTickParams) {
   const activeDigZones = getActiveDigZones(terrain);
   const scraperInDigZone = isInDigZone(scraper.x, scraper.z, terrain);
   const tipInDigZone = isInDigZone(bucketTip.x, bucketTip.z, terrain);
-  const toolZone = getZoneAt(bucketTip.x, bucketTip.z, terrain);
-  const toolGround = sampleHeight(terrain, bucketTip.x, bucketTip.z);
-  const toolTouchesGround = bucketTip.y - toolGround < 0.32;
+  const toolZone = getZoneAt(toolTip.x, toolTip.z, terrain);
+  const toolGround = sampleHeight(terrain, toolTip.x, toolTip.z);
+  const toolTouchesGround = toolTip.y - toolGround <= 0.12;
+  const breakerGroundAngle =
+    sim.attachmentType === "breaker"
+      ? getBreakerGroundAngleDeg(sim, boomSwing)
+      : 90;
+  const breakerAngleReady =
+    breakerGroundAngle >= MIN_BREAKER_GROUND_ANGLE_DEG;
   const toolInputActive =
     Math.abs(filtered.right.x) > 0.2 || Math.abs(filtered.left.y) > 0.2;
   const warnAttachment = (message?: string) => {
@@ -498,17 +516,24 @@ export function tickExcavatorSim(params: SimTickParams) {
     const permission = checkAttachmentUse("breaker", toolZone, "strike");
     if (!permission.allowed) {
       if (toolTouchesGround) warnAttachment(permission.message);
+    } else if (toolTouchesGround && !breakerAngleReady) {
+      warnAttachment("브레이커를 수직에 가깝게 세우세요.");
     } else if (toolTouchesGround && runtime.attachmentActionCooldown <= 0) {
-      const tile = getCrashTileAt(terrain, bucketTip.x, bucketTip.z);
+      const tile = getCrashTileAt(terrain, toolTip.x, toolTip.z);
       if (tile?.active) {
-        const result = damageCrashTile(terrain, tile.id, stats.breakerDamage);
+        const hitDamage = stats.breakerDamage;
+        const result = damageCrashTile(terrain, tile.id, hitDamage);
         // Hold-to-hammer: rapid ticks while the foot pedal stays down.
         runtime.attachmentActionCooldown = 0.11;
         runtime.digDust.active = true;
-        runtime.digDust.x = bucketTip.x;
+        runtime.digDust.x = toolTip.x;
         runtime.digDust.y = toolGround + 0.08;
-        runtime.digDust.z = bucketTip.z;
-        if (result?.destroyed) onCrashTileDestroyed(tile.id);
+        runtime.digDust.z = toolTip.z;
+        if (result) {
+          fb.crashHitTick += 1;
+          fb.crashHitDamage = hitDamage;
+          if (result.destroyed) onCrashTileDestroyed(tile.id);
+        }
       }
     }
   }
@@ -630,12 +655,19 @@ export function tickExcavatorSim(params: SimTickParams) {
 
   const crashTileAtTip =
     sim.attachmentType === "breaker"
-      ? getCrashTileAt(terrain, bucketTip.x, bucketTip.z)
+      ? getCrashTileAt(terrain, toolTip.x, toolTip.z)
       : null;
+  const breakerNeedsVertical =
+    sim.attachmentType === "breaker" &&
+    toolZone === "crash" &&
+    toolTouchesGround &&
+    !!crashTileAtTip?.active &&
+    !breakerAngleReady;
   const canStrike =
     sim.attachmentType === "breaker" &&
     toolZone === "crash" &&
     toolTouchesGround &&
+    breakerAngleReady &&
     !!crashTileAtTip?.active;
 
   const hillZone = terrain.hillZone;
@@ -661,14 +693,34 @@ export function tickExcavatorSim(params: SimTickParams) {
     !!hillZone &&
     Math.hypot(bucketTip.x - hillZone.dropX, bucketTip.z - hillZone.dropZ) <= 5;
 
+  const digZoneAt =
+    getActiveDigZoneAt(terrain, scraper.x, scraper.z) ??
+    getActiveDigZoneAt(terrain, bucketTip.x, bucketTip.z) ??
+    (bodyNearDigZone
+      ? [...activeDigZones].sort(
+          (a, b) =>
+            Math.hypot(sim.posX - a.x, sim.posZ - a.z) -
+            Math.hypot(sim.posX - b.x, sim.posZ - b.z),
+        )[0] ?? null
+      : null);
+
   fb.inDigZone = inZone;
   fb.inDumpZone = inDump;
   fb.tipOnGround = tipOnGround;
   fb.bucketCurled = curled;
   fb.canLoad = canLoad;
+  fb.digZoneRemainingUnits = digZoneAt?.remainingUnits ?? 0;
   fb.canStrike = canStrike;
+  fb.breakerNeedsVertical = breakerNeedsVertical;
   fb.canGrab = canGrab;
   fb.canDropRock = canDropRock;
+  if (crashTileAtTip?.active) {
+    fb.crashTileHp = crashTileAtTip.hp;
+    fb.crashTileMaxHp = crashTileAtTip.maxHp;
+  } else {
+    fb.crashTileHp = 0;
+    fb.crashTileMaxHp = 0;
+  }
   fb.groundDepth = scraperDepthBelow;
   fb.digging = false;
   fb.bucketOpenReady = bucketOpenReady;
@@ -776,7 +828,14 @@ export function tickExcavatorSim(params: SimTickParams) {
         maxLoadDelta,
       );
       // 자세가 담을 수 있는 양까지만 적재 (열린/뒤집힌 버킷에 흙이 쌓이지 않음)
+      const prevLoad = sim.bucketLoad;
       sim.bucketLoad = Math.min(1, soilRetention, sim.bucketLoad + loadDelta);
+      const gainedUnits = (sim.bucketLoad - prevLoad) * stats.maxLoadUnits;
+      if (gainedUnits > 0) {
+        consumeDigZoneUnits(terrain, digX, digZ, gainedUnits);
+        fb.digZoneRemainingUnits =
+          getActiveDigZoneAt(terrain, digX, digZ)?.remainingUnits ?? 0;
+      }
     }
 
     if (fb.digging) {

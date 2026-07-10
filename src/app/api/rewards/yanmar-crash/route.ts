@@ -17,6 +17,9 @@ const REQUIRED_LEVEL = 10;
 const XP_REWARD = 1000;
 const MIN_STARS = 10;
 const MAX_STARS = 25;
+// 최대 강화 브레이커도 타일 하나를 파괴하는 데 약 1.8초가 걸린다.
+// 타일별 정상 보상은 허용하면서 직접 API 연속 호출은 제한한다.
+const REWARD_MIN_INTERVAL_MS = 1000;
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
         tx,
         session.user.id,
         GAME_ID,
-        10_000,
+        REWARD_MIN_INTERVAL_MS,
       )
     ) {
       return { status: "rate_limited" as const };

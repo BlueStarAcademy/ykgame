@@ -125,6 +125,7 @@ interface ExcavatorGameWrapperProps {
   onEnd: (result: GameResult) => void;
   exitSignal?: number;
   resumeSignal?: number;
+  scoreCommit?: { id: number; score: number } | null;
   immersive?: boolean;
   initialPlayMode?: "practice" | "game" | "ride";
   onShowRanking?: () => void;
@@ -239,6 +240,56 @@ function formatDumpScorePanelReward(panel: DumpScorePanelState) {
     return `${starSummary} · ${panel.rewardText}`;
   }
   return starSummary || panel.rewardText;
+}
+
+function crashHpBarColor(ratio: number) {
+  if (ratio > 0.5) return "bg-emerald-400";
+  if (ratio > 0.25) return "bg-orange-400";
+  return "bg-red-500";
+}
+
+function CrashAsphaltHpPanel({
+  hp,
+  maxHp,
+  hitTick,
+  hitDamage,
+}: {
+  hp: number;
+  maxHp: number;
+  hitTick: number;
+  hitDamage: number;
+}) {
+  const safeMax = Math.max(1, maxHp);
+  const ratio = Math.max(0, Math.min(1, hp / safeMax));
+  const pct = Math.round(ratio * 100);
+
+  return (
+    <div className="relative w-[11.5rem] rounded-xl border border-white/20 bg-black/55 px-3 py-2 shadow-lg backdrop-blur-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[9px] font-black uppercase tracking-[0.14em] text-white/70">
+          아스팔트
+        </span>
+        <span className="text-[10px] font-black tabular-nums text-white">
+          ({Math.round(hp).toLocaleString()}
+          <span className="text-white/45">/{safeMax.toLocaleString()}</span>)
+        </span>
+      </div>
+      <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-white/15">
+        <div
+          className={`h-full rounded-full transition-[width] duration-100 ease-out ${crashHpBarColor(ratio)}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {hitTick > 0 && hitDamage > 0 ? (
+        <span
+          key={hitTick}
+          className="yanmar-crash-hit-float pointer-events-none absolute -right-1 top-0 text-xs font-black text-amber-200"
+        >
+          -{hitDamage}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function rollOptimisticStarReward() {
@@ -371,6 +422,7 @@ export function ExcavatorGameWrapper({
   onEnd,
   exitSignal = 0,
   resumeSignal = 0,
+  scoreCommit = null,
   immersive = false,
   initialPlayMode,
   onShowRanking,
@@ -473,11 +525,13 @@ export function ExcavatorGameWrapper({
   const dumpTruckStateRef = useRef(createDumpTruckState());
   const dumpTruckPoseRef = useRef<DumpTruckPose>(getDumpTruckPose(dumpTruckStateRef.current));
   const digHudTickRef = useRef(0);
+  const lastSyncedCrashHitTickRef = useRef(0);
   const lastHudProgressRef = useRef(-1);
   const arcadeScoreRef = useRef(0);
   const rewardStarsRef = useRef(0);
   const currencyRef = useRef(session?.user?.currency ?? 0);
   const processedExitSignalRef = useRef(0);
+  const processedScoreCommitRef = useRef(0);
   const dumpScorePanelRef = useRef<DumpScorePanelState | null>(null);
   const dumpScoreHideTimerRef = useRef<number | null>(null);
   const couponDiscoveryRef = useRef<CouponDiscoveryState | null>(null);
@@ -573,15 +627,22 @@ export function ExcavatorGameWrapper({
 
   const syncDigHud = useCallback(() => {
     digHudTickRef.current += 1;
-    if (digHudTickRef.current % 3 !== 0) return;
     const fb = digFeedbackRef.current;
+    const crashHitChanged = fb.crashHitTick !== lastSyncedCrashHitTickRef.current;
+    if (digHudTickRef.current % 3 !== 0 && !crashHitChanged) return;
+    lastSyncedCrashHitTickRef.current = fb.crashHitTick;
     setDigFeedback((prev) =>
       prev.inDigZone === fb.inDigZone &&
       prev.inDumpZone === fb.inDumpZone &&
       prev.tipOnGround === fb.tipOnGround &&
       prev.bucketCurled === fb.bucketCurled &&
       prev.canLoad === fb.canLoad &&
+      Math.abs(prev.digZoneRemainingUnits - fb.digZoneRemainingUnits) < 1 &&
       prev.canStrike === fb.canStrike &&
+      prev.breakerNeedsVertical === fb.breakerNeedsVertical &&
+      prev.crashTileHp === fb.crashTileHp &&
+      prev.crashTileMaxHp === fb.crashTileMaxHp &&
+      prev.crashHitTick === fb.crashHitTick &&
       prev.canGrab === fb.canGrab &&
       prev.canDropRock === fb.canDropRock &&
       prev.digging === fb.digging &&
@@ -1214,6 +1275,15 @@ export function ExcavatorGameWrapper({
     endedRef.current = false;
   }, [resumeSignal]);
 
+  useEffect(() => {
+    if (!scoreCommit || scoreCommit.id <= processedScoreCommitRef.current) return;
+    processedScoreCommitRef.current = scoreCommit.id;
+
+    arcadeScoreRef.current = Math.max(0, arcadeScoreRef.current - scoreCommit.score);
+    setHud((current) => ({ ...current, score: arcadeScoreRef.current }));
+    persistGameSession(true);
+  }, [persistGameSession, scoreCommit, setHud]);
+
   const initialPlayModeRef = useRef(initialPlayMode);
   const hasBootstrappedRef = useRef(false);
 
@@ -1496,12 +1566,31 @@ export function ExcavatorGameWrapper({
     async (kind: "crash" | "hill", eventId: string) => {
       if (modeRef.current !== "game") return;
       try {
-        const res = await fetch(`/api/rewards/yanmar-${kind}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventId }),
-        });
-        if (!res.ok) throw new Error("Special reward failed");
+        const requestReward = () =>
+          fetch(`/api/rewards/yanmar-${kind}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventId }),
+          });
+        let res = await requestReward();
+        if (kind === "crash" && res.status === 429) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1100));
+          res = await requestReward();
+        }
+        if (res.status === 409) return;
+        if (!res.ok) {
+          if (res.status === 429) {
+            showAttachmentWarning("보상 요청이 너무 빠릅니다. 잠시 후 다시 시도하세요.");
+            return;
+          }
+          if (res.status === 403) {
+            showAttachmentWarning(
+              `${kind === "crash" ? "브레이커" : "운반"} 보상 레벨 조건을 확인하세요.`,
+            );
+            return;
+          }
+          throw new Error("Special reward failed");
+        }
         const data = await res.json();
         if (typeof data.currency === "number") {
           currencyRef.current = data.currency;
@@ -1915,11 +2004,21 @@ export function ExcavatorGameWrapper({
               </div>
             ) : digFeedback.canLoad ? (
               <div className="rounded-xl border border-orange-200/50 bg-orange-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                적재가능
+                적재가능(
+                <span className="tabular-nums">
+                  {Math.round(digFeedback.digZoneRemainingUnits)}
+                </span>
+                )
+              </div>
+            ) : digFeedback.breakerNeedsVertical ? (
+              <div className="rounded-xl border border-orange-200/50 bg-orange-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                브레이커를 수직에 가깝게 세우세요.
               </div>
             ) : digFeedback.canStrike ? (
               <div className="rounded-xl border border-amber-200/50 bg-amber-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                타격가능
+                타격가능 (
+                {Math.round(digFeedback.crashTileHp).toLocaleString()}/
+                {Math.round(digFeedback.crashTileMaxHp).toLocaleString()})
               </div>
             ) : digFeedback.canGrab ? (
               <div className="rounded-xl border border-sky-200/50 bg-sky-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
@@ -1937,6 +2036,14 @@ export function ExcavatorGameWrapper({
               <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 붐·암 들기
               </div>
+            ) : null}
+            {digFeedback.crashTileMaxHp > 0 ? (
+              <CrashAsphaltHpPanel
+                hp={digFeedback.crashTileHp}
+                maxHp={digFeedback.crashTileMaxHp}
+                hitTick={digFeedback.crashHitTick}
+                hitDamage={digFeedback.crashHitDamage}
+              />
             ) : null}
             {digFeedback.truckCooldownRemaining > 0 ? (
               <div className="rounded-xl border border-sky-300/25 bg-black/50 px-3 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">

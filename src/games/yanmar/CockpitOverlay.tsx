@@ -242,12 +242,14 @@ function VisualLever({
       : v >= 0
         ? v * -22
         : v * -48;
+  const travelStickTiltX = -12 - pushDepth * 12 + pullDepth * 154;
+  const travelHeadTiltX = 10 - pushDepth * 4 - pullDepth * 142;
   const motionClass = v > 0.16 ? "is-pushed" : v < -0.16 ? "is-pulled" : "is-neutral";
   const stickTransform = isTravel
-    ? `translate3d(-50%, 0, 0) rotateX(${v * -10}deg)`
+    ? `translate3d(-50%, 0, 0.22rem) rotateX(${travelStickTiltX}deg)`
     : `translate3d(-50%, ${stickDrop}rem, 0) rotateX(${bendX}deg)`;
   const pivotTransform = isTravel
-    ? `translate3d(-50%, calc(-50% + ${v * -0.62}rem), 0) rotateX(18deg)`
+    ? `translate3d(-50%, calc(-50% + ${v * -0.68}rem), 0) rotateX(12deg)`
     : undefined;
   return (
     <div
@@ -288,10 +290,18 @@ function VisualLever({
           className={`yanmar-lever-stick yanmar-lever-${color}`}
           style={{
             transform: stickTransform,
-            height: isTravel ? "0.22rem" : undefined,
+            height: isTravel ? "0.95rem" : undefined,
           }}
         >
-          <span />
+          <span
+            style={
+              isTravel
+                ? {
+                    transform: `translateX(-50%) translateZ(0.12rem) perspective(5rem) rotateX(${travelHeadTiltX}deg)`,
+                  }
+                : undefined
+            }
+          />
         </div>
       </div>
     </div>
@@ -864,6 +874,19 @@ function HornTouchZone({
       tabIndex={-1}
       aria-label="경적"
     >
+      <span
+        className="yanmar-horn-button-visual pointer-events-none"
+        style={{ width: "2.36rem", height: "1.4rem" }}
+        aria-hidden
+      >
+        <span
+          className="yanmar-horn-button-image"
+          style={{
+            backgroundImage:
+              'url("/images/yanmar/2d/cockpit/horn-compact-fit.png?v=3")',
+          }}
+        />
+      </span>
       {showTouchZone ? (
         <span className="pointer-events-none absolute inset-0 border border-yellow-200/70 bg-yellow-200/10" />
       ) : null}
@@ -1135,14 +1158,7 @@ function RpmLever({
       aria-label={active ? "RPM(x2)" : "RPM(x1)"}
     >
       <span className="yanmar-aux-lever-well" aria-hidden>
-        <VisualLever
-          cx={cx}
-          cy={cy}
-          value={active ? 1 : -1}
-          color="red"
-          variant="hydraulic"
-          compact
-        />
+        <span className="yanmar-menu-control-art yanmar-menu-control-art-rpm" />
       </span>
       <span className="yanmar-aux-button-label">{active ? "RPM(x2)" : "RPM(x1)"}</span>
       {showTouchZone && (
@@ -1191,14 +1207,7 @@ function SafetyLever({
       aria-label={active ? "안전(잠금)" : "안전(해제)"}
     >
       <span className="yanmar-aux-lever-well" aria-hidden>
-        <VisualLever
-          cx={cx}
-          cy={cy}
-          value={active ? 1 : -0.25}
-          color="red"
-          variant="safety"
-          compact
-        />
+        <span className="yanmar-menu-control-art yanmar-menu-control-art-safety" />
       </span>
       <span className="yanmar-aux-button-label">{active ? "안전(잠금)" : "안전(해제)"}</span>
       {showTouchZone && (
@@ -1443,10 +1452,10 @@ function BreakerPedalControl({
       }`}
       style={{
         left: `${pedal.cx * 100}%`,
-        top: `${pedal.cy * 100}%`,
         width: isPortrait ? "2.55rem" : "2.35rem",
-        height: isPortrait ? "2.55rem" : "2.35rem",
-        transform: "translate(-50%, -50%)",
+        height: isPortrait ? "3.7rem" : "3.4rem",
+        bottom: 0,
+        transform: "translateX(-50%)",
       }}
       onPointerDown={press}
       onPointerUp={release}
@@ -1596,7 +1605,7 @@ function PedalSwingControl({
       {embedded && (
         <span className="yanmar-visual-pedal-nested pointer-events-none" aria-hidden>
           <span
-            className="yanmar-pedal-pad"
+            className="yanmar-menu-control-art yanmar-menu-control-art-pedal"
             style={{
               transform: `translate(-50%, calc(-50% + ${(topPressAmount - bottomPressAmount) * 0.12}rem))`,
             }}

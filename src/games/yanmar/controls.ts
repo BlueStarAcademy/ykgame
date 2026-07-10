@@ -102,8 +102,8 @@ export const DEFAULT_BOOM_SWING = 0.28;
 /** 블레이드: 0=상승(기본), 1=하강(접지) */
 export const BLADE_RAISED = 0;
 export const BLADE_LOWERED = 1;
-/** 레버를 끝까지 밀었을 때 0↔1 왕복에 약 2.5초 */
-export const BLADE_SPEED_PER_SECOND = 0.4;
+/** 레버를 끝까지 밀었을 때 0↔1 이동에 약 1.25초 */
+export const BLADE_SPEED_PER_SECOND = 0.8;
 
 export function createAuxiliaryControls(): AuxiliaryControlState {
   return {

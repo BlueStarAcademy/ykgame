@@ -12,6 +12,7 @@ interface PhaserGameWrapperProps {
   onEnd: (result: GameResult) => void;
   exitSignal?: number;
   resumeSignal?: number;
+  scoreCommit?: { id: number; score: number } | null;
   immersive?: boolean;
   initialPlayMode?: "practice" | "game" | "ride";
   onShowRanking?: () => void;
@@ -103,6 +104,7 @@ export function PhaserGameWrapper({
   onEnd,
   exitSignal = 0,
   resumeSignal = 0,
+  scoreCommit = null,
   immersive = false,
   initialPlayMode,
   onShowRanking,
@@ -114,6 +116,7 @@ export function PhaserGameWrapper({
         onEnd={onEnd}
         exitSignal={exitSignal}
         resumeSignal={resumeSignal}
+        scoreCommit={scoreCommit}
         immersive={immersive}
         initialPlayMode={initialPlayMode}
         onShowRanking={onShowRanking}
