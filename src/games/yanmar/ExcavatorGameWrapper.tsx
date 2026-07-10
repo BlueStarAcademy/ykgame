@@ -59,8 +59,10 @@ import {
   type YanmarGameSessionSnapshot,
 } from "./gameSessionPersistence";
 import {
-  loadSavedArmPoseSlots,
+  loadAutoPoseSlotsForSession,
+  resolveAutoPoseStorageOwner,
   saveSavedArmPoseSlot,
+  saveSavedArmPoseSlots,
 } from "./autoPosePersistence";
 import {
   createDumpTruckState,
@@ -349,9 +351,9 @@ export function ExcavatorGameWrapper({
   );
   const [equipmentStats, setEquipmentStats] =
     useState<YanmarEquipmentStats>(defaultEquipmentStats);
-  const [currency, setCurrency] = useState(0);
-  const [totalXp, setTotalXp] = useState(0);
-  const [previewStars, setPreviewStars] = useState(0);
+  const [currency, setCurrency] = useState(() => session?.user?.currency ?? 0);
+  const [totalXp, setTotalXp] = useState(() => session?.user?.totalXp ?? 0);
+  const [previewStars, setPreviewStars] = useState(() => session?.user?.currency ?? 0);
   const [stepCompleteFlash, setStepCompleteFlash] = useState(false);
   const [showControlsGuide, setShowControlsGuide] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
@@ -385,7 +387,7 @@ export function ExcavatorGameWrapper({
   const lastHudProgressRef = useRef(-1);
   const arcadeScoreRef = useRef(0);
   const rewardStarsRef = useRef(0);
-  const currencyRef = useRef(0);
+  const currencyRef = useRef(session?.user?.currency ?? 0);
   const processedExitSignalRef = useRef(0);
   const dumpScorePanelRef = useRef<DumpScorePanelState | null>(null);
   const dumpScoreHideTimerRef = useRef<number | null>(null);
@@ -531,24 +533,29 @@ export function ExcavatorGameWrapper({
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
-    const userId = session?.user?.id;
-    if (!userId) return;
-
-    dumpTruckUserIdRef.current = userId;
-    gameSessionUserIdRef.current = userId;
-
-    const savedSlots = loadSavedArmPoseSlots(userId);
-    if (savedSlots[0] || savedSlots[1]) {
-      autoPoseRef.current.slots = savedSlots;
-      autoPoseRef.current.saved = savedSlots[autoPoseRef.current.activeSlot];
-      setAutoPose({ ...autoPoseRef.current });
+    const userId = session?.user?.id ?? null;
+    if (userId) {
+      dumpTruckUserIdRef.current = userId;
+      gameSessionUserIdRef.current = userId;
     }
 
-    if (modeRef.current === "game" && !gameSessionRestoredRef.current) {
+    const savedSlots = loadAutoPoseSlotsForSession(userId);
+    autoPoseRef.current.slots = [savedSlots[0], savedSlots[1]];
+    autoPoseRef.current.saved = savedSlots[autoPoseRef.current.activeSlot];
+    // 실행 중이면 유지하고, 아니면 저장된 슬롯만 복원한다.
+    if (!autoPoseRef.current.executing) {
+      autoPoseRef.current.phase = null;
+    }
+    setAutoPose({
+      ...autoPoseRef.current,
+      slots: [...autoPoseRef.current.slots],
+    });
+
+    if (userId && modeRef.current === "game" && !gameSessionRestoredRef.current) {
       const snapshot = loadYanmarGameSession(userId);
       gameSessionRestoredRef.current = true;
       if (snapshot) applyGameSnapshot(snapshot);
-    } else if (modeRef.current !== "game" && !gameSessionRestoredRef.current) {
+    } else if (userId && modeRef.current !== "game" && !gameSessionRestoredRef.current) {
       const restored = loadDumpTruckCooldown(userId);
       if (restored) {
         Object.assign(dumpTruckStateRef.current, restored);
@@ -559,8 +566,14 @@ export function ExcavatorGameWrapper({
     return () => {
       persistGameSession(true);
       persistDumpTruckCooldown(true);
-      dumpTruckUserIdRef.current = null;
-      gameSessionUserIdRef.current = null;
+      const ownerId = resolveAutoPoseStorageOwner(
+        session?.user?.id ?? gameSessionUserIdRef.current,
+      );
+      saveSavedArmPoseSlots(ownerId, autoPoseRef.current.slots);
+      if (!session?.user?.id) {
+        dumpTruckUserIdRef.current = null;
+        gameSessionUserIdRef.current = null;
+      }
     };
   }, [
     applyGameSnapshot,
@@ -574,10 +587,14 @@ export function ExcavatorGameWrapper({
     const saveBeforeLeaving = () => {
       persistGameSession(true);
       persistDumpTruckCooldown(true);
+      const ownerId = resolveAutoPoseStorageOwner(
+        session?.user?.id ?? gameSessionUserIdRef.current,
+      );
+      saveSavedArmPoseSlots(ownerId, autoPoseRef.current.slots);
     };
     window.addEventListener("pagehide", saveBeforeLeaving);
     return () => window.removeEventListener("pagehide", saveBeforeLeaving);
-  }, [persistDumpTruckCooldown, persistGameSession]);
+  }, [persistDumpTruckCooldown, persistGameSession, session?.user?.id]);
 
   const syncMergedInput = useCallback(() => {
     setInput(
@@ -672,6 +689,18 @@ export function ExcavatorGameWrapper({
   }, [session?.user?.totalXp]);
 
   useEffect(() => {
+    const sessionCurrency = session?.user?.currency;
+    if (typeof sessionCurrency !== "number" || sessionCurrency < 0) return;
+    // API로 이미 채운 값은 덮어쓰지 않고, 초기 0만 세션으로 채운다.
+    setCurrency((prev) => {
+      if (prev > 0) return prev;
+      currencyRef.current = sessionCurrency;
+      return sessionCurrency;
+    });
+    setPreviewStars((prev) => (prev > 0 ? prev : sessionCurrency));
+  }, [session?.user?.currency]);
+
+  useEffect(() => {
     if (mode === "ride") return;
     void loadEquipment();
   }, [loadEquipment, mode]);
@@ -757,10 +786,10 @@ export function ExcavatorGameWrapper({
       slots: [...autoPoseRef.current.slots],
     });
 
-    const userId = session?.user?.id ?? gameSessionUserIdRef.current;
-    if (userId) {
-      saveSavedArmPoseSlot(userId, slot, pose, now);
-    }
+    const ownerId = resolveAutoPoseStorageOwner(
+      session?.user?.id ?? gameSessionUserIdRef.current,
+    );
+    saveSavedArmPoseSlot(ownerId, slot, pose, now);
 
     setSavePoseCooldownUntil(now + poseActionCooldownMs);
     showPoseSaveToast();
@@ -790,13 +819,23 @@ export function ExcavatorGameWrapper({
     const nextAuxiliary = createAuxiliaryControls();
     auxiliaryRef.current = nextAuxiliary;
     setAuxiliary(nextAuxiliary);
-    // 저장된 자세는 세션 리셋 후에도 유지 (종료 후 재입장 시 실행 가능)
-    const userId = session?.user?.id ?? gameSessionUserIdRef.current;
-    const persistedSlots = userId ? loadSavedArmPoseSlots(userId) : ([null, null] as const);
+    // 저장된 자세는 세션 리셋·종료 후에도 유지 (재입장 시 실행 가능)
+    const ownerId = resolveAutoPoseStorageOwner(
+      session?.user?.id ?? gameSessionUserIdRef.current,
+    );
+    saveSavedArmPoseSlots(ownerId, autoPoseRef.current.slots);
+    const persistedSlots = loadAutoPoseSlotsForSession(
+      session?.user?.id ?? gameSessionUserIdRef.current,
+    );
+    const prevActiveSlot = autoPoseRef.current.activeSlot;
     autoPoseRef.current = createAutoPoseState();
+    autoPoseRef.current.activeSlot = prevActiveSlot;
     autoPoseRef.current.slots = [persistedSlots[0], persistedSlots[1]];
-    autoPoseRef.current.saved = persistedSlots[0];
-    setAutoPose({ ...autoPoseRef.current });
+    autoPoseRef.current.saved = persistedSlots[prevActiveSlot];
+    setAutoPose({
+      ...autoPoseRef.current,
+      slots: [...autoPoseRef.current.slots],
+    });
     clearAllInput();
     if (dumpScoreHideTimerRef.current != null) {
       window.clearTimeout(dumpScoreHideTimerRef.current);
@@ -912,6 +951,10 @@ export function ExcavatorGameWrapper({
     clearAllInput();
     persistGameSession(true);
     persistDumpTruckCooldown(true);
+    const ownerId = resolveAutoPoseStorageOwner(
+      session?.user?.id ?? gameSessionUserIdRef.current,
+    );
+    saveSavedArmPoseSlots(ownerId, autoPoseRef.current.slots);
 
     const currentMode = modeRef.current;
     const score = scoreRef.current;
@@ -938,6 +981,7 @@ export function ExcavatorGameWrapper({
     onEnd,
     persistDumpTruckCooldown,
     persistGameSession,
+    session?.user?.id,
   ]);
 
   useEffect(() => {
@@ -1269,6 +1313,7 @@ export function ExcavatorGameWrapper({
             setEquipmentStats(data.stats);
           }
           if (typeof data.currency === "number") {
+            currencyRef.current = data.currency;
             setCurrency(data.currency);
             await updateSessionRef.current({ user: { currency: data.currency } });
           }
@@ -1331,6 +1376,7 @@ export function ExcavatorGameWrapper({
           setEquipmentStats(data.stats);
         }
         if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
           setCurrency(data.currency);
           await updateSessionRef.current({ user: { currency: data.currency } });
         }

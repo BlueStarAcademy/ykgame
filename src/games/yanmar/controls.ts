@@ -360,7 +360,7 @@ export function getActiveAutoPoseJoint(
 
 /**
  * 저장 자세까지 수동 조이스틱과 동일한 축 입력을 합성한다.
- * applyControls의 부호(암: -left.y, 붐: +right.y, 버킷: +right.x)에 맞춘다.
+ * applyControls 부호: 암 +left.y, 붐 +right.y, 버킷 +right.x
  */
 export function buildAutoArmControlInput(
   sim: { boom: number; arm: number; bucket: number },
@@ -375,10 +375,10 @@ export function buildAutoArmControlInput(
 
   switch (getActiveAutoPoseJoint(autoPose)) {
     case "arm":
-      // left.y > 0 = 암 당김(각도↓), applyControls에서 vel.arm = -left.y
+      // left.y > 0 = 암 뻗음(각도↑), applyControls에서 vel.arm = +left.y
       return {
         ...idle,
-        left: { x: 0, y: -autoStickToward(sim.arm, saved.arm) },
+        left: { x: 0, y: autoStickToward(sim.arm, saved.arm) },
       };
     case "boom":
       return {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { clientLogout } from "@/lib/client-logout";
 import { MailboxModal, useMailboxBadge } from "@/components/layout/MailboxModal";
@@ -46,17 +46,55 @@ function HamburgerButton({ onClick, open }: { onClick: () => void; open: boolean
 }
 
 export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
-  const { data: session } = useSession();
+  const { data: session, status, update } = useSession();
+  const [liveCurrency, setLiveCurrency] = useState<number | null>(null);
+  const seenSessionCurrencyRef = useRef<number | undefined>(undefined);
+  const syncedServerCurrencyRef = useRef<number | null>(null);
+  const { unclaimedCount, refresh: refreshMailbox } = useMailboxBadge();
   const [menuOpen, setMenuOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [mailboxOpen, setMailboxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rankingOpen, setRankingOpen] = useState(false);
-  const { unclaimedCount, refresh: refreshMailbox } = useMailboxBadge();
+
+  const sessionCurrency = session?.user?.currency;
+
+  // 페이지 SSR(DB) 값이 있으면 JWT보다 우선해 첫 페인트 오표시를 막는다.
+  useEffect(() => {
+    setLiveCurrency(null);
+    syncedServerCurrencyRef.current = null;
+  }, [currency]);
+
+  // 서버에서 내려준 최신 재화로 JWT를 맞춘다.
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    if (typeof currency !== "number") return;
+    if (sessionCurrency === currency) return;
+    if (syncedServerCurrencyRef.current === currency) return;
+    syncedServerCurrencyRef.current = currency;
+    void update({ user: { currency } });
+  }, [currency, sessionCurrency, status, update]);
+
+  // 우편 수령·게임 보상 등 페이지 내 세션 갱신만 반영한다.
+  // 첫 하이드레이션 값은 SSR이 있을 때 무시해 잠깐 0/구값으로 깜빡이지 않게 한다.
+  useEffect(() => {
+    if (typeof sessionCurrency !== "number") return;
+    const prev = seenSessionCurrencyRef.current;
+    seenSessionCurrencyRef.current = sessionCurrency;
+    if (prev === undefined) {
+      if (typeof currency !== "number") {
+        setLiveCurrency(sessionCurrency);
+      }
+      return;
+    }
+    if (prev !== sessionCurrency) {
+      setLiveCurrency(sessionCurrency);
+    }
+  }, [currency, sessionCurrency]);
 
   const displayNickname =
     session?.user?.nickname ?? nickname ?? "플레이어";
-  const displayCurrency = session?.user?.currency ?? currency ?? 0;
+  const displayCurrency = liveCurrency ?? currency ?? sessionCurrency ?? 0;
   const displayRole = session?.user?.role ?? role ?? "USER";
 
   return (

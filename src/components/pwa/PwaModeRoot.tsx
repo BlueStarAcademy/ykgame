@@ -23,6 +23,13 @@ function PwaModeRootInner({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Install prompt may be unavailable without SW; ignore registration errors.
+    });
+  }, []);
+
+  useEffect(() => {
     const fromUrl = activatePwaFromSearchParams(searchParams);
     const on = fromUrl || isPwaMode() || isStandalonePwa();
     setActive(on);

@@ -1,12 +1,12 @@
 {
-  "name": "YK건기 중장비 체험",
-  "short_name": "YKGAME",
+  "name": "YK게임",
+  "short_name": "YK게임",
   "description": "YK건기 중장비를 게임으로 직접 체험하세요",
   "start_url": "/?pwa=1",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#1e293b",
+  "background_color": "#C62828",
   "theme_color": "#C62828",
   "lang": "ko",
   "icons": [

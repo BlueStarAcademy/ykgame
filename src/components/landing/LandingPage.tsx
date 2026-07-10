@@ -3,6 +3,7 @@ import { GAMES } from "@/lib/games";
 import { COMPANY, EXPERIENCE_STEPS } from "@/lib/landing-content";
 import { LandingEquipmentCard } from "./LandingEquipmentCard";
 import { PwaExperienceButton } from "./PwaExperienceButton";
+import { PwaInstallButton } from "./PwaInstallButton";
 import { WebExperienceSection } from "./WebExperienceSection";
 
 interface LandingPageProps {
@@ -49,6 +50,7 @@ export function LandingPage({ rideHref, gameHref }: LandingPageProps) {
               게임 체험
             </PwaExperienceButton>
           </div>
+          <PwaInstallButton />
           <p className="mx-auto max-w-[280px] text-center text-[9px] leading-relaxed text-gray-400">
             탑승 체험은 실제 조작감 시뮬레이터 · 게임 체험은 미션·보상·랭킹
           </p>

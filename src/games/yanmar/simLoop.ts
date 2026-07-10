@@ -467,8 +467,9 @@ export function tickExcavatorSim(params: SimTickParams) {
   const bucketCurlReady =
     (bucketCurlingInward && sim.bucket <= 1.85) ||
     (autoActiveJoint === "bucket" && autoSaved != null && sim.bucket <= 1.85);
+  // left.y < 0 / vel.arm < 0 = 암 당김(각도↓) — applyControls 매핑과 동일
   const armPulling =
-    filtered.left.y > 0.05 ||
+    filtered.left.y < -0.05 ||
     vel.arm < -0.025 ||
     autoActiveJoint === "arm";
   const naturalDigPose =
@@ -547,7 +548,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       inwardBucketMotion * 0.48 +
       Math.abs(vel.boom) * 0.25;
     const inputMotion =
-      Math.max(0, filtered.left.y) * 0.75 +
+      Math.max(0, -filtered.left.y) * 0.75 +
       Math.abs(filtered.right.y) * 0.3 +
       Math.max(0, -filtered.right.x) * 0.42;
     const autoDigLoadingActive =

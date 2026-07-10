@@ -5,6 +5,9 @@ const STORAGE_PREFIX = "ykgame:yanmar:auto-pose:v2";
 const LEGACY_STORAGE_PREFIX = "ykgame:yanmar:auto-pose:v1";
 const SNAPSHOT_VERSION = 2;
 
+/** 비로그인·세션 대기 중에도 같은 브라우저에서 자세를 유지한다. */
+export const AUTO_POSE_LOCAL_OWNER = "local";
+
 export type AutoPoseSlots = [SavedArmPose | null, SavedArmPose | null];
 
 interface AutoPoseSnapshotV2 {
@@ -19,12 +22,12 @@ interface AutoPoseSnapshotV1 {
   pose: SavedArmPose;
 }
 
-function storageKey(userId: string) {
-  return `${STORAGE_PREFIX}:${userId}`;
+function storageKey(ownerId: string) {
+  return `${STORAGE_PREFIX}:${ownerId}`;
 }
 
-function legacyStorageKey(userId: string) {
-  return `${LEGACY_STORAGE_PREFIX}:${userId}`;
+function legacyStorageKey(ownerId: string) {
+  return `${LEGACY_STORAGE_PREFIX}:${ownerId}`;
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -54,6 +57,10 @@ function normalizeSlots(value: unknown): AutoPoseSlots {
   return slots;
 }
 
+function hasAnySlot(slots: AutoPoseSlots): boolean {
+  return slots[0] != null || slots[1] != null;
+}
+
 function isValidSnapshotV2(value: unknown): value is AutoPoseSnapshotV2 {
   if (!value || typeof value !== "object") return false;
   const snapshot = value as Partial<AutoPoseSnapshotV2>;
@@ -74,47 +81,69 @@ function isValidSnapshotV1(value: unknown): value is AutoPoseSnapshotV1 {
   );
 }
 
-function migrateLegacySlots(userId: string): AutoPoseSlots | null {
+function migrateLegacySlots(ownerId: string): AutoPoseSlots | null {
   try {
-    const raw = window.localStorage.getItem(legacyStorageKey(userId));
+    const raw = window.localStorage.getItem(legacyStorageKey(ownerId));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!isValidSnapshotV1(parsed)) {
-      window.localStorage.removeItem(legacyStorageKey(userId));
+      window.localStorage.removeItem(legacyStorageKey(ownerId));
       return null;
     }
     const slots: AutoPoseSlots = [{ ...parsed.pose }, null];
-    saveSavedArmPoseSlots(userId, slots, parsed.savedAtMs);
-    window.localStorage.removeItem(legacyStorageKey(userId));
+    saveSavedArmPoseSlots(ownerId, slots, parsed.savedAtMs);
+    window.localStorage.removeItem(legacyStorageKey(ownerId));
     return slots;
   } catch {
     return null;
   }
 }
 
-export function loadSavedArmPoseSlots(userId: string): AutoPoseSlots {
+/** 로그인 사용자는 userId, 아니면 브라우저 로컬 키. */
+export function resolveAutoPoseStorageOwner(userId?: string | null): string {
+  return userId?.trim() ? userId : AUTO_POSE_LOCAL_OWNER;
+}
+
+export function loadSavedArmPoseSlots(ownerId: string): AutoPoseSlots {
   try {
-    const raw = window.localStorage.getItem(storageKey(userId));
+    const raw = window.localStorage.getItem(storageKey(ownerId));
     if (raw) {
       const parsed: unknown = JSON.parse(raw);
       if (isValidSnapshotV2(parsed)) {
         return normalizeSlots(parsed.slots);
       }
-      window.localStorage.removeItem(storageKey(userId));
+      window.localStorage.removeItem(storageKey(ownerId));
     }
-    return migrateLegacySlots(userId) ?? emptySlots();
+    return migrateLegacySlots(ownerId) ?? emptySlots();
   } catch {
     return emptySlots();
   }
 }
 
+/**
+ * 로그인 시 사용자 슬롯을 우선하고, 비어 있으면 로컬(게스트) 슬롯을 이어받는다.
+ */
+export function loadAutoPoseSlotsForSession(userId?: string | null): AutoPoseSlots {
+  const ownerId = resolveAutoPoseStorageOwner(userId);
+  const owned = loadSavedArmPoseSlots(ownerId);
+  if (hasAnySlot(owned) || ownerId === AUTO_POSE_LOCAL_OWNER) {
+    return owned;
+  }
+
+  const local = loadSavedArmPoseSlots(AUTO_POSE_LOCAL_OWNER);
+  if (!hasAnySlot(local)) return owned;
+
+  saveSavedArmPoseSlots(ownerId, local);
+  return local;
+}
+
 /** @deprecated 단일 슬롯 호환 — 슬롯 0만 반환 */
-export function loadSavedArmPose(userId: string): SavedArmPose | null {
-  return loadSavedArmPoseSlots(userId)[0];
+export function loadSavedArmPose(ownerId: string): SavedArmPose | null {
+  return loadSavedArmPoseSlots(ownerId)[0];
 }
 
 export function saveSavedArmPoseSlots(
-  userId: string,
+  ownerId: string,
   slots: AutoPoseSlots,
   nowMs = Date.now(),
 ) {
@@ -127,32 +156,32 @@ export function saveSavedArmPoseSlots(
         slots[1] ? { ...slots[1] } : null,
       ],
     };
-    window.localStorage.setItem(storageKey(userId), JSON.stringify(payload));
+    window.localStorage.setItem(storageKey(ownerId), JSON.stringify(payload));
   } catch {
     // 저장 공간이 차단되더라도 게임 진행은 유지한다.
   }
 }
 
 export function saveSavedArmPoseSlot(
-  userId: string,
+  ownerId: string,
   slot: AutoPoseSlotIndex,
   pose: SavedArmPose,
   nowMs = Date.now(),
 ) {
-  const slots = loadSavedArmPoseSlots(userId);
+  const slots = loadSavedArmPoseSlots(ownerId);
   slots[slot] = { ...pose };
-  saveSavedArmPoseSlots(userId, slots, nowMs);
+  saveSavedArmPoseSlots(ownerId, slots, nowMs);
 }
 
 /** @deprecated 단일 슬롯 호환 — 슬롯 0에 저장 */
-export function saveSavedArmPose(userId: string, pose: SavedArmPose, nowMs = Date.now()) {
-  saveSavedArmPoseSlot(userId, 0, pose, nowMs);
+export function saveSavedArmPose(ownerId: string, pose: SavedArmPose, nowMs = Date.now()) {
+  saveSavedArmPoseSlot(ownerId, 0, pose, nowMs);
 }
 
-export function clearSavedArmPose(userId: string) {
+export function clearSavedArmPose(ownerId: string) {
   try {
-    window.localStorage.removeItem(storageKey(userId));
-    window.localStorage.removeItem(legacyStorageKey(userId));
+    window.localStorage.removeItem(storageKey(ownerId));
+    window.localStorage.removeItem(legacyStorageKey(ownerId));
   } catch {
     // ignore
   }
