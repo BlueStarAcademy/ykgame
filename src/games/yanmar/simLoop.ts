@@ -24,16 +24,20 @@ import {
   dumpTruckBedCenterWorld,
   dumpTruckBedDeckWorldY,
   getMapWorldBounds,
+  addHaulTruckRock,
+  damageCrashTile,
+  getCrashTileAt,
   digZoneLabel,
   getDigZoneRespawnEtaSec,
   sampleHeight,
   updateDigZoneRespawns,
+  updateSpecialZones,
   worldToDumpTruckLocal,
   type TerrainData,
   DUMP_ZONE,
   DUMP_TRUCK,
-  DUMP_TRUCK_BED,
 } from "./terrain";
+import { checkAttachmentUse, getZoneAt } from "./attachmentZones";
 import {
   BUCKET_SOIL_HOLD_MIN,
   getBucketBodyContactWorld,
@@ -98,6 +102,8 @@ export interface SimLoopRuntime {
   dumpSoilVisual: DumpSoilVisual;
   digDust: DigDustVisual;
   bladeSpray: BladeSprayVisual;
+  attachmentActionCooldown: number;
+  warningCooldown: number;
 }
 
 export function createSimLoopRuntime(): SimLoopRuntime {
@@ -120,6 +126,8 @@ export function createSimLoopRuntime(): SimLoopRuntime {
       heading: 0,
       intensity: 0,
     },
+    attachmentActionCooldown: 0,
+    warningCooldown: 0,
   };
 }
 
@@ -142,6 +150,9 @@ export interface SimTickParams {
   runtime: SimLoopRuntime;
   onProgress: (dumped: number, progress: number) => void;
   onDumpScore: (popup: Omit<DumpScorePopup, "id">) => void;
+  onCrashTileDestroyed: (tileId: string) => void;
+  onHillRockDelivered: (rockId: string) => void;
+  onAttachmentWarning: (message: string) => void;
   onSimTick: () => void;
 }
 
@@ -291,10 +302,22 @@ export function tickExcavatorSim(params: SimTickParams) {
     runtime,
     onProgress,
     onDumpScore,
+    onCrashTileDestroyed,
+    onHillRockDelivered,
+    onAttachmentWarning,
     onSimTick,
   } = params;
 
   updateDumpTruckState(truckState, dt, stats.truckCooldownSec);
+  updateSpecialZones(
+    terrain,
+    dt,
+    Date.now(),
+    stats.crashRespawnSec,
+    stats.haulTruckCooldownSec,
+  );
+  runtime.attachmentActionCooldown = Math.max(0, runtime.attachmentActionCooldown - dt);
+  runtime.warningCooldown = Math.max(0, runtime.warningCooldown - dt);
   const truckPose = getDumpTruckPose(truckState);
   params.dumpTruckPose.groupX = truckPose.groupX;
   params.dumpTruckPose.groupZ = truckPose.groupZ;
@@ -324,7 +347,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     terrain,
   );
   const bucketAnchoredToGround =
-    bucketTipInDigZone && beforeControlBucket.clearance < 0.18;
+    sim.attachmentType === "bucket" &&
+    bucketTipInDigZone &&
+    beforeControlBucket.clearance < -0.05;
   const wantsTravel =
     allowed.travel &&
     (Math.abs(rawInput.travel.left) > 0.08 || Math.abs(rawInput.travel.right) > 0.08);
@@ -382,6 +407,30 @@ export function tickExcavatorSim(params: SimTickParams) {
   if (constrainExcavatorToMap(sim, terrain)) {
     vel.travel = 0;
   }
+  // Height samples are cell-based. Dividing a cell-boundary height jump by the
+  // tiny per-frame travel distance creates a false near-vertical slope and
+  // repeatedly zeroes travel velocity. Probe across a full terrain cell instead.
+  const slopeProbe = Math.max(terrain.cellSize, 1);
+  const slopeX =
+    Math.abs(
+      sampleHeight(terrain, sim.posX + slopeProbe, sim.posZ) -
+        sampleHeight(terrain, sim.posX - slopeProbe, sim.posZ),
+    ) /
+    (slopeProbe * 2);
+  const slopeZ =
+    Math.abs(
+      sampleHeight(terrain, sim.posX, sim.posZ + slopeProbe) -
+        sampleHeight(terrain, sim.posX, sim.posZ - slopeProbe),
+    ) /
+    (slopeProbe * 2);
+  const terrainGrade = Math.hypot(slopeX, slopeZ);
+  if (terrainGrade > 1.05) {
+    sim.posX = beforeTravel.x;
+    sim.posZ = beforeTravel.z;
+    vel.travel = 0;
+  }
+  const bodyGround = sampleHeight(terrain, sim.posX, sim.posZ);
+  sim.posY += (bodyGround - 0.72 - sim.posY) * Math.min(1, dt * 18);
   if (constrainExcavatorToDumpTruck(sim, beforeTravel, truckPose)) {
     vel.travel = 0;
   }
@@ -421,6 +470,72 @@ export function tickExcavatorSim(params: SimTickParams) {
   const activeDigZones = getActiveDigZones(terrain);
   const scraperInDigZone = isInDigZone(scraper.x, scraper.z, terrain);
   const tipInDigZone = isInDigZone(bucketTip.x, bucketTip.z, terrain);
+  const toolZone = getZoneAt(bucketTip.x, bucketTip.z, terrain);
+  const toolGround = sampleHeight(terrain, bucketTip.x, bucketTip.z);
+  const toolTouchesGround = bucketTip.y - toolGround < 0.32;
+  const toolInputActive =
+    Math.abs(filtered.right.x) > 0.2 || Math.abs(filtered.left.y) > 0.2;
+  const warnAttachment = (message?: string) => {
+    if (!message || runtime.warningCooldown > 0) return;
+    runtime.warningCooldown = 3;
+    onAttachmentWarning(message);
+  };
+
+  if (sim.attachmentType === "breaker" && toolInputActive && toolTouchesGround) {
+    const permission = checkAttachmentUse("breaker", toolZone, "strike");
+    if (!permission.allowed) {
+      warnAttachment(permission.message);
+    } else if (runtime.attachmentActionCooldown <= 0) {
+      const tile = getCrashTileAt(terrain, bucketTip.x, bucketTip.z);
+      if (tile?.active) {
+        const result = damageCrashTile(terrain, tile.id);
+        runtime.attachmentActionCooldown = 0.3;
+        runtime.digDust.active = true;
+        runtime.digDust.x = bucketTip.x;
+        runtime.digDust.y = toolGround + 0.08;
+        runtime.digDust.z = bucketTip.z;
+        if (result?.destroyed) onCrashTileDestroyed(tile.id);
+      }
+    }
+  }
+
+  if (sim.attachmentType === "grapple" && toolInputActive) {
+    const permission = checkAttachmentUse("grapple", toolZone, "grab");
+    if (!permission.allowed && toolTouchesGround) {
+      warnAttachment(permission.message);
+    } else if (permission.allowed && runtime.attachmentActionCooldown <= 0) {
+      const hill = terrain.hillZone;
+      const closing = filtered.right.x < -0.2 || sim.bucket <= 0.72;
+      const opening = filtered.right.x > 0.2 || sim.bucket >= 1.32;
+      if (hill && !sim.carriedBoulderId && closing) {
+        const rock = hill.boulders
+          .filter((item) => item.active && !item.delivered)
+          .map((item) => ({
+            item,
+            distance: Math.hypot(item.x - bucketTip.x, item.z - bucketTip.z),
+          }))
+          .sort((a, b) => a.distance - b.distance)[0];
+        if (rock && rock.distance <= 2.6) {
+          rock.item.active = false;
+          sim.carriedBoulderId = rock.item.id;
+          runtime.attachmentActionCooldown = 0.5;
+        }
+      } else if (hill && sim.carriedBoulderId && opening) {
+        const atDrop =
+          Math.hypot(bucketTip.x - hill.dropX, bucketTip.z - hill.dropZ) <= 5;
+        if (atDrop && addHaulTruckRock(terrain)) {
+          const rock = hill.boulders.find(
+            (item) => item.id === sim.carriedBoulderId,
+          );
+          if (rock) rock.delivered = true;
+          const deliveredId = sim.carriedBoulderId;
+          sim.carriedBoulderId = null;
+          runtime.attachmentActionCooldown = 0.6;
+          onHillRockDelivered(deliveredId);
+        }
+      }
+    }
+  }
   const isInDumpTruckRearBox = (wx: number, wz: number) => {
     const local = worldToDumpTruckLocal(wx, wz, truckPose.groupX, truckPose.groupZ);
     const relX = local.x - DUMP_TRUCK.bedLocalX;
@@ -536,7 +651,26 @@ export function tickExcavatorSim(params: SimTickParams) {
   const digRate = isTutorial ? 9.5 : 7.2;
   const loadRate = isTutorial ? 7.0 : 5.4;
 
-  if (inZone && bucketInWorkRange && sim.bucketLoad < 1 && soilRetention >= BUCKET_SOIL_HOLD_MIN) {
+  const bucketDigInput =
+    Math.max(0, -filtered.right.x) > 0.12 ||
+    Math.max(0, -filtered.left.y) > 0.12;
+  if (
+    sim.attachmentType === "bucket" &&
+    bucketDigInput &&
+    toolTouchesGround &&
+    !inZone
+  ) {
+    const permission = checkAttachmentUse("bucket", toolZone, "dig");
+    warnAttachment(permission.message);
+  }
+
+  if (
+    sim.attachmentType === "bucket" &&
+    inZone &&
+    bucketInWorkRange &&
+    sim.bucketLoad < 1 &&
+    soilRetention >= BUCKET_SOIL_HOLD_MIN
+  ) {
     const scrape = Math.max(0.38, scraperDepthBelow + 0.9);
     const digX = scraperInDigZone ? scraper.x : tipInDigZone ? bucketTip.x : scraper.x;
     const digZ = scraperInDigZone ? scraper.z : tipInDigZone ? bucketTip.z : scraper.z;
@@ -619,7 +753,10 @@ export function tickExcavatorSim(params: SimTickParams) {
     onProgress,
     onDumpScore,
   };
-  if (sim.bucketLoad > soilRetention + 0.002) {
+  if (
+    sim.attachmentType === "bucket" &&
+    sim.bucketLoad > soilRetention + 0.002
+  ) {
     const excess = sim.bucketLoad - soilRetention;
     const spillRate = soilRetention < BUCKET_SOIL_HOLD_MIN ? 2.4 : 1.35;
     const spillAmount =
@@ -643,7 +780,24 @@ export function tickExcavatorSim(params: SimTickParams) {
 
   // 하역 자세(버킷 펴기)면 장소와 무관하게 흙이 쏟아짐 — 트럭 위만 점수 반영
   const bucketDumpOpen = sim.bucket > 1.35;
-  if (sim.bucketLoad > 0 && bucketDumpOpen) {
+  if (
+    sim.attachmentType === "bucket" &&
+    sim.bucketLoad > 0.02 &&
+    bucketDumpOpen &&
+    !inTruckDumpTarget
+  ) {
+    const permission = checkAttachmentUse(
+      "bucket",
+      getZoneAt(bucketMouthCenter.x, bucketMouthCenter.z, terrain),
+      "dump",
+    );
+    warnAttachment(permission.message);
+  }
+  if (
+    sim.attachmentType === "bucket" &&
+    sim.bucketLoad > 0 &&
+    bucketDumpOpen
+  ) {
     const spillRate = 1.65;
     const remainingLoad = sim.bucketLoad;
     const dumpAmount =

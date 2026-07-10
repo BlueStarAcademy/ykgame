@@ -32,6 +32,8 @@ enum EquipmentPart {
   TRUCK
   TRUCK_CAPACITY
   TRUCK_SPEED
+  CRASH_RESPAWN
+  HAUL_TRUCK_SPEED
 }
 
 model User {

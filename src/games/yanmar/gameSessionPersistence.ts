@@ -11,11 +11,14 @@ import {
   createTerrain,
   updateDigZoneRespawns,
   type DigZone,
+  type CrashZone,
+  type HillZone,
   type TerrainData,
 } from "./terrain";
+import type { MapTier } from "./mapTier";
 
 const STORAGE_PREFIX = "ykgame:yanmar:game-session:v1";
-const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_VERSION = 2;
 
 export interface YanmarGameSessionSnapshot {
   version: typeof SNAPSHOT_VERSION;
@@ -25,6 +28,11 @@ export interface YanmarGameSessionSnapshot {
   dumpTruck: DumpTruckRuntimeState;
   dumpTruckCooldownSec: number;
   digZones: DigZone[];
+  crashZone: CrashZone | null;
+  hillZone: HillZone | null;
+  mapTier: MapTier;
+  gridSizeX: number;
+  gridSizeZ: number;
   heights: number[];
   baseHeights: number[];
   arcadeScore: number;
@@ -57,9 +65,14 @@ function isValidSim(value: unknown): value is ExcavatorSimState {
     isFiniteNumber(sim.arm) &&
     isFiniteNumber(sim.bucket) &&
     isFiniteNumber(sim.posX) &&
+    isFiniteNumber(sim.posY) &&
     isFiniteNumber(sim.posZ) &&
     isFiniteNumber(sim.heading) &&
-    isFiniteNumber(sim.bucketLoad)
+    isFiniteNumber(sim.bucketLoad) &&
+    (sim.attachmentType === "bucket" ||
+      sim.attachmentType === "breaker" ||
+      sim.attachmentType === "grapple") &&
+    (sim.carriedBoulderId === null || typeof sim.carriedBoulderId === "string")
   );
 }
 
@@ -104,6 +117,9 @@ function isValidSnapshot(value: unknown): value is YanmarGameSessionSnapshot {
     isFiniteNumber(snapshot.dumpTruckCooldownSec) &&
     Array.isArray(snapshot.digZones) &&
     snapshot.digZones.every(isValidDigZone) &&
+    (snapshot.mapTier === 1 || snapshot.mapTier === 2 || snapshot.mapTier === 3) &&
+    isFiniteNumber(snapshot.gridSizeX) &&
+    isFiniteNumber(snapshot.gridSizeZ) &&
     Array.isArray(snapshot.heights) &&
     Array.isArray(snapshot.baseHeights) &&
     snapshot.heights.length === snapshot.baseHeights.length &&
@@ -137,6 +153,22 @@ export function saveYanmarGameSession(
       dumpTruck: { ...snapshot.dumpTruck },
       dumpTruckCooldownSec: snapshot.dumpTruckCooldownSec,
       digZones: cloneDigZones(snapshot.digZones),
+      crashZone: snapshot.crashZone
+        ? {
+            ...snapshot.crashZone,
+            tiles: snapshot.crashZone.tiles.map((tile) => ({ ...tile })),
+          }
+        : null,
+      hillZone: snapshot.hillZone
+        ? {
+            ...snapshot.hillZone,
+            boulders: snapshot.hillZone.boulders.map((rock) => ({ ...rock })),
+            haulTruck: { ...snapshot.hillZone.haulTruck },
+          }
+        : null,
+      mapTier: snapshot.mapTier,
+      gridSizeX: snapshot.gridSizeX,
+      gridSizeZ: snapshot.gridSizeZ,
       heights: Array.from(snapshot.heights),
       baseHeights: Array.from(snapshot.baseHeights),
       arcadeScore: snapshot.arcadeScore,
@@ -182,6 +214,19 @@ export function loadYanmarGameSession(
       sim: { ...parsed.sim },
       dumpTruck,
       digZones: cloneDigZones(parsed.digZones),
+      crashZone: parsed.crashZone
+        ? {
+            ...parsed.crashZone,
+            tiles: parsed.crashZone.tiles.map((tile) => ({ ...tile })),
+          }
+        : null,
+      hillZone: parsed.hillZone
+        ? {
+            ...parsed.hillZone,
+            boulders: parsed.hillZone.boulders.map((rock) => ({ ...rock })),
+            haulTruck: { ...parsed.hillZone.haulTruck },
+          }
+        : null,
       heights: [...parsed.heights],
       baseHeights: [...parsed.baseHeights],
     };
@@ -191,11 +236,35 @@ export function loadYanmarGameSession(
 }
 
 export function applyGameSessionTerrain(
-  snapshot: Pick<YanmarGameSessionSnapshot, "digZones" | "heights" | "baseHeights">,
+  snapshot: Pick<
+    YanmarGameSessionSnapshot,
+    | "digZones"
+    | "heights"
+    | "baseHeights"
+    | "crashZone"
+    | "hillZone"
+    | "mapTier"
+    | "gridSizeX"
+    | "gridSizeZ"
+  >,
   nowMs = Date.now(),
 ): TerrainData {
-  const terrain = createTerrain(-48, -48, true);
+  const levelForTier = snapshot.mapTier === 3 ? 15 : snapshot.mapTier === 2 ? 10 : 1;
+  const terrain = createTerrain(-48, -48, true, levelForTier);
   terrain.digZones = cloneDigZones(snapshot.digZones);
+  terrain.crashZone = snapshot.crashZone
+    ? {
+        ...snapshot.crashZone,
+        tiles: snapshot.crashZone.tiles.map((tile) => ({ ...tile })),
+      }
+    : null;
+  terrain.hillZone = snapshot.hillZone
+    ? {
+        ...snapshot.hillZone,
+        boulders: snapshot.hillZone.boulders.map((rock) => ({ ...rock })),
+        haulTruck: { ...snapshot.hillZone.haulTruck },
+      }
+    : null;
   if (
     snapshot.heights.length === terrain.heights.length &&
     snapshot.baseHeights.length === terrain.baseHeights.length

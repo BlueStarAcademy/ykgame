@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  canIssueSeasonGameDropCoupon,
   createBarcodeCode,
   getCouponExpiresAt,
 } from "@/lib/coupon";
+import { lockAndCanIssueYanmarCoupon } from "@/lib/yanmar-rewards";
 import { getSeasonKey } from "@/lib/games";
 import {
   mergeYanmarEquipmentLevelsFromDb,
@@ -192,7 +192,7 @@ export async function POST(request: Request) {
       totalScore += planned.score;
 
       if (planned.kind === "coupon") {
-        const allowed = await canIssueSeasonGameDropCoupon(
+        const allowed = await lockAndCanIssueYanmarCoupon(
           tx,
           planned.couponType,
           seasonKey,

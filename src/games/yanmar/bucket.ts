@@ -68,7 +68,7 @@ function bucketPointWorld(sim: ExcavatorSimState, boomSwing: number, localX: num
 
   return {
     x: sim.posX + Math.sin(facing) * BOOM_OFFSET + Math.cos(facing) * reach,
-    y: height,
+    y: height + sim.posY,
     z: sim.posZ + Math.cos(facing) * BOOM_OFFSET - Math.sin(facing) * reach,
   };
 }
@@ -81,7 +81,7 @@ export function getBoomPivotWorld(sim: ExcavatorSimState, boomSwing = 0): Bucket
   const facing = sim.heading + sim.swing + boomSwing * 0.38;
   return {
     x: sim.posX + Math.sin(facing) * BOOM_OFFSET,
-    y: BOOM_PIVOT_Y,
+    y: BOOM_PIVOT_Y + sim.posY,
     z: sim.posZ + Math.cos(facing) * BOOM_OFFSET,
   };
 }
@@ -115,7 +115,7 @@ function linkPointWorld(
 
   return {
     x: sim.posX + Math.sin(facing) * BOOM_OFFSET + Math.cos(facing) * reach,
-    y: height,
+    y: height + sim.posY,
     z: sim.posZ + Math.cos(facing) * BOOM_OFFSET - Math.sin(facing) * reach,
   };
 }

@@ -1,4 +1,9 @@
 import { getDumpTruckLaneSegment } from "./dumpTruckLane";
+import {
+  distanceToSiteSegment,
+  getSiteRoadsForTier,
+  SITE_LAYOUT,
+} from "./siteLayout";
 
 function terrainSeed(wx: number, wz: number) {
   return Math.abs(Math.sin(wx * 0.31 + wz * 0.47) * 43758.5453) % 1;
@@ -62,7 +67,12 @@ export function computeBaseTerrainHeight(
   let h = 0.66 + seed * 0.2;
   h += Math.sin(wx * 0.07 + 1.2) * 0.035 + Math.cos(wz * 0.055 - 0.8) * 0.028;
 
-  const roadDist = distanceToSegment(wx, wz, -18, -22, 4, 18);
+  const roadDist = distanceToSiteSegment(
+    wx,
+    wz,
+    SITE_LAYOUT.spawn,
+    SITE_LAYOUT.dig,
+  );
   if (roadDist < 3.2) {
     const blend = 1 - roadDist / 3.2;
     h = h + (0.71 - h) * blend * 0.84;
@@ -121,4 +131,55 @@ export function applyZoneMoundHeight(
   if (dist >= zone.radius) return current;
   const moundH = 0.84 + computeMoundHeight(dist, zone.radius, wx, wz) + terrainSeed(wx, wz) * 0.08;
   return Math.max(current, moundH);
+}
+
+export function applyCrashAsphaltPad(
+  wx: number,
+  wz: number,
+  h: number,
+  zone: { centerX: number; centerZ: number; width: number; depth: number },
+) {
+  const dx = Math.abs(wx - zone.centerX);
+  const dz = Math.abs(wz - zone.centerZ);
+  const feather = 2.4;
+  const outsideX = Math.max(0, dx - zone.width / 2);
+  const outsideZ = Math.max(0, dz - zone.depth / 2);
+  const outside = Math.hypot(outsideX, outsideZ);
+  if (outside >= feather) return h;
+  const blend = 1 - outside / feather;
+  return h + (0.735 - h) * Math.min(1, blend * 0.96);
+}
+
+export function applyHillZoneHeight(
+  wx: number,
+  wz: number,
+  h: number,
+  zone: { centerX: number; centerZ: number; radius: number },
+) {
+  const dist = distance(wx, wz, zone.centerX, zone.centerZ);
+  if (dist >= zone.radius + 8) return h;
+  const t = Math.max(0, Math.min(1, 1 - dist / (zone.radius + 8)));
+  const smooth = t * t * (3 - 2 * t);
+  const plateau = dist < zone.radius * 0.42 ? 1 : Math.max(0, 1 - dist / zone.radius);
+  const target = 0.76 + smooth * 5.2 + plateau * 0.65;
+  return Math.max(h, target);
+}
+
+export function applyExpansionRoads(
+  wx: number,
+  wz: number,
+  h: number,
+  tier: 1 | 2 | 3 = 3,
+) {
+  for (const road of getSiteRoadsForTier(tier).filter(
+    (item) => item.unlockTier > 1,
+  )) {
+    const distance = distanceToSiteSegment(wx, wz, road.from, road.to);
+    const shoulder = road.width / 2 + 2;
+    if (distance >= shoulder) continue;
+    const blend = 1 - distance / shoulder;
+    const crown = distance < road.width / 2 ? 0.02 * (1 - distance / (road.width / 2)) : 0;
+    h += (0.74 + crown - h) * blend * 0.9;
+  }
+  return h;
 }

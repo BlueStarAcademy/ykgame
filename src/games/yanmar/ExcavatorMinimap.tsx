@@ -162,6 +162,56 @@ export function ExcavatorMinimap({
         drawZoneLabel("굴착", dig.px, dig.py - Math.max(digR * 0.3, 7 * labelScale), "#ffecb3");
       }
 
+      if (terrain.crashZone) {
+        const crash = worldToMinimap(
+          terrain.crashZone.centerX,
+          terrain.crashZone.centerZ,
+          bounds,
+          size,
+          pad,
+        );
+        const width =
+          (terrain.crashZone.width / (bounds.maxX - bounds.minX)) * inner;
+        const depth =
+          (terrain.crashZone.depth / (bounds.maxZ - bounds.minZ)) * inner;
+        context.fillStyle = terrain.crashZone.active
+          ? "rgba(245,158,11,0.42)"
+          : "rgba(100,116,139,0.28)";
+        context.fillRect(
+          crash.px - width / 2,
+          crash.py - depth / 2,
+          width,
+          depth,
+        );
+        context.strokeStyle = "#fbbf24";
+        context.strokeRect(
+          crash.px - width / 2,
+          crash.py - depth / 2,
+          width,
+          depth,
+        );
+        drawZoneLabel("CRASH", crash.px, crash.py - depth / 2 - 5, "#fde68a");
+      }
+
+      if (terrain.hillZone) {
+        const hill = worldToMinimap(
+          terrain.hillZone.centerX,
+          terrain.hillZone.centerZ,
+          bounds,
+          size,
+          pad,
+        );
+        const radius =
+          (terrain.hillZone.radius / (bounds.maxX - bounds.minX)) * inner;
+        context.fillStyle = "rgba(148,163,184,0.3)";
+        context.beginPath();
+        context.arc(hill.px, hill.py, Math.max(radius, 5), 0, Math.PI * 2);
+        context.fill();
+        context.strokeStyle = "#cbd5e1";
+        context.stroke();
+        drawZoneLabel("STONE", hill.px, hill.py - radius - 5, "#e2e8f0");
+      }
+
       const dump = worldToMinimap(DUMP_ZONE.x, DUMP_ZONE.z, bounds, size, pad);
       const dumpR = (DUMP_ZONE.radius / (bounds.maxX - bounds.minX)) * inner;
       context.fillStyle = "rgba(76,175,80,0.3)";

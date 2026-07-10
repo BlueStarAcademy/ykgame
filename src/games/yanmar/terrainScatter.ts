@@ -18,7 +18,8 @@ function seededRandom(seed: number) {
 
 export function buildTerrainScatterRocks(terrain: TerrainData, perZone = 28): ScatterRock[] {
   const rocks: ScatterRock[] = [];
-  const span = terrain.gridSize * terrain.cellSize;
+  const spanX = terrain.gridSizeX * terrain.cellSize;
+  const spanZ = terrain.gridSizeZ * terrain.cellSize;
 
   for (const zone of terrain.digZones) {
     for (let i = 0; i < perZone; i++) {
@@ -41,8 +42,8 @@ export function buildTerrainScatterRocks(terrain: TerrainData, perZone = 28): Sc
 
   for (let i = 0; i < 48; i++) {
     const seed = i * 53 + 7;
-    const x = terrain.originX + 8 + seededRandom(seed) * (span - 16);
-    const z = terrain.originZ + 8 + seededRandom(seed + 1) * (span - 16);
+    const x = terrain.originX + 8 + seededRandom(seed) * (spanX - 16);
+    const z = terrain.originZ + 8 + seededRandom(seed + 1) * (spanZ - 16);
     const y = sampleHeight(terrain, x, z);
     if (y < 1.05) {
       rocks.push({

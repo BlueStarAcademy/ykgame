@@ -4,11 +4,13 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
-import { RoundedBox, Text, Billboard } from "@react-three/drei";
+import { Billboard, ContactShadows, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { AuxiliaryControlState, ExcavatorControlState, ControlMask, HydraulicVelocity } from "./controls";
 import { DEFAULT_BOOM_SWING } from "./controls";
 import { ExcavatorBucket } from "./ExcavatorBucket";
+import { ExcavatorBreaker } from "./ExcavatorBreaker";
+import { ExcavatorGrapple } from "./ExcavatorGrapple";
 import {
   PremiumDozerBlade,
   PremiumExcavatorBody,
@@ -45,15 +47,20 @@ import type { DiggingScoreState } from "./scoring";
 import type { GameMode, TutorialStep } from "./tutorial";
 import type { YanmarEquipmentStats } from "./equipment";
 import {
-  createGroundDirtTexture,
   createRockTexture,
 } from "./proceduralTextures";
+import {
+  configureSiteTexture,
+  PREMIUM_SITE_TEXTURES,
+} from "./siteTextures";
 import {
   buildTerrainScatterRocks,
   createRockGeometry,
   type ScatterRock,
 } from "./terrainScatter";
 import { MapSiteDecor } from "./mapDecor";
+import { CrashZoneDecor } from "./CrashZoneDecor";
+import { HillZoneDecor } from "./HillZoneDecor";
 import type { CameraMode, DumpScorePopup, ExcavatorSimState, AutoPoseState } from "./types";
 import {
   createSimLoopRuntime,
@@ -82,6 +89,9 @@ interface ExcavatorSceneProps {
   dumpTruckPoseRef: React.MutableRefObject<DumpTruckPose>;
   onProgress: (dumped: number, progress: number) => void;
   onDumpScore: (popup: Omit<DumpScorePopup, "id">) => void;
+  onCrashTileDestroyed: (tileId: string) => void;
+  onHillRockDelivered: (rockId: string) => void;
+  onAttachmentWarning: (message: string) => void;
   onSimTick: () => void;
   cameraMode: CameraMode;
 }
@@ -90,17 +100,42 @@ function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
   const meshRef = useRef<THREE.Mesh>(null);
   const geomRef = useRef<THREE.PlaneGeometry | null>(null);
   const colorsRef = useRef<Float32Array | null>(null);
-  const dirtTexture = useMemo(() => createGroundDirtTexture(), []);
+  const normalFrameRef = useRef(0);
+  const groundNormalScale = useMemo(
+    () => new THREE.Vector2(0.42, 0.42),
+    [],
+  );
+  const loadedGroundTextures = useLoader(
+    THREE.TextureLoader,
+    [
+      PREMIUM_SITE_TEXTURES.groundAlbedo,
+      PREMIUM_SITE_TEXTURES.groundNormal,
+      PREMIUM_SITE_TEXTURES.groundRoughness,
+    ],
+  );
+  const [dirtTexture, groundNormal, groundRoughness] = useMemo(
+    () => loadedGroundTextures.map((texture) => texture.clone()),
+    [loadedGroundTextures],
+  );
 
-  useLayoutEffect(() => () => dirtTexture.dispose(), [dirtTexture]);
+  useLayoutEffect(() => {
+    configureSiteTexture(dirtTexture, 18, 18, true);
+    configureSiteTexture(groundNormal, 18);
+    configureSiteTexture(groundRoughness, 18);
+    return () => {
+      dirtTexture.dispose();
+      groundNormal.dispose();
+      groundRoughness.dispose();
+    };
+  }, [dirtTexture, groundNormal, groundRoughness]);
 
   const geometry = useMemo(() => {
     const t = terrainRef.current;
     const geo = new THREE.PlaneGeometry(
-      t.gridSize * t.cellSize,
-      t.gridSize * t.cellSize,
-      t.gridSize - 1,
-      t.gridSize - 1,
+      t.gridSizeX * t.cellSize,
+      t.gridSizeZ * t.cellSize,
+      t.gridSizeX - 1,
+      t.gridSizeZ - 1,
     );
     geo.rotateX(-Math.PI / 2);
     const count = geo.attributes.position.count;
@@ -125,14 +160,14 @@ function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
     const cGravel = new THREE.Color("#c4b29a");
 
     const heightAt = (gx: number, gz: number) => {
-      const cx = Math.max(0, Math.min(t.gridSize - 1, gx));
-      const cz = Math.max(0, Math.min(t.gridSize - 1, gz));
-      return t.heights[cz * t.gridSize + cx];
+      const cx = Math.max(0, Math.min(t.gridSizeX - 1, gx));
+      const cz = Math.max(0, Math.min(t.gridSizeZ - 1, gz));
+      return t.heights[cz * t.gridSizeX + cx];
     };
 
-    for (let gz = 0; gz < t.gridSize; gz++) {
-      for (let gx = 0; gx < t.gridSize; gx++) {
-        const idx = gz * t.gridSize + gx;
+    for (let gz = 0; gz < t.gridSizeZ; gz++) {
+      for (let gx = 0; gx < t.gridSizeX; gx++) {
+        const idx = gz * t.gridSizeX + gx;
         const vi = idx;
         const h = t.heights[idx];
         pos.setY(vi, h);
@@ -178,7 +213,8 @@ function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
     }
     pos.needsUpdate = true;
     (geo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
-    geo.computeVertexNormals();
+    normalFrameRef.current = (normalFrameRef.current + 1) % 4;
+    if (normalFrameRef.current === 0) geo.computeVertexNormals();
   });
 
   return (
@@ -186,14 +222,19 @@ function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
       ref={meshRef}
       geometry={geometry}
       position={[
-        terrainRef.current.originX + (terrainRef.current.gridSize * terrainRef.current.cellSize) / 2,
+        terrainRef.current.originX +
+          (terrainRef.current.gridSizeX * terrainRef.current.cellSize) / 2,
         0,
-        terrainRef.current.originZ + (terrainRef.current.gridSize * terrainRef.current.cellSize) / 2,
+        terrainRef.current.originZ +
+          (terrainRef.current.gridSizeZ * terrainRef.current.cellSize) / 2,
       ]}
       receiveShadow
     >
       <meshStandardMaterial
         map={dirtTexture}
+        normalMap={groundNormal}
+        normalScale={groundNormalScale}
+        roughnessMap={groundRoughness}
         vertexColors
         roughness={0.9}
         metalness={0.015}
@@ -203,6 +244,7 @@ function TerrainMesh({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
 }
 
 function TerrainRockScatter({ terrainRef }: { terrainRef: React.MutableRefObject<TerrainData> }) {
+  const instancesRef = useRef<THREE.InstancedMesh>(null);
   const rockTexture = useMemo(() => createRockTexture(), []);
   const rockGeometry = useMemo(() => createRockGeometry(), []);
   const [rocks, setRocks] = useState<ScatterRock[]>(() =>
@@ -225,25 +267,40 @@ function TerrainRockScatter({ terrainRef }: { terrainRef: React.MutableRefObject
     }
   });
 
+  useLayoutEffect(() => {
+    const mesh = instancesRef.current;
+    if (!mesh) return;
+    const matrix = new THREE.Matrix4();
+    const quaternion = new THREE.Quaternion();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const euler = new THREE.Euler();
+    rocks.forEach((rock, index) => {
+      position.set(rock.x, rock.y, rock.z);
+      euler.set(rock.rotX, rock.rotY, 0);
+      quaternion.setFromEuler(euler);
+      scale.set(rock.scale * 1.1, rock.scale * 0.7, rock.scale);
+      matrix.compose(position, quaternion, scale);
+      mesh.setMatrixAt(index, matrix);
+    });
+    mesh.count = rocks.length;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }, [rocks]);
+
   return (
-    <group>
-      {rocks.map((rock, index) => (
-        <mesh
-          key={`${rock.x.toFixed(2)}:${rock.z.toFixed(2)}:${index}`}
-          geometry={rockGeometry}
-          position={[rock.x, rock.y, rock.z]}
-          rotation={[rock.rotX, rock.rotY, 0]}
-          scale={[rock.scale * 1.1, rock.scale * 0.7, rock.scale]}
-        >
-          <meshStandardMaterial
-            map={rockTexture}
-            color="#b0a89c"
-            roughness={0.92}
-            metalness={0.04}
-          />
-        </mesh>
-      ))}
-    </group>
+    <instancedMesh
+      ref={instancesRef}
+      args={[rockGeometry, undefined, Math.max(1, rocks.length)]}
+      receiveShadow
+    >
+      <meshStandardMaterial
+        map={rockTexture}
+        color="#b0a89c"
+        roughness={0.92}
+        metalness={0.04}
+      />
+    </instancedMesh>
   );
 }
 
@@ -1538,12 +1595,14 @@ function ExcavatorBodyAssembly({
 function ExcavatorArm({
   simRef,
   velRef,
+  terrainRef,
   auxiliaryRef,
   inputRef,
   showBody,
 }: {
   simRef: React.MutableRefObject<ExcavatorSimState>;
   velRef: React.MutableRefObject<HydraulicVelocity>;
+  terrainRef: React.MutableRefObject<TerrainData>;
   auxiliaryRef: React.RefObject<AuxiliaryControlState>;
   inputRef: React.RefObject<ExcavatorControlState>;
   showBody: boolean;
@@ -1553,6 +1612,10 @@ function ExcavatorArm({
   const boomRef = useRef<THREE.Group>(null);
   const armRef = useRef<THREE.Group>(null);
   const bucketRef = useRef<THREE.Group>(null);
+  const bucketVisualRef = useRef<THREE.Group>(null);
+  const breakerVisualRef = useRef<THREE.Group>(null);
+  const grappleVisualRef = useRef<THREE.Group>(null);
+  const carriedRockRef = useRef<THREE.Mesh>(null);
   const dirtRef = useRef<THREE.Mesh>(null);
   const tipRef = useRef<THREE.Mesh>(null);
   const bladeRef = useRef<THREE.Group>(null);
@@ -1575,13 +1638,54 @@ function ExcavatorArm({
   const bucketLen = YANMAR_MACHINE_RIG.bucketLength;
   const armRootY = showBody ? 1.0 : 0.92;
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const g = groupRef.current;
     const s = simRef.current;
     if (!g) return;
-    const terrainY = showBody ? EXCAVATOR_FIXED_VISUAL_Y : 0;
+    const terrainY = showBody
+      ? EXCAVATOR_FIXED_VISUAL_Y + s.posY
+      : s.posY;
     g.position.set(s.posX, terrainY, s.posZ);
-    g.rotation.y = s.heading + s.swing;
+    const facing = s.heading + s.swing;
+    const probe = 1.35;
+    const forwardX = Math.sin(facing);
+    const forwardZ = Math.cos(facing);
+    const rightX = Math.cos(facing);
+    const rightZ = -Math.sin(facing);
+    const terrain = terrainRef.current;
+    const frontHeight = sampleHeight(
+      terrain,
+      s.posX + forwardX * probe,
+      s.posZ + forwardZ * probe,
+    );
+    const backHeight = sampleHeight(
+      terrain,
+      s.posX - forwardX * probe,
+      s.posZ - forwardZ * probe,
+    );
+    const rightHeight = sampleHeight(
+      terrain,
+      s.posX + rightX * probe,
+      s.posZ + rightZ * probe,
+    );
+    const leftHeight = sampleHeight(
+      terrain,
+      s.posX - rightX * probe,
+      s.posZ - rightZ * probe,
+    );
+    const targetPitch = Math.max(
+      -0.3,
+      Math.min(0.3, -Math.atan2(frontHeight - backHeight, probe * 2)),
+    );
+    const targetRoll = Math.max(
+      -0.24,
+      Math.min(0.24, Math.atan2(rightHeight - leftHeight, probe * 2)),
+    );
+    const terrainFollow = 1 - Math.exp(-delta * 9);
+    g.rotation.order = "YXZ";
+    g.rotation.x += (targetPitch - g.rotation.x) * terrainFollow;
+    g.rotation.y = facing;
+    g.rotation.z += (targetRoll - g.rotation.z) * terrainFollow;
     const aux = auxiliaryRef.current;
     if (boomSwingRef.current) {
       boomSwingRef.current.rotation.y = (aux?.boomSwing ?? DEFAULT_BOOM_SWING) * 0.38;
@@ -1590,6 +1694,23 @@ function ExcavatorArm({
     if (boomRef.current) boomRef.current.rotation.z = Math.PI / 2 - s.boom;
     if (armRef.current) armRef.current.rotation.z = s.arm * YANMAR_MACHINE_RIG.armRotationScale;
     if (bucketRef.current) bucketRef.current.rotation.z = s.bucket * YANMAR_MACHINE_RIG.bucketRotationScale;
+    if (bucketVisualRef.current) {
+      bucketVisualRef.current.visible = s.attachmentType === "bucket";
+    }
+    if (breakerVisualRef.current) {
+      breakerVisualRef.current.visible = s.attachmentType === "breaker";
+      breakerVisualRef.current.position.y =
+        s.attachmentType === "breaker"
+          ? Math.sin(performance.now() * 0.045) * 0.035
+          : 0;
+    }
+    if (grappleVisualRef.current) {
+      grappleVisualRef.current.visible = s.attachmentType === "grapple";
+    }
+    if (carriedRockRef.current) {
+      carriedRockRef.current.visible =
+        s.attachmentType === "grapple" && s.carriedBoulderId != null;
+    }
     if (bladeRef.current) {
       // 시각은 레버 명령값을 그대로 반영. 지면 클램프는 흙 튀김 판정에만 사용.
       const blade = Math.max(0, Math.min(1, aux?.blade ?? 0));
@@ -1688,7 +1809,23 @@ function ExcavatorArm({
             </mesh>
 
             <group ref={bucketRef} position={[armLen, 0, 0]}>
-              <ExcavatorBucket dirtRef={dirtRef} />
+              <group ref={bucketVisualRef}>
+                <ExcavatorBucket dirtRef={dirtRef} />
+              </group>
+              <group ref={breakerVisualRef}>
+                <ExcavatorBreaker />
+              </group>
+              <group ref={grappleVisualRef}>
+                <ExcavatorGrapple openAmount={0.35} />
+                <mesh
+                  ref={carriedRockRef}
+                  position={[-1.45, -0.28, 0]}
+                  castShadow
+                >
+                  <dodecahedronGeometry args={[0.72, 1]} />
+                  <meshStandardMaterial color="#5b6470" roughness={0.92} />
+                </mesh>
+              </group>
             </group>
           </group>
         </group>
@@ -1700,6 +1837,68 @@ function ExcavatorArm({
       </mesh>
       </group>
     </group>
+  );
+}
+
+function ExcavatorGroundContact({
+  simRef,
+  terrainRef,
+}: {
+  simRef: React.MutableRefObject<ExcavatorSimState>;
+  terrainRef: React.MutableRefObject<TerrainData>;
+}) {
+  const shadowRef = useRef<THREE.Mesh>(null);
+  const alphaMap = useMemo(() => {
+    if (typeof document === "undefined") {
+      const fallback = new THREE.DataTexture(
+        new Uint8Array([255, 255, 255, 255]),
+        1,
+        1,
+      );
+      fallback.needsUpdate = true;
+      return fallback;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = 128;
+    canvas.height = 128;
+    const context = canvas.getContext("2d");
+    if (context) {
+      const gradient = context.createRadialGradient(64, 64, 16, 64, 64, 64);
+      gradient.addColorStop(0, "#ffffff");
+      gradient.addColorStop(0.56, "#b8b8b8");
+      gradient.addColorStop(1, "#000000");
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, 128, 128);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+  }, []);
+  useLayoutEffect(() => () => alphaMap.dispose(), [alphaMap]);
+  useFrame(() => {
+    const mesh = shadowRef.current;
+    if (!mesh) return;
+    const sim = simRef.current;
+    mesh.position.set(
+      sim.posX,
+      sampleHeight(terrainRef.current, sim.posX, sim.posZ) + 0.035,
+      sim.posZ,
+    );
+    mesh.rotation.set(-Math.PI / 2, 0, sim.heading);
+  });
+  return (
+    <mesh ref={shadowRef} scale={[1.4, 0.78, 1]} renderOrder={3}>
+      <circleGeometry args={[1.65, 40]} />
+      <meshBasicMaterial
+        color="#17120d"
+        alphaMap={alphaMap}
+        transparent
+        opacity={0.28}
+        depthWrite={false}
+        polygonOffset
+        polygonOffsetFactor={-2}
+      />
+    </mesh>
   );
 }
 
@@ -1792,6 +1991,9 @@ function SimLoop({
   dumpTruckPoseRef,
   onProgress,
   onDumpScore,
+  onCrashTileDestroyed,
+  onHillRockDelivered,
+  onAttachmentWarning,
   onSimTick,
 }: ExcavatorSceneProps) {
   const runtimeRef = useRef(createSimLoopRuntime());
@@ -1820,6 +2022,9 @@ function SimLoop({
       runtime: runtimeRef.current,
       onProgress,
       onDumpScore,
+      onCrashTileDestroyed,
+      onHillRockDelivered,
+      onAttachmentWarning,
       onSimTick,
     });
 
@@ -1893,18 +2098,29 @@ function WaypointMarker({
 
 function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<TerrainData> }) {
   const [zones, setZones] = useState(() => getActiveDigZones(terrainRef.current));
+  const [, setSpecialVersion] = useState(0);
   const signatureRef = useRef("");
 
   useFrame(() => {
     const nextZones = getActiveDigZones(terrainRef.current);
+    const crash = terrainRef.current.crashZone;
+    const hill = terrainRef.current.hillZone;
     const signature = nextZones
       .map((zone) => `${zone.id}:${zone.x.toFixed(1)}:${zone.z.toFixed(1)}:${zone.active}`)
-      .join("|");
+      .join("|") +
+      `|crash:${crash?.active}:${crash?.tiles.map((tile) => tile.hp).join(",")}` +
+      `|hill:${hill?.haulTruck.phase}:${hill?.haulTruck.loadCount}:${hill?.boulders
+        .map((rock) => `${rock.id}:${rock.active}:${rock.delivered}`)
+        .join(",")}`;
     if (signature !== signatureRef.current) {
       signatureRef.current = signature;
       setZones([...nextZones]);
+      setSpecialVersion((value) => value + 1);
     }
   });
+
+  const crash = terrainRef.current.crashZone;
+  const hill = terrainRef.current.hillZone;
 
   return (
     <>
@@ -1940,6 +2156,12 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
           </Text>
         </group>
       ))}
+      {crash ? (
+        <CrashZoneDecor zone={crash} terrain={terrainRef.current} />
+      ) : null}
+      {hill ? (
+        <HillZoneDecor zone={hill} terrain={terrainRef.current} />
+      ) : null}
       <mesh position={[DUMP_ZONE.x, 0.12, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[DUMP_ZONE.radius, 40]} />
         <meshBasicMaterial color="#1b5e20" transparent opacity={0.16} side={THREE.DoubleSide} />
@@ -1979,8 +2201,94 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
   );
 }
 
+function TierBoundaryBarriers({
+  terrainRef,
+}: {
+  terrainRef: React.MutableRefObject<TerrainData>;
+}) {
+  const terrain = terrainRef.current;
+  const eastLocked = terrain.mapTier < 2;
+  const northLocked = terrain.mapTier < 3;
+  const coreMaxX = terrain.originX + 64 * terrain.cellSize;
+  const coreMaxZ = terrain.originZ + 64 * terrain.cellSize;
+  const fenceColor = "#ef4444";
+  const buildFence = (
+    axis: "x" | "z",
+    fixed: number,
+    start: number,
+    end: number,
+    level: number,
+  ) => {
+    const length = end - start;
+    return (
+      <group key={`${axis}-${level}`}>
+        {Array.from({ length: Math.floor(length / 8) + 1 }, (_, index) => {
+          const along = start + Math.min(length, index * 8);
+          const x = axis === "x" ? fixed : along;
+          const z = axis === "z" ? fixed : along;
+          return (
+            <mesh key={index} position={[x, 1.2, z]} castShadow>
+              <boxGeometry args={[0.16, 2.4, 0.16]} />
+              <meshStandardMaterial color="#475569" metalness={0.65} roughness={0.4} />
+            </mesh>
+          );
+        })}
+        <mesh
+          position={[
+            axis === "x" ? fixed : (start + end) / 2,
+            1.25,
+            axis === "z" ? fixed : (start + end) / 2,
+          ]}
+        >
+          <boxGeometry
+            args={[
+              axis === "x" ? 0.1 : length,
+              0.16,
+              axis === "z" ? 0.1 : length,
+            ]}
+          />
+          <meshStandardMaterial color={fenceColor} />
+        </mesh>
+        <Billboard
+          position={[
+            axis === "x" ? fixed - 0.3 : (start + end) / 2,
+            2.4,
+            axis === "z" ? fixed - 0.3 : (start + end) / 2,
+          ]}
+        >
+          <Text
+            fontSize={0.9}
+            color="#ffffff"
+            outlineWidth={0.08}
+            outlineColor="#7f1d1d"
+          >
+            {`Lv.${level} 작업장 확장`}
+          </Text>
+        </Billboard>
+      </group>
+    );
+  };
+
+  return (
+    <>
+      {eastLocked
+        ? buildFence("x", coreMaxX - 0.5, terrain.originZ, coreMaxZ, 10)
+        : null}
+      {northLocked
+        ? buildFence(
+            "z",
+            coreMaxZ - 0.5,
+            terrain.originX,
+            terrain.originX + terrain.gridSizeX * terrain.cellSize,
+            15,
+          )
+        : null}
+    </>
+  );
+}
+
 interface NavigationTarget {
-  label: "DIG" | "DUMP";
+  label: "DIG" | "DUMP" | "CRASH" | "STONE";
   x: number;
   z: number;
   color: string;
@@ -2019,8 +2327,26 @@ function NavigationGuide({
         (zone) => Math.hypot(zone.x - sim.posX, zone.z - sim.posZ) < zone.radius,
       );
       const inDump = isInDumpZone(sim.posX, sim.posZ);
+      const crash = terrainRef.current.crashZone;
+      const hill = terrainRef.current.hillZone;
       const next =
-        inDig || (!inDump && sim.bucketLoad > 0.08)
+        sim.attachmentType === "breaker" && crash
+          ? {
+              label: "CRASH" as const,
+              x: crash.centerX,
+              z: crash.centerZ,
+              color: "#fbbf24",
+              outline: "#451a03",
+            }
+          : sim.attachmentType === "grapple" && hill
+            ? {
+                label: "STONE" as const,
+                x: sim.carriedBoulderId ? hill.dropX : hill.centerX,
+                z: sim.carriedBoulderId ? hill.dropZ : hill.centerZ,
+                color: "#e2e8f0",
+                outline: "#172554",
+              }
+            : inDig || (!inDump && sim.bucketLoad > 0.08)
           ? {
               label: "DUMP" as const,
               x: DUMP_ZONE.x,
@@ -2556,6 +2882,45 @@ function Cloud({
   );
 }
 
+function CinematicBackdrop() {
+  const loadedTexture = useLoader(
+    THREE.TextureLoader,
+    PREMIUM_SITE_TEXTURES.backdrop,
+  );
+  const texture = useMemo(() => loadedTexture.clone(), [loadedTexture]);
+  useLayoutEffect(() => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    // A mirrored repeat avoids the visible hard cuts produced by four flat
+    // billboards while preserving the source image's non-panoramic aspect.
+    texture.wrapS = THREE.MirroredRepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.repeat.set(4, 1);
+    texture.anisotropy = 8;
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.needsUpdate = true;
+    return () => texture.dispose();
+  }, [texture]);
+
+  return (
+    <mesh
+      position={[48, 62, 48]}
+      rotation={[0, Math.PI * 0.18, 0]}
+      renderOrder={-10}
+    >
+      <cylinderGeometry args={[170, 170, 130, 128, 1, true]} />
+      <meshBasicMaterial
+        map={texture}
+        color="#ffffff"
+        fog={false}
+        toneMapped={false}
+        side={THREE.BackSide}
+        depthWrite={false}
+      />
+    </mesh>
+  );
+}
+
 function SunnySky() {
   return (
     <>
@@ -2586,39 +2951,56 @@ function AuxiliarySceneEffects({
 function SceneContent(props: ExcavatorSceneProps) {
   return (
     <>
-      <color attach="background" args={["#9fd2f2"]} />
-      <fog attach="fog" args={["#b8dcf1", 110, 320]} />
-      <hemisphereLight args={["#eef9ff", "#b97b48", 0.72]} />
-      <ambientLight intensity={0.36} />
+      <color attach="background" args={["#b8d6e8"]} />
+      <fog attach="fog" args={["#c7d9df", 125, 295]} />
+      <hemisphereLight args={["#f1f7f7", "#8f6644", 0.86]} />
+      <ambientLight intensity={0.28} />
       <directionalLight
-        position={[22, 34, -28]}
-        intensity={2.7}
-        color="#fff4d2"
+        position={[-42, 58, -54]}
+        intensity={3.15}
+        color="#fff0c9"
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-        shadow-camera-left={-72}
-        shadow-camera-right={72}
-        shadow-camera-top={72}
-        shadow-camera-bottom={-72}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-left={-125}
+        shadow-camera-right={125}
+        shadow-camera-top={125}
+        shadow-camera-bottom={-125}
         shadow-camera-near={1}
-        shadow-camera-far={140}
-        shadow-bias={-0.00035}
+        shadow-camera-far={220}
+        shadow-bias={-0.00022}
+        shadow-normalBias={0.035}
       />
-      <directionalLight position={[-18, 22, 36]} intensity={0.5} color="#bddcff" />
-      <pointLight position={[34, 31, -56]} intensity={0.62} color="#ffe28a" distance={95} />
+      <directionalLight position={[72, 30, 48]} intensity={0.62} color="#b9d8ef" />
+      <pointLight position={[18, 20, -28]} intensity={0.38} color="#ffe9b0" distance={78} />
       <SunnySky />
+      <CinematicBackdrop />
       <TerrainMesh terrainRef={props.terrainRef} />
       <MapSiteDecor terrainRef={props.terrainRef} />
       <TerrainRockScatter terrainRef={props.terrainRef} />
+      <ContactShadows
+        position={[48, 0.12, 48]}
+        scale={205}
+        opacity={0.24}
+        blur={2.8}
+        far={38}
+        resolution={512}
+        frames={1}
+      />
       <WorksiteSetDressing
         dumpTruckStateRef={props.dumpTruckStateRef}
         equipmentStatsRef={props.equipmentStatsRef}
       />
       <ZoneMarkers terrainRef={props.terrainRef} />
+      <TierBoundaryBarriers terrainRef={props.terrainRef} />
+      <ExcavatorGroundContact
+        simRef={props.simRef}
+        terrainRef={props.terrainRef}
+      />
       <ExcavatorArm
         simRef={props.simRef}
         velRef={props.velRef}
+        terrainRef={props.terrainRef}
         auxiliaryRef={props.auxiliaryRef}
         inputRef={props.inputRef}
         showBody={props.cameraMode !== 3}
@@ -2638,7 +3020,7 @@ function SceneContent(props: ExcavatorSceneProps) {
 export function ExcavatorScene(props: ExcavatorSceneProps) {
   return (
     <Canvas
-      shadows="basic"
+      shadows="percentage"
       gl={{
         antialias: true,
         powerPreference: "high-performance",
@@ -2646,11 +3028,12 @@ export function ExcavatorScene(props: ExcavatorSceneProps) {
         stencil: false,
       }}
       dpr={[1, 1.5]}
-      camera={{ fov: 58, near: 0.1, far: 180 }}
+      camera={{ fov: 58, near: 0.1, far: 320 }}
       style={{ width: "100%", height: "100%" }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.05;
+        gl.toneMappingExposure = 1.08;
+        gl.outputColorSpace = THREE.SRGBColorSpace;
       }}
     >
       <SceneContent {...props} />
@@ -2665,12 +3048,18 @@ export function createInitialSim(): ExcavatorSimState {
     arm: -0.95,
     bucket: 0.85,
     posX: -18,
+    posY: 0,
     posZ: -22,
     heading: 0,
     bucketLoad: 0,
+    attachmentType: "bucket",
+    carriedBoulderId: null,
   };
 }
 
-export function createInitialTerrain(dynamicDigZones = false): TerrainData {
-  return createTerrain(-48, -48, dynamicDigZones);
+export function createInitialTerrain(
+  dynamicDigZones = false,
+  playerLevel = 1,
+): TerrainData {
+  return createTerrain(-48, -48, dynamicDigZones, playerLevel);
 }

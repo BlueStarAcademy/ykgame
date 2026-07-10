@@ -1,14 +1,25 @@
 export type CameraMode = 1 | 2 | 3;
 
+export type AttachmentType = "bucket" | "breaker" | "grapple";
+
 export interface ExcavatorSimState {
   swing: number;
   boom: number;
   arm: number;
   bucket: number;
   posX: number;
+  /** Vertical offset from the core worksite ground plane. */
+  posY: number;
   posZ: number;
   heading: number;
   bucketLoad: number;
+  attachmentType: AttachmentType;
+  carriedBoulderId: string | null;
+}
+
+export interface AttachmentWarning {
+  key: number;
+  message: string;
 }
 
 export interface DumpScorePopup {

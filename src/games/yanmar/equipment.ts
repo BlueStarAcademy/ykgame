@@ -62,6 +62,18 @@ export const YANMAR_EQUIPMENT_CONFIG = {
     cooldownReductionPerLevel: 0.05,
     description: "복귀 대기 5% 단축",
   },
+  CRASH_RESPAWN: {
+    label: "[브레이커] Crash 재생성",
+    maxLevel: 10,
+    cooldownReductionPerLevel: 0.1,
+    description: "Crash 재생성 대기 10% 단축",
+  },
+  HAUL_TRUCK_SPEED: {
+    label: "[집게] 운반 트럭 속도",
+    maxLevel: 10,
+    cooldownReductionPerLevel: 0.1,
+    description: "돌 운반 트럭 복귀 10% 단축",
+  },
 } as const;
 
 export type YanmarEquipmentPart = keyof typeof YANMAR_EQUIPMENT_CONFIG;
@@ -76,6 +88,8 @@ export interface YanmarEquipmentStats {
   criticalChance: number;
   criticalMultiplier: number;
   travelSpeedMultiplier: number;
+  crashRespawnSec: number;
+  haulTruckCooldownSec: number;
 }
 
 export const DEFAULT_YANMAR_EQUIPMENT_LEVELS: YanmarEquipmentLevels = {
@@ -85,6 +99,8 @@ export const DEFAULT_YANMAR_EQUIPMENT_LEVELS: YanmarEquipmentLevels = {
   ENGINE: 0,
   TRUCK_CAPACITY: 0,
   TRUCK_SPEED: 0,
+  CRASH_RESPAWN: 0,
+  HAUL_TRUCK_SPEED: 0,
 };
 
 export const YANMAR_UPGRADE_COSTS = {
@@ -94,6 +110,8 @@ export const YANMAR_UPGRADE_COSTS = {
   ENGINE: [20, 50, 100, 200, 500],
   TRUCK_CAPACITY: YANMAR_TRUCK_UPGRADE_COSTS,
   TRUCK_SPEED: YANMAR_TRUCK_UPGRADE_COSTS,
+  CRASH_RESPAWN: YANMAR_TRUCK_UPGRADE_COSTS,
+  HAUL_TRUCK_SPEED: YANMAR_TRUCK_UPGRADE_COSTS,
 } as const satisfies Record<YanmarEquipmentPart, readonly number[]>;
 
 export const YANMAR_EQUIPMENT_RESET_REFUND_RATE = 0.7;
@@ -220,7 +238,27 @@ export function calculateYanmarEquipmentStats(
       safeLevels.BOOM * YANMAR_EQUIPMENT_CONFIG.BOOM.effectPerLevel,
     travelSpeedMultiplier:
       1 + safeLevels.ENGINE * YANMAR_EQUIPMENT_CONFIG.ENGINE.effectPerLevel,
+    crashRespawnSec: getYanmarSpecialCooldownSec(
+      safeLevels.CRASH_RESPAWN,
+      "CRASH_RESPAWN",
+    ),
+    haulTruckCooldownSec: getYanmarSpecialCooldownSec(
+      safeLevels.HAUL_TRUCK_SPEED,
+      "HAUL_TRUCK_SPEED",
+    ),
   };
+}
+
+export function getYanmarSpecialCooldownSec(
+  level = 0,
+  part: "CRASH_RESPAWN" | "HAUL_TRUCK_SPEED" = "CRASH_RESPAWN",
+) {
+  const safeLevel = Math.max(
+    0,
+    Math.min(YANMAR_EQUIPMENT_CONFIG[part].maxLevel, Math.floor(level)),
+  );
+  const factor = 1 - YANMAR_EQUIPMENT_CONFIG[part].cooldownReductionPerLevel;
+  return Math.max(90, 600 * factor ** safeLevel);
 }
 
 export function getYanmarTruckCapacityUnits(capacityLevel = 0) {
@@ -261,6 +299,10 @@ export function getYanmarUpgradePartStatLabel(part: YanmarEquipmentPart): string
       return "하역량";
     case "TRUCK_SPEED":
       return "트럭복귀";
+    case "CRASH_RESPAWN":
+      return "Crash복귀";
+    case "HAUL_TRUCK_SPEED":
+      return "돌트럭복귀";
     default:
       return "";
   }
@@ -299,6 +341,9 @@ export function getYanmarUpgradePartStatText(
       return `${label}${getYanmarTruckCapacityUnits(safeLevel)}`;
     case "TRUCK_SPEED":
       return `${label}${Math.round(getYanmarTruckCooldownSec(safeLevel))}초`;
+    case "CRASH_RESPAWN":
+    case "HAUL_TRUCK_SPEED":
+      return `${label}${Math.round(getYanmarSpecialCooldownSec(safeLevel, part))}초`;
     default:
       return "";
   }
@@ -335,6 +380,14 @@ export function getYanmarUpgradePartGainText(
     case "TRUCK_SPEED": {
       const saved = Math.round(
         getYanmarTruckCooldownSec(safeLevel) - getYanmarTruckCooldownSec(safeLevel + 1),
+      );
+      return `(+${saved}초)`;
+    }
+    case "CRASH_RESPAWN":
+    case "HAUL_TRUCK_SPEED": {
+      const saved = Math.round(
+        getYanmarSpecialCooldownSec(safeLevel, part) -
+          getYanmarSpecialCooldownSec(safeLevel + 1, part),
       );
       return `(+${saved}초)`;
     }

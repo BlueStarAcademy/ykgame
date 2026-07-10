@@ -1,15 +1,30 @@
 "use client";
 
+/* eslint-disable react-hooks/refs */
+
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useLoader } from "@react-three/fiber";
+import { Text } from "@react-three/drei";
 import * as THREE from "three";
 import {
   createCompactedDirtTexture,
   createGravelTexture,
   createPaintedMetalTexture,
 } from "./proceduralTextures";
-import { DIG_ZONE, DUMP_TRUCK, DUMP_ZONE, getActiveDigZones, sampleHeight, type TerrainData } from "./terrain";
+import {
+  DUMP_TRUCK,
+  DUMP_ZONE,
+  getActiveDigZones,
+  getMapWorldBounds,
+  sampleHeight,
+  type TerrainData,
+} from "./terrain";
 import { getDumpTruckLaneSegment, DUMP_TRUCK_LANE_LENGTH } from "./dumpTruckLane";
+import { getSiteRoadsForTier } from "./siteLayout";
+import {
+  configureSiteTexture,
+  PREMIUM_SITE_TEXTURES,
+} from "./siteTextures";
 
 function RoadMesh({
   from,
@@ -111,6 +126,29 @@ export function MapSiteDecor({
   const gravelTexture = useMemo(() => createGravelTexture(), []);
   const compactTexture = useMemo(() => createCompactedDirtTexture(), []);
   const metalTexture = useMemo(() => createPaintedMetalTexture(), []);
+  const loadedGroundTextures = useLoader(
+    THREE.TextureLoader,
+    [
+      PREMIUM_SITE_TEXTURES.groundAlbedo,
+      PREMIUM_SITE_TEXTURES.groundNormal,
+      PREMIUM_SITE_TEXTURES.groundRoughness,
+    ],
+  );
+  const [groundAlbedo, groundNormal, groundRoughness] = useMemo(
+    () => loadedGroundTextures.map((texture) => texture.clone()),
+    [loadedGroundTextures],
+  );
+
+  useLayoutEffect(() => {
+    configureSiteTexture(groundAlbedo, 8, 2, true);
+    configureSiteTexture(groundNormal, 8, 2);
+    configureSiteTexture(groundRoughness, 8, 2);
+    return () => {
+      groundAlbedo.dispose();
+      groundNormal.dispose();
+      groundRoughness.dispose();
+    };
+  }, [groundAlbedo, groundNormal, groundRoughness]);
 
   useLayoutEffect(
     () => () => {
@@ -123,19 +161,16 @@ export function MapSiteDecor({
 
   return (
     <group>
-      <RoadMesh
-        from={[-18, -22]}
-        to={[DIG_ZONE.x, DIG_ZONE.z]}
-        width={5.6}
-        texture={compactTexture}
-      />
-      <RoadMesh
-        from={[DIG_ZONE.x, DIG_ZONE.z]}
-        to={[DUMP_ZONE.x, DUMP_ZONE.z]}
-        width={4.8}
-        texture={compactTexture}
-        y={0.708}
-      />
+      {getSiteRoadsForTier(terrainRef.current.mapTier).map((road) => (
+        <RoadMesh
+          key={road.id}
+          from={[road.from[0], road.from[1]]}
+          to={[road.to[0], road.to[1]]}
+          width={road.width}
+          texture={road.surface === "gravel" ? gravelTexture : compactTexture}
+          y={0.735}
+        />
+      ))}
       <TruckDepartureLane compactTexture={compactTexture} gravelTexture={gravelTexture} />
       <mesh position={[DUMP_ZONE.x, 0.72, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[DUMP_ZONE.radius + 2.2, 48]} />
@@ -147,7 +182,16 @@ export function MapSiteDecor({
         />
       </mesh>
       <DigMoundCollars terrainRef={terrainRef} />
-      <SiteBarrierRow texture={metalTexture} />
+      <SiteBarrierRow
+        texture={metalTexture}
+        terrain={terrainRef.current}
+      />
+      <PremiumSiteInfrastructure
+        terrain={terrainRef.current}
+        groundAlbedo={groundAlbedo}
+        groundNormal={groundNormal}
+        groundRoughness={groundRoughness}
+      />
     </group>
   );
 }
@@ -213,20 +257,24 @@ function DigMoundCollars({
   );
 }
 
-function SiteBarrierRow({ texture }: { texture: THREE.Texture }) {
+function SiteBarrierRow({
+  texture,
+  terrain,
+}: {
+  texture: THREE.Texture;
+  terrain: TerrainData;
+}) {
+  const bounds = getMapWorldBounds(terrain);
+  const inset = 4;
   const posts: [number, number][] = [
-    [-38, -32],
-    [-12, -36],
-    [16, -32],
-    [42, -24],
-    [58, -12],
-    [68, 8],
-    [58, 26],
-    [34, 38],
-    [4, 42],
-    [-24, 38],
-    [-42, 24],
-    [-46, 0],
+    [bounds.minX + inset, bounds.minZ + inset],
+    [(bounds.minX + bounds.maxX) / 2, bounds.minZ + inset],
+    [bounds.maxX - inset, bounds.minZ + inset],
+    [bounds.maxX - inset, (bounds.minZ + bounds.maxZ) / 2],
+    [bounds.maxX - inset, bounds.maxZ - inset],
+    [(bounds.minX + bounds.maxX) / 2, bounds.maxZ - inset],
+    [bounds.minX + inset, bounds.maxZ - inset],
+    [bounds.minX + inset, (bounds.minZ + bounds.maxZ) / 2],
   ];
 
   return (
@@ -254,6 +302,156 @@ function SiteBarrierRow({ texture }: { texture: THREE.Texture }) {
           </group>
         );
       })}
+    </group>
+  );
+}
+
+function KoreanSafetySign({
+  position,
+  rotation = 0,
+  title,
+}: {
+  position: [number, number, number];
+  rotation?: number;
+  title: string;
+}) {
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      {[-1.35, 1.35].map((x) => (
+        <mesh key={x} position={[x, -0.75, 0]}>
+          <boxGeometry args={[0.1, 2.2, 0.1]} />
+          <meshStandardMaterial color="#334155" metalness={0.62} roughness={0.36} />
+        </mesh>
+      ))}
+      <mesh>
+        <boxGeometry args={[3.2, 1.35, 0.12]} />
+        <meshStandardMaterial color="#f8fafc" roughness={0.38} />
+      </mesh>
+      <mesh position={[0, 0.43, 0.07]}>
+        <boxGeometry args={[3.05, 0.34, 0.035]} />
+        <meshStandardMaterial color="#dc2626" roughness={0.42} />
+      </mesh>
+      <Text
+        position={[0, -0.12, 0.09]}
+        fontSize={0.42}
+        color="#111827"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {title}
+      </Text>
+      <Text
+        position={[0, -0.48, 0.09]}
+        fontSize={0.19}
+        color="#475569"
+        anchorX="center"
+      >
+        안전모 착용 · 관계자 외 출입금지
+      </Text>
+    </group>
+  );
+}
+
+function PremiumSiteInfrastructure({
+  terrain,
+  groundAlbedo,
+  groundNormal,
+  groundRoughness,
+}: {
+  terrain: TerrainData;
+  groundAlbedo: THREE.Texture;
+  groundNormal: THREE.Texture;
+  groundRoughness: THREE.Texture;
+}) {
+  const bounds = getMapWorldBounds(terrain);
+  const eastX = bounds.maxX - 7;
+  const northZ = bounds.maxZ - 7;
+  const pipeX = terrain.mapTier >= 2 ? 66 : 55;
+  return (
+    <group>
+      {/* Concrete drainage channel beside the main haul road. */}
+      <group position={[7, 0.73, -0.4]} rotation={[0, -0.5, 0]}>
+        {[-1, 1].map((side) => (
+          <mesh key={side} position={[side * 2.9, -0.08, 0]} receiveShadow>
+            <boxGeometry args={[0.28, 0.24, 45]} />
+            <meshStandardMaterial color="#8f9698" roughness={0.86} />
+          </mesh>
+        ))}
+        <mesh position={[0, -0.15, 0]} receiveShadow>
+          <boxGeometry args={[5.5, 0.05, 45]} />
+          <meshStandardMaterial
+            map={groundAlbedo}
+            normalMap={groundNormal}
+            roughnessMap={groundRoughness}
+            color="#8d7658"
+            roughness={0.96}
+          />
+        </mesh>
+      </group>
+
+      {/* Stacked steel pipes and precast barriers. */}
+      <group position={[pipeX, 1.05, -25]}>
+        {Array.from({ length: 12 }, (_, index) => {
+          const row = Math.floor(index / 4);
+          const col = index % 4;
+          return (
+            <mesh
+              key={index}
+              position={[0, row * 0.48, (col - 1.5) * 0.52]}
+              rotation={[0, 0, Math.PI / 2]}
+              castShadow
+            >
+              <cylinderGeometry args={[0.2, 0.2, 8, 18, 1, true]} />
+              <meshStandardMaterial color="#56616a" metalness={0.72} roughness={0.35} />
+            </mesh>
+          );
+        })}
+      </group>
+      {Array.from({ length: terrain.mapTier >= 2 ? 10 : 6 }, (_, index) => (
+        <group key={index} position={[eastX, 0.95, -22 + index * 5.5]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[1.2, 1.05, 4.8]} />
+            <meshStandardMaterial color="#c7c4ba" roughness={0.92} />
+          </mesh>
+          <mesh position={[-0.64, 0.18, 0]}>
+            <boxGeometry args={[0.08, 0.22, 3.8]} />
+            <meshStandardMaterial color={index % 2 ? "#f8fafc" : "#ef4444"} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Green Korean construction safety mesh around the north edge. */}
+      <mesh
+        position={[(bounds.minX + bounds.maxX) / 2, 1.45, northZ]}
+        receiveShadow
+      >
+        <planeGeometry args={[bounds.maxX - bounds.minX - 16, 2.5, 28, 1]} />
+        <meshStandardMaterial
+          color="#167b57"
+          transparent
+          opacity={0.58}
+          roughness={0.8}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      <KoreanSafetySign
+        position={[-30, 2.05, -37]}
+        rotation={0}
+        title="YK건기 스마트 작업장"
+      />
+      {terrain.mapTier >= 2 ? (
+        <KoreanSafetySign
+          position={[83, 2.05, 3]}
+          rotation={Math.PI / 2}
+          title="노면 파쇄 작업구역"
+        />
+      ) : null}
+      {terrain.mapTier >= 3 ? (
+        <KoreanSafetySign
+          position={[7, 2.05, 83]}
+          title="석재 운반 작업구역"
+        />
+      ) : null}
     </group>
   );
 }

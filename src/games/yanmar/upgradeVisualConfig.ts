@@ -12,6 +12,8 @@ export const YANMAR_UPGRADE_VISUALS = {
   truckUpgrades: [
     { part: "TRUCK_CAPACITY" as const, label: "하역량" },
     { part: "TRUCK_SPEED" as const, label: "트럭속도" },
+    { part: "CRASH_RESPAWN" as const, label: "Crash복귀" },
+    { part: "HAUL_TRUCK_SPEED" as const, label: "돌트럭복귀" },
   ],
 } as const;
 
@@ -19,5 +21,10 @@ export type UpgradeExcavatorPart = keyof typeof YANMAR_UPGRADE_VISUALS.excavator
 export type UpgradeTruckPart = (typeof YANMAR_UPGRADE_VISUALS.truckUpgrades)[number]["part"];
 
 export function isTruckUpgradePart(part: YanmarEquipmentPart): part is UpgradeTruckPart {
-  return part === "TRUCK_CAPACITY" || part === "TRUCK_SPEED";
+  return (
+    part === "TRUCK_CAPACITY" ||
+    part === "TRUCK_SPEED" ||
+    part === "CRASH_RESPAWN" ||
+    part === "HAUL_TRUCK_SPEED"
+  );
 }

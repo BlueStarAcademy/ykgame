@@ -34,7 +34,16 @@ import {
   createInitialSim,
   createInitialTerrain,
 } from "./ExcavatorScene";
-import type { CameraMode, CouponDiscoveryState, DumpScorePopup, DumpScorePanelState, ExcavatorSimState, AutoPoseSlotIndex, AutoPoseState } from "./types";
+import type {
+  AttachmentType,
+  CameraMode,
+  CouponDiscoveryState,
+  DumpScorePopup,
+  DumpScorePanelState,
+  ExcavatorSimState,
+  AutoPoseSlotIndex,
+  AutoPoseState,
+} from "./types";
 import { EquipmentUpgradePanel } from "./EquipmentUpgradePanel";
 import {
   createHydraulicVelocity,
@@ -70,7 +79,7 @@ import {
   getDumpTruckPose,
   type DumpTruckPose,
 } from "./dumpTruckState";
-import type { TerrainData } from "./terrain";
+import { expandTerrainForLevel, type TerrainData } from "./terrain";
 import {
   DEFAULT_YANMAR_EQUIPMENT_LEVELS,
   YANMAR_EQUIPMENT_RESET_REFUND_RATE,
@@ -106,6 +115,11 @@ import {
 } from "./rewardVisualConfig";
 import { XpProgressBar } from "@/components/ui/XpProgressBar";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
+import {
+  getCrossedUnlocks,
+  isAttachmentUnlocked,
+  type PlayerUnlockKind,
+} from "@/lib/playerUnlocks";
 
 interface ExcavatorGameWrapperProps {
   onEnd: (result: GameResult) => void;
@@ -294,6 +308,63 @@ function CouponDiscoveryOverlay({ discovery }: { discovery: CouponDiscoveryState
   );
 }
 
+function AttachmentUnlockOverlay({
+  unlock,
+  onClose,
+}: {
+  unlock: PlayerUnlockKind | undefined;
+  onClose: () => void;
+}) {
+  if (!unlock) return null;
+  const breaker = unlock === "BREAKER";
+  const level = breaker ? 10 : 15;
+  const attachmentLabel = breaker ? "브레이커" : "집게";
+  const zoneLabel = breaker ? "Crash 철거 작업장" : "Hill 운반 작업장";
+  return (
+    <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm">
+      <div
+        className="w-[min(22rem,92%)] rounded-2xl border border-amber-300/70 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 p-5 text-center text-white shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`레벨 ${level} ${attachmentLabel} 및 신규 작업장 개방 안내`}
+      >
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-300/50 bg-amber-500/15 text-4xl text-amber-300">
+          {breaker ? "▾" : "⌁"}
+        </div>
+        <p className="mt-4 text-xs font-black tracking-[0.24em] text-amber-400">
+          LEVEL {level} 작업 해금
+        </p>
+        <p className="mt-4 text-lg font-black text-amber-200">
+          새로운 작업이 개방되었습니다!
+        </p>
+        <div className="mt-4 grid gap-2 text-left text-sm font-black">
+          <div className="flex items-center gap-3 rounded-xl border border-amber-300/25 bg-amber-400/10 px-3 py-2.5 text-amber-100">
+            <span className="text-base text-amber-300" aria-hidden>✓</span>
+            <span>{attachmentLabel} 사용 가능</span>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-300/25 bg-emerald-400/10 px-3 py-2.5 text-emerald-100">
+            <span className="text-base text-emerald-300" aria-hidden>✓</span>
+            <span>새로운 작업장 작업 가능</span>
+          </div>
+        </div>
+        <p className="mt-3 text-sm font-bold leading-relaxed text-slate-100">
+          {zoneLabel}이 열렸습니다.
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">
+          기능 메뉴에서 {attachmentLabel}를 선택한 뒤 전용 작업 지역으로 이동하세요.
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-5 w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-black text-slate-950 transition active:scale-[0.98]"
+        >
+          확인
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ExcavatorGameWrapper({
   onEnd,
   exitSignal = 0,
@@ -329,9 +400,22 @@ export function ExcavatorGameWrapper({
   const [autoPose, setAutoPose] = useState<AutoPoseState>(autoPoseRef.current);
   const [poseSaveToastKey, setPoseSaveToastKey] = useState(0);
   const [poseSaveToastVisible, setPoseSaveToastVisible] = useState(false);
+  const [levelUpToast, setLevelUpToast] = useState<{
+    key: number;
+    level: number;
+  } | null>(null);
+  const [attachmentType, setAttachmentType] =
+    useState<AttachmentType>("bucket");
+  const [attachmentWarning, setAttachmentWarning] = useState<{
+    key: number;
+    message: string;
+  } | null>(null);
+  const [unlockQueue, setUnlockQueue] = useState<PlayerUnlockKind[]>([]);
+  const [sceneKey, setSceneKey] = useState(0);
   const [savePoseCooldownUntil, setSavePoseCooldownUntil] = useState(0);
   const [executePoseCooldownUntil, setExecutePoseCooldownUntil] = useState(0);
   const poseSaveToastTimerRef = useRef<number | null>(null);
+  const levelUpToastTimerRef = useRef<number | null>(null);
   const poseActionCooldownMs = 5000;
   const [hud, setHud] = useState({
     progress: 0,
@@ -353,6 +437,8 @@ export function ExcavatorGameWrapper({
     useState<YanmarEquipmentStats>(defaultEquipmentStats);
   const [currency, setCurrency] = useState(() => session?.user?.currency ?? 0);
   const [totalXp, setTotalXp] = useState(() => session?.user?.totalXp ?? 0);
+  const totalXpRef = useRef(totalXp);
+  const attachmentWarningTimerRef = useRef<number | null>(null);
   const [previewStars, setPreviewStars] = useState(() => session?.user?.currency ?? 0);
   const [stepCompleteFlash, setStepCompleteFlash] = useState(false);
   const [showControlsGuide, setShowControlsGuide] = useState(false);
@@ -436,6 +522,11 @@ export function ExcavatorGameWrapper({
         dumpTruck: { ...truckState },
         dumpTruckCooldownSec: cooldownSec,
         digZones: terrain.digZones,
+        crashZone: terrain.crashZone,
+        hillZone: terrain.hillZone,
+        mapTier: terrain.mapTier,
+        gridSizeX: terrain.gridSizeX,
+        gridSizeZ: terrain.gridSizeZ,
         heights: Array.from(terrain.heights),
         baseHeights: Array.from(terrain.baseHeights),
         arcadeScore: arcadeScoreRef.current,
@@ -453,6 +544,8 @@ export function ExcavatorGameWrapper({
     Object.assign(dumpTruckStateRef.current, snapshot.dumpTruck);
     dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
     terrainRef.current = applyGameSessionTerrain(snapshot);
+    setAttachmentType(snapshot.sim.attachmentType);
+    setSceneKey((key) => key + 1);
     arcadeScoreRef.current = snapshot.arcadeScore;
     rewardStarsRef.current = snapshot.rewardStars;
     scoreRef.current = createScoreState(config.target, config.duration);
@@ -656,6 +749,111 @@ export function ExcavatorGameWrapper({
     equipmentStatsRef.current = equipmentStats;
   }, [equipmentStats]);
 
+  const showPoseSaveToast = useCallback(() => {
+    if (poseSaveToastTimerRef.current != null) {
+      window.clearTimeout(poseSaveToastTimerRef.current);
+    }
+    setPoseSaveToastKey((key) => key + 1);
+    setPoseSaveToastVisible(true);
+    poseSaveToastTimerRef.current = window.setTimeout(() => {
+      setPoseSaveToastVisible(false);
+      poseSaveToastTimerRef.current = null;
+    }, 2100);
+  }, []);
+
+  const showLevelUpToast = useCallback((level: number) => {
+    if (levelUpToastTimerRef.current != null) {
+      window.clearTimeout(levelUpToastTimerRef.current);
+    }
+    setLevelUpToast((prev) => ({
+      key: (prev?.key ?? 0) + 1,
+      level,
+    }));
+    levelUpToastTimerRef.current = window.setTimeout(() => {
+      setLevelUpToast(null);
+      levelUpToastTimerRef.current = null;
+    }, 2800);
+  }, []);
+
+  const showAttachmentWarning = useCallback((message: string) => {
+    if (attachmentWarningTimerRef.current != null) {
+      window.clearTimeout(attachmentWarningTimerRef.current);
+    }
+    setAttachmentWarning((current) => ({
+      key: (current?.key ?? 0) + 1,
+      message,
+    }));
+    attachmentWarningTimerRef.current = window.setTimeout(() => {
+      setAttachmentWarning(null);
+      attachmentWarningTimerRef.current = null;
+    }, 2400);
+  }, []);
+
+  const handleAttachmentChange = useCallback(
+    (next: AttachmentType) => {
+      const playerLevel = getPlayerLevelProgress(totalXpRef.current).level;
+      if (!isAttachmentUnlocked(next, playerLevel)) {
+        showAttachmentWarning(
+          next === "breaker"
+            ? "브레이커는 유저 레벨 10에 개방됩니다."
+            : "집게는 유저 레벨 15에 개방됩니다.",
+        );
+        return;
+      }
+      if (simRef.current.bucketLoad > 0.01 && next !== "bucket") {
+        showAttachmentWarning("버켓에 흙이 남아 있어 다른 부착물로 전환할 수 없습니다.");
+        return;
+      }
+      simRef.current.attachmentType = next;
+      simRef.current.carriedBoulderId = null;
+      setAttachmentType(next);
+    },
+    [showAttachmentWarning],
+  );
+
+  const applyTotalXp = useCallback(
+    (nextXp: number, opts?: { announceLevelUp?: boolean }) => {
+      const prevLevel = getPlayerLevelProgress(totalXpRef.current).level;
+      const nextLevel = getPlayerLevelProgress(nextXp).level;
+      totalXpRef.current = nextXp;
+      setTotalXp(nextXp);
+      const previousTier = terrainRef.current.mapTier;
+      terrainRef.current = expandTerrainForLevel(terrainRef.current, nextLevel);
+      if (terrainRef.current.mapTier !== previousTier) {
+        setSceneKey((key) => key + 1);
+      }
+      if (opts?.announceLevelUp && nextLevel > prevLevel) {
+        showLevelUpToast(nextLevel);
+        const unlocked = getCrossedUnlocks(prevLevel, nextLevel);
+        if (unlocked.length > 0) {
+          setUnlockQueue((queue) => [...queue, ...unlocked]);
+        }
+      }
+    },
+    [showLevelUpToast],
+  );
+
+  useEffect(() => {
+    const level = getPlayerLevelProgress(totalXp).level;
+    const available = (["BREAKER", "GRAPPLE"] as PlayerUnlockKind[]).filter(
+      (kind) => {
+        const required = kind === "BREAKER" ? 10 : 15;
+        if (level < required) return false;
+        try {
+          return localStorage.getItem(`ykgame:yanmar:unlock-seen:${kind}`) !== "1";
+        } catch {
+          return true;
+        }
+      },
+    );
+    if (available.length > 0) {
+      setUnlockQueue((queue) => {
+        const unique = available.filter((kind) => !queue.includes(kind));
+        return [...queue, ...unique];
+      });
+    }
+  }, [totalXp]);
+
   const loadEquipment = useCallback(async () => {
     try {
       const res = await fetch("/api/equipment/yanmar");
@@ -674,19 +872,20 @@ export function ExcavatorGameWrapper({
         }
       }
       if (typeof data.totalXp === "number") {
-        setTotalXp(data.totalXp);
+        applyTotalXp(data.totalXp);
       }
     } catch {
       // Equipment data is optional for unauthenticated previews.
     }
-  }, []);
+  }, [applyTotalXp]);
 
   useEffect(() => {
     const sessionXp = session?.user?.totalXp;
     if (typeof sessionXp === "number" && sessionXp >= 0) {
-      setTotalXp((prev) => (prev > 0 ? prev : sessionXp));
+      if (totalXpRef.current > 0) return;
+      applyTotalXp(sessionXp);
     }
-  }, [session?.user?.totalXp]);
+  }, [applyTotalXp, session?.user?.totalXp]);
 
   useEffect(() => {
     const sessionCurrency = session?.user?.currency;
@@ -749,18 +948,6 @@ export function ExcavatorGameWrapper({
     }
   }, [clearAllInput, setAuxiliary]);
 
-  const showPoseSaveToast = useCallback(() => {
-    if (poseSaveToastTimerRef.current != null) {
-      window.clearTimeout(poseSaveToastTimerRef.current);
-    }
-    setPoseSaveToastKey((key) => key + 1);
-    setPoseSaveToastVisible(true);
-    poseSaveToastTimerRef.current = window.setTimeout(() => {
-      setPoseSaveToastVisible(false);
-      poseSaveToastTimerRef.current = null;
-    }, 2100);
-  }, []);
-
   const handleSavePose = useCallback((slot: AutoPoseSlotIndex) => {
     const now = Date.now();
     if (now < savePoseCooldownUntil) return;
@@ -805,7 +992,10 @@ export function ExcavatorGameWrapper({
 
   const resetYanmarSession = useCallback(() => {
     resetSim(simRef.current, velRef.current);
-    terrainRef.current = createInitialTerrain();
+    terrainRef.current = createInitialTerrain(
+      false,
+      getPlayerLevelProgress(totalXpRef.current).level,
+    );
     scoreRef.current = createScoreState(config.target, config.duration);
     tutorialDumpRef.current = 0;
     dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
@@ -815,6 +1005,8 @@ export function ExcavatorGameWrapper({
     arcadeScoreRef.current = 0;
     rewardStarsRef.current = 0;
     setPreviewStars(currencyRef.current);
+    setAttachmentType("bucket");
+    setSceneKey((key) => key + 1);
     tutorialCompletingRef.current = false;
     const nextAuxiliary = createAuxiliaryControls();
     auxiliaryRef.current = nextAuxiliary;
@@ -867,6 +1059,12 @@ export function ExcavatorGameWrapper({
       if (poseSaveToastTimerRef.current != null) {
         window.clearTimeout(poseSaveToastTimerRef.current);
       }
+      if (levelUpToastTimerRef.current != null) {
+        window.clearTimeout(levelUpToastTimerRef.current);
+      }
+      if (attachmentWarningTimerRef.current != null) {
+        window.clearTimeout(attachmentWarningTimerRef.current);
+      }
     };
   }, []);
 
@@ -887,7 +1085,10 @@ export function ExcavatorGameWrapper({
 
   const enterRideMode = useCallback(() => {
     resetYanmarSession();
-    terrainRef.current = createInitialTerrain(false);
+    terrainRef.current = createInitialTerrain(
+      false,
+      getPlayerLevelProgress(totalXpRef.current).level,
+    );
     tutorialStepRef.current = null;
     setShowTutorialMenu(false);
     setShowTouchZones(false);
@@ -897,7 +1098,10 @@ export function ExcavatorGameWrapper({
 
   const enterPracticeMode = useCallback(() => {
     resetYanmarSession();
-    terrainRef.current = createInitialTerrain(true);
+    terrainRef.current = createInitialTerrain(
+      true,
+      getPlayerLevelProgress(totalXpRef.current).level,
+    );
     tutorialStepRef.current = null;
     setTutorialIndex(0);
     setShowTutorialMenu(true);
@@ -923,7 +1127,10 @@ export function ExcavatorGameWrapper({
     }
 
     resetYanmarSession();
-    terrainRef.current = createInitialTerrain(true);
+    terrainRef.current = createInitialTerrain(
+      true,
+      getPlayerLevelProgress(totalXpRef.current).level,
+    );
     if (userId) {
       const truck = loadDumpTruckCooldown(userId);
       if (truck) {
@@ -1227,7 +1434,7 @@ export function ExcavatorGameWrapper({
           void updateSessionRef.current({ user: { currency: data.currency } });
         }
         if (typeof data.totalXp === "number") {
-          setTotalXp(data.totalXp);
+          applyTotalXp(data.totalXp, { announceLevelUp: true });
           void updateSessionRef.current({ user: { totalXp: data.totalXp } });
         }
 
@@ -1271,7 +1478,56 @@ export function ExcavatorGameWrapper({
         });
       }
     })();
-  }, [accumulateDumpScore, adjustDumpScorePanel, scheduleHideDumpScorePanel, showCouponDiscovery]);
+  }, [accumulateDumpScore, adjustDumpScorePanel, applyTotalXp, scheduleHideDumpScorePanel, showCouponDiscovery]);
+
+  const claimSpecialReward = useCallback(
+    async (kind: "crash" | "hill", eventId: string) => {
+      if (modeRef.current !== "game") return;
+      try {
+        const res = await fetch(`/api/rewards/yanmar-${kind}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventId }),
+        });
+        if (!res.ok) throw new Error("Special reward failed");
+        const data = await res.json();
+        if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
+          setCurrency(data.currency);
+          void updateSessionRef.current({ user: { currency: data.currency } });
+        }
+        if (typeof data.totalXp === "number") {
+          applyTotalXp(data.totalXp, { announceLevelUp: true });
+          void updateSessionRef.current({ user: { totalXp: data.totalXp } });
+        }
+        if (typeof data.score === "number") {
+          arcadeScoreRef.current += data.score;
+          setHud((current) => ({ ...current, score: arcadeScoreRef.current }));
+        }
+        const event = data.reward as DumpRewardApiEvent | undefined;
+        if (event?.kind === "coupon") {
+          showCouponDiscovery(event.couponType, event.discountPct);
+        }
+      } catch {
+        showAttachmentWarning("보상 저장에 실패했습니다. 잠시 후 다시 시도하세요.");
+      }
+    },
+    [applyTotalXp, showAttachmentWarning, showCouponDiscovery],
+  );
+
+  const handleCrashTileDestroyed = useCallback(
+    (tileId: string) => {
+      void claimSpecialReward("crash", tileId);
+    },
+    [claimSpecialReward],
+  );
+
+  const handleHillRockDelivered = useCallback(
+    (rockId: string) => {
+      void claimSpecialReward("hill", rockId);
+    },
+    [claimSpecialReward],
+  );
 
   const handleEquipmentUpgrade = useCallback(
     (part: YanmarEquipmentPart) => {
@@ -1817,6 +2073,43 @@ export function ExcavatorGameWrapper({
             현재 자세가 저장되었습니다.
           </div>
         ) : null}
+        {mode !== "intro" && attachmentWarning ? (
+          <div
+            key={attachmentWarning.key}
+            className="yanmar-attachment-warning-toast"
+            role="status"
+            aria-live="polite"
+          >
+            {attachmentWarning.message}
+          </div>
+        ) : null}
+        {mode !== "intro" && levelUpToast ? (
+          <div
+            key={levelUpToast.key}
+            className="yanmar-level-up-toast"
+            role="status"
+            aria-live="polite"
+          >
+            <p className="yanmar-level-up-toast-title">레벨이 상승했습니다.</p>
+            <p className="yanmar-level-up-toast-level">
+              현재 레벨 <span>{levelUpToast.level}</span>
+            </p>
+          </div>
+        ) : null}
+        <AttachmentUnlockOverlay
+          unlock={unlockQueue[0]}
+          onClose={() => {
+            const current = unlockQueue[0];
+            if (current) {
+              try {
+                localStorage.setItem(`ykgame:yanmar:unlock-seen:${current}`, "1");
+              } catch {
+                // Continue even when storage is unavailable.
+              }
+            }
+            setUnlockQueue((queue) => queue.slice(1));
+          }}
+        />
 
         <YanmarGameSettingsMenu
           immersive={immersive}
@@ -1845,6 +2138,7 @@ export function ExcavatorGameWrapper({
         {mode !== "intro" && (
           <div className="pointer-events-none absolute inset-0 z-0">
             <ExcavatorScene
+              key={sceneKey}
               inputRef={inputRef}
               simRef={simRef}
               velRef={velRef}
@@ -1862,6 +2156,9 @@ export function ExcavatorGameWrapper({
               dumpTruckPoseRef={dumpTruckPoseRef}
               onProgress={handleProgress}
               onDumpScore={handleDumpScore}
+              onCrashTileDestroyed={handleCrashTileDestroyed}
+              onHillRockDelivered={handleHillRockDelivered}
+              onAttachmentWarning={showAttachmentWarning}
               onSimTick={handleSimTick}
               cameraMode={cameraMode}
             />
@@ -1889,6 +2186,9 @@ export function ExcavatorGameWrapper({
             }}
             auxiliary={auxiliary}
             onAuxiliaryChange={handleAuxiliaryChange}
+            attachmentType={attachmentType}
+            playerLevel={getPlayerLevelProgress(totalXp).level}
+            onAttachmentChange={handleAttachmentChange}
             autoPose={autoPose}
             onSavePose={handleSavePose}
             onExecutePose={handleExecutePose}

@@ -15,8 +15,12 @@ import {
   COCKPIT_LAYOUT,
 } from "./controls";
 import type { TutorialStep } from "./tutorial";
-import type { AutoPoseSlotIndex, AutoPoseState } from "./types";
+import type { AttachmentType, AutoPoseSlotIndex, AutoPoseState } from "./types";
 import { AUTO_POSE_SLOT_COUNT } from "./types";
+import {
+  getAttachmentRequiredLevel,
+  isAttachmentUnlocked,
+} from "@/lib/playerUnlocks";
 
 
 interface CockpitOverlayProps {
@@ -41,6 +45,9 @@ interface CockpitOverlayProps {
   onExecutePose: (slot: AutoPoseSlotIndex) => void;
   savePoseDisabled?: boolean;
   executePoseDisabled?: boolean;
+  attachmentType: AttachmentType;
+  playerLevel: number;
+  onAttachmentChange: (attachment: AttachmentType) => void;
 }
 
 interface JoystickLayout {
@@ -101,7 +108,16 @@ const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   horn: { ...COCKPIT_LAYOUT.horn, cx: 0.9, cy: 0.495 },
 };
 
-const FUNCTION_MENU_ITEM_ORDER = ["safety", "rpm", "pedal"] as const;
+const FUNCTION_MENU_OPEN_DELAYS_MS = {
+  safety: 0,
+  rpm: 50,
+  pedal: 100,
+} as const;
+const FUNCTION_MENU_CLOSE_DELAYS_MS = {
+  pedal: 0,
+  rpm: 35,
+  safety: 70,
+} as const;
 
 const AUTO_POSE_SLOT_ORDER = Array.from(
   { length: AUTO_POSE_SLOT_COUNT },
@@ -1292,6 +1308,74 @@ interface FunctionMenuProps {
   showTouchZones: boolean;
   auxiliary: AuxiliaryControlState;
   onAuxiliaryChange: CockpitOverlayProps["onAuxiliaryChange"];
+  attachmentType: AttachmentType;
+  playerLevel: number;
+  onAttachmentChange: (attachment: AttachmentType) => void;
+}
+
+const ATTACHMENTS: Array<{
+  type: AttachmentType;
+  label: string;
+  icon: string;
+}> = [
+  {
+    type: "bucket",
+    label: "버켓",
+    icon: "/images/yanmar/2d/attachments/bucket.png",
+  },
+  {
+    type: "breaker",
+    label: "브레이커",
+    icon: "/images/yanmar/2d/attachments/breaker.png",
+  },
+  {
+    type: "grapple",
+    label: "집게",
+    icon: "/images/yanmar/2d/attachments/grapple.png",
+  },
+];
+
+function AttachmentButton({
+  type,
+  label,
+  icon,
+  selected,
+  playerLevel,
+  onSelect,
+}: {
+  type: AttachmentType;
+  label: string;
+  icon: string;
+  selected: boolean;
+  playerLevel: number;
+  onSelect: () => void;
+}) {
+  const unlocked = isAttachmentUnlocked(type, playerLevel);
+  const requiredLevel = getAttachmentRequiredLevel(type);
+  return (
+    <button
+      type="button"
+      className={`yanmar-attachment-button${selected ? " is-selected" : ""}${
+        unlocked ? "" : " is-locked"
+      }`}
+      onClick={onSelect}
+      disabled={!unlocked}
+      aria-pressed={selected}
+      aria-label={
+        unlocked ? `${label} 장착` : `${label} 잠김, 레벨 ${requiredLevel} 필요`
+      }
+    >
+      <span
+        className={`yanmar-attachment-icon yanmar-attachment-icon-${type}`}
+        style={{ backgroundImage: `url("${icon}")` }}
+        aria-hidden
+      />
+      <span className="yanmar-attachment-label">{label}</span>
+      {!unlocked ? (
+        <span className="yanmar-attachment-lock">Lv.{requiredLevel}</span>
+      ) : null}
+    </button>
+  );
 }
 
 function FunctionMenu({
@@ -1302,83 +1386,122 @@ function FunctionMenu({
   showTouchZones,
   auxiliary,
   onAuxiliaryChange,
+  attachmentType,
+  playerLevel,
+  onAttachmentChange,
 }: FunctionMenuProps) {
   const anchorCx = layout.left.cx;
   const toggleCy = AUX_MENU_TOGGLE_CY;
   const buttonSize = isPortrait ? "2.85rem" : "2.75rem";
-  const pedalHeight = isPortrait ? "4.55rem" : "5rem";
+  const gap = "0.42rem";
+  const pedalHeight = `calc(${buttonSize} * 2 + ${gap})`;
 
   return (
     <div
-      className="yanmar-function-menu"
+      className={`yanmar-function-menu${expanded ? " is-expanded" : ""}`}
       style={{
         left: `${anchorCx * 100}%`,
         top: `${toggleCy * 100}%`,
+        width: buttonSize,
+        height: buttonSize,
+        ["--yanmar-function-btn-size" as string]: buttonSize,
+        ["--yanmar-function-gap" as string]: gap,
       }}
     >
-      <div className={`yanmar-function-menu-items ${expanded ? "is-expanded" : ""}`}>
-        {FUNCTION_MENU_ITEM_ORDER.map((key, index) => {
-          const openDelayMs = index * 50;
-          const closeDelayMs = (FUNCTION_MENU_ITEM_ORDER.length - 1 - index) * 35;
+      <div
+        className={`yanmar-function-menu-grid ${expanded ? "is-expanded" : ""}`}
+        aria-hidden={!expanded}
+      >
+        <div className="yanmar-function-menu-attachments">
+          {ATTACHMENTS.map((item) => (
+            <AttachmentButton
+              key={item.type}
+              {...item}
+              selected={attachmentType === item.type}
+              playerLevel={playerLevel}
+              onSelect={() => onAttachmentChange(item.type)}
+            />
+          ))}
+        </div>
+        <div
+          className="yanmar-function-menu-item yanmar-function-menu-item-safety"
+          style={{
+            width: buttonSize,
+            height: buttonSize,
+            transitionDelay: `${
+              expanded
+                ? FUNCTION_MENU_OPEN_DELAYS_MS.safety
+                : FUNCTION_MENU_CLOSE_DELAYS_MS.safety
+            }ms`,
+          }}
+        >
+          <SafetyLever
+            cx={layout.safetyLever.cx}
+            cy={layout.safetyLever.cy}
+            active={auxiliary.safetyLocked}
+            showTouchZone={showTouchZones}
+            isPortrait={isPortrait}
+            embedded
+            onToggle={() =>
+              onAuxiliaryChange((current) => ({
+                ...current,
+                safetyLocked: !current.safetyLocked,
+              }))
+            }
+          />
+        </div>
 
-          return (
-            <div
-              key={key}
-              className="yanmar-function-menu-item"
-              style={{
-                width: buttonSize,
-                height: key === "pedal" ? pedalHeight : buttonSize,
-                transitionDelay: `${expanded ? openDelayMs : closeDelayMs}ms`,
-              }}
-              aria-hidden={!expanded}
-            >
-              {key === "safety" ? (
-                <SafetyLever
-                  cx={layout.safetyLever.cx}
-                  cy={layout.safetyLever.cy}
-                  active={auxiliary.safetyLocked}
-                  showTouchZone={showTouchZones}
-                  isPortrait={isPortrait}
-                  embedded
-                  onToggle={() =>
-                    onAuxiliaryChange((current) => ({
-                      ...current,
-                      safetyLocked: !current.safetyLocked,
-                    }))
-                  }
-                />
-              ) : null}
-              {key === "rpm" ? (
-                <RpmLever
-                  cx={layout.hydraulicSpeed.cx}
-                  cy={layout.hydraulicSpeed.cy}
-                  active={auxiliary.highSpeed}
-                  showTouchZone={showTouchZones}
-                  isPortrait={isPortrait}
-                  embedded
-                  onToggle={() =>
-                    onAuxiliaryChange((current) => ({
-                      ...current,
-                      highSpeed: !current.highSpeed,
-                    }))
-                  }
-                />
-              ) : null}
-              {key === "pedal" ? (
-                <PedalSwingControl
-                  activeValue={auxiliary.boomSwing}
-                  showTouchZone={showTouchZones}
-                  layout={layout}
-                  isPortrait={isPortrait}
-                  embedded
-                  onChange={(boomSwing) =>
-                    onAuxiliaryChange((current) => ({ ...current, boomSwing }))
-                  }
-                />
-              ) : null}
-            </div>
-          );
-        })}
+        <div
+          className="yanmar-function-menu-item yanmar-function-menu-item-rpm"
+          style={{
+            width: buttonSize,
+            height: buttonSize,
+            transitionDelay: `${
+              expanded
+                ? FUNCTION_MENU_OPEN_DELAYS_MS.rpm
+                : FUNCTION_MENU_CLOSE_DELAYS_MS.rpm
+            }ms`,
+          }}
+        >
+          <RpmLever
+            cx={layout.hydraulicSpeed.cx}
+            cy={layout.hydraulicSpeed.cy}
+            active={auxiliary.highSpeed}
+            showTouchZone={showTouchZones}
+            isPortrait={isPortrait}
+            embedded
+            onToggle={() =>
+              onAuxiliaryChange((current) => ({
+                ...current,
+                highSpeed: !current.highSpeed,
+              }))
+            }
+          />
+        </div>
+
+        <div
+          className="yanmar-function-menu-item yanmar-function-menu-item-pedal"
+          style={{
+            width: buttonSize,
+            height: pedalHeight,
+            transitionDelay: `${
+              expanded
+                ? FUNCTION_MENU_OPEN_DELAYS_MS.pedal
+                : FUNCTION_MENU_CLOSE_DELAYS_MS.pedal
+            }ms`,
+          }}
+        >
+          <PedalSwingControl
+            activeValue={auxiliary.boomSwing}
+            showTouchZone={showTouchZones}
+            layout={layout}
+            isPortrait={isPortrait}
+            embedded
+            onChange={(boomSwing) =>
+              onAuxiliaryChange((current) => ({ ...current, boomSwing }))
+            }
+          />
+        </div>
       </div>
 
       <button
@@ -1582,6 +1705,9 @@ export function CockpitOverlay({
   onExecutePose,
   savePoseDisabled = false,
   executePoseDisabled = false,
+  attachmentType,
+  playerLevel,
+  onAttachmentChange,
 }: CockpitOverlayProps) {
   const highlightLeft =
     tutorialStep?.highlight === "left" || tutorialStep?.highlight === "both";
@@ -1696,6 +1822,9 @@ export function CockpitOverlay({
             showTouchZones={showTouchZones}
             auxiliary={auxiliary}
             onAuxiliaryChange={onAuxiliaryChange}
+            attachmentType={attachmentType}
+            playerLevel={playerLevel}
+            onAttachmentChange={onAttachmentChange}
           />
           <AutoMenu
             expanded={autoMenuExpanded}

@@ -228,6 +228,95 @@ body {
   will-change: opacity, transform;
 }
 
+@keyframes yanmar-level-up-toast-fade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  62% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.02);
+  }
+}
+
+.yanmar-level-up-toast {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 85;
+  max-width: min(88vw, 20rem);
+  padding: 1rem 1.35rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  background: linear-gradient(165deg, rgba(30, 41, 59, 0.94) 0%, rgba(15, 23, 42, 0.96) 100%);
+  box-shadow:
+    0 0.55rem 1.8rem rgba(0, 0, 0, 0.5),
+    0 0 1.2rem rgba(251, 191, 36, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  text-align: center;
+  pointer-events: none;
+  animation: yanmar-level-up-toast-fade 2.8s ease-out forwards;
+  will-change: opacity, transform;
+}
+
+.yanmar-level-up-toast-title {
+  margin: 0;
+  color: #fef3c7;
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.yanmar-level-up-toast-level {
+  margin: 0.35rem 0 0;
+  color: #e2e8f0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.yanmar-level-up-toast-level span {
+  color: #fbbf24;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.yanmar-attachment-warning-toast {
+  position: absolute;
+  left: 50%;
+  top: 36%;
+  z-index: 88;
+  max-width: min(88vw, 22rem);
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(251, 146, 60, 0.7);
+  border-radius: 0.9rem;
+  background: linear-gradient(
+    160deg,
+    rgba(124, 45, 18, 0.95),
+    rgba(30, 41, 59, 0.97)
+  );
+  padding: 0.75rem 1.1rem;
+  color: #fff7ed;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+  box-shadow:
+    0 0.55rem 1.6rem rgba(0, 0, 0, 0.48),
+    0 0 1rem rgba(249, 115, 22, 0.18);
+  animation: yanmar-pose-save-toast-fade 2.4s ease-out forwards;
+}
+
 .yanmar-practice-ticker {
   background: linear-gradient(180deg, #1c1917 0%, #0c0a09 100%);
   border-bottom: 1px solid rgba(251, 191, 36, 0.32);
@@ -1714,10 +1803,33 @@ body {
   position: absolute;
   z-index: 65;
   transform: translate(-50%, -50%);
+  overflow: visible;
+}
+
+.yanmar-function-menu-grid {
+  --yanmar-function-gap: 0.42rem;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns:
+    var(--yanmar-function-btn-size, 2.75rem)
+    var(--yanmar-function-btn-size, 2.75rem)
+    var(--yanmar-function-btn-size, 2.75rem);
+  grid-template-rows:
+    var(--yanmar-function-btn-size, 2.75rem)
+    var(--yanmar-function-btn-size, 2.75rem)
+    var(--yanmar-function-btn-size, 2.75rem);
+  column-gap: var(--yanmar-function-gap);
+  row-gap: var(--yanmar-function-gap);
+  pointer-events: none;
 }
 
 .yanmar-function-menu-toggle {
-  position: relative;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 2;
   flex-shrink: 0;
   border-color: rgba(167, 243, 208, 0.34);
   background:
@@ -1791,45 +1903,139 @@ body {
   text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.58);
 }
 
-.yanmar-function-menu-items {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 0.42rem);
-  display: flex;
-  flex-direction: column-reverse;
-  align-items: center;
-  gap: 0.42rem;
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.yanmar-function-menu-items:not(.is-expanded) {
-  gap: 0;
-}
-
 .yanmar-function-menu-item {
   flex-shrink: 0;
   opacity: 0;
-  transform: translateY(0.75rem) scale(0.9);
-  max-height: 0;
+  transform: translateX(-0.55rem) scale(0.9);
   overflow: hidden;
   pointer-events: none;
   transition:
     opacity 0.28s ease,
-    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
-    max-height 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.yanmar-function-menu-items.is-expanded .yanmar-function-menu-item {
+.yanmar-function-menu-item-safety {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.yanmar-function-menu-item-rpm {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.yanmar-function-menu-item-pedal {
+  grid-column: 3;
+  grid-row: 2 / span 2;
+  align-self: stretch;
+}
+
+.yanmar-function-menu-attachments {
+  grid-column: 1 / span 3;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: repeat(3, var(--yanmar-function-btn-size, 2.75rem));
+  gap: var(--yanmar-function-gap);
+  opacity: 0;
+  transform: translateX(-0.55rem) scale(0.9);
+  pointer-events: none;
+  transition:
+    opacity 0.28s ease,
+    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.yanmar-function-menu-grid.is-expanded .yanmar-function-menu-attachments {
   opacity: 1;
-  transform: translateY(0) scale(1);
-  max-height: 3.2rem;
-  overflow: visible;
+  transform: translateX(0) scale(1);
   pointer-events: auto;
 }
 
-.yanmar-function-menu-items.is-expanded .yanmar-function-menu-item:last-child {
-  max-height: 5rem;
+.yanmar-attachment-button {
+  position: relative;
+  width: var(--yanmar-function-btn-size, 2.75rem);
+  height: var(--yanmar-function-btn-size, 2.75rem);
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  border-radius: 0.7rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 35%),
+    linear-gradient(160deg, rgba(30, 41, 59, 0.96), rgba(2, 6, 23, 0.96));
+  color: #e2e8f0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0.15rem 0.35rem rgba(0, 0, 0, 0.45);
+}
+
+.yanmar-attachment-button.is-selected {
+  border-color: rgba(251, 191, 36, 0.9);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.15), transparent 35%),
+    linear-gradient(160deg, rgba(180, 83, 9, 0.94), rgba(69, 26, 3, 0.96));
+  box-shadow:
+    0 0 0 0.08rem rgba(251, 191, 36, 0.3),
+    0 0 0.8rem rgba(245, 158, 11, 0.28);
+}
+
+.yanmar-attachment-button.is-locked {
+  filter: grayscale(0.7);
+  opacity: 0.55;
+}
+
+.yanmar-attachment-icon {
+  position: absolute;
+  left: 50%;
+  top: 0.08rem;
+  width: 2.05rem;
+  height: 1.95rem;
+  transform: translateX(-50%);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: drop-shadow(0 0.12rem 0.1rem rgba(0, 0, 0, 0.9));
+  transition: filter 150ms ease, transform 150ms ease;
+}
+
+.yanmar-attachment-button.is-selected .yanmar-attachment-icon {
+  filter:
+    drop-shadow(0 0.12rem 0.1rem rgba(0, 0, 0, 0.9))
+    drop-shadow(0 0 0.28rem rgba(251, 191, 36, 0.72));
+  transform: translateX(-50%) scale(1.06);
+}
+
+.yanmar-attachment-icon-breaker {
+  transform: translateX(-50%) scale(1.08);
+}
+
+.yanmar-attachment-button.is-selected .yanmar-attachment-icon-breaker {
+  transform: translateX(-50%) scale(1.14);
+}
+
+.yanmar-attachment-label {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0.2rem;
+  font-size: 0.42rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.yanmar-attachment-lock {
+  position: absolute;
+  right: 0.12rem;
+  top: 0.12rem;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.82);
+  padding: 0.08rem 0.18rem;
+  color: #f8fafc;
+  font-size: 0.32rem;
+  font-weight: 900;
+}
+
+.yanmar-function-menu-grid.is-expanded .yanmar-function-menu-item {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  overflow: visible;
+  pointer-events: auto;
 }
 
 .yanmar-layout-portrait .yanmar-function-menu-toggle-label {

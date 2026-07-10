@@ -26,6 +26,13 @@ const MENU_ITEMS = [
     color: "border-violet-200 bg-gradient-to-br from-violet-50 to-white",
   },
   {
+    href: "/admin/workshops",
+    emoji: "🏗️",
+    title: "작업장 정보",
+    desc: "굴착·하역·Crash·Hill 작업장별 운영 및 활동 현황",
+    color: "border-orange-200 bg-gradient-to-br from-orange-50 to-white",
+  },
+  {
     href: "/admin/mail",
     emoji: "📮",
     title: "우편발송",
