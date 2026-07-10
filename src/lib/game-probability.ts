@@ -1,6 +1,8 @@
 import {
   YANMAR_EQUIPMENT_CONFIG,
   YANMAR_REWARD_CONFIG,
+  YANMAR_CRASH_REWARD_CONFIG,
+  YANMAR_HILL_REWARD_CONFIG,
   YANMAR_EQUIPMENT_RESET_REFUND_RATE,
   YANMAR_SPECIAL_UPGRADE_COSTS,
   YANMAR_TRUCK_UPGRADE_COSTS,
@@ -101,6 +103,73 @@ export function getGameProbabilityReport() {
               value: "종류별 고정",
               detail:
                 "시즌이 바뀌면 한도가 다시 채워집니다. 한도 소진 시 쿠폰 대신 스타가 지급됩니다.",
+            },
+          ],
+        },
+        {
+          title: "Crash 아스팔트 파괴 보상 (타일 1개)",
+          items: [
+            {
+              label: "기본 점수",
+              value: `${YANMAR_CRASH_REWARD_CONFIG.baseScoreMin}~${YANMAR_CRASH_REWARD_CONFIG.baseScoreMax}점 (랜덤)`,
+              detail: "암/붐 강화의 크리티컬 확률·배율 적용",
+            },
+            {
+              label: "기본 크리티컬 확률",
+              value: pct(YANMAR_REWARD_CONFIG.baseCriticalChance),
+            },
+            {
+              label: "기본 크리티컬 배율",
+              value: `×${YANMAR_REWARD_CONFIG.baseCriticalMultiplier}`,
+            },
+            {
+              label: "필터세트 교환쿠폰",
+              value: pct(filterChance, 4),
+              detail: "하역과 동일 확률",
+            },
+            {
+              label: "YK건기 부품 할인 쿠폰",
+              value: pct(partsChance),
+              detail: "하역과 동일 확률",
+            },
+            {
+              label: "중장비 대여 할인 쿠폰",
+              value: pct(rentalChance),
+              detail: "하역과 동일 확률",
+            },
+            {
+              label: "스타 보상",
+              value: pct(starChance),
+              detail: `${YANMAR_CRASH_REWARD_CONFIG.minStarReward}~${YANMAR_CRASH_REWARD_CONFIG.maxStarReward} 스타 랜덤`,
+            },
+            {
+              label: "경험치",
+              value: `${YANMAR_CRASH_REWARD_CONFIG.xpReward.toLocaleString()} XP`,
+            },
+            {
+              label: "구역 재생성",
+              value: "9칸 전부 파괴 후 5분",
+              detail: "같은 자리에 아스팔트 9칸 일괄 리젠",
+            },
+          ],
+        },
+        {
+          title: "Hill 돌 운반 보상 (돌 1개 트럭 적재)",
+          items: [
+            {
+              label: "기본 점수",
+              value: `${YANMAR_HILL_REWARD_CONFIG.baseScoreMin}~${YANMAR_HILL_REWARD_CONFIG.baseScoreMax}점 (랜덤)`,
+              detail: "암/붐 강화의 크리티컬 확률·배율 적용",
+            },
+            {
+              label: "스타 보상",
+              value: pct(starChance),
+              detail: `${YANMAR_HILL_REWARD_CONFIG.minStarReward}~${YANMAR_HILL_REWARD_CONFIG.maxStarReward} 스타 랜덤 · 쿠폰 확률은 하역과 동일`,
+            },
+            {
+              label: "구역 규칙",
+              value: "돌 5개 · 트럭 적재 10개",
+              detail: "돌을 모두 구역 밖으로 반출하면 구역 소멸 · 5분 후 같은 자리 재생성",
             },
           ],
         },

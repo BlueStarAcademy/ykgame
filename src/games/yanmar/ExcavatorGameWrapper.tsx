@@ -74,6 +74,11 @@ import {
   saveSavedArmPoseSlots,
 } from "./autoPosePersistence";
 import {
+  loadAuxiliarySettingsForSession,
+  resolveAuxiliarySettingsOwner,
+  saveAuxiliarySettings,
+} from "./auxiliarySettingsPersistence";
+import {
   createDumpTruckState,
   formatDumpTruckReturnTime,
   getDumpTruckPose,
@@ -85,6 +90,10 @@ import {
   YANMAR_EQUIPMENT_RESET_REFUND_RATE,
   YANMAR_EQUIPMENT_CONFIG,
   YANMAR_REWARD_CONFIG,
+  YANMAR_CRASH_REWARD_CONFIG,
+  YANMAR_HILL_REWARD_CONFIG,
+  calculateYanmarCrashScore,
+  calculateYanmarHillScore,
   calculateYanmarEquipmentStats,
   getLoadUnits,
   getYanmarPartResetRefundStars,
@@ -118,6 +127,7 @@ import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import {
   getCrossedUnlocks,
   isAttachmentUnlocked,
+  PRACTICE_FULL_UNLOCK_LEVEL,
   type PlayerUnlockKind,
 } from "@/lib/playerUnlocks";
 
@@ -189,7 +199,7 @@ function TutorialSelectModal({
           >
             자유동작
             <span className="mt-0.5 block text-[10px] font-medium text-gray-500">
-              튜토리얼 없이 모든 조작을 자유롭게 사용
+              브레이커·집게·전체 맵 포함, 모든 기능을 자유롭게 사용
             </span>
           </button>
           {TUTORIAL_STEPS.map((step, index) => (
@@ -292,11 +302,35 @@ function CrashAsphaltHpPanel({
   );
 }
 
-function rollOptimisticStarReward() {
-  const { minStarReward, maxStarReward } = YANMAR_REWARD_CONFIG;
-  return (
-    Math.floor(Math.random() * (maxStarReward - minStarReward + 1)) + minStarReward
-  );
+function rollOptimisticStarReward(
+  minStars: number = YANMAR_REWARD_CONFIG.minStarReward,
+  maxStars: number = YANMAR_REWARD_CONFIG.maxStarReward,
+) {
+  return Math.floor(Math.random() * (maxStars - minStars + 1)) + minStars;
+}
+
+function rollLocalCrashReward(stats: YanmarEquipmentStats) {
+  const critical = Math.random() < stats.criticalChance;
+  return {
+    score: calculateYanmarCrashScore(stats, critical),
+    critical,
+    stars: rollOptimisticStarReward(
+      YANMAR_CRASH_REWARD_CONFIG.minStarReward,
+      YANMAR_CRASH_REWARD_CONFIG.maxStarReward,
+    ),
+  };
+}
+
+function rollLocalHillReward(stats: YanmarEquipmentStats) {
+  const critical = Math.random() < stats.criticalChance;
+  return {
+    score: calculateYanmarHillScore(stats, critical),
+    critical,
+    stars: rollOptimisticStarReward(
+      YANMAR_HILL_REWARD_CONFIG.minStarReward,
+      YANMAR_HILL_REWARD_CONFIG.maxStarReward,
+    ),
+  };
 }
 
 function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
@@ -373,46 +407,82 @@ function AttachmentUnlockOverlay({
   const level = breaker ? 10 : 15;
   const attachmentLabel = breaker ? "브레이커" : "집게";
   const zoneLabel = breaker ? "Crash 철거 작업장" : "Hill 운반 작업장";
+  const machineSrc = breaker
+    ? "/images/yanmar/2d/excavator-side-diagram-breaker.png"
+    : "/images/yanmar/2d/excavator-side-diagram-grapple.png";
+  const attachmentSrc = breaker
+    ? "/images/yanmar/2d/attachments/breaker.png"
+    : "/images/yanmar/2d/attachments/grapple.png";
+
   return (
-    <div className="absolute inset-0 z-[95] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm">
+    <div className="yanmar-unlock-overlay" role="presentation">
       <div
-        className="w-[min(22rem,92%)] rounded-2xl border border-amber-300/70 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 p-5 text-center text-white shadow-2xl"
+        className="yanmar-unlock-panel"
         role="dialog"
         aria-modal="true"
         aria-label={`레벨 ${level} ${attachmentLabel} 및 신규 작업장 개방 안내`}
       >
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-300/50 bg-amber-500/15 text-4xl text-amber-300">
-          {breaker ? "▾" : "⌁"}
-        </div>
-        <p className="mt-4 text-xs font-black tracking-[0.24em] text-amber-400">
-          LEVEL {level} 작업 해금
-        </p>
-        <p className="mt-4 text-lg font-black text-amber-200">
-          새로운 작업이 개방되었습니다!
-        </p>
-        <div className="mt-4 grid gap-2 text-left text-sm font-black">
-          <div className="flex items-center gap-3 rounded-xl border border-amber-300/25 bg-amber-400/10 px-3 py-2.5 text-amber-100">
-            <span className="text-base text-amber-300" aria-hidden>✓</span>
-            <span>{attachmentLabel} 사용 가능</span>
+        <div className="yanmar-unlock-panel-glow" aria-hidden />
+        <div className="yanmar-unlock-panel-frame" aria-hidden />
+
+        <header className="yanmar-unlock-brand">
+          <span className="yanmar-unlock-brand-mark">YANMAR</span>
+          <span className="yanmar-unlock-brand-rule" aria-hidden />
+          <span className="yanmar-unlock-brand-sub">SV08-1 · WORKSITE UNLOCK</span>
+        </header>
+
+        <div className="yanmar-unlock-hero">
+          <div className="yanmar-unlock-hero-stage">
+            <img
+              className="yanmar-unlock-machine"
+              src={machineSrc}
+              alt={`블레이드가 장착된 얀마 굴착기와 ${attachmentLabel}`}
+              draggable={false}
+            />
+            <div className="yanmar-unlock-blade-sheen" aria-hidden />
+            <div className="yanmar-unlock-attachment-orb">
+              <img
+                className="yanmar-unlock-attachment"
+                src={attachmentSrc}
+                alt={attachmentLabel}
+                draggable={false}
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-3 rounded-xl border border-emerald-300/25 bg-emerald-400/10 px-3 py-2.5 text-emerald-100">
-            <span className="text-base text-emerald-300" aria-hidden>✓</span>
-            <span>새로운 작업장 작업 가능</span>
-          </div>
+          <div className="yanmar-unlock-hero-fade" aria-hidden />
         </div>
-        <p className="mt-3 text-sm font-bold leading-relaxed text-slate-100">
-          {zoneLabel}이 열렸습니다.
-        </p>
-        <p className="mt-2 text-xs leading-relaxed text-slate-400">
-          기능 메뉴에서 {attachmentLabel}를 선택한 뒤 전용 작업 지역으로 이동하세요.
-        </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-5 w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-black text-slate-950 transition active:scale-[0.98]"
-        >
-          확인
-        </button>
+
+        <div className="yanmar-unlock-body">
+          <p className="yanmar-unlock-level">
+            <span>LEVEL</span> {level}
+          </p>
+          <h2 className="yanmar-unlock-title">새로운 작업이 개방되었습니다</h2>
+          <p className="yanmar-unlock-lead">
+            {zoneLabel}과 {attachmentLabel} 장비가 해금되었습니다.
+          </p>
+
+          <ul className="yanmar-unlock-perks">
+            <li>
+              <span className="yanmar-unlock-perk-index">01</span>
+              <div>
+                <strong>{attachmentLabel} 장착</strong>
+                <span>기능 메뉴에서 부착물을 교체할 수 있습니다</span>
+              </div>
+            </li>
+            <li>
+              <span className="yanmar-unlock-perk-index">02</span>
+              <div>
+                <strong>{zoneLabel}</strong>
+                <span>전용 작업 구역으로 이동해 미션을 수행하세요</span>
+              </div>
+            </li>
+          </ul>
+
+          <button type="button" className="yanmar-unlock-cta" onClick={onClose}>
+            <span>확인</span>
+            <span className="yanmar-unlock-cta-shine" aria-hidden />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -466,7 +536,7 @@ export function ExcavatorGameWrapper({
     message: string;
   } | null>(null);
   const [unlockQueue, setUnlockQueue] = useState<PlayerUnlockKind[]>([]);
-  const [sceneKey, setSceneKey] = useState(0);
+  const [terrainRevision, setTerrainRevision] = useState(0);
   const [savePoseCooldownUntil, setSavePoseCooldownUntil] = useState(0);
   const [executePoseCooldownUntil, setExecutePoseCooldownUntil] = useState(0);
   const poseSaveToastTimerRef = useRef<number | null>(null);
@@ -511,13 +581,15 @@ export function ExcavatorGameWrapper({
   );
   const gameFrameStyle: CSSProperties | undefined = immersive
     ? {
-        width: "min(100cqw, calc(100cqh * 9 / 16))",
-        height: "min(100cqh, calc(100cqw * 16 / 9))",
+        width: "100%",
+        height: "100%",
       }
     : undefined;
   const endedRef = useRef(false);
   const elapsedRef = useRef(0);
   const tutorialDumpRef = useRef(0);
+  const tutorialCrashHitsRef = useRef(0);
+  const tutorialHillDeliverRef = useRef(0);
   const tutorialCompletingRef = useRef(false);
   const tutorialIndexRef = useRef(0);
   const digFeedbackRef = useRef<DigFeedback>(createDigFeedback());
@@ -602,7 +674,7 @@ export function ExcavatorGameWrapper({
     dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
     terrainRef.current = applyGameSessionTerrain(snapshot);
     setAttachmentType(snapshot.sim.attachmentType);
-    setSceneKey((key) => key + 1);
+    setTerrainRevision((key) => key + 1);
     arcadeScoreRef.current = snapshot.arcadeScore;
     rewardStarsRef.current = snapshot.rewardStars;
     scoreRef.current = createScoreState(config.target, config.duration);
@@ -629,6 +701,10 @@ export function ExcavatorGameWrapper({
     digHudTickRef.current += 1;
     const fb = digFeedbackRef.current;
     const crashHitChanged = fb.crashHitTick !== lastSyncedCrashHitTickRef.current;
+    if (crashHitChanged && modeRef.current === "tutorial") {
+      const delta = fb.crashHitTick - lastSyncedCrashHitTickRef.current;
+      if (delta > 0) tutorialCrashHitsRef.current += delta;
+    }
     if (digHudTickRef.current % 3 !== 0 && !crashHitChanged) return;
     lastSyncedCrashHitTickRef.current = fb.crashHitTick;
     setDigFeedback((prev) =>
@@ -699,6 +775,17 @@ export function ExcavatorGameWrapper({
       gameSessionUserIdRef.current = userId;
     }
 
+    const savedAuxiliary = loadAuxiliarySettingsForSession(userId);
+    if (savedAuxiliary) {
+      const restoredAuxiliary = {
+        ...auxiliaryRef.current,
+        ...savedAuxiliary,
+        breakerPedal: false,
+      };
+      auxiliaryRef.current = restoredAuxiliary;
+      setAuxiliary(restoredAuxiliary);
+    }
+
     const savedSlots = loadAutoPoseSlotsForSession(userId);
     autoPoseRef.current.slots = [savedSlots[0], savedSlots[1]];
     autoPoseRef.current.saved = savedSlots[autoPoseRef.current.activeSlot];
@@ -730,6 +817,12 @@ export function ExcavatorGameWrapper({
         session?.user?.id ?? gameSessionUserIdRef.current,
       );
       saveSavedArmPoseSlots(ownerId, autoPoseRef.current.slots);
+      saveAuxiliarySettings(
+        resolveAuxiliarySettingsOwner(
+          session?.user?.id ?? gameSessionUserIdRef.current,
+        ),
+        auxiliaryRef.current,
+      );
       if (!session?.user?.id) {
         dumpTruckUserIdRef.current = null;
         gameSessionUserIdRef.current = null;
@@ -751,6 +844,12 @@ export function ExcavatorGameWrapper({
         session?.user?.id ?? gameSessionUserIdRef.current,
       );
       saveSavedArmPoseSlots(ownerId, autoPoseRef.current.slots);
+      saveAuxiliarySettings(
+        resolveAuxiliarySettingsOwner(
+          session?.user?.id ?? gameSessionUserIdRef.current,
+        ),
+        auxiliaryRef.current,
+      );
     };
     window.addEventListener("pagehide", saveBeforeLeaving);
     return () => window.removeEventListener("pagehide", saveBeforeLeaving);
@@ -856,10 +955,15 @@ export function ExcavatorGameWrapper({
     }, 2400);
   }, []);
 
+  const practiceUnlocksAll =
+    mode === "practice" || mode === "tutorial";
+
   const handleAttachmentChange = useCallback(
     (next: AttachmentType) => {
+      const unlockAll =
+        modeRef.current === "practice" || modeRef.current === "tutorial";
       const playerLevel = getPlayerLevelProgress(totalXpRef.current).level;
-      if (!isAttachmentUnlocked(next, playerLevel)) {
+      if (!isAttachmentUnlocked(next, playerLevel, { unlockAll })) {
         showAttachmentWarning(
           next === "breaker"
             ? "브레이커는 유저 레벨 10에 개방됩니다."
@@ -887,7 +991,7 @@ export function ExcavatorGameWrapper({
       const previousTier = terrainRef.current.mapTier;
       terrainRef.current = expandTerrainForLevel(terrainRef.current, nextLevel);
       if (terrainRef.current.mapTier !== previousTier) {
-        setSceneKey((key) => key + 1);
+        setTerrainRevision((key) => key + 1);
       }
       if (opts?.announceLevelUp && nextLevel > prevLevel) {
         showLevelUpToast(nextLevel);
@@ -993,6 +1097,17 @@ export function ExcavatorGameWrapper({
     auxiliaryRef.current = auxiliary;
   }, [auxiliary]);
 
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    const ownerId = resolveAuxiliarySettingsOwner(
+      session?.user?.id ?? gameSessionUserIdRef.current,
+    );
+    const timer = window.setTimeout(() => {
+      saveAuxiliarySettings(ownerId, auxiliaryRef.current);
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [auxiliary.boomSwing, auxiliary.highSpeed, session?.user?.id, sessionStatus]);
+
   const handleAuxiliaryChange = useCallback((next: AuxiliaryControlState | ((current: AuxiliaryControlState) => AuxiliaryControlState)) => {
     const resolved = typeof next === "function" ? next(auxiliaryRef.current) : next;
     if (autoPoseRef.current.executing) {
@@ -1063,14 +1178,31 @@ export function ExcavatorGameWrapper({
     setExecutePoseCooldownUntil(now + poseActionCooldownMs);
   }, [executePoseCooldownUntil, poseActionCooldownMs]);
 
-  const resetYanmarSession = useCallback(() => {
+  const resetExcavatorPosition = useCallback(() => {
+    const initial = createInitialSim();
+    const sim = simRef.current;
+    sim.posX = initial.posX;
+    sim.posY = initial.posY;
+    sim.posZ = initial.posZ;
+
+    // 순간이동 직후 기존 주행 관성으로 다시 움직이지 않도록 주행 속도만 멈춘다.
+    const velocity = velRef.current;
+    velocity.travel = 0;
+    velocity.trackTurn = 0;
+    velocity.trackLeft = 0;
+    velocity.trackRight = 0;
+  }, []);
+
+  const resetYanmarSession = useCallback((opts?: { terrainLevel?: number }) => {
     resetSim(simRef.current, velRef.current);
     terrainRef.current = createInitialTerrain(
       false,
-      getPlayerLevelProgress(totalXpRef.current).level,
+      opts?.terrainLevel ?? getPlayerLevelProgress(totalXpRef.current).level,
     );
     scoreRef.current = createScoreState(config.target, config.duration);
     tutorialDumpRef.current = 0;
+    tutorialCrashHitsRef.current = 0;
+    tutorialHillDeliverRef.current = 0;
     dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
     endedRef.current = false;
     elapsedRef.current = 0;
@@ -1079,9 +1211,13 @@ export function ExcavatorGameWrapper({
     rewardStarsRef.current = 0;
     setPreviewStars(currencyRef.current);
     setAttachmentType("bucket");
-    setSceneKey((key) => key + 1);
+    setTerrainRevision((key) => key + 1);
     tutorialCompletingRef.current = false;
-    const nextAuxiliary = createAuxiliaryControls();
+    const nextAuxiliary = {
+      ...createAuxiliaryControls(),
+      highSpeed: auxiliaryRef.current.highSpeed,
+      boomSwing: auxiliaryRef.current.boomSwing,
+    };
     auxiliaryRef.current = nextAuxiliary;
     setAuxiliary(nextAuxiliary);
     // 저장된 자세는 세션 리셋·종료 후에도 유지 (재입장 시 실행 가능)
@@ -1170,11 +1306,9 @@ export function ExcavatorGameWrapper({
   }, [resetYanmarSession, setMode, setShowTutorialMenu, setShowTouchZones]);
 
   const enterPracticeMode = useCallback(() => {
-    resetYanmarSession();
-    terrainRef.current = createInitialTerrain(
-      true,
-      getPlayerLevelProgress(totalXpRef.current).level,
-    );
+    resetYanmarSession({ terrainLevel: PRACTICE_FULL_UNLOCK_LEVEL });
+    terrainRef.current = createInitialTerrain(true, PRACTICE_FULL_UNLOCK_LEVEL);
+    setTerrainRevision((key) => key + 1);
     tutorialStepRef.current = null;
     setTutorialIndex(0);
     setShowTutorialMenu(true);
@@ -1302,18 +1436,35 @@ export function ExcavatorGameWrapper({
   }, [enterRideMode, enterPracticeMode, startGameDirect]);
 
   const startTutorial = useCallback((index: number) => {
-    resetYanmarSession();
+    resetYanmarSession({ terrainLevel: PRACTICE_FULL_UNLOCK_LEVEL });
+    terrainRef.current = createInitialTerrain(true, PRACTICE_FULL_UNLOCK_LEVEL);
+    setTerrainRevision((key) => key + 1);
     const step = TUTORIAL_STEPS[index] ?? null;
     tutorialCompletingRef.current = false;
+    tutorialCrashHitsRef.current = 0;
+    tutorialHillDeliverRef.current = 0;
     tutorialIndexRef.current = index;
     tutorialStepRef.current = step;
+    if (step?.startPose) {
+      const sim = simRef.current;
+      sim.posX = step.startPose.x;
+      sim.posZ = step.startPose.z;
+      if (step.startPose.heading != null) sim.heading = step.startPose.heading;
+    }
+    if (step?.startAttachment) {
+      simRef.current.attachmentType = step.startAttachment;
+      simRef.current.carriedBoulderId = null;
+      setAttachmentType(step.startAttachment);
+    }
     setTutorialIndex(index);
     setShowTutorialMenu(false);
     setMode("tutorial");
   }, [resetYanmarSession, setMode, setShowTutorialMenu, setTutorialIndex]);
 
   const startFreePractice = useCallback(() => {
-    resetYanmarSession();
+    resetYanmarSession({ terrainLevel: PRACTICE_FULL_UNLOCK_LEVEL });
+    terrainRef.current = createInitialTerrain(true, PRACTICE_FULL_UNLOCK_LEVEL);
+    setTerrainRevision((key) => key + 1);
     tutorialStepRef.current = null;
     setShowTutorialMenu(false);
     setMode("practice");
@@ -1330,7 +1481,13 @@ export function ExcavatorGameWrapper({
     const step = tutorialStepRef.current;
     if (!step) return;
 
-    if (checkTutorialStepComplete(step, simRef.current, tutorialDumpRef.current)) {
+    if (
+      checkTutorialStepComplete(step, simRef.current, {
+        dumped: tutorialDumpRef.current,
+        crashHits: tutorialCrashHitsRef.current,
+        hillDelivered: tutorialHillDeliverRef.current,
+      })
+    ) {
       tutorialCompletingRef.current = true;
       setStepCompleteFlash(true);
       window.setTimeout(() => setStepCompleteFlash(false), 600);
@@ -1564,7 +1721,31 @@ export function ExcavatorGameWrapper({
 
   const claimSpecialReward = useCallback(
     async (kind: "crash" | "hill", eventId: string) => {
-      if (modeRef.current !== "game") return;
+      if (modeRef.current === "ride") return;
+
+      if (modeRef.current !== "game") {
+        if (kind === "crash" || kind === "hill") {
+          const local =
+            kind === "crash"
+              ? rollLocalCrashReward(equipmentStatsRef.current)
+              : rollLocalHillReward(equipmentStatsRef.current);
+          setPreviewStars((value) => value + local.stars);
+          accumulateDumpScore(local.score, local.critical);
+          const panel = dumpScorePanelRef.current;
+          if (panel) {
+            const next = {
+              ...panel,
+              earnedStars: panel.earnedStars + local.stars,
+              critical: panel.critical || local.critical,
+            };
+            dumpScorePanelRef.current = next;
+            setDumpScorePanel(next);
+            scheduleHideDumpScorePanel();
+          }
+        }
+        return;
+      }
+
       try {
         const requestReward = () =>
           fetch(`/api/rewards/yanmar-${kind}`, {
@@ -1601,19 +1782,61 @@ export function ExcavatorGameWrapper({
           applyTotalXp(data.totalXp, { announceLevelUp: true });
           void updateSessionRef.current({ user: { totalXp: data.totalXp } });
         }
-        if (typeof data.score === "number") {
-          arcadeScoreRef.current += data.score;
-          setHud((current) => ({ ...current, score: arcadeScoreRef.current }));
-        }
+
         const event = data.reward as DumpRewardApiEvent | undefined;
-        if (event?.kind === "coupon") {
+        const critical = Boolean(
+          (typeof data.critical === "boolean" && data.critical) ||
+            event?.critical,
+        );
+        const score =
+          typeof data.score === "number"
+            ? data.score
+            : typeof event?.score === "number"
+              ? event.score
+              : 0;
+
+        if (score > 0) {
+          accumulateDumpScore(score, critical);
+        }
+
+        if (event?.kind === "stars") {
+          rewardStarsRef.current += event.stars;
+          adjustDumpScorePanel(0, {
+            critical: critical || dumpScorePanelRef.current?.critical,
+            earnedStars: rewardStarsRef.current,
+          });
+        } else if (event?.kind === "coupon") {
           showCouponDiscovery(event.couponType, event.discountPct);
+          adjustDumpScorePanel(0, {
+            critical: true,
+            earnedStars: rewardStarsRef.current,
+            rewardText: appendRewardText(
+              dumpScorePanelRef.current?.rewardText ?? "",
+              "쿠폰 획득!",
+            ),
+          });
+        } else if (
+          (kind === "crash" || kind === "hill") &&
+          typeof data.totalStars === "number"
+        ) {
+          rewardStarsRef.current += data.totalStars;
+          adjustDumpScorePanel(0, {
+            critical: critical || dumpScorePanelRef.current?.critical,
+            earnedStars: rewardStarsRef.current,
+          });
         }
       } catch {
         showAttachmentWarning("보상 저장에 실패했습니다. 잠시 후 다시 시도하세요.");
       }
     },
-    [applyTotalXp, showAttachmentWarning, showCouponDiscovery],
+    [
+      accumulateDumpScore,
+      adjustDumpScorePanel,
+      applyTotalXp,
+      scheduleHideDumpScorePanel,
+      showAttachmentWarning,
+      showCouponDiscovery,
+    ],
   );
 
   const handleCrashTileDestroyed = useCallback(
@@ -1625,6 +1848,9 @@ export function ExcavatorGameWrapper({
 
   const handleHillRockDelivered = useCallback(
     (rockId: string) => {
+      if (modeRef.current === "tutorial") {
+        tutorialHillDeliverRef.current += 1;
+      }
       void claimSpecialReward("hill", rockId);
     },
     [claimSpecialReward],
@@ -1867,10 +2093,9 @@ export function ExcavatorGameWrapper({
     <div
       className={`relative touch-manipulation ${
         immersive
-          ? "flex h-full w-full items-center justify-center overflow-hidden bg-slate-950"
+          ? "h-full w-full overflow-hidden bg-slate-950"
           : "mx-auto w-full max-w-lg"
       } yanmar-layout-portrait`}
-      style={immersive ? { containerType: "size" } : undefined}
     >
       <div
         className={`relative overflow-hidden bg-slate-300 ${
@@ -1921,17 +2146,17 @@ export function ExcavatorGameWrapper({
         ) : null}
 
         {mode !== "intro" && mode !== "gameReady" && mode !== "ride" && (
-          <div className="absolute left-2 top-2 z-50 flex max-w-[9.75rem] flex-col items-start gap-1.5">
+          <div className="absolute left-2 top-2 z-50 flex w-[7.3125rem] flex-col items-stretch gap-1.5">
             {(mode === "practice" || mode === "tutorial") && (
               <button
                 type="button"
                 onClick={() => setShowTutorialMenu(true)}
-                className="rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
+                className="w-full rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
               >
                 튜토리얼
               </button>
             )}
-            <div className="flex w-full min-w-0 flex-col items-center gap-1 rounded-lg border border-orange-100/20 bg-black/60 px-2.5 py-2 text-center shadow-lg backdrop-blur-sm">
+            <div className="flex w-full flex-col items-center gap-1 rounded-lg border border-orange-100/20 bg-black/60 px-2.5 py-2 text-center shadow-lg backdrop-blur-sm">
               <span className="text-[10px] font-black text-orange-100">적재량</span>
               <span className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
                 <span
@@ -1939,17 +2164,20 @@ export function ExcavatorGameWrapper({
                   style={{ width: `${loadOverlayPercent}%` }}
                 />
               </span>
-              <span className="text-[9px] font-bold tabular-nums text-orange-50">
+              <span className="w-full text-[9px] font-bold tabular-nums text-orange-50">
                 {loadOverlayUnits}/{equipmentStats.maxLoadUnits} ({Math.round(loadOverlayPercent)}%)
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowEquipmentUpgrade(true)}
-              className="rounded-lg border border-amber-200/30 bg-amber-500/90 px-2.5 py-1.5 text-[11px] font-black text-white shadow-lg backdrop-blur-sm hover:bg-amber-400"
-            >
-              장비강화
-            </button>
+            {showDigPoseGraph ? (
+              <div className="yanmar-dig-pose-panel w-full rounded-sm border border-white/10 bg-black/55 px-2 py-1.5 text-white shadow-xl backdrop-blur-sm">
+                <DigPoseGraph
+                  boom={hud.boom}
+                  arm={hud.arm}
+                  bucket={hud.bucket}
+                  feedback={digFeedback}
+                />
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -2149,34 +2377,36 @@ export function ExcavatorGameWrapper({
           </div>
         )}
 
-        {mode !== "intro" && mode !== "gameReady" && (
-          <div className="absolute right-2 top-2 z-30 flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setCameraMode((current) => ((current % 3) + 1) as CameraMode)}
-              className="flex h-[30px] items-center gap-1 rounded-lg border border-white/20 bg-black/70 px-2 text-[10px] font-black text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
-              aria-label={`카메라 ${cameraMode}번 시점`}
-            >
-              <span
-                className="relative h-3.5 w-5 rounded-[0.25rem] border border-white/65"
-                aria-hidden
+        {mode !== "intro" && (mode !== "gameReady" || showMinimap) && (
+          <div className="absolute right-1.5 top-1.5 z-30 flex w-fit flex-col overflow-hidden rounded-xl border border-white/15 bg-black/60 shadow-lg backdrop-blur-sm">
+            {mode !== "gameReady" ? (
+              <button
+                type="button"
+                onClick={() => setCameraMode((current) => ((current % 3) + 1) as CameraMode)}
+                className="flex h-6 w-full items-center justify-center gap-0.5 border-b border-white/10 px-1 text-[9px] font-black text-white hover:bg-white/10"
+                aria-label={`카메라 ${cameraMode}번 시점`}
               >
-                <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/75" />
-                <span className="absolute left-1 top-[-0.22rem] h-1 w-2 rounded-t-[0.18rem] border-x border-t border-white/55" />
-              </span>
-              <span>카메라{cameraMode}</span>
-            </button>
+                <span
+                  className="relative h-3 w-4 shrink-0 rounded-[0.2rem] border border-white/65"
+                  aria-hidden
+                >
+                  <span className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/75" />
+                  <span className="absolute left-0.5 top-[-0.18rem] h-0.5 w-1.5 rounded-t-[0.12rem] border-x border-t border-white/55" />
+                </span>
+                <span>카메라{cameraMode}</span>
+              </button>
+            ) : null}
+            {showMinimap ? (
+              <ExcavatorMinimap
+                simRef={simRef}
+                terrainRef={terrainRef}
+                tutorialStepRef={tutorialStepRef}
+                visible
+                embedded
+                displaySize={88}
+              />
+            ) : null}
           </div>
-        )}
-
-        {mode !== "intro" && showMinimap && (
-          <ExcavatorMinimap
-            simRef={simRef}
-            terrainRef={terrainRef}
-            tutorialStepRef={tutorialStepRef}
-            visible
-            displaySize={88}
-          />
         )}
 
         {mode === "tutorial" && tutorialStep?.id === "dump" ? (
@@ -2194,17 +2424,6 @@ export function ExcavatorGameWrapper({
         {mode === "tutorial" && tutorialStep?.waypoint && (
           <div className="absolute left-2 top-[12.25rem] z-20 rounded-lg bg-sky-600/85 px-2 py-1 text-[10px] font-semibold text-white">
             목표까지 {hud.goalDist}m
-          </div>
-        )}
-
-        {mode !== "intro" && showDigPoseGraph && (
-          <div className="yanmar-dig-pose-panel pointer-events-none absolute right-[8.25rem] top-2 z-20 w-[116px] rounded-sm border border-white/10 bg-black/55 px-2 py-1.5 text-white shadow-xl backdrop-blur-sm">
-            <DigPoseGraph
-              boom={hud.boom}
-              arm={hud.arm}
-              bucket={hud.bucket}
-              feedback={digFeedback}
-            />
           </div>
         )}
 
@@ -2266,6 +2485,7 @@ export function ExcavatorGameWrapper({
           onToggleTouchZones={() => setShowTouchZones((v) => !v)}
           touchZonesAvailable={mode !== "gameReady"}
           onOpenControlsGuide={() => setShowControlsGuide(true)}
+          onResetPosition={resetExcavatorPosition}
           onShowRanking={onShowRanking}
         />
 
@@ -2280,11 +2500,11 @@ export function ExcavatorGameWrapper({
         {mode !== "intro" && (
           <div className="pointer-events-none absolute inset-0 z-0">
             <ExcavatorScene
-              key={sceneKey}
               inputRef={inputRef}
               simRef={simRef}
               velRef={velRef}
               terrainRef={terrainRef}
+              terrainRevision={terrainRevision}
               scoreRef={scoreRef}
               modeRef={modeRef}
               equipmentStatsRef={equipmentStatsRef}
@@ -2331,7 +2551,9 @@ export function ExcavatorGameWrapper({
             onAuxiliaryChange={handleAuxiliaryChange}
             attachmentType={attachmentType}
             playerLevel={getPlayerLevelProgress(totalXp).level}
+            unlockAllAttachments={practiceUnlocksAll}
             onAttachmentChange={handleAttachmentChange}
+            onAttachmentWarning={showAttachmentWarning}
             autoPose={autoPose}
             onSavePose={handleSavePose}
             onExecutePose={handleExecutePose}
@@ -2340,6 +2562,7 @@ export function ExcavatorGameWrapper({
             allowed={allowed}
             tutorialStep={tutorialStep}
             showTouchZones={showTouchZones}
+            onOpenEquipmentUpgrade={() => setShowEquipmentUpgrade(true)}
           />
         )}
 

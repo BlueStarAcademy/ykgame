@@ -4,19 +4,22 @@ import { getSeasonKey } from "@/lib/games";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import { prisma } from "@/lib/prisma";
 import {
+  calculateYanmarCrashScore,
+  calculateYanmarEquipmentStats,
+  mergeYanmarEquipmentLevelsFromDb,
+  YANMAR_CRASH_REWARD_CONFIG,
+} from "@/games/yanmar/equipment";
+import {
   lockAndCheckRewardEvent,
   isYanmarRewardRateLimited,
   parseRewardEventId,
   persistYanmarReward,
-  randomInt,
   rollYanmarReward,
 } from "@/lib/yanmar-rewards";
 
 const GAME_ID = "yanmar-crash";
 const REQUIRED_LEVEL = 10;
-const XP_REWARD = 1000;
-const MIN_STARS = 10;
-const MAX_STARS = 25;
+const { minStarReward, maxStarReward, xpReward } = YANMAR_CRASH_REWARD_CONFIG;
 // 최대 강화 브레이커도 타일 하나를 파괴하는 데 약 1.8초가 걸린다.
 // 타일별 정상 보상은 허용하면서 직접 API 연속 호출은 제한한다.
 const REWARD_MIN_INTERVAL_MS = 1000;
@@ -71,28 +74,37 @@ export async function POST(request: Request) {
       return { status: "rate_limited" as const };
     }
 
-    const score = randomInt(900, 1100);
+    const rows = await tx.userEquipmentUpgrade.findMany({
+      where: { userId: session.user.id, gameId: "yanmar" },
+      select: { part: true, level: true },
+    });
+    const stats = calculateYanmarEquipmentStats(
+      mergeYanmarEquipmentLevelsFromDb(rows),
+    );
+    const critical = Math.random() < stats.criticalChance;
+    const score = calculateYanmarCrashScore(stats, critical);
     const reward = rollYanmarReward({
       score,
-      minStars: MIN_STARS,
-      maxStars: MAX_STARS,
+      minStars: minStarReward,
+      maxStars: maxStarReward,
       seasonKey: getSeasonKey(),
+      critical,
     });
     const issuedReward = await persistYanmarReward({
       tx,
       userId: session.user.id,
       gameId: GAME_ID,
       reward,
-      minStars: MIN_STARS,
-      maxStars: MAX_STARS,
-      metadata: { eventId, xpGained: XP_REWARD },
+      minStars: minStarReward,
+      maxStars: maxStarReward,
+      metadata: { eventId, xpGained: xpReward },
     });
     const totalStars =
       issuedReward.kind === "stars" ? issuedReward.stars : 0;
     const updated = await tx.user.update({
       where: { id: session.user.id },
       data: {
-        totalXp: { increment: XP_REWARD },
+        totalXp: { increment: xpReward },
         ...(totalStars > 0 ? { currency: { increment: totalStars } } : {}),
       },
       select: { currency: true, totalXp: true },
@@ -138,7 +150,8 @@ export async function POST(request: Request) {
     eventId,
     reward: result.reward,
     score: result.reward.score,
-    xpGained: XP_REWARD,
+    critical: result.reward.critical,
+    xpGained: xpReward,
     totalStars: result.totalStars,
     currency: result.currency,
     totalXp: result.totalXp,

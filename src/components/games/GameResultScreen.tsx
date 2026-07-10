@@ -168,8 +168,12 @@ export function GameResultScreen({
           </p>
         ) : null}
         <p className="mt-2 text-2xl font-bold text-gray-800">
-          {isYanmarArcade
-            ? `누적 점수 ${yanmarDisplayScore.toLocaleString()}`
+          {isRide
+            ? "탑승 체험 완료"
+            : isYanmarArcade
+              ? result.mode === "game"
+                ? `누적 점수 ${yanmarDisplayScore.toLocaleString()}`
+                : `연습 점수 ${(result.arcadeScore ?? 0).toLocaleString()}`
             : `${result.progress}%`}
         </p>
         <p className="text-sm text-gray-500">
@@ -179,15 +183,16 @@ export function GameResultScreen({
         {!isYanmar && saved && stars > 0 && (
           <p className="mt-2 text-sm text-green-600">⭐ {stars}별 획득!</p>
         )}
-        {saved && myRank && (
+        {result.mode === "game" && saved && myRank && (
           <p className="mt-1 text-sm text-blue-600">시즌 순위 #{myRank}</p>
         )}
-        {isYanmar && result.mode !== "game" && (
+        {isYanmar && result.mode === "practice" && (
           <p className="mt-2 text-xs text-gray-400">연습 운행 결과는 랭킹에 저장되지 않습니다.</p>
         )}
       </div>
 
-      <div className="mb-4 rounded-xl bg-gray-50 p-4">
+      {!isYanmar || result.mode === "game" ? (
+        <div className="mb-4 rounded-xl bg-gray-50 p-4">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-bold text-gray-700">
             {isYanmar ? "누적 점수 Top 10" : "이번 달 Top 10"}
@@ -247,7 +252,8 @@ export function GameResultScreen({
             ))}
           </ul>
         )}
-      </div>
+        </div>
+      ) : null}
 
       <div className="flex gap-2">
         {isYanmar && onStay ? (

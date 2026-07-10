@@ -131,19 +131,6 @@ export function ExcavatorMinimap({
       }
 
       const digZones = getActiveDigZones(terrain);
-      const labelScale = size / DEFAULT_DISPLAY_SIZE;
-      const drawZoneLabel = (label: string, x: number, y: number, color: string) => {
-        context.save();
-        context.font = `900 ${Math.max(8, Math.round(10 * labelScale))}px "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`;
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.lineWidth = Math.max(2, 3 * labelScale);
-        context.strokeStyle = "rgba(0,0,0,0.78)";
-        context.fillStyle = color;
-        context.strokeText(label, x, y);
-        context.fillText(label, x, y);
-        context.restore();
-      };
 
       for (const zone of digZones) {
         const dig = worldToMinimap(zone.x, zone.z, bounds, size, pad);
@@ -159,7 +146,6 @@ export function ExcavatorMinimap({
         context.beginPath();
         context.arc(dig.px, dig.py, 3.5 * (size / DEFAULT_DISPLAY_SIZE), 0, Math.PI * 2);
         context.fill();
-        drawZoneLabel("굴착", dig.px, dig.py - Math.max(digR * 0.3, 7 * labelScale), "#ffecb3");
       }
 
       if (terrain.crashZone) {
@@ -190,7 +176,6 @@ export function ExcavatorMinimap({
           width,
           depth,
         );
-        drawZoneLabel("CRASH", crash.px, crash.py - depth / 2 - 5, "#fde68a");
       }
 
       if (terrain.hillZone) {
@@ -203,13 +188,14 @@ export function ExcavatorMinimap({
         );
         const radius =
           (terrain.hillZone.radius / (bounds.maxX - bounds.minX)) * inner;
-        context.fillStyle = "rgba(148,163,184,0.3)";
+        context.fillStyle = terrain.hillZone.active
+          ? "rgba(148,163,184,0.3)"
+          : "rgba(100,116,139,0.2)";
         context.beginPath();
         context.arc(hill.px, hill.py, Math.max(radius, 5), 0, Math.PI * 2);
         context.fill();
-        context.strokeStyle = "#cbd5e1";
+        context.strokeStyle = terrain.hillZone.active ? "#cbd5e1" : "#64748b";
         context.stroke();
-        drawZoneLabel("STONE", hill.px, hill.py - radius - 5, "#e2e8f0");
       }
 
       const dump = worldToMinimap(DUMP_ZONE.x, DUMP_ZONE.z, bounds, size, pad);
@@ -224,7 +210,6 @@ export function ExcavatorMinimap({
       const dumpMark = 3.5 * (size / DEFAULT_DISPLAY_SIZE);
       context.fillStyle = "#c8e6c9";
       context.fillRect(dump.px - dumpMark, dump.py - dumpMark, dumpMark * 2, dumpMark * 2);
-      drawZoneLabel("하역", dump.px, dump.py - Math.max(dumpR * 0.3, 7 * labelScale), "#d9fdd3");
 
       if (wp) {
         const goal = worldToMinimap(wp.x, wp.z, bounds, size, pad);
@@ -242,32 +227,55 @@ export function ExcavatorMinimap({
       const facing = sim.heading + sim.swing;
       const dirX = Math.sin(facing);
       const dirY = Math.cos(facing);
-      const markerScale = size / DEFAULT_DISPLAY_SIZE;
-      const tipLen = 7 * markerScale;
-      const baseLen = 4 * markerScale;
-      const halfW = 3.5 * markerScale;
-      const px = player.px;
-      const py = player.py;
-      const tx = px + dirX * tipLen;
-      const ty = py + dirY * tipLen;
-      const bx = px + dirX * (tipLen - baseLen);
-      const by = py + dirY * (tipLen - baseLen);
       const nx = -dirY;
       const ny = dirX;
-      context.shadowColor = "rgba(239,83,80,0.55)";
-      context.shadowBlur = 4;
-      context.fillStyle = "#ef5350";
+      const markerScale = size / DEFAULT_DISPLAY_SIZE;
+      const px = player.px;
+      const py = player.py;
+
+      // High-contrast facing arrow (GPS-style) so heading stays readable on the small map.
+      const tipLen = 11 * markerScale;
+      const tailLen = 5.5 * markerScale;
+      const halfW = 5.2 * markerScale;
+      const tipX = px + dirX * tipLen;
+      const tipY = py + dirY * tipLen;
+      const leftX = px - dirX * tailLen + nx * halfW;
+      const leftY = py - dirY * tailLen + ny * halfW;
+      const rightX = px - dirX * tailLen - nx * halfW;
+      const rightY = py - dirY * tailLen - ny * halfW;
+      const notchX = px - dirX * (tailLen * 0.35);
+      const notchY = py - dirY * (tailLen * 0.35);
+
+      context.save();
+      context.shadowColor = "rgba(0,0,0,0.65)";
+      context.shadowBlur = 5 * markerScale;
+      context.shadowOffsetY = 1;
+
       context.beginPath();
-      context.moveTo(tx, ty);
-      context.lineTo(bx + nx * halfW, by + ny * halfW);
-      context.lineTo(bx - nx * halfW, by - ny * halfW);
+      context.moveTo(tipX, tipY);
+      context.lineTo(leftX, leftY);
+      context.lineTo(notchX, notchY);
+      context.lineTo(rightX, rightY);
       context.closePath();
+
+      context.fillStyle = "#ff2d2d";
       context.fill();
       context.shadowBlur = 0;
-      context.fillStyle = "rgba(255,255,255,0.9)";
+      context.shadowOffsetY = 0;
+      context.lineJoin = "round";
+      context.lineWidth = Math.max(1.6, 2.2 * markerScale);
+      context.strokeStyle = "rgba(255,255,255,0.95)";
+      context.stroke();
+      context.lineWidth = Math.max(0.7, 1.1 * markerScale);
+      context.strokeStyle = "rgba(120,0,0,0.85)";
+      context.stroke();
+
+      // Bright tip highlight for facing direction.
+      context.fillStyle = "#ffe082";
       context.beginPath();
-      context.arc(px, py, 2 * markerScale, 0, Math.PI * 2);
+      context.arc(tipX, tipY, Math.max(1.4, 1.9 * markerScale), 0, Math.PI * 2);
       context.fill();
+      context.restore();
 
       raf = requestAnimationFrame(draw);
     };
@@ -286,19 +294,43 @@ export function ExcavatorMinimap({
 
   if (!visible) return null;
 
+  const legendItems = [
+    { label: "굴착", swatch: "bg-amber-400 ring-1 ring-amber-200/80" },
+    { label: "하역", swatch: "bg-emerald-400 ring-1 ring-emerald-200/70" },
+    { label: "철거", swatch: "bg-amber-500 ring-1 ring-yellow-300/70" },
+    { label: "석재", swatch: "bg-slate-300 ring-1 ring-slate-100/70" },
+  ] as const;
+
   return (
     <div
       className={
         embedded
-          ? "pointer-events-none rounded-2xl border border-white/10 bg-black/55 p-1 shadow-[0_8px_20px_rgba(0,0,0,0.45)]"
-          : "pointer-events-none absolute right-2 top-11 z-20 rounded-2xl border border-white/10 bg-black/55 p-1 shadow-[0_8px_20px_rgba(0,0,0,0.45)]"
+          ? "pointer-events-none flex w-full flex-col items-stretch"
+          : "pointer-events-none absolute right-1.5 top-1.5 z-20 flex flex-col items-stretch overflow-hidden rounded-xl border border-white/15 bg-black/60 shadow-lg backdrop-blur-sm"
       }
     >
       <canvas
         ref={canvasRef}
-        className="block rounded-2xl"
+        className="block"
         aria-label="미니맵"
       />
+      <ul
+        className="grid w-full grid-cols-2 gap-x-1 gap-y-0.5 border-t border-white/10 px-1 py-0.5"
+        aria-label="미니맵 범례"
+      >
+        {legendItems.map((item) => (
+          <li
+            key={item.label}
+            className="flex min-w-0 items-center justify-center gap-0.5 text-[7px] font-bold leading-none text-white/85"
+          >
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.swatch}`}
+              aria-hidden
+            />
+            <span className="truncate">{item.label}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -59,6 +59,7 @@ interface YanmarGameSettingsMenuProps {
   onToggleTouchZones: () => void;
   touchZonesAvailable: boolean;
   onOpenControlsGuide: () => void;
+  onResetPosition: () => void;
   onShowRanking?: () => void;
 }
 
@@ -75,6 +76,7 @@ export function YanmarGameSettingsMenu({
   onToggleTouchZones,
   touchZonesAvailable,
   onOpenControlsGuide,
+  onResetPosition,
   onShowRanking,
 }: YanmarGameSettingsMenuProps) {
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
@@ -124,6 +126,16 @@ export function YanmarGameSettingsMenu({
               className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10"
             >
               기능정보
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onOpenChange(false);
+                onResetPosition();
+              }}
+              className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10"
+            >
+              초기위치
             </button>
             {fullscreen?.canFullscreen &&
             !fullscreen.apiFullscreen &&

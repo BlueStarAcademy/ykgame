@@ -1,11 +1,18 @@
 import type { ExcavatorSimState } from "./ExcavatorScene";
 import type { ControlMask } from "./controls";
 import { ALL_CONTROLS } from "./controls";
+import type { AttachmentType } from "./types";
 
 export type { ControlMask };
 export type GameMode = "intro" | "ride" | "practice" | "tutorial" | "gameReady" | "game";
 
-export type TutorialHighlight = "left" | "right" | "travel" | "both" | null;
+export type TutorialHighlight =
+  | "left"
+  | "right"
+  | "travel"
+  | "both"
+  | "breaker"
+  | null;
 
 export interface TutorialWaypoint {
   x: number;
@@ -20,6 +27,10 @@ export interface TutorialStep {
   highlight: TutorialHighlight;
   allowed: ControlMask;
   waypoint?: TutorialWaypoint;
+  /** 시작 시 자동 장착할 부착물 */
+  startAttachment?: AttachmentType;
+  /** 시작 시 굴착기 위치 (미설정 시 기본 스폰) */
+  startPose?: { x: number; z: number; heading?: number };
   swingTarget?: number;
   armMin?: number;
   armMax?: number;
@@ -27,6 +38,16 @@ export interface TutorialStep {
   bucketMax?: number;
   loadMin?: number;
   dumpMin?: number;
+  /** 브레이커 성공 타격 횟수 */
+  crashHitsMin?: number;
+  /** 집게로 돌 하역 횟수 */
+  hillDeliverMin?: number;
+}
+
+export interface TutorialProgress {
+  dumped: number;
+  crashHits: number;
+  hillDelivered: number;
 }
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
@@ -86,6 +107,28 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     allowed: { ...ALL_CONTROLS },
     dumpMin: 0.12,
   },
+  {
+    id: "breaker",
+    title: "8. 브레이커",
+    instruction:
+      "Crash 구역에서 브레이커 팁을 수직에 가깝게 세운 뒤, 하이라이트된 발판을 밟아 타격하세요",
+    highlight: "breaker",
+    allowed: { ...ALL_CONTROLS },
+    startAttachment: "breaker",
+    startPose: { x: 96, z: 12, heading: Math.PI / 2 },
+    crashHitsMin: 8,
+  },
+  {
+    id: "grapple",
+    title: "9. 집게",
+    instruction:
+      "Stone 구역에서 우 조이스틱 좌로 돌을 집고, 하역 지점(트럭)에서 우로 펴서 내려놓으세요",
+    highlight: "right",
+    allowed: { ...ALL_CONTROLS },
+    startAttachment: "grapple",
+    startPose: { x: 22, z: 98, heading: 0 },
+    hillDeliverMin: 1,
+  },
 ];
 
 export function isAtWaypoint(sim: ExcavatorSimState, wp: TutorialWaypoint) {
@@ -104,7 +147,7 @@ export function waypointDistance(sim: ExcavatorSimState, wp: TutorialWaypoint) {
 export function checkTutorialStepComplete(
   step: TutorialStep,
   sim: ExcavatorSimState,
-  tutorialDumped: number,
+  progress: TutorialProgress,
 ): boolean {
   switch (step.id) {
     case "travel":
@@ -120,7 +163,13 @@ export function checkTutorialStepComplete(
     case "dig":
       return step.loadMin != null && sim.bucketLoad >= step.loadMin;
     case "dump":
-      return step.dumpMin != null && tutorialDumped >= step.dumpMin;
+      return step.dumpMin != null && progress.dumped >= step.dumpMin;
+    case "breaker":
+      return step.crashHitsMin != null && progress.crashHits >= step.crashHitsMin;
+    case "grapple":
+      return (
+        step.hillDeliverMin != null && progress.hillDelivered >= step.hillDeliverMin
+      );
     default:
       return false;
   }

@@ -42,8 +42,8 @@ const WORKSHOP_DEFINITIONS = [
     mapArea: "동쪽 확장 192 × 128m",
     accent: "orange",
     task: "3 × 3 아스팔트 타일 파쇄",
-    rewardRule: "타일당 XP 1,000 · 스타 10~25 · 점수 900~1,100",
-    operationRule: "타일 HP 1,000 · 전체 파쇄 후 기본 10분 재생성",
+    rewardRule: "타일당 XP 1,000 · 스타 5~15 · 점수 350~400(크리티컬 적용)",
+    operationRule: "타일 HP 1,000 · 9칸 전부 파쇄 후 5분 뒤 일괄 재생성",
   },
   {
     id: "hill",
@@ -55,9 +55,9 @@ const WORKSHOP_DEFINITIONS = [
     attachment: "집게",
     mapArea: "북쪽 확장 192 × 192m",
     accent: "emerald",
-    task: "바위를 집어 정상의 운반 트럭에 적재",
-    rewardRule: "바위당 XP 90~120 · 스타 2~5 · 쿠폰 추첨",
-    operationRule: "10개 적재 시 출발 · 기본 10분 후 복귀",
+    task: "바위 5개를 집어 정상의 운반 트럭에 적재",
+    rewardRule: "바위당 점수 90~120(크리티컬 적용) · 스타 7~15 · 쿠폰 추첨",
+    operationRule: "트럭 10개 적재 시 출발 · 돌 전부 반출 시 구역 소멸 · 5분 후 재생성",
   },
 ] as const;
 

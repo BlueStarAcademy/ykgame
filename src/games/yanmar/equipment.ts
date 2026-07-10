@@ -21,6 +21,23 @@ export const YANMAR_REWARD_CONFIG = {
   maxStarReward: 3,
 } as const;
 
+/** Crash(아스팔트) 타일 1개 파괴 보상 — 쿠폰 확률은 하역과 동일, 스타 수량만 별도. */
+export const YANMAR_CRASH_REWARD_CONFIG = {
+  baseScoreMin: 350,
+  baseScoreMax: 400,
+  minStarReward: 5,
+  maxStarReward: 15,
+  xpReward: 1000,
+} as const;
+
+/** Hill(돌) 1개 트럭 적재 보상 — 쿠폰 확률은 하역과 동일, 스타 수량만 별도. */
+export const YANMAR_HILL_REWARD_CONFIG = {
+  baseScoreMin: 90,
+  baseScoreMax: 120,
+  minStarReward: 7,
+  maxStarReward: 15,
+} as const;
+
 export const YANMAR_TRUCK_UPGRADE_COSTS = [
   50, 100, 150, 200, 250, 300, 400, 500, 750, 1000,
 ] as const;
@@ -227,6 +244,32 @@ export function calculateYanmarChunkScore(
   return Math.round(baseScore * (critical ? stats.criticalMultiplier : 1));
 }
 
+export function rollYanmarCrashBaseScore(): number {
+  const { baseScoreMin, baseScoreMax } = YANMAR_CRASH_REWARD_CONFIG;
+  return Math.floor(Math.random() * (baseScoreMax - baseScoreMin + 1)) + baseScoreMin;
+}
+
+export function calculateYanmarCrashScore(
+  stats: YanmarEquipmentStats,
+  critical: boolean,
+  baseScore = rollYanmarCrashBaseScore(),
+): number {
+  return Math.round(baseScore * (critical ? stats.criticalMultiplier : 1));
+}
+
+export function rollYanmarHillBaseScore(): number {
+  const { baseScoreMin, baseScoreMax } = YANMAR_HILL_REWARD_CONFIG;
+  return Math.floor(Math.random() * (baseScoreMax - baseScoreMin + 1)) + baseScoreMin;
+}
+
+export function calculateYanmarHillScore(
+  stats: YanmarEquipmentStats,
+  critical: boolean,
+  baseScore = rollYanmarHillBaseScore(),
+): number {
+  return Math.round(baseScore * (critical ? stats.criticalMultiplier : 1));
+}
+
 export function calculateYanmarEquipmentStats(
   levels: Partial<Record<YanmarEquipmentPart, number>>,
 ): YanmarEquipmentStats {
@@ -247,7 +290,7 @@ export function calculateYanmarEquipmentStats(
     travelSpeedMultiplier:
       1 + safeLevels.ENGINE * YANMAR_EQUIPMENT_CONFIG.ENGINE.effectPerLevel,
     breakerDamage: getYanmarBreakerDamage(safeLevels.CRASH_RESPAWN),
-    crashRespawnSec: 10 * 60,
+    crashRespawnSec: 5 * 60,
     haulTruckCooldownSec: getYanmarHaulTruckCooldownSec(safeLevels.HAUL_TRUCK_SPEED),
   };
 }

@@ -101,7 +101,9 @@ export function DigHintContent({
       </ul>
       {compact ? null : <BoomLoadGauge bucketLoad={bucketLoad} maxLoadUnits={maxLoadUnits} />}
       {compact || arm == null || bucket == null ? null : (
-        <DigPoseGraph boom={boom} arm={arm} bucket={bucket} feedback={feedback} />
+        <div className="mt-1 border-t border-white/10">
+          <DigPoseGraph boom={boom} arm={arm} bucket={bucket} feedback={feedback} />
+        </div>
       )}
     </div>
   );
@@ -206,7 +208,7 @@ export function DigPoseGraph({
   const scorePct = Math.round(feedback.digPoseScore * 100);
 
   return (
-    <div className="border-t border-white/10 pt-0.5">
+    <div className="pt-0.5">
       <div className="mb-0.5 flex items-center justify-between">
         <span className="text-[8px] font-bold text-orange-200">적재 자세</span>
         <span

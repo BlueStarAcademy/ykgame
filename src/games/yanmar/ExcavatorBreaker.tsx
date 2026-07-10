@@ -1,6 +1,7 @@
 "use client";
 
 import { RoundedBox } from "@react-three/drei";
+import * as THREE from "three";
 import {
   YANMAR_MACHINE_COLORS as COLOR,
   YANMAR_MACHINE_MATERIALS as MATERIAL,
@@ -23,6 +24,20 @@ const BRIGHT_STEEL = {
   color: COLOR.steelBright,
   ...MATERIAL.steel,
 } as const;
+
+const BREAKER_TOOL_PROFILE = [
+  new THREE.Vector2(0, -0.34),
+  new THREE.Vector2(0.13, -0.34),
+  new THREE.Vector2(0.118, -0.29),
+  new THREE.Vector2(0.108, -0.22),
+  new THREE.Vector2(0.103, 0.08),
+  new THREE.Vector2(0.096, 0.15),
+  new THREE.Vector2(0.08, 0.24),
+  new THREE.Vector2(0.058, 0.32),
+  new THREE.Vector2(0.039, 0.365),
+  new THREE.Vector2(0.028, 0.382),
+  new THREE.Vector2(0, 0.385),
+];
 
 function PivotPin({
   x,
@@ -141,21 +156,18 @@ export function ExcavatorBreaker() {
           <cylinderGeometry args={[0.145, 0.115, 0.19, 24]} />
           <meshStandardMaterial {...STEEL} />
         </mesh>
-        <mesh position={[-1.73, -0.15, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.082, 0.105, 0.55, 20]} />
-          <meshStandardMaterial {...BRIGHT_STEEL} />
-        </mesh>
+        {/* 축과 둥근 날끝을 하나의 연속 곡면으로 만들어 이음새를 없앤다. */}
         <mesh
           position={[
-            YANMAR_MACHINE_RIG.breakerTipLocalX + 0.1,
+            YANMAR_MACHINE_RIG.breakerTipLocalX + 0.385,
             YANMAR_MACHINE_RIG.breakerTipLocalY,
             0,
           ]}
-          rotation={[0, 0, -Math.PI / 2]}
+          rotation={[0, 0, Math.PI / 2]}
           castShadow
         >
-          <coneGeometry args={[0.105, 0.2, 20]} />
-          <meshStandardMaterial color={COLOR.chrome} roughness={0.2} metalness={0.86} />
+          <latheGeometry args={[BREAKER_TOOL_PROFILE, 32]} />
+          <meshStandardMaterial {...BRIGHT_STEEL} />
         </mesh>
       </group>
     </group>

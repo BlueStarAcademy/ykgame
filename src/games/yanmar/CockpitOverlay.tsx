@@ -48,7 +48,11 @@ interface CockpitOverlayProps {
   executePoseDisabled?: boolean;
   attachmentType: AttachmentType;
   playerLevel: number;
+  /** 연습·튜토리얼: 레벨 제한 없이 모든 부착물 사용 */
+  unlockAllAttachments?: boolean;
   onAttachmentChange: (attachment: AttachmentType) => void;
+  onAttachmentWarning?: (message: string) => void;
+  onOpenEquipmentUpgrade?: () => void;
 }
 
 interface JoystickLayout {
@@ -100,11 +104,12 @@ const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   left: { ...COCKPIT_LAYOUT.left, cx: 0.1, cy: 0.965 },
   right: { ...COCKPIT_LAYOUT.right, cx: 0.9, cy: 0.965 },
   safetyLever: { ...COCKPIT_LAYOUT.safetyLever, cx: 0.1, cy: 0.385 },
-  travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cx: 0.455, cy: 0.79 },
-  travelRight: { ...COCKPIT_LAYOUT.travelRight, cx: 0.545, cy: 0.79 },
+  travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cx: 0.448, cy: 0.79 },
+  travelRight: { ...COCKPIT_LAYOUT.travelRight, cx: 0.548, cy: 0.79 },
   travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cx: 0.5, cy: 0.79 },
   rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.1, cy: 0.165 },
-  breakerPedal: { ...COCKPIT_LAYOUT.breakerPedal, cx: 0.275, cy: 0.86 },
+  // Midpoint between left D-pad (11.5%) and travel levers (50%).
+  breakerPedal: { ...COCKPIT_LAYOUT.breakerPedal, cx: 0.3075, cy: 0.79 },
   hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.1, cy: 0.275 },
   blade: { ...COCKPIT_LAYOUT.blade, cx: 0.695, cy: 0.79 },
   horn: { ...COCKPIT_LAYOUT.horn, cx: 0.9, cy: 0.495 },
@@ -242,14 +247,14 @@ function VisualLever({
       : v >= 0
         ? v * -22
         : v * -48;
-  const travelStickTiltX = -12 - pushDepth * 12 + pullDepth * 154;
-  const travelHeadTiltX = 10 - pushDepth * 4 - pullDepth * 142;
+  const travelStickTiltX = -12 - pushDepth * 12 + pullDepth * 94;
+  const travelHeadTiltX = 10 - pushDepth * 4 - pullDepth * 84;
   const motionClass = v > 0.16 ? "is-pushed" : v < -0.16 ? "is-pulled" : "is-neutral";
   const stickTransform = isTravel
     ? `translate3d(-50%, 0, 0.22rem) rotateX(${travelStickTiltX}deg)`
     : `translate3d(-50%, ${stickDrop}rem, 0) rotateX(${bendX}deg)`;
   const pivotTransform = isTravel
-    ? `translate3d(-50%, calc(-50% + ${v * -0.68}rem), 0) rotateX(12deg)`
+    ? `translate3d(-50%, calc(-50% + ${v * -0.72}rem), -0.12rem) rotateX(12deg)`
     : undefined;
   return (
     <div
@@ -290,7 +295,11 @@ function VisualLever({
           className={`yanmar-lever-stick yanmar-lever-${color}`}
           style={{
             transform: stickTransform,
-            height: isTravel ? "0.95rem" : undefined,
+            ...(isTravel
+              ? {
+                  height: "var(--yanmar-travel-stick-h, 2.45rem)",
+                }
+              : null),
           }}
         >
           <span
@@ -325,7 +334,7 @@ function VisualTravelLevers({
         className="yanmar-premium-dual-travel-panel"
         style={{
           left: `${layout.travelBoth.cx * 100}%`,
-          top: "calc(100% - 1.375rem)",
+          top: "calc(100% - var(--yanmar-travel-baseline, 2.45rem))",
         }}
         aria-hidden
       >
@@ -340,7 +349,7 @@ function VisualTravelLevers({
       </div>
       <VisualLever
         cx={layout.travelLeft.cx}
-        cy="calc(100% - 1.375rem)"
+        cy="calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
         value={left}
         color="dark"
         highlighted={highlighted}
@@ -348,7 +357,7 @@ function VisualTravelLevers({
       />
       <VisualLever
         cx={layout.travelRight.cx}
-        cy="calc(100% - 1.375rem)"
+        cy="calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
         value={right}
         color="dark"
         highlighted={highlighted}
@@ -454,7 +463,7 @@ function MainDPadVisual({
               position: "absolute",
               left: side === "left" ? "11.5%" : "88.5%",
               top: "auto",
-              bottom: "0.1rem",
+              bottom: "calc(0.1rem - var(--yanmar-controls-sink, 0rem))",
               width: "clamp(5.4rem, 24vw, 6.8rem)",
               aspectRatio: "1",
               transform: "translate3d(-50%, 0, 0)",
@@ -812,7 +821,7 @@ function GameJoystick({
               : "88.5%"
             : `${layout.cx * 100}%`,
           top: useDPad ? "auto" : `${(layout.cy - joystickZone.centerYOffset) * 100}%`,
-          bottom: useDPad ? "0.1rem" : "auto",
+          bottom: useDPad ? "calc(0.1rem - var(--yanmar-controls-sink, 0rem))" : "auto",
           width: useDPad ? "clamp(5rem, 24vw, 6.8rem)" : joystickZone.width,
           height: useDPad ? "clamp(5rem, 24vw, 6.8rem)" : joystickZone.height,
           transform: useDPad ? "translateX(-50%)" : "translate(-50%, -50%)",
@@ -889,6 +898,47 @@ function HornTouchZone({
       </span>
       {showTouchZone ? (
         <span className="pointer-events-none absolute inset-0 border border-yellow-200/70 bg-yellow-200/10" />
+      ) : null}
+    </div>
+  );
+}
+
+function EquipmentUpgradeTouchZone({
+  layout,
+  isPortrait,
+  showTouchZone,
+  onOpen,
+}: {
+  layout: JoystickLayout;
+  isPortrait: boolean;
+  showTouchZone: boolean;
+  onOpen: () => void;
+}) {
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    onOpen();
+  };
+
+  return (
+    <div
+      className="yanmar-upgrade-touch-zone absolute touch-none"
+      style={getHornTouchZoneStyle(layout, isPortrait)}
+      onPointerDown={handlePointerDown}
+      role="button"
+      tabIndex={-1}
+      aria-label="장비강화"
+    >
+      <span
+        className="yanmar-upgrade-button-visual pointer-events-none"
+        style={{ width: "2.36rem", height: "1.4rem" }}
+        aria-hidden
+      >
+        <span className="yanmar-upgrade-button-sheen" />
+        <span className="yanmar-upgrade-button-icon" />
+        <span className="yanmar-upgrade-button-label">강화</span>
+      </span>
+      {showTouchZone ? (
+        <span className="pointer-events-none absolute inset-0 border border-amber-200/70 bg-amber-200/10" />
       ) : null}
     </div>
   );
@@ -977,7 +1027,7 @@ function TravelLever({
         style={{
           left: `calc(${layout.cx * 100}% + ${hitboxCenterOffset})`,
           top: isPortrait
-            ? "calc(100% - 1.375rem)"
+            ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
             : `calc(${layout.cy * 100}% + ${hitboxTopOffset})`,
           width: hitboxWidth,
           height: hitboxHeight,
@@ -1086,7 +1136,7 @@ function DualTravelCenter({
       style={{
         left: `${layout.cx * 100}%`,
         top: isPortrait
-          ? "calc(100% - 1.375rem)"
+          ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
           : `calc(${layout.cy * 100}% + 0%)`,
         width: isPortrait ? "12%" : "12.5%",
         height: isPortrait ? "48%" : "68%",
@@ -1347,7 +1397,7 @@ function BladeLever({
         }`}
         style={{
           left: `${blade.cx * 100}%`,
-          top: "calc(100% - 1.375rem)",
+          top: "calc(100% - var(--yanmar-travel-baseline, 2.45rem) - 0.14rem)",
           transform: "translate(-50%, -50%)",
         }}
         aria-hidden
@@ -1369,7 +1419,7 @@ function BladeLever({
         style={{
           left: `${blade.cx * 100}%`,
           top: isPortrait
-            ? "calc(100% - 1.375rem)"
+            ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem) - 0.14rem)"
             : `${blade.cy * 100}%`,
           width: isPortrait ? "10%" : "6.6%",
           height: isPortrait ? "40%" : "58%",
@@ -1402,23 +1452,38 @@ function BladeLever({
 
 function BreakerPedalControl({
   pressed,
-  enabled,
+  canOperate,
+  dimmed,
+  highlighted = false,
   showTouchZone,
   onChange,
+  onRequireBreaker,
   layout,
   isPortrait,
 }: {
   pressed: boolean;
-  enabled: boolean;
+  /** True when breaker is equipped and safety lock is off. */
+  canOperate: boolean;
+  /** Visual-only dim (e.g. safety lock). Missing breaker stays fully visible. */
+  dimmed?: boolean;
+  highlighted?: boolean;
   showTouchZone: boolean;
   onChange: (pressed: boolean) => void;
+  onRequireBreaker?: () => void;
   layout: CockpitLayout;
   isPortrait: boolean;
 }) {
   const pedal = layout.breakerPedal;
   const setPressed = (next: boolean) => {
-    if (!enabled && next) return;
-    onChange(next);
+    if (!next) {
+      onChange(false);
+      return;
+    }
+    if (!canOperate) {
+      onRequireBreaker?.();
+      return;
+    }
+    onChange(true);
   };
 
   const press = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -1444,18 +1509,20 @@ function BreakerPedalControl({
       type="button"
       aria-label="브레이커 발판"
       aria-pressed={pressed}
-      disabled={!enabled}
+      aria-disabled={!canOperate}
       className={`yanmar-breaker-pedal-button select-none absolute z-40 ${
         pressed ? "is-active" : ""
-      } ${enabled ? "" : "is-disabled"} ${
+      } ${dimmed ? "is-disabled" : ""} ${highlighted ? "yanmar-visual-highlight" : ""} ${
         isPortrait ? "yanmar-breaker-pedal-button-portrait" : ""
       }`}
       style={{
         left: `${pedal.cx * 100}%`,
+        top: isPortrait
+          ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
+          : `${pedal.cy * 100}%`,
         width: isPortrait ? "2.55rem" : "2.35rem",
         height: isPortrait ? "3.7rem" : "3.4rem",
-        bottom: 0,
-        transform: "translateX(-50%)",
+        transform: "translate(-50%, -50%)",
       }}
       onPointerDown={press}
       onPointerUp={release}
@@ -1464,7 +1531,9 @@ function BreakerPedalControl({
       onContextMenu={(e) => e.preventDefault()}
     >
       <span className="yanmar-breaker-pedal-pad" aria-hidden />
-      <span className="yanmar-breaker-pedal-caption">발판</span>
+      {highlighted ? (
+        <span className="pointer-events-none absolute inset-[-12%] rounded-[0.85rem] border-2 border-amber-300/95 bg-amber-300/10" />
+      ) : null}
       {showTouchZone ? (
         <span className="pointer-events-none absolute inset-0 rounded-[0.72rem] border border-amber-200/65" />
       ) : null}
@@ -1660,6 +1729,7 @@ interface FunctionMenuProps {
   onAuxiliaryChange: CockpitOverlayProps["onAuxiliaryChange"];
   attachmentType: AttachmentType;
   playerLevel: number;
+  unlockAllAttachments?: boolean;
   onAttachmentChange: (attachment: AttachmentType) => void;
 }
 
@@ -1691,6 +1761,7 @@ function AttachmentButton({
   icon,
   selected,
   playerLevel,
+  unlockAll,
   onSelect,
 }: {
   type: AttachmentType;
@@ -1698,9 +1769,10 @@ function AttachmentButton({
   icon: string;
   selected: boolean;
   playerLevel: number;
+  unlockAll?: boolean;
   onSelect: () => void;
 }) {
-  const unlocked = isAttachmentUnlocked(type, playerLevel);
+  const unlocked = isAttachmentUnlocked(type, playerLevel, { unlockAll });
   const requiredLevel = getAttachmentRequiredLevel(type);
   return (
     <button
@@ -1738,6 +1810,7 @@ function FunctionMenu({
   onAuxiliaryChange,
   attachmentType,
   playerLevel,
+  unlockAllAttachments,
   onAttachmentChange,
 }: FunctionMenuProps) {
   const anchorCx = layout.left.cx;
@@ -1769,6 +1842,7 @@ function FunctionMenu({
               {...item}
               selected={attachmentType === item.type}
               playerLevel={playerLevel}
+              unlockAll={unlockAllAttachments}
               onSelect={() => onAttachmentChange(item.type)}
             />
           ))}
@@ -2058,33 +2132,46 @@ export function CockpitOverlay({
   executePoseDisabled = false,
   attachmentType,
   playerLevel,
+  unlockAllAttachments = false,
   onAttachmentChange,
+  onAttachmentWarning,
+  onOpenEquipmentUpgrade,
 }: CockpitOverlayProps) {
   const highlightLeft =
     tutorialStep?.highlight === "left" || tutorialStep?.highlight === "both";
   const highlightRight =
     tutorialStep?.highlight === "right" || tutorialStep?.highlight === "both";
   const highlightTravel = tutorialStep?.highlight === "travel";
+  const highlightBreaker = tutorialStep?.highlight === "breaker";
   const layout = PORTRAIT_COCKPIT_LAYOUT;
   const isPortrait = true;
   const useDPad = mode !== "intro";
   const [functionMenuExpanded, setFunctionMenuExpanded] = useState(false);
   const [autoMenuExpanded, setAutoMenuExpanded] = useState(false);
-  /** 한쪽 주행 레버(또는 중앙 동시) 조작 중에는 다른 주행 입력을 잠근다. */
-  const [travelLock, setTravelLock] = useState<"left" | "right" | "both" | null>(null);
+  /** 중앙 동시 레버와 좌·우 개별 레버는 서로 배타. 좌·우는 동시 조작 가능. */
+  const [travelLock, setTravelLock] = useState<"sides" | "both" | null>(null);
+  const sideTravelActiveRef = useRef({ left: false, right: false });
   const travelEnabled = allowed.travel && !auxiliary.safetyLocked;
-  const breakerPedalEnabled =
-    attachmentType === "breaker" && !auxiliary.safetyLocked;
+  const breakerEquipped = attachmentType === "breaker";
+  const breakerPedalCanOperate = breakerEquipped && !auxiliary.safetyLocked;
+
+  const syncSideTravelLock = useCallback(() => {
+    const { left, right } = sideTravelActiveRef.current;
+    setTravelLock(left || right ? "sides" : null);
+  }, []);
 
   useEffect(() => {
-    if (!travelEnabled) setTravelLock(null);
+    if (!travelEnabled) {
+      sideTravelActiveRef.current = { left: false, right: false };
+      setTravelLock(null);
+    }
   }, [travelEnabled]);
 
   useEffect(() => {
-    if (breakerPedalEnabled) return;
+    if (breakerPedalCanOperate) return;
     if (!auxiliary.breakerPedal) return;
     onAuxiliaryChange((current) => ({ ...current, breakerPedal: false }));
-  }, [auxiliary.breakerPedal, breakerPedalEnabled, onAuxiliaryChange]);
+  }, [auxiliary.breakerPedal, breakerPedalCanOperate, onAuxiliaryChange]);
 
   return (
     <>
@@ -2128,40 +2215,36 @@ export function CockpitOverlay({
           <TravelLever
             side="left"
             layout={layout.travelLeft}
-            enabled={travelEnabled && (travelLock === null || travelLock === "left")}
+            enabled={travelEnabled && travelLock !== "both"}
             highlighted={highlightTravel}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
-            onDragActiveChange={(active) =>
-              setTravelLock((current) => {
-                if (active) return "left";
-                return current === "left" ? null : current;
-              })
-            }
+            onDragActiveChange={(active) => {
+              sideTravelActiveRef.current.left = active;
+              syncSideTravelLock();
+            }}
             onChange={(left) =>
               onInputChange((current) => ({
                 ...current,
-                travel: { left, right: 0 },
+                travel: { left, right: current.travel.right },
               }))
             }
           />
           <TravelLever
             side="right"
             layout={layout.travelRight}
-            enabled={travelEnabled && (travelLock === null || travelLock === "right")}
+            enabled={travelEnabled && travelLock !== "both"}
             highlighted={highlightTravel}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
-            onDragActiveChange={(active) =>
-              setTravelLock((current) => {
-                if (active) return "right";
-                return current === "right" ? null : current;
-              })
-            }
+            onDragActiveChange={(active) => {
+              sideTravelActiveRef.current.right = active;
+              syncSideTravelLock();
+            }}
             onChange={(right) =>
               onInputChange((current) => ({
                 ...current,
-                travel: { left: 0, right },
+                travel: { left: current.travel.left, right },
               }))
             }
           />
@@ -2177,7 +2260,7 @@ export function CockpitOverlay({
           />
           <DualTravelCenter
             layout={layout.travelBoth}
-            enabled={travelEnabled && (travelLock === null || travelLock === "both")}
+            enabled={travelEnabled && travelLock !== "sides"}
             highlighted={highlightTravel}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
@@ -2194,18 +2277,23 @@ export function CockpitOverlay({
               }))
             }
           />
-          {attachmentType === "breaker" ? (
-            <BreakerPedalControl
-              pressed={auxiliary.breakerPedal}
-              enabled={breakerPedalEnabled}
-              showTouchZone={showTouchZones}
-              layout={layout}
-              isPortrait={isPortrait}
-              onChange={(breakerPedal) =>
-                onAuxiliaryChange((current) => ({ ...current, breakerPedal }))
-              }
-            />
-          ) : null}
+          <BreakerPedalControl
+            pressed={auxiliary.breakerPedal}
+            canOperate={breakerPedalCanOperate}
+            dimmed={breakerEquipped && auxiliary.safetyLocked}
+            highlighted={highlightBreaker}
+            showTouchZone={showTouchZones}
+            layout={layout}
+            isPortrait={isPortrait}
+            onRequireBreaker={
+              breakerEquipped
+                ? undefined
+                : () => onAttachmentWarning?.("브레이커 장착 후 사용해주세요.")
+            }
+            onChange={(breakerPedal) =>
+              onAuxiliaryChange((current) => ({ ...current, breakerPedal }))
+            }
+          />
           <FunctionMenu
             expanded={functionMenuExpanded}
             onToggle={() => setFunctionMenuExpanded((open) => !open)}
@@ -2216,6 +2304,7 @@ export function CockpitOverlay({
             onAuxiliaryChange={onAuxiliaryChange}
             attachmentType={attachmentType}
             playerLevel={playerLevel}
+            unlockAllAttachments={unlockAllAttachments}
             onAttachmentChange={onAttachmentChange}
           />
           <AutoMenu
@@ -2266,6 +2355,14 @@ export function CockpitOverlay({
             showTouchZone={showTouchZones}
             onHorn={playHorn}
           />
+          {onOpenEquipmentUpgrade && mode !== "ride" && mode !== "gameReady" ? (
+            <EquipmentUpgradeTouchZone
+              layout={layout.left}
+              isPortrait={isPortrait}
+              showTouchZone={showTouchZones}
+              onOpen={onOpenEquipmentUpgrade}
+            />
+          ) : null}
         </div>
       </div>
     </>

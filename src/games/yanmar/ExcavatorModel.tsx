@@ -84,15 +84,17 @@ function PremiumTrack({
   const rollers = [-0.72, -0.36, 0, 0.36, 0.72];
 
   useFrame((_, delta) => {
-    const speed = velRef.current.travel + velRef.current.trackTurn * side * 0.58;
+    // side -1 = left track, +1 = right track — match lever independently.
+    const speed = side < 0 ? velRef.current.trackLeft : velRef.current.trackRight;
+    // Bottom pads must travel rearward when the machine moves forward.
     trackOffsetRef.current = THREE.MathUtils.euclideanModulo(
-      trackOffsetRef.current + speed * delta * 0.82,
+      trackOffsetRef.current - speed * delta * 0.82,
       TRACK_LOOP_LENGTH,
     );
 
     if (Math.abs(speed) >= 0.01) {
       wheels.current.forEach((wheel) => {
-        if (wheel) wheel.rotation.z -= speed * delta * 2.4;
+        if (wheel) wheel.rotation.z += speed * delta * 2.4;
       });
     }
 
@@ -310,85 +312,95 @@ function OperatorStation() {
   );
 }
 
-function SnowClearingAuger() {
-  const [leftHelix, rightHelix] = useMemo(() => {
-    const makeHelix = (startZ: number, endZ: number, direction: 1 | -1) => {
-      const points = Array.from({ length: 49 }, (_, index) => {
-        const progress = index / 48;
-        const angle = direction * progress * Math.PI * 4;
-        return new THREE.Vector3(
-          Math.cos(angle) * 0.18,
-          Math.sin(angle) * 0.18,
-          THREE.MathUtils.lerp(startZ, endZ, progress),
-        );
-      });
-      return new THREE.CatmullRomCurve3(points);
-    };
-
-    return [
-      makeHelix(-1.04, -0.06, 1),
-      makeHelix(0.06, 1.04, -1),
-    ];
+export function PremiumDozerBlade() {
+  const moldboardProfile = useMemo(() => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.035, -0.31);
+    shape.lineTo(0.1, -0.31);
+    shape.quadraticCurveTo(-0.075, 0, 0.1, 0.31);
+    shape.lineTo(-0.035, 0.31);
+    shape.quadraticCurveTo(-0.205, 0, -0.035, -0.31);
+    shape.closePath();
+    return shape;
   }, []);
 
   return (
-    <group position={[0.2, -0.08, 0]}>
-      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.055, 0.055, 2.22, 20]} />
-        <meshStandardMaterial color="#30383e" roughness={0.3} metalness={0.68} />
-      </mesh>
-      {[leftHelix, rightHelix].map((curve, index) => (
-        <mesh key={index} castShadow>
-          <tubeGeometry args={[curve, 64, 0.055, 10, false]} />
-          <meshStandardMaterial color="#8c969d" roughness={0.28} metalness={0.72} />
-        </mesh>
-      ))}
-      {[-1.12, 0, 1.12].map((z) => (
-        <group key={z} position={[0, 0, z]}>
-          <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.15, 0.15, 0.1, 24]} />
-            <meshStandardMaterial color="#353d43" roughness={0.36} metalness={0.58} />
-          </mesh>
-          <mesh position={[0, 0, z === 0 ? 0.055 : Math.sign(z) * 0.055]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.075, 0.075, 0.025, 20]} />
-            <meshStandardMaterial color="#a7b0b6" roughness={0.22} metalness={0.8} />
-          </mesh>
-        </group>
-      ))}
-      {[-0.06, 0.06].map((z, index) => (
-        <mesh
-          key={z}
-          position={[0.02, index === 0 ? -0.1 : 0.1, z]}
-          rotation={[0, 0, index === 0 ? -0.62 : 0.62]}
-          castShadow
-        >
-          <boxGeometry args={[0.48, 0.1, 0.12]} />
-          <meshStandardMaterial color="#707980" roughness={0.3} metalness={0.65} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-export function PremiumDozerBlade() {
-  return (
     <group position={[1.8, -0.08, 0]}>
       <group scale={0.88}>
-        <mesh rotation={[0, 0, -0.08]} castShadow>
-          <boxGeometry args={[0.16, 0.62, 2.42]} />
-          <meshStandardMaterial color={COLOR.dozerBlade} {...MATERIAL.frame} />
+        {/* 곡면 몰드보드: 흙과 눈을 말아 올리며 앞으로 미는 실제 블레이드 단면 */}
+        <mesh position={[0, 0, -1.24]} castShadow receiveShadow>
+          <extrudeGeometry
+            args={[
+              moldboardProfile,
+              {
+                depth: 2.48,
+                bevelEnabled: true,
+                bevelSize: 0.018,
+                bevelThickness: 0.018,
+                bevelSegments: 3,
+                curveSegments: 12,
+              },
+            ]}
+          />
+          <meshStandardMaterial
+            color={COLOR.dozerBlade}
+            roughness={0.36}
+            metalness={0.52}
+          />
         </mesh>
-        <mesh position={[0.08, 0.2, 0]}>
-          <boxGeometry args={[0.055, 0.12, 2.28]} />
+
+        {/* 교체식 하단 절삭날 */}
+        <mesh position={[0.075, -0.345, 0]} rotation={[0, 0, 0.055]} castShadow>
+          <boxGeometry args={[0.14, 0.095, 2.62]} />
           <meshStandardMaterial color={COLOR.dozerBladeEdge} {...MATERIAL.steel} />
         </mesh>
-        {[-0.72, 0.72].map((z) => (
-          <mesh key={z} position={[-0.42, 0.06, z]} rotation={[0, 0, -0.42]}>
-            <boxGeometry args={[0.86, 0.12, 0.13]} />
+
+        {/* 상단 말림 방지 보강 빔 */}
+        <RoundedBox
+          args={[0.13, 0.095, 2.5]}
+          radius={0.035}
+          smoothness={5}
+          position={[0.035, 0.325, 0]}
+          castShadow
+        >
+          <meshStandardMaterial color={COLOR.dozerBladeArm} {...MATERIAL.frame} />
+        </RoundedBox>
+
+        {/* 양 끝 측판으로 밀린 토사와 눈이 옆으로 새는 양을 줄인다. */}
+        {[-1.275, 1.275].map((z) => (
+          <mesh
+            key={`blade-side-${z}`}
+            position={[0, 0, z]}
+            castShadow
+          >
+            <shapeGeometry args={[moldboardProfile, 12]} />
+            <meshStandardMaterial
+              color={COLOR.dozerBladeArm}
+              {...MATERIAL.frame}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        ))}
+
+        {/* 후면 수직 리브와 차체 연결 암 */}
+        {[-0.78, 0, 0.78].map((z) => (
+          <mesh key={`blade-rib-${z}`} position={[-0.105, 0, z]} castShadow>
+            <boxGeometry args={[0.09, 0.54, 0.075]} />
             <meshStandardMaterial color={COLOR.dozerBladeArm} {...MATERIAL.frame} />
           </mesh>
         ))}
-        <SnowClearingAuger />
+        {[-0.72, 0.72].map((z) => (
+          <group key={`blade-arm-${z}`}>
+            <mesh position={[-0.46, 0.02, z]} rotation={[0, 0, -0.38]} castShadow>
+              <boxGeometry args={[0.86, 0.13, 0.14]} />
+              <meshStandardMaterial color={COLOR.dozerBladeArm} {...MATERIAL.frame} />
+            </mesh>
+            <mesh position={[-0.82, 0.18, z]} rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.105, 0.105, 0.18, 20]} />
+              <meshStandardMaterial color={COLOR.steel} {...MATERIAL.steel} />
+            </mesh>
+          </group>
+        ))}
       </group>
     </group>
   );
@@ -398,31 +410,41 @@ export function PremiumExcavatorBody({
   velRef,
   yanmarLogo,
   ykLogo,
+  upperBodyRef,
 }: {
   velRef: React.MutableRefObject<HydraulicVelocity>;
   yanmarLogo?: THREE.Texture;
   ykLogo?: THREE.Texture;
+  upperBodyRef?: React.Ref<THREE.Group>;
 }) {
   const premiumRearMark = useMemo(() => createYkGeongiMarkTexture("1588-3806"), []);
   useLayoutEffect(() => () => premiumRearMark?.dispose(), [premiumRearMark]);
   const rearMark = premiumRearMark ?? ykLogo;
 
   return (
-    <group scale={[0.58, 1, 0.82]}>
-      <group position={[-0.72, 0.24, 0]}>
-        {[-1, 1].map((side) => (
-          <PremiumTrack key={side} side={side as 1 | -1} velRef={velRef} />
-        ))}
-        <RoundedBox args={[2.12, 0.24, 1.76]} radius={0.09} smoothness={6} position={[0.02, 0.48, 0]} castShadow>
-          <meshStandardMaterial color={COLOR.frameLight} {...MATERIAL.frame} />
-        </RoundedBox>
-        <mesh position={[0.02, 0.62, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.73, 0.73, 1.5, 36]} />
-          <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
-        </mesh>
+    <group>
+      <group>
+        <group scale={[0.58, 1, 0.82]}>
+          <group position={[-0.72, 0.24, 0]}>
+            {[-1, 1].map((side) => (
+              <PremiumTrack key={side} side={side as 1 | -1} velRef={velRef} />
+            ))}
+          </group>
+        </group>
       </group>
 
-      <group position={[-0.38, 0.83, 0]}>
+      <group ref={upperBodyRef}>
+        <group scale={[0.58, 1, 0.82]}>
+        <group position={[-0.72, 0.24, 0]}>
+          <RoundedBox args={[2.12, 0.24, 1.76]} radius={0.09} smoothness={6} position={[0.02, 0.48, 0]} castShadow>
+            <meshStandardMaterial color={COLOR.frameLight} {...MATERIAL.frame} />
+          </RoundedBox>
+          <mesh position={[0.02, 0.62, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.73, 0.73, 1.5, 36]} />
+            <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
+          </mesh>
+        </group>
+        <group position={[-0.38, 0.83, 0]}>
         <RoundedBox args={[1.82, 0.58, 1.78]} radius={0.18} smoothness={9} castShadow>
           <meshStandardMaterial color={COLOR.paintRed} {...MATERIAL.painted} />
         </RoundedBox>
@@ -510,6 +532,8 @@ export function PremiumExcavatorBody({
           </mesh>
         </group>
       ))}
+        </group>
+      </group>
     </group>
   );
 }

@@ -20,6 +20,23 @@ import type { MapTier } from "./mapTier";
 const STORAGE_PREFIX = "ykgame:yanmar:game-session:v1";
 const SNAPSHOT_VERSION = 2;
 
+function normalizeHillZone(zone: HillZone): HillZone {
+  return {
+    ...zone,
+    active: typeof zone.active === "boolean" ? zone.active : true,
+    clearedAt: zone.clearedAt ?? null,
+    respawnAt: zone.respawnAt ?? null,
+    boulders: zone.boulders.map((rock) => ({
+      ...rock,
+      extracted:
+        typeof rock.extracted === "boolean"
+          ? rock.extracted
+          : Boolean(rock.delivered),
+    })),
+    haulTruck: { ...zone.haulTruck },
+  };
+}
+
 export interface YanmarGameSessionSnapshot {
   version: typeof SNAPSHOT_VERSION;
   seasonKey: string;
@@ -189,13 +206,7 @@ export function saveYanmarGameSession(
             tiles: snapshot.crashZone.tiles.map((tile) => ({ ...tile })),
           }
         : null,
-      hillZone: snapshot.hillZone
-        ? {
-            ...snapshot.hillZone,
-            boulders: snapshot.hillZone.boulders.map((rock) => ({ ...rock })),
-            haulTruck: { ...snapshot.hillZone.haulTruck },
-          }
-        : null,
+      hillZone: snapshot.hillZone ? normalizeHillZone(snapshot.hillZone) : null,
       mapTier: snapshot.mapTier,
       gridSizeX: snapshot.gridSizeX,
       gridSizeZ: snapshot.gridSizeZ,
@@ -250,13 +261,7 @@ export function loadYanmarGameSession(
             tiles: parsed.crashZone.tiles.map((tile) => ({ ...tile })),
           }
         : null,
-      hillZone: parsed.hillZone
-        ? {
-            ...parsed.hillZone,
-            boulders: parsed.hillZone.boulders.map((rock) => ({ ...rock })),
-            haulTruck: { ...parsed.hillZone.haulTruck },
-          }
-        : null,
+      hillZone: parsed.hillZone ? normalizeHillZone(parsed.hillZone) : null,
       heights: [...parsed.heights],
       baseHeights: [...parsed.baseHeights],
     };
@@ -289,11 +294,7 @@ export function applyGameSessionTerrain(
       }
     : null;
   terrain.hillZone = snapshot.hillZone
-    ? {
-        ...snapshot.hillZone,
-        boulders: snapshot.hillZone.boulders.map((rock) => ({ ...rock })),
-        haulTruck: { ...snapshot.hillZone.haulTruck },
-      }
+    ? normalizeHillZone(snapshot.hillZone)
     : null;
   if (
     snapshot.heights.length === terrain.heights.length &&

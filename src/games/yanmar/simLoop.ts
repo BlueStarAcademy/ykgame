@@ -29,6 +29,9 @@ import {
   addHaulTruckRock,
   damageCrashTile,
   getCrashTileAt,
+  isInsideHillZoneCore,
+  markHillRockExtracted,
+  tryClearHillZone,
   digZoneLabel,
   getDigZoneRespawnEtaSec,
   sampleHeight,
@@ -368,6 +371,8 @@ export function tickExcavatorSim(params: SimTickParams) {
     };
     vel.travel = 0;
     vel.trackTurn = 0;
+    vel.trackLeft = 0;
+    vel.trackRight = 0;
   }
   const beforeGroundContact = {
     boom: sim.boom,
@@ -414,6 +419,9 @@ export function tickExcavatorSim(params: SimTickParams) {
   }
   if (constrainExcavatorToMap(sim, terrain)) {
     vel.travel = 0;
+    vel.trackTurn = 0;
+    vel.trackLeft = 0;
+    vel.trackRight = 0;
   }
   // Height samples are cell-based. Dividing a cell-boundary height jump by the
   // tiny per-frame travel distance creates a false near-vertical slope and
@@ -436,15 +444,21 @@ export function tickExcavatorSim(params: SimTickParams) {
     sim.posX = beforeTravel.x;
     sim.posZ = beforeTravel.z;
     vel.travel = 0;
+    vel.trackTurn = 0;
+    vel.trackLeft = 0;
+    vel.trackRight = 0;
   }
   const bodyGround = sampleHeight(terrain, sim.posX, sim.posZ);
   const targetPosY = bodyGround - 0.72;
   const verticalFollow = (targetPosY - sim.posY) * Math.min(1, dt * 18);
-  // 굴착지 복구로 차체 아래 지면이 갑자기 높아져도 기체가 공중으로
-  // 발사되듯 따라가지 않게 상승만 궤도 주행 수준의 속도로 제한한다.
-  sim.posY += Math.min(verticalFollow, dt * 1.2);
+  // Cap both rise and drop so sharp pivots over height samples cannot fling the body.
+  const maxStep = dt * 1.2;
+  sim.posY += Math.max(-maxStep, Math.min(maxStep, verticalFollow));
   if (constrainExcavatorToDumpTruck(sim, beforeTravel, truckPose)) {
     vel.travel = 0;
+    vel.trackTurn = 0;
+    vel.trackLeft = 0;
+    vel.trackRight = 0;
   }
 
   let bucketContact = bucketClearance(sim, terrain, boomSwing);
@@ -546,9 +560,9 @@ export function tickExcavatorSim(params: SimTickParams) {
       const hill = terrain.hillZone;
       const closing = filtered.right.x < -0.2 || sim.bucket <= 0.72;
       const opening = filtered.right.x > 0.2 || sim.bucket >= 1.32;
-      if (hill && !sim.carriedBoulderId && closing) {
+      if (hill?.active && !sim.carriedBoulderId && closing) {
         const rock = hill.boulders
-          .filter((item) => item.active && !item.delivered)
+          .filter((item) => item.active && !item.delivered && !item.extracted)
           .map((item) => ({
             item,
             distance: Math.hypot(item.x - bucketTip.x, item.z - bucketTip.z),
@@ -566,13 +580,25 @@ export function tickExcavatorSim(params: SimTickParams) {
           const rock = hill.boulders.find(
             (item) => item.id === sim.carriedBoulderId,
           );
-          if (rock) rock.delivered = true;
+          if (rock) {
+            rock.delivered = true;
+            rock.extracted = true;
+            rock.active = false;
+          }
           const deliveredId = sim.carriedBoulderId;
           sim.carriedBoulderId = null;
           runtime.attachmentActionCooldown = 0.6;
+          tryClearHillZone(terrain);
           onHillRockDelivered(deliveredId);
         }
       }
+    }
+  }
+
+  // 집어서 돌 구역 밖으로 나가면 반출 처리. 전부 반출되면 구역이 사라진다.
+  if (terrain.hillZone?.active && sim.carriedBoulderId) {
+    if (!isInsideHillZoneCore(terrain.hillZone, sim.posX, sim.posZ)) {
+      markHillRockExtracted(terrain, sim.carriedBoulderId);
     }
   }
   const isInDumpTruckRearBox = (wx: number, wz: number) => {
@@ -672,9 +698,9 @@ export function tickExcavatorSim(params: SimTickParams) {
 
   const hillZone = terrain.hillZone;
   const nearestHillRock =
-    sim.attachmentType === "grapple" && hillZone && !sim.carriedBoulderId
+    sim.attachmentType === "grapple" && hillZone?.active && !sim.carriedBoulderId
       ? hillZone.boulders
-          .filter((item) => item.active && !item.delivered)
+          .filter((item) => item.active && !item.delivered && !item.extracted)
           .map((item) => ({
             item,
             distance: Math.hypot(item.x - bucketTip.x, item.z - bucketTip.z),

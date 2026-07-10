@@ -5,6 +5,9 @@ export const PLAYER_UNLOCKS = {
   GRAPPLE: 15,
 } as const;
 
+/** 연습·튜토리얼에서 맵/부착물을 전부 열 때 쓰는 유효 레벨 */
+export const PRACTICE_FULL_UNLOCK_LEVEL = PLAYER_UNLOCKS.GRAPPLE;
+
 export type PlayerUnlockKind = keyof typeof PLAYER_UNLOCKS;
 
 export function getAttachmentRequiredLevel(type: AttachmentType): number {
@@ -13,7 +16,12 @@ export function getAttachmentRequiredLevel(type: AttachmentType): number {
   return 1;
 }
 
-export function isAttachmentUnlocked(type: AttachmentType, playerLevel: number): boolean {
+export function isAttachmentUnlocked(
+  type: AttachmentType,
+  playerLevel: number,
+  opts?: { unlockAll?: boolean },
+): boolean {
+  if (opts?.unlockAll) return true;
   return playerLevel >= getAttachmentRequiredLevel(type);
 }
 

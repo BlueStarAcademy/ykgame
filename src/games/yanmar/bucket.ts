@@ -200,7 +200,7 @@ export function getBucketGroundContactWorld(sim: ExcavatorSimState, boomSwing = 
 
 /** 도저 블레이드 하단 월드 좌표 (blade: 0=상승 … 1=하강) */
 export function getDozerBladeContactWorld(sim: ExcavatorSimState, blade: number): BucketTip {
-  const facing = sim.heading + sim.swing;
+  const facing = sim.heading;
   const drop = Math.max(0, Math.min(1, blade)) * YANMAR_MACHINE_RIG.dozerBladeDrop;
   const localBottomY =
     YANMAR_MACHINE_RIG.dozerBladeGroupBaseY -

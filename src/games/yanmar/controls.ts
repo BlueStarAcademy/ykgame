@@ -102,8 +102,8 @@ export const DEFAULT_BOOM_SWING = 0.28;
 /** 블레이드: 0=상승(기본), 1=하강(접지) */
 export const BLADE_RAISED = 0;
 export const BLADE_LOWERED = 1;
-/** 레버를 끝까지 밀었을 때 0↔1 이동에 약 1.25초 */
-export const BLADE_SPEED_PER_SECOND = 0.8;
+/** 레버를 끝까지 밀었을 때 최저↔최고 이동에 2초 */
+export const BLADE_SPEED_PER_SECOND = 0.5;
 
 export function createAuxiliaryControls(): AuxiliaryControlState {
   return {
@@ -172,11 +172,36 @@ export interface HydraulicVelocity {
   bucket: number;
   travel: number;
   trackTurn: number;
+  /** Left track linear speed (model -Z). */
+  trackLeft: number;
+  /** Right track linear speed (model +Z). */
+  trackRight: number;
 }
 
 export function createHydraulicVelocity(): HydraulicVelocity {
-  return { swing: 0, boom: 0, arm: 0, bucket: 0, travel: 0, trackTurn: 0 };
+  return {
+    swing: 0,
+    boom: 0,
+    arm: 0,
+    bucket: 0,
+    travel: 0,
+    trackTurn: 0,
+    trackLeft: 0,
+    trackRight: 0,
+  };
 }
+
+/**
+ * Physics track stance for yaw. Sized so one-lever pivots rotate about the
+ * stopped track at a playable rate (≈ legacy trackTurn) without launching.
+ */
+const TRACK_WIDTH_PHYSICS = 4;
+
+/** 직진 주행 시 하부가 상체 방향으로 따라오는 정렬 속도. */
+const DRIVE_CHASSIS_ALIGN_MAX_SPEED = 0.9;
+const DRIVE_CHASSIS_ALIGN_RESPONSE = 1.8;
+const DRIVE_CHASSIS_ALIGN_INPUT_THRESHOLD = 0.1;
+const DRIVE_CHASSIS_ALIGN_EPSILON = 0.006;
 
 function approach(current: number, target: number, accel: number, damp: number, dt: number) {
   if (Math.abs(target) > 0.02) {
@@ -245,25 +270,29 @@ export function applyControls(
     DAMPING.arm,
     dt,
   );
-  const leftTrack = travel.right;
-  const rightTrack = travel.left;
-  const trackAverage = (leftTrack + rightTrack) / 2;
-  const trackDelta = leftTrack - rightTrack;
 
-  vel.travel = approach(
-    vel.travel,
-    trackAverage * speedProfile.travel * travelSpeedScale,
+  // Independent track drives: one lever moves only that track (pivot on the other).
+  const trackSpeedMax = speedProfile.travel * travelSpeedScale;
+  vel.trackLeft = approach(
+    vel.trackLeft,
+    travel.left * trackSpeedMax,
     ACCEL.travel,
     DAMPING.travel,
     dt,
   );
-  vel.trackTurn = approach(
-    vel.trackTurn,
-    trackDelta * speedProfile.trackTurn,
+  vel.trackRight = approach(
+    vel.trackRight,
+    travel.right * trackSpeedMax,
     ACCEL.travel,
     DAMPING.travel,
     dt,
   );
+  vel.travel = (vel.trackLeft + vel.trackRight) / 2;
+  // Positive heading = CCW; left-forward/right-stop turns right (CW) → negative ω.
+  // Use physics width so one-sided drive pivots on the stopped track without
+  // an extreme yaw rate that launches the body over terrain samples.
+  vel.trackTurn = (vel.trackRight - vel.trackLeft) / TRACK_WIDTH_PHYSICS;
+
   // 우 조이스틱 앞=붐 하강(각도↑·버킷↓), 뒤=붐 상승 — 3D 암 골격과 일치
   vel.boom = approach(
     vel.boom,
@@ -283,17 +312,75 @@ export function applyControls(
     dt,
   );
 
-  state.swing += vel.swing * dt;
-  state.heading += vel.trackTurn * dt;
+  // Integrate travel on an arc around the instantaneous center of rotation so a
+  // stopped track stays planted (in-place circle) instead of slip-translating.
+  // 주행은 하부 차체 방향만 따른다. 상체 스윙은 궤도 진행 방향에 영향을 주지 않는다.
+  const facing = state.heading;
+  const driveCommand = (travel.left + travel.right) / 2;
+  const straightDriveRequested =
+    Math.abs(driveCommand) > DRIVE_CHASSIS_ALIGN_INPUT_THRESHOLD &&
+    travel.left * travel.right > 0 &&
+    Math.abs(travel.left - travel.right) < 0.15;
+
+  // 직진 주행으로 하부 정렬 중에는 잔여 스윙 속도가 다시 어긋남을 만들지 않게 한다.
+  if (straightDriveRequested && Math.abs(normalizeAngle(state.swing)) > DRIVE_CHASSIS_ALIGN_EPSILON) {
+    vel.swing = 0;
+  } else {
+    state.swing += vel.swing * dt;
+  }
 
   const nextArm = state.arm + vel.arm * dt;
   if (nextArm < JOINT_LIMITS.arm.min) vel.arm = Math.max(0, vel.arm);
   if (nextArm > JOINT_LIMITS.arm.max) vel.arm = Math.min(0, vel.arm);
   state.arm = clamp(nextArm, JOINT_LIMITS.arm.min, JOINT_LIMITS.arm.max);
 
-  const move = vel.travel * dt;
-  state.posX += Math.sin(state.heading + state.swing) * move;
-  state.posZ += Math.cos(state.heading + state.swing) * move;
+  let speed = vel.travel;
+  let omega = vel.trackTurn;
+  let chassisAlignmentDelta = 0;
+  if (straightDriveRequested) {
+    const alignmentError = normalizeAngle(state.swing);
+    state.swing = alignmentError;
+    if (Math.abs(alignmentError) <= DRIVE_CHASSIS_ALIGN_EPSILON) {
+      state.swing = 0;
+    } else {
+      const alignmentSpeed =
+        Math.min(
+          DRIVE_CHASSIS_ALIGN_MAX_SPEED,
+          Math.abs(alignmentError) * DRIVE_CHASSIS_ALIGN_RESPONSE,
+        ) * Math.min(1, Math.abs(driveCommand));
+      chassisAlignmentDelta =
+        Math.sign(alignmentError) *
+        Math.min(Math.abs(alignmentError), alignmentSpeed * dt);
+
+      // 전진·후진을 유지한 채 하부를 상체 쪽으로 돌려 곡선으로 정렬한다.
+      omega += dt > 0 ? chassisAlignmentDelta / dt : 0;
+      vel.trackTurn = omega;
+    }
+  }
+  if (Math.abs(omega) > 1e-4) {
+    const radius = speed / omega;
+    const rightX = Math.cos(facing);
+    const rightZ = -Math.sin(facing);
+    const iccX = state.posX - radius * rightX;
+    const iccZ = state.posZ - radius * rightZ;
+    const dTheta = omega * dt;
+    const cos = Math.cos(dTheta);
+    const sin = Math.sin(dTheta);
+    const relX = state.posX - iccX;
+    const relZ = state.posZ - iccZ;
+    state.posX = iccX + relX * cos - relZ * sin;
+    state.posZ = iccZ + relX * sin + relZ * cos;
+    state.heading += dTheta;
+  } else {
+    const move = speed * dt;
+    state.posX += Math.sin(facing) * move;
+    state.posZ += Math.cos(facing) * move;
+  }
+  // 하부가 따라 회전한 만큼 상체 상대각을 줄여 상체의 세계 방향은 유지한다.
+  state.swing -= chassisAlignmentDelta;
+  if (Math.abs(state.swing) <= DRIVE_CHASSIS_ALIGN_EPSILON) {
+    state.swing = 0;
+  }
 
   const nextBoom = state.boom + vel.boom * dt;
   if (nextBoom < JOINT_LIMITS.boom.min) vel.boom = Math.max(0, vel.boom);
@@ -308,6 +395,10 @@ export function applyControls(
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
+}
+
+function normalizeAngle(angle: number) {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
 export function canLoadBucket(boom: number, bucket: number) {
@@ -487,7 +578,10 @@ export function getAutoDigPoseReadiness(
 
 const MANUAL_INPUT_THRESHOLD = 0.08;
 
-/** 조이스틱·주행만 — 보조 레버(붐스윙 등)는 클릭 잔여값으로 실행을 끊지 않는다. */
+/**
+ * 암·붐·버켓(좌·우 조이스틱) 수동 입력만 감지한다.
+ * 주행 레버는 자동 자세 실행 중에도 허용하므로 여기서 제외한다.
+ */
 export function hasManualControlInput(
   input: ExcavatorControlState,
   allowed: ControlMask,
@@ -497,13 +591,6 @@ export function hasManualControlInput(
   if (allowed.leftY && Math.abs(input.left.y) > MANUAL_INPUT_THRESHOLD) return true;
   if (allowed.rightX && Math.abs(input.right.x) > MANUAL_INPUT_THRESHOLD) return true;
   if (allowed.rightY && Math.abs(input.right.y) > MANUAL_INPUT_THRESHOLD) return true;
-  if (
-    allowed.travel &&
-    (Math.abs(input.travel.left) > MANUAL_INPUT_THRESHOLD ||
-      Math.abs(input.travel.right) > MANUAL_INPUT_THRESHOLD)
-  ) {
-    return true;
-  }
   return false;
 }
 

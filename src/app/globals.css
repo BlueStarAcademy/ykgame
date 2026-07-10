@@ -353,6 +353,11 @@ body {
 }
 
 .yanmar-control-deck {
+  /* Panel height + clearance so perspective/shadow bottoms are not clipped. */
+  --yanmar-travel-panel-h: 3.6rem;
+  --yanmar-travel-panel-half: 1.8rem;
+  --yanmar-travel-baseline: 2.45rem;
+  --yanmar-travel-stick-h: 2.45rem;
   bottom: 0;
   height: clamp(9.5rem, 34dvh, 15rem);
   width: 100%;
@@ -362,6 +367,7 @@ body {
   /* Avoid projecting the whole deck; nested perspective softens edges on mobile GPUs */
   perspective: none;
   transform: none;
+  overflow: visible;
 }
 
 .yanmar-control-touch-layer {
@@ -1808,6 +1814,104 @@ body {
     0 0 0.72rem rgba(245, 158, 11, 0.38);
 }
 
+.yanmar-upgrade-touch-zone {
+  z-index: 58;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.yanmar-upgrade-button-visual {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  height: 1.4rem;
+  width: 2.36rem;
+  transform: translate(-50%, -50%);
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0.38rem;
+  background:
+    linear-gradient(165deg, rgba(255, 236, 179, 0.42) 0%, transparent 38%),
+    linear-gradient(180deg, #f59e0b 0%, #b45309 48%, #78350f 100%);
+  box-shadow:
+    0 0 0 0.08rem rgba(120, 53, 15, 0.92),
+    inset 0 0.08rem 0.12rem rgba(255, 251, 235, 0.45),
+    inset 0 -0.14rem 0.2rem rgba(69, 26, 3, 0.55),
+    0 0.22rem 0.32rem rgba(0, 0, 0, 0.46),
+    0 0 0.55rem rgba(245, 158, 11, 0.28);
+  transition:
+    transform 90ms ease,
+    filter 90ms ease,
+    box-shadow 90ms ease;
+}
+
+.yanmar-upgrade-button-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 28%,
+    rgba(255, 255, 255, 0.28) 46%,
+    transparent 62%
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.yanmar-upgrade-button-icon {
+  position: relative;
+  z-index: 1;
+  width: 0.62rem;
+  height: 0.62rem;
+  flex-shrink: 0;
+  background:
+    radial-gradient(circle at 50% 50%, #fff7ed 0 28%, transparent 30%),
+    conic-gradient(
+      from 20deg,
+      #fef3c7 0 14%,
+      #d97706 14% 28%,
+      #fef3c7 28% 42%,
+      #d97706 42% 56%,
+      #fef3c7 56% 70%,
+      #d97706 70% 84%,
+      #fef3c7 84% 100%
+    );
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 0.05rem rgba(120, 53, 15, 0.75),
+    inset 0 0 0 0.06rem rgba(255, 247, 237, 0.35);
+}
+
+.yanmar-upgrade-button-label {
+  position: relative;
+  z-index: 1;
+  font-size: 0.52rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: #fffbeb;
+  text-shadow:
+    0 0.05rem 0 rgba(69, 26, 3, 0.85),
+    0 0 0.35rem rgba(251, 191, 36, 0.45);
+}
+
+.yanmar-upgrade-touch-zone:active .yanmar-upgrade-button-visual {
+  transform: translate(-50%, calc(-50% + 0.1rem)) scale(0.96);
+  filter: brightness(1.12);
+  box-shadow:
+    inset 0 0.18rem 0.28rem rgba(69, 26, 3, 0.72),
+    0 0 0 0.08rem rgba(120, 53, 15, 0.95),
+    0 0.08rem 0.16rem rgba(0, 0, 0, 0.5),
+    0 0 0.72rem rgba(251, 191, 36, 0.5);
+}
+
 .yanmar-horn-button {
   position: absolute;
   z-index: 70;
@@ -2473,14 +2577,6 @@ body {
   background-image: url("/images/yanmar/2d/cockpit/menu-pedal-premium.png?v=2");
 }
 
-.yanmar-function-menu-item-safety .yanmar-aux-button,
-.yanmar-function-menu-item-rpm .yanmar-aux-button,
-.yanmar-function-menu-item-pedal .yanmar-pedal-button {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-}
-
 .yanmar-function-menu-item-safety .yanmar-aux-lever-well,
 .yanmar-function-menu-item-rpm .yanmar-aux-lever-well {
   border-color: transparent;
@@ -2755,7 +2851,7 @@ body {
 
 .yanmar-visual-lever-travel .yanmar-lever-slot {
   top: 72%;
-  height: 4.25rem;
+  height: 4.85rem;
   width: 1.18rem;
   transform: translate3d(-50%, -50%, -0.12rem) rotateX(58deg) scaleY(0.92);
   transform-origin: 50% 88%;
@@ -2784,7 +2880,7 @@ body {
 
 .yanmar-visual-lever-travel .yanmar-lever-stick {
   bottom: 0.02rem;
-  height: 3.55rem;
+  height: var(--yanmar-travel-stick-h, 2.45rem);
   width: 0.56rem;
   transform-origin: 50% 100%;
   transform-style: preserve-3d;
@@ -2798,19 +2894,26 @@ body {
 }
 
 .yanmar-visual-lever-travel .yanmar-lever-stick > span {
-  top: -0.9rem;
-  height: 1.36rem;
-  width: 1.86rem;
-  border-radius: 0.36rem;
-  border: 1px solid rgba(203, 213, 225, 0.28);
-  transform: translateX(-50%) translateZ(0.08rem) rotateX(-10deg);
+  top: -1.2rem;
+  height: 1.18rem;
+  width: 1.18rem;
+  border-radius: 50%;
+  border: 1px solid rgba(203, 213, 225, 0.48);
+  transform: translateX(-50%) translateZ(0.12rem) perspective(5rem) rotateX(10deg);
+  transform-origin: 50% 82%;
   background:
-    radial-gradient(ellipse at 34% 20%, rgba(255, 255, 255, 0.42), transparent 26%),
-    linear-gradient(180deg, #64748b 0%, #334155 58%, #0f172a 100%);
+    radial-gradient(ellipse at 30% 18%, rgba(255, 255, 255, 0.38), transparent 27%),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.025) 0 1px,
+      transparent 1px 4px
+    ),
+    linear-gradient(105deg, #1e293b 0%, #64748b 35%, #94a3b8 49%, #475569 63%, #111827 100%);
   box-shadow:
-    inset 0.12rem 0.12rem 0.14rem rgba(255, 255, 255, 0.24),
-    inset -0.14rem -0.14rem 0.18rem rgba(0, 0, 0, 0.58),
-    0 0.16rem 0.22rem rgba(0, 0, 0, 0.42);
+    inset 0.1rem 0.1rem 0 rgba(255, 255, 255, 0.14),
+    inset -0.12rem -0.18rem 0 rgba(0, 0, 0, 0.48),
+    0 0.18rem 0 #111827,
+    0 0.28rem 0.2rem rgba(0, 0, 0, 0.5);
 }
 
 .yanmar-visual-pedal {
@@ -2851,10 +2954,20 @@ body {
 }
 
 /* In-game portrait cockpit layout */
+.yanmar-layout-portrait {
+  /* Keep at 0 so lever/joystick bottoms are not clipped by the game frame. */
+  --yanmar-controls-sink: 0rem;
+}
+
 .yanmar-layout-portrait .yanmar-control-deck {
+  --yanmar-travel-panel-h: 3.6rem;
+  --yanmar-travel-panel-half: 1.8rem;
+  --yanmar-travel-baseline: 2.45rem;
+  --yanmar-travel-stick-h: 2.45rem;
   bottom: 0;
   height: clamp(16rem, 40dvh, 20rem);
   transform: none;
+  overflow: visible;
 }
 
 .yanmar-layout-portrait .yanmar-visual-joystick {
@@ -2903,8 +3016,10 @@ body {
 
 .yanmar-blade-lever-visual {
   position: absolute;
-  width: 2.85rem;
-  height: 4.6rem;
+  /* Match travel VisualLever root box so pivot/panel centers share the baseline. */
+  width: 3.3rem;
+  height: 4.8rem;
+  overflow: visible;
 }
 
 .yanmar-blade-lever-visual.is-disabled {
@@ -2914,25 +3029,34 @@ body {
 .yanmar-blade-lever-visual .yanmar-visual-lever-travel {
   position: absolute;
   left: 50%;
-  top: 42%;
+  top: 50%;
   width: 100%;
   height: 100%;
   transform: translate(-50%, -50%);
+  overflow: visible;
 }
 
 .yanmar-blade-lever-visual .yanmar-visual-lever-travel .yanmar-lever-slot {
   display: none;
 }
 
+/* Keep panel/pivot on the same 52% center as travel levers. */
+.yanmar-blade-lever-visual .yanmar-premium-lever-panel,
+.yanmar-blade-lever-visual .yanmar-visual-lever-travel .yanmar-lever-pivot {
+  top: 52%;
+}
+
 .yanmar-blade-lever-visual .yanmar-visual-lever-travel .yanmar-lever-stick {
-  height: 2.85rem;
-  width: 0.48rem;
+  height: var(--yanmar-travel-stick-h, 2.45rem);
+  width: 0.54rem;
 }
 
 .yanmar-blade-lever-label {
   position: absolute;
   left: 50%;
-  bottom: 0.02rem;
+  top: calc(52% + var(--yanmar-travel-panel-half, 1.8rem) - 0.7rem);
+  bottom: auto;
+  z-index: 5;
   transform: translateX(-50%);
   border-radius: 999px;
   background: rgba(2, 6, 23, 0.62);
@@ -3618,6 +3742,11 @@ html.pwa-mode body {
 .yanmar-visual-lever-travel {
   --lever-accent: 148, 163, 184;
   filter: drop-shadow(0 0.34rem 0.26rem rgba(2, 6, 23, 0.58));
+  overflow: visible;
+}
+
+.yanmar-travel-cluster {
+  overflow: visible;
 }
 
 .yanmar-travel-cluster .yanmar-premium-lever-panel {
@@ -3635,7 +3764,7 @@ html.pwa-mode body {
   position: absolute;
   z-index: 7;
   width: 4.55rem;
-  height: 2.75rem;
+  height: var(--yanmar-travel-panel-h, 3.1rem);
   transform: translate(-50%, -50%) perspective(8rem) rotateX(13deg);
   overflow: hidden;
   border: 1px solid rgba(203, 213, 225, 0.5);
@@ -3670,35 +3799,37 @@ html.pwa-mode body {
   position: absolute;
   top: 50%;
   z-index: 1;
-  width: 1.22rem;
-  height: 2.56rem;
-  transform: translate(-50%, -50%) rotateX(48deg);
+  width: 1.28rem;
+  height: 3.45rem;
+  transform: translate(-50%, -50%) rotateX(56deg);
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.55);
   border-radius: 999px;
   background:
-    radial-gradient(ellipse at 50% 12%, rgba(148, 163, 184, 0.3), transparent 38%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 22% 78%, rgba(0, 0, 0, 0.42)),
-    linear-gradient(180deg, #334155 0%, #111827 42%, #020617 100%);
+    radial-gradient(ellipse at 50% 18%, rgba(148, 163, 184, 0.22), transparent 42%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1), transparent 18% 82%, rgba(0, 0, 0, 0.55)),
+    linear-gradient(180deg, #1e293b 0%, #0b1220 38%, #020617 100%);
   box-shadow:
-    inset 0 0 0 0.1rem rgba(255, 255, 255, 0.08),
-    inset 0 0 0.54rem rgba(148, 163, 184, 0.14),
-    inset 0 -0.4rem 0.48rem rgba(0, 0, 0, 0.72);
+    inset 0 0 0 0.1rem rgba(255, 255, 255, 0.07),
+    inset 0 0.35rem 0.55rem rgba(0, 0, 0, 0.55),
+    inset 0 -0.55rem 0.65rem rgba(0, 0, 0, 0.88),
+    0 0.12rem 0.18rem rgba(0, 0, 0, 0.45);
 }
 
 .yanmar-premium-dual-travel-lane::before {
   content: "";
   position: absolute;
-  inset: 0.24rem 0.14rem;
+  inset: 0.28rem 0.16rem;
   border-radius: 999px;
   background:
     repeating-linear-gradient(
       180deg,
       transparent 0 0.3rem,
-      rgba(226, 232, 240, 0.22) 0.3rem 0.34rem,
+      rgba(226, 232, 240, 0.16) 0.3rem 0.34rem,
       transparent 0.34rem 0.6rem
     );
-  opacity: 0.72;
+  opacity: 0.55;
+  box-shadow: inset 0 0 0.35rem rgba(0, 0, 0, 0.65);
 }
 
 .yanmar-premium-dual-travel-lane.is-left {
@@ -3732,7 +3863,7 @@ html.pwa-mode body {
   top: 52%;
   z-index: 0;
   width: 2.35rem;
-  height: 2.75rem;
+  height: var(--yanmar-travel-panel-h, 3.1rem);
   transform: translate(-50%, -50%) perspective(8rem) rotateX(13deg);
   overflow: hidden;
   border: 1px solid rgba(203, 213, 225, 0.5);
@@ -3759,19 +3890,19 @@ html.pwa-mode body {
   left: 50%;
   top: 50%;
   bottom: auto;
-  width: 1.35rem;
-  height: 2.56rem;
-  transform: translate(-50%, -50%) rotateX(48deg);
-  border: 1px solid rgba(var(--lever-accent), 0.4);
+  width: 1.28rem;
+  height: 3.45rem;
+  transform: translate(-50%, -50%) rotateX(56deg);
+  border: 1px solid rgba(var(--lever-accent), 0.45);
   border-radius: 999px;
   background:
-    radial-gradient(ellipse at 50% 12%, rgba(var(--lever-accent), 0.3), transparent 38%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 22% 78%, rgba(0, 0, 0, 0.42)),
-    linear-gradient(180deg, #334155 0%, #111827 42%, #020617 100%);
+    radial-gradient(ellipse at 50% 18%, rgba(var(--lever-accent), 0.2), transparent 42%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1), transparent 18% 82%, rgba(0, 0, 0, 0.55)),
+    linear-gradient(180deg, #1e293b 0%, #0b1220 38%, #020617 100%);
   box-shadow:
-    inset 0 0 0 0.1rem rgba(255, 255, 255, 0.08),
-    inset 0 0 0.54rem rgba(var(--lever-accent), 0.14),
-    inset 0 -0.4rem 0.48rem rgba(0, 0, 0, 0.72);
+    inset 0 0 0 0.1rem rgba(255, 255, 255, 0.07),
+    inset 0 0.35rem 0.55rem rgba(0, 0, 0, 0.55),
+    inset 0 -0.55rem 0.65rem rgba(0, 0, 0, 0.88);
 }
 
 .yanmar-premium-lever-panel-inset {
@@ -3897,26 +4028,31 @@ html.pwa-mode body {
 
 .yanmar-visual-lever-travel .yanmar-lever-pivot {
   z-index: 3;
-  /* Neutral is defined by the lever root sitting at the rail center. */
+  /* Seat the root inside the lever track well. */
   top: 52%;
-  height: 0.92rem;
-  width: 0.92rem;
+  height: 0.7rem;
+  width: 0.7rem;
+  overflow: visible;
   border: 1px solid rgba(var(--lever-accent), 0.72);
   background:
-    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.42), transparent 22%),
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.28), transparent 24%),
     radial-gradient(circle, #64748b 0%, #1e293b 48%, #020617 100%);
   box-shadow:
     inset 0.08rem 0.08rem 0 rgba(255, 255, 255, 0.14),
-    inset -0.1rem -0.12rem 0 rgba(0, 0, 0, 0.56),
-    0 0 0 0.1rem #080d14,
-    0 0 0.48rem rgba(var(--lever-accent), 0.34);
+    inset -0.1rem -0.12rem 0 rgba(0, 0, 0, 0.45),
+    0 0 0 0.08rem #080d14;
   transition: transform 95ms cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+.yanmar-visual-lever-travel .yanmar-lever-pivot::before,
+.yanmar-visual-lever-travel .yanmar-lever-pivot::after {
+  content: none;
 }
 
 .yanmar-visual-lever-travel .yanmar-lever-stick {
   z-index: 4;
   bottom: 0.14rem;
-  height: 0.95rem;
+  height: var(--yanmar-travel-stick-h, 2.45rem);
   width: 0.54rem;
   border: 1px solid rgba(203, 213, 225, 0.28);
   background:
@@ -3929,7 +4065,7 @@ html.pwa-mode body {
 }
 
 .yanmar-visual-lever-travel .yanmar-lever-stick > span {
-  top: -1.02rem;
+  top: -1.2rem;
   height: 1.18rem;
   width: 1.18rem;
   transform: translateX(-50%) translateZ(0.12rem) perspective(5rem) rotateX(10deg);
@@ -4700,4 +4836,413 @@ html.pwa-mode body {
   border-color: rgba(59, 130, 246, 0.45);
   background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
   box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.12);
+}
+
+/* ── Attachment unlock modal (premium) ── */
+@keyframes yanmar-unlock-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes yanmar-unlock-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(1.1rem) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes yanmar-unlock-machine-in {
+  from {
+    opacity: 0;
+    transform: translateX(8%) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes yanmar-unlock-attachment-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-0.35rem);
+  }
+}
+
+@keyframes yanmar-unlock-sheen {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateX(160%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+@keyframes yanmar-unlock-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.yanmar-unlock-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem;
+  background:
+    radial-gradient(ellipse at 50% 18%, rgba(198, 40, 40, 0.22), transparent 42%),
+    radial-gradient(ellipse at 70% 80%, rgba(201, 169, 98, 0.12), transparent 48%),
+    rgba(4, 6, 10, 0.78);
+  backdrop-filter: blur(0.45rem);
+  animation: yanmar-unlock-overlay-in 320ms ease-out both;
+}
+
+.yanmar-unlock-panel {
+  --yanmar-unlock-gold: #d4b56a;
+  --yanmar-unlock-gold-deep: #a8843d;
+  --yanmar-unlock-red: #c62828;
+  position: relative;
+  width: min(22.5rem, 94vw);
+  overflow: hidden;
+  border-radius: 1.35rem;
+  color: #f4efe4;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.07), transparent 28%),
+    linear-gradient(180deg, #171a20 0%, #0b0d11 48%, #08090c 100%);
+  box-shadow:
+    0 0 0 1px rgba(212, 181, 106, 0.28),
+    0 1.4rem 3rem rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  animation: yanmar-unlock-panel-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.yanmar-unlock-panel-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: -20% -10% auto;
+  height: 55%;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(198, 40, 40, 0.35),
+    transparent 62%
+  );
+  animation: yanmar-unlock-glow-pulse 3.6s ease-in-out infinite;
+}
+
+.yanmar-unlock-panel-frame {
+  pointer-events: none;
+  position: absolute;
+  inset: 0.45rem;
+  border-radius: 1.05rem;
+  border: 1px solid rgba(212, 181, 106, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.yanmar-unlock-brand {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1.05rem 1rem 0.35rem;
+  text-align: center;
+}
+
+.yanmar-unlock-brand-mark {
+  font-family: "Bebas Neue", "Arial Narrow", sans-serif;
+  font-size: 1.55rem;
+  letter-spacing: 0.34em;
+  color: #fff;
+  text-indent: 0.34em;
+  text-shadow: 0 0.12rem 0.4rem rgba(0, 0, 0, 0.45);
+}
+
+.yanmar-unlock-brand-rule {
+  width: 3.4rem;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--yanmar-unlock-gold),
+    transparent
+  );
+}
+
+.yanmar-unlock-brand-sub {
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: rgba(212, 181, 106, 0.78);
+}
+
+.yanmar-unlock-hero {
+  position: relative;
+  z-index: 2;
+  margin-top: 0.2rem;
+  height: 11.4rem;
+  overflow: hidden;
+}
+
+.yanmar-unlock-hero-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 78%, rgba(212, 181, 106, 0.16), transparent 55%),
+    linear-gradient(180deg, transparent 0%, rgba(8, 9, 12, 0.15) 70%, #08090c 100%);
+}
+
+.yanmar-unlock-machine {
+  width: min(118%, 24rem);
+  max-width: none;
+  height: auto;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 0.55rem 1.1rem rgba(0, 0, 0, 0.55));
+  animation: yanmar-unlock-machine-in 700ms cubic-bezier(0.22, 1, 0.36, 1) 80ms both;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.yanmar-unlock-blade-sheen {
+  pointer-events: none;
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 18%;
+  height: 42%;
+  overflow: hidden;
+  border-radius: 0.4rem;
+  mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
+}
+
+.yanmar-unlock-blade-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 28%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 245, 220, 0.28),
+    transparent
+  );
+  animation: yanmar-unlock-sheen 2.8s ease-in-out 0.6s infinite;
+}
+
+.yanmar-unlock-attachment-orb {
+  position: absolute;
+  right: 0.55rem;
+  bottom: 1.15rem;
+  display: grid;
+  place-items: center;
+  width: 5.1rem;
+  height: 5.1rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.16), transparent 42%),
+    radial-gradient(circle at 50% 55%, rgba(20, 22, 28, 0.92), #050608 78%);
+  border: 1px solid rgba(212, 181, 106, 0.55);
+  box-shadow:
+    0 0 0 4px rgba(8, 9, 12, 0.55),
+    0 0.55rem 1.2rem rgba(0, 0, 0, 0.5),
+    0 0 1.4rem rgba(212, 181, 106, 0.28);
+  animation: yanmar-unlock-attachment-float 3.2s ease-in-out infinite;
+}
+
+.yanmar-unlock-attachment {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.2rem 0.35rem rgba(0, 0, 0, 0.55));
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.yanmar-unlock-hero-fade {
+  pointer-events: none;
+  position: absolute;
+  inset: auto 0 0;
+  height: 2.4rem;
+  background: linear-gradient(180deg, transparent, #08090c);
+}
+
+.yanmar-unlock-body {
+  position: relative;
+  z-index: 2;
+  padding: 0.15rem 1.15rem 1.15rem;
+  text-align: center;
+}
+
+.yanmar-unlock-level {
+  margin: 0;
+  font-family: "Bebas Neue", "Arial Narrow", sans-serif;
+  font-size: 1.85rem;
+  letter-spacing: 0.18em;
+  color: var(--yanmar-unlock-gold);
+  text-indent: 0.18em;
+}
+
+.yanmar-unlock-level span {
+  margin-right: 0.2rem;
+  color: rgba(244, 239, 228, 0.55);
+  letter-spacing: 0.28em;
+}
+
+.yanmar-unlock-title {
+  margin: 0.15rem 0 0;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  color: #fff8ec;
+}
+
+.yanmar-unlock-lead {
+  margin: 0.45rem auto 0;
+  max-width: 18rem;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.55;
+  color: rgba(226, 220, 208, 0.72);
+}
+
+.yanmar-unlock-perks {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.yanmar-unlock-perks li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(212, 181, 106, 0.14);
+  background: linear-gradient(
+    105deg,
+    rgba(212, 181, 106, 0.08),
+    rgba(255, 255, 255, 0.02) 55%
+  );
+}
+
+.yanmar-unlock-perk-index {
+  font-family: "Bebas Neue", "Arial Narrow", sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  color: var(--yanmar-unlock-gold);
+  opacity: 0.9;
+}
+
+.yanmar-unlock-perks strong {
+  display: block;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #fff7ea;
+}
+
+.yanmar-unlock-perks span {
+  display: block;
+  margin-top: 0.12rem;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.62rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgba(214, 208, 196, 0.68);
+}
+
+.yanmar-unlock-cta {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  width: 100%;
+  margin-top: 0.95rem;
+  border: 0;
+  border-radius: 0.85rem;
+  padding: 0.82rem 1rem;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #1a1208;
+  background: linear-gradient(
+    180deg,
+    #e8d19a 0%,
+    var(--yanmar-unlock-gold) 42%,
+    var(--yanmar-unlock-gold-deep) 100%
+  );
+  box-shadow:
+    0 0.45rem 1rem rgba(168, 132, 61, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.yanmar-unlock-cta:active {
+  transform: scale(0.985);
+  filter: brightness(0.96);
+}
+
+.yanmar-unlock-cta-shine {
+  pointer-events: none;
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
+  );
+  animation: yanmar-unlock-sheen 2.4s ease-in-out 1s infinite;
+}
+
+@media (max-height: 700px) {
+  .yanmar-unlock-hero {
+    height: 9.2rem;
+  }
+
+  .yanmar-unlock-attachment-orb {
+    width: 4.3rem;
+    height: 4.3rem;
+    bottom: 0.85rem;
+  }
+
+  .yanmar-unlock-body {
+    padding-bottom: 0.9rem;
+  }
 }

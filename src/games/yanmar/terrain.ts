@@ -20,10 +20,15 @@ export const DIG_ZONE_CAPACITY_MAX = 5000;
 export const DIG_ZONE_CAPACITY_STEP = 100;
 export const DIG_ZONE_COUNT = 2;
 export const DIG_ZONE_RESPAWN_MS = 10 * 1000;
-export const CRASH_ZONE_RESPAWN_MS = 10 * 60 * 1000;
+/** 아스팔트 9칸 전부 파괴 후 일괄 재생성까지 대기. */
+export const CRASH_ZONE_RESPAWN_MS = 5 * 60 * 1000;
 export const CRASH_TILE_MAX_HP = 1000;
 export const CRASH_HIT_DAMAGE = 10;
 export const HAUL_TRUCK_COOLDOWN_SEC = 10 * 60;
+export const HAUL_TRUCK_CAPACITY = 10;
+export const HILL_BOULDER_COUNT = 5;
+/** 돌 구역의 돌을 모두 반출한 뒤 구역 재생성까지 대기. */
+export const HILL_ZONE_RESPAWN_MS = 5 * 60 * 1000;
 /** 채취량은 유지하되 화면에 보이는 지형 침하는 완만하게 제한한다. */
 const DIG_TERRAIN_DEFORMATION_SCALE = 0.45;
 const DIG_TERRAIN_MAX_DEPTH = 0.7;
@@ -67,6 +72,8 @@ export interface HillBoulder {
   z: number;
   active: boolean;
   delivered: boolean;
+  /** 집어서 구역 밖으로 반출되었거나 트럭에 적재됨. */
+  extracted: boolean;
 }
 
 export interface HaulTruckState {
@@ -83,8 +90,11 @@ export interface HillZone {
   radius: number;
   dropX: number;
   dropZ: number;
+  active: boolean;
   boulders: HillBoulder[];
   haulTruck: HaulTruckState;
+  clearedAt: number | null;
+  respawnAt: number | null;
 }
 
 export interface TerrainData {
@@ -498,9 +508,9 @@ export function randomDigCapacityUnits() {
 export function digZoneLabel(zoneId: string, index = 0) {
   const match = zoneId.match(/(\d+)\s*$/);
   const n = match ? Number(match[1]) : index + 1;
-  if (n === 1) return "DIG I";
-  if (n === 2) return "DIG II";
-  return `DIG ${n}`;
+  if (n === 1) return "굴착 I";
+  if (n === 2) return "굴착 II";
+  return `굴착 ${n}`;
 }
 
 export function getDigZoneRespawnEtaSec(zone: DigZone, now = Date.now()) {
@@ -718,14 +728,17 @@ export function isInDigZone(wx: number, wz: number, terrain?: TerrainData): bool
   return Math.sqrt(dx * dx + dz * dz) < DIG_ZONE.radius;
 }
 
-function createCrashZone(): CrashZone {
+function createCrashZone(
+  centerX = 108,
+  centerZ = 12,
+): CrashZone {
   const cycleId = `crash-${Date.now().toString(36)}-${Math.floor(
     Math.random() * 1_000_000,
   ).toString(36)}`;
   return {
     id: cycleId,
-    centerX: 108,
-    centerZ: 12,
+    centerX,
+    centerZ,
     width: 24,
     depth: 24,
     active: true,
@@ -742,9 +755,30 @@ function createCrashZone(): CrashZone {
   };
 }
 
-function createHillZone(): HillZone {
-  const centerX = 22;
-  const centerZ = 112;
+function createHillBoulders(
+  cycleId: string,
+  centerX: number,
+  centerZ: number,
+): HillBoulder[] {
+  return Array.from({ length: HILL_BOULDER_COUNT }, (_, index) => {
+    const angle = (index / HILL_BOULDER_COUNT) * Math.PI * 2 + 0.35;
+    const ring = 7.5 + (index % 2) * 2.4;
+    return {
+      id: `${cycleId}-rock-${index + 1}`,
+      x: centerX + Math.cos(angle) * ring,
+      z: centerZ + Math.sin(angle) * ring,
+      active: true,
+      delivered: false,
+      extracted: false,
+    };
+  });
+}
+
+function createHillZone(
+  centerX = 22,
+  centerZ = 112,
+  haulTruck?: HaulTruckState,
+): HillZone {
   const cycleId = `hill-${Date.now().toString(36)}-${Math.floor(
     Math.random() * 1_000_000,
   ).toString(36)}`;
@@ -755,23 +789,18 @@ function createHillZone(): HillZone {
     radius: 25,
     dropX: centerX + 13,
     dropZ: centerZ + 6,
-    boulders: Array.from({ length: 15 }, (_, index) => {
-      const angle = (index / 15) * Math.PI * 2;
-      const ring = 7 + (index % 3) * 3.1;
-      return {
-        id: `${cycleId}-rock-${index + 1}`,
-        x: centerX + Math.cos(angle) * ring,
-        z: centerZ + Math.sin(angle) * ring,
-        active: true,
-        delivered: false,
-      };
-    }),
-    haulTruck: {
-      phase: "ready",
-      loadCount: 0,
-      cooldownRemaining: 0,
-      phaseElapsed: 0,
-    },
+    active: true,
+    boulders: createHillBoulders(cycleId, centerX, centerZ),
+    haulTruck: haulTruck
+      ? { ...haulTruck }
+      : {
+          phase: "ready",
+          loadCount: 0,
+          cooldownRemaining: 0,
+          phaseElapsed: 0,
+        },
+    clearedAt: null,
+    respawnAt: null,
   };
 }
 
@@ -829,7 +858,44 @@ export function isInHillZone(
   wz: number,
 ): boolean {
   const zone = terrain.hillZone;
-  return !!zone && Math.hypot(wx - zone.centerX, wz - zone.centerZ) <= zone.radius + 8;
+  if (!zone?.active) return false;
+  return Math.hypot(wx - zone.centerX, wz - zone.centerZ) <= zone.radius + 8;
+}
+
+export function isInsideHillZoneCore(
+  zone: HillZone,
+  wx: number,
+  wz: number,
+): boolean {
+  return Math.hypot(wx - zone.centerX, wz - zone.centerZ) <= zone.radius;
+}
+
+export function markHillRockExtracted(
+  terrain: TerrainData,
+  rockId: string,
+  now = Date.now(),
+): boolean {
+  const zone = terrain.hillZone;
+  const rock = zone?.boulders.find((item) => item.id === rockId);
+  if (!zone?.active || !rock || rock.extracted) return false;
+  rock.extracted = true;
+  rock.active = false;
+  return tryClearHillZone(terrain, now);
+}
+
+export function tryClearHillZone(
+  terrain: TerrainData,
+  now = Date.now(),
+): boolean {
+  const zone = terrain.hillZone;
+  if (!zone?.active) return false;
+  if (!zone.boulders.every((rock) => rock.extracted || rock.delivered)) {
+    return false;
+  }
+  zone.active = false;
+  zone.clearedAt = now;
+  zone.respawnAt = now + HILL_ZONE_RESPAWN_MS;
+  return true;
 }
 
 export function updateSpecialZones(
@@ -844,16 +910,22 @@ export function updateSpecialZones(
     crash.respawnAt = crash.clearedAt + crashRespawnSec * 1000;
   }
   if (crash && !crash.active && crash.respawnAt && now >= crash.respawnAt) {
-    const next = createCrashZone();
-    const offsets = [
-      [0, 0],
-      [8, 18],
-      [16, -14],
-    ] as const;
-    const offset = offsets[Math.floor(Math.random() * offsets.length)];
-    next.centerX += offset[0];
-    next.centerZ += offset[1];
-    terrain.crashZone = next;
+    // 같은 자리에 9칸 아스팔트를 한꺼번에 재생성한다.
+    terrain.crashZone = createCrashZone(crash.centerX, crash.centerZ);
+    rebakeSpecialSiteSurfaces(terrain);
+  }
+
+  const hill = terrain.hillZone;
+  if (hill && !hill.active && hill.clearedAt) {
+    hill.respawnAt = hill.clearedAt + HILL_ZONE_RESPAWN_MS;
+  }
+  if (hill && !hill.active && hill.respawnAt && now >= hill.respawnAt) {
+    // 트럭 적재/운행 상태는 유지한 채 같은 자리에 돌 구역만 재생성한다.
+    terrain.hillZone = createHillZone(
+      hill.centerX,
+      hill.centerZ,
+      hill.haulTruck,
+    );
     rebakeSpecialSiteSurfaces(terrain);
   }
 
@@ -875,18 +947,14 @@ export function updateSpecialZones(
     truck.phaseElapsed = 0;
     truck.cooldownRemaining = 0;
     truck.loadCount = 0;
-    const hill = terrain.hillZone;
-    if (hill) {
-      hill.boulders = createHillZone().boulders;
-    }
   }
 }
 
 export function addHaulTruckRock(terrain: TerrainData) {
   const truck = terrain.hillZone?.haulTruck;
   if (!truck || truck.phase !== "ready") return false;
-  truck.loadCount = Math.min(10, truck.loadCount + 1);
-  if (truck.loadCount >= 10) {
+  truck.loadCount = Math.min(HAUL_TRUCK_CAPACITY, truck.loadCount + 1);
+  if (truck.loadCount >= HAUL_TRUCK_CAPACITY) {
     truck.phase = "departing";
     truck.phaseElapsed = 0;
   }

@@ -14,11 +14,13 @@ export type YanmarStarReward = {
   kind: "stars";
   score: number;
   stars: number;
+  critical: boolean;
 };
 
 export type YanmarCouponReward = {
   kind: "coupon";
   score: number;
+  critical: boolean;
   couponType: CouponType;
   discountPct: number;
   barcodeCode: string;
@@ -51,11 +53,13 @@ export function createYanmarStarReward(
   score: number,
   minStars: number,
   maxStars: number,
+  critical = false,
 ): YanmarStarReward {
   return {
     kind: "stars",
     score,
     stars: randomInt(minStars, maxStars),
+    critical,
   };
 }
 
@@ -64,11 +68,13 @@ export function rollYanmarReward({
   minStars,
   maxStars,
   seasonKey,
+  critical = false,
 }: {
   score: number;
   minStars: number;
   maxStars: number;
   seasonKey: string;
+  critical?: boolean;
 }): YanmarReward {
   const roll = Math.random();
   const filterChance = YANMAR_REWARD_CONFIG.filterSetCouponChance;
@@ -89,12 +95,13 @@ export function rollYanmarReward({
   }
 
   if (!couponType) {
-    return createYanmarStarReward(score, minStars, maxStars);
+    return createYanmarStarReward(score, minStars, maxStars, critical);
   }
 
   return {
     kind: "coupon",
     score,
+    critical,
     couponType,
     discountPct,
     barcodeCode: createBarcodeCode(),
@@ -186,6 +193,7 @@ export async function persistYanmarReward({
         issuedReward.score,
         minStars,
         maxStars,
+        issuedReward.critical,
       );
     }
   }
@@ -211,6 +219,7 @@ export async function persistYanmarReward({
         metadata: {
           ...metadata,
           score: issuedReward.score,
+          critical: issuedReward.critical,
           couponType: issuedReward.couponType,
           barcodeCode: issuedReward.barcodeCode,
           seasonKey: issuedReward.seasonKey,
@@ -229,6 +238,7 @@ export async function persistYanmarReward({
       metadata: {
         ...metadata,
         score: issuedReward.score,
+        critical: issuedReward.critical,
         ...(fallbackFromCoupon ? { fallbackFromCoupon: true } : {}),
       },
     },

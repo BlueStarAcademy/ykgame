@@ -4,18 +4,22 @@ import { getSeasonKey } from "@/lib/games";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import { prisma } from "@/lib/prisma";
 import {
+  calculateYanmarEquipmentStats,
+  calculateYanmarHillScore,
+  mergeYanmarEquipmentLevelsFromDb,
+  YANMAR_HILL_REWARD_CONFIG,
+} from "@/games/yanmar/equipment";
+import {
   lockAndCheckRewardEvent,
   isYanmarRewardRateLimited,
   parseRewardEventId,
   persistYanmarReward,
-  randomInt,
   rollYanmarReward,
 } from "@/lib/yanmar-rewards";
 
 const GAME_ID = "yanmar-hill";
 const REQUIRED_LEVEL = 15;
-const MIN_STARS = 2;
-const MAX_STARS = 5;
+const { minStarReward, maxStarReward } = YANMAR_HILL_REWARD_CONFIG;
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -67,21 +71,30 @@ export async function POST(request: Request) {
       return { status: "rate_limited" as const };
     }
 
-    const xpGained = randomInt(90, 120);
-    const score = xpGained;
+    const rows = await tx.userEquipmentUpgrade.findMany({
+      where: { userId: session.user.id, gameId: "yanmar" },
+      select: { part: true, level: true },
+    });
+    const stats = calculateYanmarEquipmentStats(
+      mergeYanmarEquipmentLevelsFromDb(rows),
+    );
+    const critical = Math.random() < stats.criticalChance;
+    const score = calculateYanmarHillScore(stats, critical);
+    const xpGained = score;
     const reward = rollYanmarReward({
       score,
-      minStars: MIN_STARS,
-      maxStars: MAX_STARS,
+      minStars: minStarReward,
+      maxStars: maxStarReward,
       seasonKey: getSeasonKey(),
+      critical,
     });
     const issuedReward = await persistYanmarReward({
       tx,
       userId: session.user.id,
       gameId: GAME_ID,
       reward,
-      minStars: MIN_STARS,
-      maxStars: MAX_STARS,
+      minStars: minStarReward,
+      maxStars: maxStarReward,
       metadata: { eventId, xpGained },
     });
     const totalStars =
@@ -136,6 +149,7 @@ export async function POST(request: Request) {
     eventId,
     reward: result.reward,
     score: result.reward.score,
+    critical: result.reward.critical,
     xpGained: result.xpGained,
     totalStars: result.totalStars,
     currency: result.currency,
