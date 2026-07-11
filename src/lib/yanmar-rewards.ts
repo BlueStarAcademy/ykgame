@@ -117,7 +117,7 @@ export async function lockAndCheckRewardEvent(
   eventId: string,
 ) {
   const lockKey = `yanmar-reward:${userId}:${gameId}:${eventId}`;
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
 
   const existing = await tx.$queryRaw<Array<{ exists: boolean }>>`
     SELECT EXISTS (
@@ -139,7 +139,7 @@ export async function isYanmarRewardRateLimited(
   minimumIntervalMs: number,
 ) {
   const lockKey = `yanmar-reward-rate:${userId}:${gameId}`;
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
   const latest = await tx.userRewardInventory.findFirst({
     where: { userId, gameId },
     orderBy: { createdAt: "desc" },
@@ -157,7 +157,7 @@ export async function lockAndCanIssueYanmarCoupon(
   seasonKey: string,
 ) {
   const quotaLockKey = `yanmar-coupon:${seasonKey}:${couponType}`;
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))`;
   return canIssueSeasonGameDropCoupon(tx, couponType, seasonKey);
 }
 

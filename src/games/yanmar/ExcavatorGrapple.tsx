@@ -1,49 +1,35 @@
 "use client";
 
-import { useMemo } from "react";
-import { RoundedBox } from "@react-three/drei";
+import { useMemo, useRef, type RefObject } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import {
   YANMAR_MACHINE_COLORS as COLOR,
   YANMAR_MACHINE_MATERIALS as MATERIAL,
 } from "./machineVisualTheme";
 
-const FRAME = {
-  color: COLOR.frame,
-  ...MATERIAL.frame,
-} as const;
-const FRAME_LIGHT = {
-  color: COLOR.frameLight,
-  ...MATERIAL.frame,
-} as const;
-const STEEL = {
-  color: COLOR.steel,
-  ...MATERIAL.steel,
-} as const;
-const BRIGHT_STEEL = {
-  color: COLOR.steelBright,
-  ...MATERIAL.steel,
-} as const;
-
 export interface ExcavatorGrappleProps {
-  /** Jaw opening, clamped to the inclusive range 0 (closed) to 1 (fully open). */
-  openAmount?: number;
+  /** Parent group userData.openAmount: 0=closed against bucket, 1=fully open. */
+  openAmountRef: RefObject<THREE.Group | null>;
 }
 
 function CrossPin({
   position,
-  radius = 0.12,
-  width = 0.56,
+  radius,
+  width,
 }: {
   position: [number, number, number];
-  radius?: number;
-  width?: number;
+  radius: number;
+  width: number;
 }) {
   return (
     <group position={position}>
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[radius, radius, width, 24]} />
-        <meshStandardMaterial {...FRAME} />
+        <meshStandardMaterial
+          color={COLOR.frame}
+          {...MATERIAL.frame}
+        />
       </mesh>
       {[-1, 1].map((side) => (
         <mesh
@@ -51,129 +37,131 @@ function CrossPin({
           position={[0, 0, side * (width / 2 + 0.012)]}
           rotation={[Math.PI / 2, 0, 0]}
         >
-          <cylinderGeometry args={[radius * 0.68, radius * 0.68, 0.034, 20]} />
-          <meshStandardMaterial {...BRIGHT_STEEL} />
+          <cylinderGeometry args={[radius * 0.66, radius * 0.66, 0.034, 18]} />
+          <meshStandardMaterial
+            color={COLOR.steelBright}
+            {...MATERIAL.steel}
+          />
         </mesh>
       ))}
     </group>
   );
 }
 
-function GrappleClaw({
+function ThumbTine({
+  side,
   shape,
-  mirrored,
-  angle,
 }: {
+  side: -1 | 1;
   shape: THREE.Shape;
-  mirrored: boolean;
-  angle: number;
 }) {
-  const direction = mirrored ? -1 : 1;
-
   return (
-    <group rotation={[0, 0, direction * angle]} scale={[1, direction, 1]}>
-      <mesh position={[0, 0, -0.14]} castShadow>
-        <extrudeGeometry
-          args={[
-            shape,
-            {
-              depth: 0.28,
-              bevelEnabled: true,
-              bevelSize: 0.018,
-              bevelThickness: 0.018,
-              bevelSegments: 2,
-            },
-          ]}
-        />
-        <meshStandardMaterial {...STEEL} side={THREE.DoubleSide} />
-      </mesh>
-
-      {/* Raised spine and replaceable gripping tooth. */}
-      <mesh position={[-0.75, -0.12, 0]} rotation={[0, 0, 0.2]} castShadow>
-        <boxGeometry args={[0.72, 0.075, 0.34]} />
-        <meshStandardMaterial color={COLOR.frameLight} {...MATERIAL.frame} />
-      </mesh>
-      <mesh position={[-1.43, -0.08, 0]} rotation={[0, 0, -0.18]} castShadow>
-        <boxGeometry args={[0.28, 0.11, 0.36]} />
-        <meshStandardMaterial color={COLOR.chrome} roughness={0.19} metalness={0.84} />
-      </mesh>
-      {[-1, 1].map((side) => (
-        <mesh key={side} position={[-0.58, -0.01, side * 0.19]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.04, 0.04, 0.025, 12]} />
-          <meshStandardMaterial {...BRIGHT_STEEL} />
-        </mesh>
-      ))}
-    </group>
+    <mesh position={[0, 0, side * 0.29]} castShadow>
+      <extrudeGeometry
+        args={[
+          shape,
+          {
+            depth: 0.09,
+            bevelEnabled: true,
+            bevelSize: 0.012,
+            bevelThickness: 0.012,
+            bevelSegments: 2,
+          },
+        ]}
+      />
+      <meshStandardMaterial
+        color={COLOR.steel}
+        {...MATERIAL.steel}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
   );
 }
 
-/** Procedural two-jaw grapple mounted at the arm-end pivot (local origin). */
-export function ExcavatorGrapple({ openAmount = 0 }: ExcavatorGrappleProps) {
-  const openness = Math.min(1, Math.max(0, openAmount));
-  const jawAngle = openness * 0.46;
-  const clawShape = useMemo(() => {
+/** 버켓 위에 장착되어 버켓 이빨과 맞물리는 유압식 엄지 집게. */
+export function ExcavatorGrapple({
+  openAmountRef,
+}: ExcavatorGrappleProps) {
+  const thumbRef = useRef<THREE.Group>(null);
+  const currentOpenRef = useRef(1);
+  const tineShape = useMemo(() => {
     const shape = new THREE.Shape();
     shape.moveTo(0.08, 0.11);
-    shape.lineTo(-0.34, 0.16);
-    shape.quadraticCurveTo(-0.78, 0.1, -1.1, -0.2);
-    shape.quadraticCurveTo(-1.34, -0.44, -1.55, -0.11);
-    shape.lineTo(-1.43, 0.04);
-    shape.quadraticCurveTo(-1.3, -0.16, -1.16, -0.09);
-    shape.quadraticCurveTo(-0.78, 0.24, -0.3, 0.27);
-    shape.lineTo(0.08, 0.24);
+    shape.lineTo(-0.2, 0.17);
+    shape.quadraticCurveTo(-0.62, 0.12, -0.93, -0.12);
+    shape.quadraticCurveTo(-1.1, -0.25, -1.18, -0.42);
+    shape.lineTo(-1.08, -0.48);
+    shape.quadraticCurveTo(-0.97, -0.31, -0.82, -0.2);
+    shape.quadraticCurveTo(-0.55, -0.01, -0.16, 0.02);
+    shape.lineTo(0.08, 0.01);
     shape.closePath();
     return shape;
   }, []);
 
+  useFrame((_, delta) => {
+    const target = Math.max(
+      0,
+      Math.min(1, Number(openAmountRef.current?.userData.openAmount ?? 1)),
+    );
+    // 유압 엄지의 개폐 속도는 기존 대비 절반으로 낮춘다.
+    const follow = 1 - Math.exp(-delta * 5);
+    currentOpenRef.current += (target - currentOpenRef.current) * follow;
+    if (thumbRef.current) {
+      thumbRef.current.rotation.z = -currentOpenRef.current * 0.82;
+    }
+  });
+
   return (
     <group>
-      <CrossPin position={[0, 0, 0]} radius={0.155} width={0.52} />
-
-      {/* Quick-coupler and rotary head. */}
-      <group position={[-0.19, -0.08, 0]}>
-        <RoundedBox args={[0.46, 0.34, 0.56]} radius={0.075} smoothness={6} castShadow>
-          <meshStandardMaterial color={COLOR.paintRedDark} {...MATERIAL.paintedDark} />
-        </RoundedBox>
-        {[-1, 1].map((side) => (
-          <mesh key={side} position={[-0.01, 0.06, side * 0.3]} castShadow>
-            <boxGeometry args={[0.36, 0.18, 0.045]} />
-            <meshStandardMaterial color={COLOR.paintRed} {...MATERIAL.painted} />
-          </mesh>
-        ))}
-      </group>
-      <CrossPin position={[-0.31, -0.13, 0]} radius={0.105} width={0.6} />
-
-      {/* The jaw axis follows the bucket's local -X working direction. */}
-      <group position={[-0.25, -0.13, 0]} rotation={[0, 0, -0.06]}>
-        <mesh position={[-0.18, 0, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.29, 0.29, 0.54, 28]} />
-          <meshStandardMaterial {...FRAME} />
+      {/* 버켓 링크 위 고정 브래킷. 버켓 자체는 별도 컴포넌트로 항상 함께 보인다. */}
+      <CrossPin position={[-0.03, 0.18, 0]} radius={0.14} width={0.68} />
+      {[-1, 1].map((side) => (
+        <mesh
+          key={side}
+          position={[-0.08, 0.23, side * 0.3]}
+          rotation={[0, 0, -0.16]}
+          castShadow
+        >
+          <boxGeometry args={[0.52, 0.16, 0.08]} />
+          <meshStandardMaterial
+            color={COLOR.paintRedDark}
+            {...MATERIAL.paintedDark}
+          />
         </mesh>
-        <mesh position={[-0.18, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.15, 0.15, 0.59, 24]} />
-          <meshStandardMaterial {...BRIGHT_STEEL} />
+      ))}
+
+      {/* 엄지를 여닫는 중앙 유압 실린더. */}
+      <mesh position={[-0.12, 0.48, 0]} rotation={[0, 0, -0.22]}>
+        <capsuleGeometry args={[0.075, 0.46, 8, 16]} />
+        <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
+      </mesh>
+      <mesh position={[-0.29, 0.7, 0]} rotation={[0, 0, -0.22]}>
+        <capsuleGeometry args={[0.035, 0.3, 7, 14]} />
+        <meshStandardMaterial
+          color={COLOR.steelBright}
+          {...MATERIAL.steel}
+        />
+      </mesh>
+
+      <group ref={thumbRef} position={[-0.08, 0.2, 0]}>
+        <CrossPin position={[0, 0, 0]} radius={0.12} width={0.72} />
+        <ThumbTine side={-1} shape={tineShape} />
+        <ThumbTine side={1} shape={tineShape} />
+        <mesh position={[-0.52, 0.01, 0]} castShadow>
+          <boxGeometry args={[0.65, 0.09, 0.64]} />
+          <meshStandardMaterial
+            color={COLOR.frameLight}
+            {...MATERIAL.frame}
+          />
         </mesh>
-
-        {/* Twin actuator barrels imply synchronized hydraulic jaw motion. */}
-        {[-1, 1].map((side) => (
-          <group key={side} scale={[1, side, 1]}>
-            <mesh position={[-0.25, 0.3, 0]} rotation={[0, 0, 0.14]}>
-              <capsuleGeometry args={[0.065, 0.34, 7, 14]} />
-              <meshStandardMaterial {...FRAME_LIGHT} />
-            </mesh>
-            <mesh position={[-0.33, 0.52, 0]} rotation={[0, 0, 0.14]}>
-              <capsuleGeometry args={[0.031, 0.2, 6, 12]} />
-              <meshStandardMaterial {...BRIGHT_STEEL} />
-            </mesh>
-            <mesh position={[-0.37, 0.65, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.075, 0.075, 0.38, 18]} />
-              <meshStandardMaterial {...FRAME} />
-            </mesh>
-          </group>
-        ))}
-
-        <GrappleClaw shape={clawShape} mirrored={false} angle={jawAngle} />
-        <GrappleClaw shape={clawShape} mirrored angle={jawAngle} />
+        <mesh position={[-1.11, -0.43, 0]} castShadow>
+          <boxGeometry args={[0.2, 0.11, 0.7]} />
+          <meshStandardMaterial
+            color={COLOR.chrome}
+            roughness={0.19}
+            metalness={0.84}
+          />
+        </mesh>
       </group>
     </group>
   );

@@ -138,6 +138,46 @@ export function BoomLoadGauge({
   );
 }
 
+export function GrappleGripGauge({
+  adhesion,
+  pressure,
+}: {
+  adhesion: number;
+  pressure: number;
+}) {
+  const adhesionPct = Math.max(1, Math.min(100, Math.round(Math.min(1, adhesion) * 100)));
+  const pressurePct = Math.max(0, Math.min(100, Math.round(Math.min(1, pressure) * 100)));
+
+  return (
+    <div className="min-w-[11rem] rounded-xl border border-sky-200/40 bg-slate-900/80 px-3 py-2 shadow-lg backdrop-blur-sm">
+      <div className="flex items-center gap-2">
+        <span className="w-10 shrink-0 text-[9px] font-semibold text-sky-200">밀착감</span>
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/15">
+          <div
+            className="h-full rounded-full bg-sky-400 transition-all duration-100"
+            style={{ width: `${adhesionPct}%` }}
+          />
+        </div>
+        <span className="w-8 text-right text-[9px] font-bold tabular-nums text-white">
+          {adhesionPct}%
+        </span>
+      </div>
+      <div className="mt-1 flex items-center gap-2">
+        <span className="w-10 shrink-0 text-[9px] font-semibold text-slate-300">압력</span>
+        <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-slate-300/90 transition-all duration-100"
+            style={{ width: `${pressurePct}%` }}
+          />
+        </div>
+        <span className="w-8 text-right text-[8px] tabular-nums text-white/70">
+          {pressurePct}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }

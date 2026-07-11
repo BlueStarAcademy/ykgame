@@ -34,6 +34,8 @@ enum EquipmentPart {
   TRUCK_SPEED
   CRASH_RESPAWN
   HAUL_TRUCK_SPEED
+  GRAPPLE_ADHESION
+  HILL_ROCK_PICK
 }
 
 model User {

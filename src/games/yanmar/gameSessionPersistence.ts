@@ -26,13 +26,35 @@ function normalizeHillZone(zone: HillZone): HillZone {
     active: typeof zone.active === "boolean" ? zone.active : true,
     clearedAt: zone.clearedAt ?? null,
     respawnAt: zone.respawnAt ?? null,
-    boulders: zone.boulders.map((rock) => ({
-      ...rock,
-      extracted:
-        typeof rock.extracted === "boolean"
-          ? rock.extracted
-          : Boolean(rock.delivered),
-    })),
+    boulders: zone.boulders.map((rock, index) => {
+      const size =
+        typeof rock.size === "number" && Number.isFinite(rock.size)
+          ? rock.size
+          : (index % 5) / 4;
+      const roundness =
+        typeof rock.roundness === "number" && Number.isFinite(rock.roundness)
+          ? rock.roundness
+          : index % 2;
+      const comOffsetX =
+        typeof rock.comOffsetX === "number" && Number.isFinite(rock.comOffsetX)
+          ? rock.comOffsetX
+          : (((index * 17) % 7) / 7) * 0.35 - 0.175;
+      const comOffsetZ =
+        typeof rock.comOffsetZ === "number" && Number.isFinite(rock.comOffsetZ)
+          ? rock.comOffsetZ
+          : (((index * 29) % 7) / 7) * 0.35 - 0.175;
+      return {
+        ...rock,
+        size,
+        roundness,
+        comOffsetX,
+        comOffsetZ,
+        extracted:
+          typeof rock.extracted === "boolean"
+            ? rock.extracted
+            : Boolean(rock.delivered),
+      };
+    }),
     haulTruck: { ...zone.haulTruck },
   };
 }

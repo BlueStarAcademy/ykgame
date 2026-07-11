@@ -122,8 +122,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: "grapple",
     title: "9. 집게",
     instruction:
-      "Stone 구역에서 우 조이스틱 좌로 돌을 집고, 하역 지점(트럭)에서 우로 펴서 내려놓으세요",
-    highlight: "right",
+      "버켓 각도를 집게와 맞춘 뒤 발판 위쪽으로 돌을 집고, 트럭에서 아래쪽을 밟아 여세요",
+    highlight: "breaker",
     allowed: { ...ALL_CONTROLS },
     startAttachment: "grapple",
     startPose: { x: 22, z: 98, heading: 0 },

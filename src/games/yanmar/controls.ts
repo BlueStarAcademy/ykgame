@@ -17,7 +17,7 @@ export const COCKPIT_LAYOUT = {
   travelBoth: { cx: 0.5, cy: 0.75, radius: 0.052, travel: 0.062 },
   hydraulicSpeed: { cx: 0.665, cy: 0.77, radius: 0.038, travel: 0.032 },
   rightPedal: { cx: 0.735, cy: 0.68, width: 0.052, height: 0.62 },
-  /** 좌측 패드와 주행 레버 사이 — 브레이커 타격 발판(1칸) */
+  /** 좌측 패드와 주행 레버 사이 — 브레이커·집게 양방향 발판 */
   breakerPedal: { cx: 0.28, cy: 0.76, width: 0.048, height: 0.28 },
   boomSwing: { cx: 0.34, cy: 0.45, radius: 0.04, travel: 0.045 },
   /** 우측 조이스틱과 우측 주행 레버 사이 */
@@ -48,8 +48,10 @@ export interface AuxiliaryControlState {
   throttle: number;
   highSpeed: boolean;
   safetyLocked: boolean;
-  /** Hold to hammer with breaker attachment. */
-  breakerPedal: boolean;
+  /** 위=1, 아래=-1. 브레이커는 양쪽 모두 타격, 집게는 위 닫기·아래 열기. */
+  attachmentPedal: -1 | 0 | 1;
+  /** 0=닫힘, 1=완전히 열림. */
+  grappleOpen: number;
 }
 
 export interface ControlMask {
@@ -112,7 +114,8 @@ export function createAuxiliaryControls(): AuxiliaryControlState {
     throttle: 0,
     highSpeed: false,
     safetyLocked: false,
-    breakerPedal: false,
+    attachmentPedal: 0,
+    grappleOpen: 1,
   };
 }
 

@@ -73,13 +73,39 @@ function getJoystickZoneMetrics(isPortrait: boolean) {
   };
 }
 
+/** 인게임 D-pad 크기 — GameJoystick / MainDPadVisual 과 동일 */
+const DPAD_SIZE = "clamp(5rem, 24vw, 6.8rem)";
+const DPAD_BOTTOM = "calc(0.1rem - var(--yanmar-controls-sink, 0rem))";
+
+function getAuxMenuButtonSize(isPortrait: boolean) {
+  return isPortrait ? "2.85rem" : "2.75rem";
+}
+
 /** 좌·우 보조 메뉴 토글 공통 높이 (기능 / 자동) */
 const AUX_MENU_TOGGLE_CY = 0.495;
 
-function getHornTouchZoneStyle(layout: JoystickLayout, isPortrait: boolean) {
-  const { centerYOffset, heightHalfPct, width } = getJoystickZoneMetrics(isPortrait);
+function getHornTouchZoneStyle(
+  layout: JoystickLayout,
+  isPortrait: boolean,
+  useDPad: boolean,
+) {
+  const gap = isPortrait ? "0.28rem" : "0.2rem";
   const autoToggleHalf = isPortrait ? "1.425rem" : "1.375rem";
-  const gap = isPortrait ? "0.24rem" : "0.2rem";
+  const buttonSize = getAuxMenuButtonSize(isPortrait);
+
+  // D-pad 모드: 기능/자동 버튼과 같은 가로 중심·폭으로, 바로 아래에 배치
+  if (useDPad) {
+    return {
+      left: `${layout.cx * 100}%`,
+      top: `calc(${AUX_MENU_TOGGLE_CY * 100}% + ${autoToggleHalf} + ${gap})`,
+      bottom: "auto" as const,
+      width: buttonSize,
+      height: "1.55rem",
+      transform: "translateX(-50%)",
+    };
+  }
+
+  const { centerYOffset, heightHalfPct, width } = getJoystickZoneMetrics(isPortrait);
   const joystickCenterTop = (layout.cy - centerYOffset) * 100;
 
   return {
@@ -87,6 +113,7 @@ function getHornTouchZoneStyle(layout: JoystickLayout, isPortrait: boolean) {
     top: `calc(${AUX_MENU_TOGGLE_CY * 100}% + ${autoToggleHalf} + ${gap})`,
     bottom: `calc(${100 - joystickCenterTop}% + ${heightHalfPct}% + ${gap})`,
     width,
+    height: "auto" as const,
     transform: "translateX(-50%)",
   };
 }
@@ -463,8 +490,8 @@ function MainDPadVisual({
               position: "absolute",
               left: side === "left" ? "11.5%" : "88.5%",
               top: "auto",
-              bottom: "calc(0.1rem - var(--yanmar-controls-sink, 0rem))",
-              width: "clamp(5.4rem, 24vw, 6.8rem)",
+              bottom: DPAD_BOTTOM,
+              width: DPAD_SIZE,
               aspectRatio: "1",
               transform: "translate3d(-50%, 0, 0)",
               zIndex: 70,
@@ -821,9 +848,9 @@ function GameJoystick({
               : "88.5%"
             : `${layout.cx * 100}%`,
           top: useDPad ? "auto" : `${(layout.cy - joystickZone.centerYOffset) * 100}%`,
-          bottom: useDPad ? "calc(0.1rem - var(--yanmar-controls-sink, 0rem))" : "auto",
-          width: useDPad ? "clamp(5rem, 24vw, 6.8rem)" : joystickZone.width,
-          height: useDPad ? "clamp(5rem, 24vw, 6.8rem)" : joystickZone.height,
+          bottom: useDPad ? DPAD_BOTTOM : "auto",
+          width: useDPad ? DPAD_SIZE : joystickZone.width,
+          height: useDPad ? DPAD_SIZE : joystickZone.height,
           transform: useDPad ? "translateX(-50%)" : "translate(-50%, -50%)",
         }}
         onPointerDown={handleStart}
@@ -861,11 +888,13 @@ function GameJoystick({
 function HornTouchZone({
   layout,
   isPortrait,
+  useDPad,
   showTouchZone,
   onHorn,
 }: {
   layout: JoystickLayout;
   isPortrait: boolean;
+  useDPad: boolean;
   showTouchZone: boolean;
   onHorn: () => void;
 }) {
@@ -873,11 +902,12 @@ function HornTouchZone({
     e.preventDefault();
     onHorn();
   };
+  const buttonWidth = getAuxMenuButtonSize(isPortrait);
 
   return (
     <div
       className="yanmar-horn-touch-zone absolute touch-none"
-      style={getHornTouchZoneStyle(layout, isPortrait)}
+      style={getHornTouchZoneStyle(layout, isPortrait, useDPad)}
       onPointerDown={handlePointerDown}
       role="button"
       tabIndex={-1}
@@ -885,7 +915,7 @@ function HornTouchZone({
     >
       <span
         className="yanmar-horn-button-visual pointer-events-none"
-        style={{ width: "2.36rem", height: "1.4rem" }}
+        style={{ width: buttonWidth, height: "1.4rem" }}
         aria-hidden
       >
         <span
@@ -906,11 +936,13 @@ function HornTouchZone({
 function EquipmentUpgradeTouchZone({
   layout,
   isPortrait,
+  useDPad,
   showTouchZone,
   onOpen,
 }: {
   layout: JoystickLayout;
   isPortrait: boolean;
+  useDPad: boolean;
   showTouchZone: boolean;
   onOpen: () => void;
 }) {
@@ -918,11 +950,12 @@ function EquipmentUpgradeTouchZone({
     e.preventDefault();
     onOpen();
   };
+  const buttonWidth = getAuxMenuButtonSize(isPortrait);
 
   return (
     <div
       className="yanmar-upgrade-touch-zone absolute touch-none"
-      style={getHornTouchZoneStyle(layout, isPortrait)}
+      style={getHornTouchZoneStyle(layout, isPortrait, useDPad)}
       onPointerDown={handlePointerDown}
       role="button"
       tabIndex={-1}
@@ -930,7 +963,7 @@ function EquipmentUpgradeTouchZone({
     >
       <span
         className="yanmar-upgrade-button-visual pointer-events-none"
-        style={{ width: "2.36rem", height: "1.4rem" }}
+        style={{ width: buttonWidth, height: "1.4rem" }}
         aria-hidden
       >
         <span className="yanmar-upgrade-button-sheen" />
@@ -1450,46 +1483,49 @@ function BladeLever({
   );
 }
 
-function BreakerPedalControl({
-  pressed,
+function AttachmentPedalControl({
+  direction,
   canOperate,
   dimmed,
   highlighted = false,
   showTouchZone,
   onChange,
-  onRequireBreaker,
+  onRequireAttachment,
   layout,
   isPortrait,
 }: {
-  pressed: boolean;
-  /** True when breaker is equipped and safety lock is off. */
+  direction: -1 | 0 | 1;
+  /** True when breaker/grapple is equipped and safety lock is off. */
   canOperate: boolean;
-  /** Visual-only dim (e.g. safety lock). Missing breaker stays fully visible. */
+  /** Visual-only dim (e.g. safety lock). Missing attachment stays fully visible. */
   dimmed?: boolean;
   highlighted?: boolean;
   showTouchZone: boolean;
-  onChange: (pressed: boolean) => void;
-  onRequireBreaker?: () => void;
+  onChange: (direction: -1 | 0 | 1) => void;
+  onRequireAttachment?: () => void;
   layout: CockpitLayout;
   isPortrait: boolean;
 }) {
   const pedal = layout.breakerPedal;
-  const setPressed = (next: boolean) => {
-    if (!next) {
-      onChange(false);
+  const setDirection = (next: -1 | 0 | 1) => {
+    if (next === 0) {
+      onChange(0);
       return;
     }
     if (!canOperate) {
-      onRequireBreaker?.();
+      onRequireAttachment?.();
       return;
     }
-    onChange(true);
+    onChange(next);
   };
 
-  const press = (e: React.PointerEvent<HTMLButtonElement>) => {
+  const press = (
+    e: React.PointerEvent<HTMLButtonElement>,
+    next: -1 | 1,
+  ) => {
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
-    setPressed(true);
+    setDirection(next);
   };
 
   const release = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -1501,17 +1537,21 @@ function BreakerPedalControl({
     } catch {
       /* already released */
     }
-    setPressed(false);
+    setDirection(0);
   };
 
   return (
-    <button
-      type="button"
-      aria-label="브레이커 발판"
-      aria-pressed={pressed}
+    <div
+      aria-label="브레이커 및 집게 양방향 발판"
       aria-disabled={!canOperate}
       className={`yanmar-breaker-pedal-button select-none absolute z-40 ${
-        pressed ? "is-active" : ""
+        direction !== 0 ? "is-active" : ""
+      } ${
+        direction > 0
+          ? "is-top-active"
+          : direction < 0
+            ? "is-bottom-active"
+            : ""
       } ${dimmed ? "is-disabled" : ""} ${highlighted ? "yanmar-visual-highlight" : ""} ${
         isPortrait ? "yanmar-breaker-pedal-button-portrait" : ""
       }`}
@@ -1520,24 +1560,48 @@ function BreakerPedalControl({
         top: isPortrait
           ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
           : `${pedal.cy * 100}%`,
-        width: isPortrait ? "2.55rem" : "2.35rem",
-        height: isPortrait ? "3.7rem" : "3.4rem",
+        width: isPortrait ? "2.75rem" : "2.6rem",
+        height: isPortrait ? "4.45rem" : "4.1rem",
         transform: "translate(-50%, -50%)",
       }}
-      onPointerDown={press}
-      onPointerUp={release}
-      onPointerCancel={release}
-      onLostPointerCapture={() => setPressed(false)}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <span className="yanmar-breaker-pedal-pad" aria-hidden />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/images/yanmar/2d/cockpit/attachment-pedal-front.png?v=4"
+        alt=""
+        className="yanmar-breaker-pedal-pad pointer-events-none object-contain"
+        style={{ backgroundImage: "none" }}
+        draggable={false}
+        aria-hidden
+      />
+      <button
+        type="button"
+        className="absolute inset-x-[7%] top-[5%] h-[43%] rounded-t-[0.55rem]"
+        aria-label="발판 위쪽: 집게 닫기 또는 브레이커 작동"
+        aria-pressed={direction > 0}
+        onPointerDown={(event) => press(event, 1)}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onLostPointerCapture={() => setDirection(0)}
+      />
+      <button
+        type="button"
+        className="absolute inset-x-[7%] bottom-[5%] h-[43%] rounded-b-[0.55rem]"
+        aria-label="발판 아래쪽: 집게 열기 또는 브레이커 작동"
+        aria-pressed={direction < 0}
+        onPointerDown={(event) => press(event, -1)}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onLostPointerCapture={() => setDirection(0)}
+      />
       {highlighted ? (
         <span className="pointer-events-none absolute inset-[-12%] rounded-[0.85rem] border-2 border-amber-300/95 bg-amber-300/10" />
       ) : null}
       {showTouchZone ? (
         <span className="pointer-events-none absolute inset-0 rounded-[0.72rem] border border-amber-200/65" />
       ) : null}
-    </button>
+    </div>
   );
 }
 
@@ -1815,7 +1879,7 @@ function FunctionMenu({
 }: FunctionMenuProps) {
   const anchorCx = layout.left.cx;
   const toggleCy = AUX_MENU_TOGGLE_CY;
-  const buttonSize = isPortrait ? "2.85rem" : "2.75rem";
+  const buttonSize = getAuxMenuButtonSize(isPortrait);
   const gap = "0.42rem";
   const pedalHeight = `calc(${buttonSize} * 2 + ${gap})`;
 
@@ -2019,7 +2083,7 @@ function AutoMenu({
 }: AutoMenuProps) {
   const anchorCx = layout.horn.cx;
   const toggleCy = AUX_MENU_TOGGLE_CY;
-  const buttonSize = isPortrait ? "2.85rem" : "2.75rem";
+  const buttonSize = getAuxMenuButtonSize(isPortrait);
 
   return (
     <div
@@ -2152,8 +2216,10 @@ export function CockpitOverlay({
   const [travelLock, setTravelLock] = useState<"sides" | "both" | null>(null);
   const sideTravelActiveRef = useRef({ left: false, right: false });
   const travelEnabled = allowed.travel && !auxiliary.safetyLocked;
-  const breakerEquipped = attachmentType === "breaker";
-  const breakerPedalCanOperate = breakerEquipped && !auxiliary.safetyLocked;
+  const pedalAttachmentEquipped =
+    attachmentType === "breaker" || attachmentType === "grapple";
+  const attachmentPedalCanOperate =
+    pedalAttachmentEquipped && !auxiliary.safetyLocked;
 
   const syncSideTravelLock = useCallback(() => {
     const { left, right } = sideTravelActiveRef.current;
@@ -2168,10 +2234,14 @@ export function CockpitOverlay({
   }, [travelEnabled]);
 
   useEffect(() => {
-    if (breakerPedalCanOperate) return;
-    if (!auxiliary.breakerPedal) return;
-    onAuxiliaryChange((current) => ({ ...current, breakerPedal: false }));
-  }, [auxiliary.breakerPedal, breakerPedalCanOperate, onAuxiliaryChange]);
+    if (attachmentPedalCanOperate) return;
+    if (auxiliary.attachmentPedal === 0) return;
+    onAuxiliaryChange((current) => ({ ...current, attachmentPedal: 0 }));
+  }, [
+    auxiliary.attachmentPedal,
+    attachmentPedalCanOperate,
+    onAuxiliaryChange,
+  ]);
 
   return (
     <>
@@ -2277,21 +2347,33 @@ export function CockpitOverlay({
               }))
             }
           />
-          <BreakerPedalControl
-            pressed={auxiliary.breakerPedal}
-            canOperate={breakerPedalCanOperate}
-            dimmed={breakerEquipped && auxiliary.safetyLocked}
+          <AttachmentPedalControl
+            direction={auxiliary.attachmentPedal}
+            canOperate={attachmentPedalCanOperate}
+            dimmed={pedalAttachmentEquipped && auxiliary.safetyLocked}
             highlighted={highlightBreaker}
             showTouchZone={showTouchZones}
             layout={layout}
             isPortrait={isPortrait}
-            onRequireBreaker={
-              breakerEquipped
+            onRequireAttachment={
+              pedalAttachmentEquipped
                 ? undefined
-                : () => onAttachmentWarning?.("브레이커 장착 후 사용해주세요.")
+                : () =>
+                    onAttachmentWarning?.(
+                      "브레이커 또는 집게를 장착 후 사용하세요.",
+                    )
             }
-            onChange={(breakerPedal) =>
-              onAuxiliaryChange((current) => ({ ...current, breakerPedal }))
+            onChange={(attachmentPedal) =>
+              onAuxiliaryChange((current) => ({
+                ...current,
+                attachmentPedal,
+                grappleOpen:
+                  attachmentType !== "grapple" || attachmentPedal === 0
+                    ? current.grappleOpen
+                    : attachmentPedal > 0
+                      ? 0
+                      : 1,
+              }))
             }
           />
           <FunctionMenu
@@ -2352,6 +2434,7 @@ export function CockpitOverlay({
           <HornTouchZone
             layout={layout.right}
             isPortrait={isPortrait}
+            useDPad={useDPad}
             showTouchZone={showTouchZones}
             onHorn={playHorn}
           />
@@ -2359,6 +2442,7 @@ export function CockpitOverlay({
             <EquipmentUpgradeTouchZone
               layout={layout.left}
               isPortrait={isPortrait}
+              useDPad={useDPad}
               showTouchZone={showTouchZones}
               onOpen={onOpenEquipmentUpgrade}
             />

@@ -46,7 +46,7 @@ export function HaulTruckModel({
         <RoundedBox args={[4.35, 1.55, 3.4]} radius={0.15} castShadow>
           <meshStandardMaterial color="#5b6470" roughness={0.58} metalness={0.5} />
         </RoundedBox>
-        {Array.from({ length: Math.min(10, rockCount) }, (_, index) => (
+        {Array.from({ length: Math.min(12, rockCount) }, (_, index) => (
           <mesh
             key={index}
             position={[

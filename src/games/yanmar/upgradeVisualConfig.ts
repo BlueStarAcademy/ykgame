@@ -20,7 +20,7 @@ export const YANMAR_UPGRADE_ATTACHMENT_TABS = [
   {
     id: "grapple" as const,
     label: "집게",
-    part: "HAUL_TRUCK_SPEED" as const,
+    part: "GRAPPLE_ADHESION" as const,
     icon: "/images/yanmar/2d/attachments/grapple.png",
     diagram: "/images/yanmar/2d/excavator-side-diagram-grapple.png",
   },
@@ -40,7 +40,10 @@ export const YANMAR_UPGRADE_VISUALS = {
     { part: "TRUCK_CAPACITY" as const, label: "하역량" },
     { part: "TRUCK_SPEED" as const, label: "트럭속도" },
   ],
-  haulTruckUpgrades: [{ part: "HAUL_TRUCK_SPEED" as const, label: "돌지역 회복" }],
+  haulTruckUpgrades: [
+    { part: "HAUL_TRUCK_SPEED" as const, label: "돌트럭속도" },
+    { part: "HILL_ROCK_PICK" as const, label: "돌 고르기" },
+  ],
 } as const;
 
 export type UpgradeExcavatorPart = "BOOM" | "ARM" | "ENGINE";
@@ -65,6 +68,7 @@ export function isTruckUpgradePart(part: YanmarEquipmentPart): part is UpgradeTr
   return (
     part === "TRUCK_CAPACITY" ||
     part === "TRUCK_SPEED" ||
-    part === "HAUL_TRUCK_SPEED"
+    part === "HAUL_TRUCK_SPEED" ||
+    part === "HILL_ROCK_PICK"
   );
 }

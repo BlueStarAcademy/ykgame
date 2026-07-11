@@ -7,7 +7,7 @@ import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { Billboard, ContactShadows, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { AuxiliaryControlState, ExcavatorControlState, ControlMask, HydraulicVelocity } from "./controls";
-import { DEFAULT_BOOM_SWING } from "./controls";
+import { DEFAULT_BOOM_SWING, JOINT_LIMITS } from "./controls";
 import { ExcavatorBucket } from "./ExcavatorBucket";
 import { ExcavatorBreaker } from "./ExcavatorBreaker";
 import { ExcavatorGrapple } from "./ExcavatorGrapple";
@@ -25,6 +25,7 @@ import {
   isInDumpZone,
   dumpTruckBedDeckWorldY,
   sampleHeight,
+  sampleCrashContactHeight,
   getCrashTileAt,
   type TerrainData,
   DIG_ZONE,
@@ -36,6 +37,8 @@ import type { DigFeedback } from "./bucket";
 import {
   getBreakerGroundAngleDeg,
   getBreakerTipWorld,
+  getDozerBladeContactWorld,
+  getMaxDozerBladeFromGround,
   MIN_BREAKER_GROUND_ANGLE_DEG,
 } from "./bucket";
 import {
@@ -67,6 +70,7 @@ import {
 import { MapSiteDecor } from "./mapDecor";
 import { CrashZoneDecor } from "./CrashZoneDecor";
 import { HillZoneDecor } from "./HillZoneDecor";
+import { hillBoulderVisualScale } from "./terrain";
 import type { CameraMode, DumpScorePopup, ExcavatorSimState, AutoPoseState } from "./types";
 import {
   createSimLoopRuntime,
@@ -752,28 +756,77 @@ function HydraulicCylinder({
   y,
   length,
   angle = 0,
+  controlRef,
 }: {
   x: number;
   y: number;
   length: number;
   angle?: number;
+  controlRef?: React.MutableRefObject<THREE.Group | null>;
 }) {
+  const cylinderRef = useRef<THREE.Group>(null);
+  const rodRef = useRef<THREE.Mesh>(null);
+  const endPinRef = useRef<THREE.Mesh>(null);
+  const extensionRef = useRef(0.5);
+  const rearPinX = -length * 0.44;
+  const barrelLength = length * 0.54;
+  const barrelCenterX = rearPinX + barrelLength / 2;
+  const barrelFrontX = rearPinX + barrelLength;
+
+  useFrame((_, delta) => {
+    const target = THREE.MathUtils.clamp(
+      Number(cylinderRef.current?.userData.extension ?? 0.5),
+      0,
+      1,
+    );
+    const follow = 1 - Math.exp(-delta * 12);
+    extensionRef.current += (target - extensionRef.current) * follow;
+    const visibleRodLength =
+      length * (0.18 + extensionRef.current * 0.28);
+    const endX = barrelFrontX + visibleRodLength;
+
+    if (rodRef.current) {
+      rodRef.current.position.x = barrelFrontX + visibleRodLength / 2;
+      rodRef.current.scale.y = visibleRodLength;
+    }
+    if (endPinRef.current) {
+      endPinRef.current.position.x = endX;
+    }
+  });
+
   return (
-    <group position={[x, y, 0]} rotation={[0, 0, angle]}>
-      <mesh position={[-length * 0.12, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-        <capsuleGeometry args={[0.09, length * 0.52, 8, 16]} />
+    <group
+      ref={(node) => {
+        cylinderRef.current = node;
+        if (controlRef) controlRef.current = node;
+      }}
+      position={[x, y, 0]}
+      rotation={[0, 0, angle]}
+    >
+      <mesh position={[barrelCenterX, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
+        <capsuleGeometry args={[0.09, Math.max(0.1, barrelLength - 0.18), 8, 16]} />
         <meshStandardMaterial color="#151a20" roughness={0.28} metalness={0.42} />
       </mesh>
-      <mesh position={[length * 0.22, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-        <capsuleGeometry args={[0.035, length * 0.48, 6, 12]} />
+      <mesh position={[barrelFrontX, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.11, 0.11, 0.44, 20]} />
+        <meshStandardMaterial color="#252c34" roughness={0.26} metalness={0.52} />
+      </mesh>
+      <mesh
+        ref={rodRef}
+        position={[barrelFrontX, 0, 0]}
+        rotation={[0, 0, -Math.PI / 2]}
+      >
+        <cylinderGeometry args={[0.035, 0.035, 1, 16]} />
         <meshStandardMaterial color="#dfe7ee" roughness={0.18} metalness={0.78} />
       </mesh>
-      {[-length * 0.42, length * 0.48].map((pinX) => (
-        <mesh key={pinX} position={[pinX, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.08, 0.08, 0.42, 18]} />
-          <meshStandardMaterial color="#252c34" roughness={0.3} metalness={0.45} />
-        </mesh>
-      ))}
+      <mesh position={[rearPinX, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 0.42, 18]} />
+        <meshStandardMaterial color="#252c34" roughness={0.3} metalness={0.45} />
+      </mesh>
+      <mesh ref={endPinRef} position={[barrelFrontX, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 0.42, 18]} />
+        <meshStandardMaterial color="#252c34" roughness={0.3} metalness={0.45} />
+      </mesh>
     </group>
   );
 }
@@ -1650,6 +1703,8 @@ function ExcavatorArm({
   const boomSwingRef = useRef<THREE.Group>(null);
   const boomRef = useRef<THREE.Group>(null);
   const armRef = useRef<THREE.Group>(null);
+  const boomCylinderRef = useRef<THREE.Group>(null);
+  const armCylinderRef = useRef<THREE.Group>(null);
   const bucketRef = useRef<THREE.Group>(null);
   const bucketVisualRef = useRef<THREE.Group>(null);
   const breakerVisualRef = useRef<THREE.Group>(null);
@@ -1731,7 +1786,29 @@ function ExcavatorArm({
     if (workEquipmentYawRef.current) workEquipmentYawRef.current.rotation.y = s.swing;
     const aux = auxiliaryRef.current;
     const blade = Math.max(0, Math.min(1, aux?.blade ?? 0));
-    const bladeSupportProgress = THREE.MathUtils.smoothstep(blade, 0.8, 1);
+    const bladeProbe = getDozerBladeContactWorld(s, 0);
+    const bladeAsphaltTile = getCrashTileAt(
+      terrainRef.current,
+      bladeProbe.x,
+      bladeProbe.z,
+    );
+    const bladeOnAsphalt = !!bladeAsphaltTile?.active;
+    let visualBlade = blade;
+    if (bladeOnAsphalt) {
+      const asphaltSurface = sampleCrashContactHeight(
+        terrainRef.current,
+        bladeProbe.x,
+        bladeProbe.z,
+      );
+      visualBlade = Math.min(
+        blade,
+        getMaxDozerBladeFromGround(s, asphaltSurface, 0.02),
+      );
+    }
+    // 아스팔트는 posY 리프트로 차체를 들므로 추가 시각 리프트는 쓰지 않는다.
+    const bladeSupportProgress = bladeOnAsphalt
+      ? 0
+      : THREE.MathUtils.smoothstep(blade, 0.8, 1);
     const targetChassisLift = bladeSupportProgress * 0.035;
     const targetChassisTilt = bladeSupportProgress * 0.035;
     const bladeSupportFollow = 1 - Math.exp(-delta * 8);
@@ -1752,9 +1829,31 @@ function ExcavatorArm({
     // Match the visual pivots to bucket.ts: segment direction is (sin(theta), cos(theta)).
     if (boomRef.current) boomRef.current.rotation.z = Math.PI / 2 - s.boom;
     if (armRef.current) armRef.current.rotation.z = s.arm * YANMAR_MACHINE_RIG.armRotationScale;
+    if (boomCylinderRef.current) {
+      const boomTravel = THREE.MathUtils.clamp(
+        (s.boom - JOINT_LIMITS.boom.min) /
+          (JOINT_LIMITS.boom.max - JOINT_LIMITS.boom.min),
+        0,
+        1,
+      );
+      // 실제 붐 실린더처럼 로드가 뻗을수록 붐이 상승한다.
+      boomCylinderRef.current.userData.extension =
+        1 - THREE.MathUtils.smoothstep(boomTravel, 0, 1);
+    }
+    if (armCylinderRef.current) {
+      const armTravel = THREE.MathUtils.clamp(
+        (s.arm - JOINT_LIMITS.arm.min) /
+          (JOINT_LIMITS.arm.max - JOINT_LIMITS.arm.min),
+        0,
+        1,
+      );
+      armCylinderRef.current.userData.extension =
+        THREE.MathUtils.smoothstep(armTravel, 0, 1);
+    }
     if (bucketRef.current) bucketRef.current.rotation.z = s.bucket * YANMAR_MACHINE_RIG.bucketRotationScale;
     if (bucketVisualRef.current) {
-      bucketVisualRef.current.visible = s.attachmentType === "bucket";
+      bucketVisualRef.current.visible =
+        s.attachmentType === "bucket" || s.attachmentType === "grapple";
     }
     if (breakerVisualRef.current) {
       const isBreaker = s.attachmentType === "breaker";
@@ -1764,12 +1863,12 @@ function ExcavatorArm({
       } else {
         const boomSwing = aux?.boomSwing ?? DEFAULT_BOOM_SWING;
         const tip = getBreakerTipWorld(s, boomSwing);
-        const groundY = sampleHeight(terrainRef.current, tip.x, tip.z);
+        const groundY = sampleCrashContactHeight(terrainRef.current, tip.x, tip.z);
         const onAsphalt =
           tip.y - groundY <= 0.12 &&
           getBreakerGroundAngleDeg(s, boomSwing) >= MIN_BREAKER_GROUND_ANGLE_DEG &&
           !!getCrashTileAt(terrainRef.current, tip.x, tip.z)?.active;
-        const hammering = (aux?.breakerPedal ?? false) && onAsphalt;
+        const hammering = (aux?.attachmentPedal ?? 0) !== 0 && onAsphalt;
         const t = performance.now();
         const vibrationOffset = hammering
           ? Math.sin(t * 0.14) * 0.11 + Math.sin(t * 0.31) * 0.035
@@ -1790,15 +1889,25 @@ function ExcavatorArm({
     }
     if (grappleVisualRef.current) {
       grappleVisualRef.current.visible = s.attachmentType === "grapple";
+      grappleVisualRef.current.userData.openAmount = aux?.grappleOpen ?? 1;
     }
     if (carriedRockRef.current) {
-      carriedRockRef.current.visible =
+      const carrying =
         s.attachmentType === "grapple" && s.carriedBoulderId != null;
+      carriedRockRef.current.visible = carrying;
+      if (carrying && s.carriedBoulderId) {
+        const rock = terrainRef.current.hillZone?.boulders.find(
+          (item) => item.id === s.carriedBoulderId,
+        );
+        const scale = rock ? hillBoulderVisualScale(rock.size) : 0.9;
+        carriedRockRef.current.scale.setScalar(0.72 + scale * 0.55);
+      }
     }
     if (bladeRef.current) {
-      // 시각은 레버 명령값을 그대로 반영. 지면 클램프는 흙 튀김 판정에만 사용.
+      // 흙밭: 레버 그대로(절반 침투 허용). 아스팔트: 표면에서 클램프.
       bladeRef.current.position.y =
-        YANMAR_MACHINE_RIG.dozerBladeGroupBaseY - blade * YANMAR_MACHINE_RIG.dozerBladeDrop;
+        YANMAR_MACHINE_RIG.dozerBladeGroupBaseY -
+        visualBlade * YANMAR_MACHINE_RIG.dozerBladeDrop;
     }
     if (dirtRef.current) {
       const load = s.bucketLoad;
@@ -1869,7 +1978,13 @@ function ExcavatorArm({
           <LinkPin x={0} y={0} radius={0.21} width={0.58} />
           <LinkPin x={boomLen} y={0} radius={0.19} width={0.54} />
           <LinkPin x={boomLen * 0.32} y={0.34} radius={0.13} width={0.5} />
-          <HydraulicCylinder x={boomLen * 0.58} y={0.43} length={boomLen * 0.62} angle={0.08} />
+          <HydraulicCylinder
+            x={boomLen * 0.58}
+            y={0.43}
+            length={boomLen * 0.62}
+            angle={0.08}
+            controlRef={boomCylinderRef}
+          />
           <mesh position={[boomLen * 0.58, 0.28, 0]}>
             <boxGeometry args={[boomLen * 0.55, 0.045, 0.34]} />
             <meshStandardMaterial color="#ef3b2f" roughness={0.36} metalness={0.12} />
@@ -1887,7 +2002,13 @@ function ExcavatorArm({
             />
             <LinkPin x={0} y={0} radius={0.18} width={0.52} />
             <LinkPin x={armLen} y={0} radius={0.15} width={0.48} />
-            <HydraulicCylinder x={armLen * 0.43} y={0.34} length={armLen * 0.72} angle={-0.05} />
+            <HydraulicCylinder
+              x={armLen * 0.43}
+              y={0.34}
+              length={armLen * 0.72}
+              angle={-0.05}
+              controlRef={armCylinderRef}
+            />
             <mesh position={[armLen * 0.58, 0.2, 0]}>
               <boxGeometry args={[armLen * 0.54, 0.04, 0.3]} />
               <meshStandardMaterial color="#ef3b2f" roughness={0.36} metalness={0.12} />
@@ -1901,13 +2022,15 @@ function ExcavatorArm({
                 <ExcavatorBreaker />
               </group>
               <group ref={grappleVisualRef}>
-                <ExcavatorGrapple openAmount={0.35} />
+                <ExcavatorGrapple
+                  openAmountRef={grappleVisualRef}
+                />
                 <mesh
                   ref={carriedRockRef}
-                  position={[-1.45, -0.28, 0]}
+                  position={[-0.78, -0.42, 0]}
                   castShadow
                 >
-                  <dodecahedronGeometry args={[0.72, 1]} />
+                  <dodecahedronGeometry args={[0.58, 1]} />
                   <meshStandardMaterial color="#5b6470" roughness={0.92} />
                 </mesh>
               </group>
@@ -2265,9 +2388,18 @@ function GroundZoneArrows({
   );
 }
 
-function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<TerrainData> }) {
+function ZoneMarkers({
+  terrainRef,
+  simRef,
+}: {
+  terrainRef: React.MutableRefObject<TerrainData>;
+  simRef: React.MutableRefObject<ExcavatorSimState>;
+}) {
   const [zones, setZones] = useState(() =>
     getActiveDigZones(terrainRef.current).map((zone) => ({ ...zone })),
+  );
+  const [showGrappleOutlines, setShowGrappleOutlines] = useState(
+    () => simRef.current.attachmentType === "grapple",
   );
   const [, setSpecialVersion] = useState(0);
   const signatureRef = useRef("");
@@ -2276,6 +2408,7 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
     const nextZones = getActiveDigZones(terrainRef.current);
     const crash = terrainRef.current.crashZone;
     const hill = terrainRef.current.hillZone;
+    const grappleOn = simRef.current.attachmentType === "grapple";
     const signature = nextZones
       .map(
         (zone) =>
@@ -2287,10 +2420,12 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
       `|crash:${crash?.active}:${crash?.tiles.map((tile) => tile.hp).join(",")}` +
       `|hill:${hill?.active}:${hill?.haulTruck.phase}:${hill?.haulTruck.loadCount}:${hill?.boulders
         .map((rock) => `${rock.id}:${rock.active}:${rock.delivered}:${rock.extracted}`)
-        .join(",")}`;
+        .join(",")}` +
+      `|grapple:${grappleOn}`;
     if (signature !== signatureRef.current) {
       signatureRef.current = signature;
       setZones(nextZones.map((zone) => ({ ...zone })));
+      setShowGrappleOutlines(grappleOn);
       setSpecialVersion((value) => value + 1);
     }
   });
@@ -2358,7 +2493,11 @@ function ZoneMarkers({ terrainRef }: { terrainRef: React.MutableRefObject<Terrai
       (hill.active ||
         hill.haulTruck.phase !== "ready" ||
         hill.haulTruck.loadCount > 0) ? (
-        <HillZoneDecor zone={hill} terrain={terrain} />
+        <HillZoneDecor
+          zone={hill}
+          terrain={terrain}
+          showGrappleOutlines={showGrappleOutlines}
+        />
       ) : null}
       <group position={[DUMP_ZONE.x, dumpPaintY, DUMP_ZONE.z]}>
         <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={0}>
@@ -3224,7 +3363,7 @@ function SceneContent(props: ExcavatorSceneProps) {
         dumpTruckStateRef={props.dumpTruckStateRef}
         equipmentStatsRef={props.equipmentStatsRef}
       />
-      <ZoneMarkers terrainRef={props.terrainRef} />
+      <ZoneMarkers terrainRef={props.terrainRef} simRef={props.simRef} />
       <TierBoundaryBarriers
         key={`tier-barriers-${terrainRevision}`}
         terrainRef={props.terrainRef}

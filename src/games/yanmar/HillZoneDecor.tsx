@@ -1,31 +1,34 @@
 "use client";
 
-import { Text } from "@react-three/drei";
+import { Outlines, Text } from "@react-three/drei";
 import { HaulTruckModel } from "./HaulTruckModel";
-import type { HillZone, TerrainData } from "./terrain";
+import type { HillBoulder, HillZone, TerrainData } from "./terrain";
 import { sampleHeight } from "./terrain";
+import { hillBoulderVisualScale } from "./terrain";
 
 function PremiumBoulder({
-  x,
-  z,
+  rock,
   index,
   terrain,
+  showOutline,
 }: {
-  x: number;
-  z: number;
+  rock: HillBoulder;
   index: number;
   terrain: TerrainData;
+  showOutline: boolean;
 }) {
-  const scale = 0.72 + (index % 5) * 0.11;
+  const scale = hillBoulderVisualScale(rock.size);
+  const detail = rock.roundness >= 0.5 ? 1 : 0;
   return (
     <group
-      position={[x, sampleHeight(terrain, x, z) + scale * 0.55, z]}
+      position={[rock.x, sampleHeight(terrain, rock.x, rock.z) + scale * 0.55, rock.z]}
       rotation={[(index % 3) * 0.14, index * 1.71, (index % 4) * 0.1]}
       scale={[scale * 1.16, scale * 0.82, scale]}
     >
       <mesh castShadow receiveShadow>
-        <icosahedronGeometry args={[1, index % 2]} />
+        <icosahedronGeometry args={[1, detail]} />
         <meshStandardMaterial color={index % 3 ? "#697078" : "#596168"} roughness={0.96} />
+        {showOutline ? <Outlines thickness={0.06} color="#38bdf8" /> : null}
       </mesh>
       <mesh position={[0.16, 0.46, 0.58]} scale={[0.55, 0.13, 0.35]}>
         <sphereGeometry args={[0.5, 10, 6]} />
@@ -38,9 +41,11 @@ function PremiumBoulder({
 export function HillZoneDecor({
   zone,
   terrain,
+  showGrappleOutlines = false,
 }: {
   zone: HillZone;
   terrain: TerrainData;
+  showGrappleOutlines?: boolean;
 }) {
   const topY = sampleHeight(terrain, zone.centerX, zone.centerZ);
   const dropY = sampleHeight(terrain, zone.dropX, zone.dropZ);
@@ -76,10 +81,10 @@ export function HillZoneDecor({
             .map((rock, index) => (
               <PremiumBoulder
                 key={rock.id}
-                x={rock.x}
-                z={rock.z}
+                rock={rock}
                 index={index}
                 terrain={terrain}
+                showOutline={showGrappleOutlines}
               />
             ))
         : null}

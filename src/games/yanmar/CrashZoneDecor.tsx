@@ -4,8 +4,14 @@ import { useLayoutEffect, useMemo } from "react";
 import { useLoader } from "@react-three/fiber";
 import { Billboard, Text } from "@react-three/drei";
 import * as THREE from "three";
-import type { CrashZone, TerrainData } from "./terrain";
-import { sampleHeight } from "./terrain";
+import {
+  CRASH_ASPHALT_BOX_CENTER_Y,
+  CRASH_ASPHALT_BOX_THICKNESS,
+  CRASH_ASPHALT_SURFACE_SINK,
+  type CrashZone,
+  type TerrainData,
+  sampleHeight,
+} from "./terrain";
 import {
   configureSiteTexture,
   PREMIUM_SITE_TEXTURES,
@@ -70,12 +76,22 @@ export function CrashZoneDecor({
             {tile.active ? (
               <>
                 <mesh
-                  position={[0, 0.12 - damage * 0.1, 0]}
+                  position={[
+                    0,
+                    CRASH_ASPHALT_BOX_CENTER_Y - damage * CRASH_ASPHALT_SURFACE_SINK,
+                    0,
+                  ]}
                   rotation={[0, (tile.row * 3 + tile.col) * 0.025 * damage, damage * 0.02]}
                   receiveShadow
                   castShadow={damage > 0.45}
                 >
-                  <boxGeometry args={[tileWidth - 0.14, 0.2, tileDepth - 0.14]} />
+                  <boxGeometry
+                    args={[
+                      tileWidth - 0.14,
+                      CRASH_ASPHALT_BOX_THICKNESS,
+                      tileDepth - 0.14,
+                    ]}
+                  />
                   <meshStandardMaterial
                     map={albedo}
                     normalMap={normal}

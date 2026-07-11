@@ -52,7 +52,7 @@ import {
   type HydraulicVelocity,
 } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
-import { DigPoseGraph } from "./DigHintPanel";
+import { DigPoseGraph, GrappleGripGauge } from "./DigHintPanel";
 import { DumpHintPanel } from "./DumpHintPanel";
 import { ControlsGuidePanel } from "./ControlsGuidePanel";
 import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
@@ -341,6 +341,7 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
   return (
     <div className="pointer-events-none absolute left-1/2 top-[4.25rem] z-50 w-[16rem] -translate-x-1/2">
       <div
+        key={panel.pulseKey}
         className={`yanmar-score-panel rounded-xl border px-4 py-2.5 text-center font-black shadow-xl backdrop-blur-md ${
           panel.critical
             ? "border-yellow-200/70 bg-black/80 text-yellow-300"
@@ -348,7 +349,6 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
         }`}
       >
         <div
-          key={panel.pulseKey}
           className={`yanmar-score-panel-value ${panel.critical ? "text-sm" : "text-xs"}`}
         >
           +{panel.totalScore}
@@ -720,7 +720,13 @@ export function ExcavatorGameWrapper({
       prev.crashTileMaxHp === fb.crashTileMaxHp &&
       prev.crashHitTick === fb.crashHitTick &&
       prev.canGrab === fb.canGrab &&
+      prev.grappleNeedsAlignment === fb.grappleNeedsAlignment &&
       prev.canDropRock === fb.canDropRock &&
+      prev.showGripGauge === fb.showGripGauge &&
+      Math.abs(prev.gripAdhesion - fb.gripAdhesion) < 0.01 &&
+      Math.abs(prev.gripPressure - fb.gripPressure) < 0.01 &&
+      prev.grappleLiftResult === fb.grappleLiftResult &&
+      prev.grappleLiftResultTick === fb.grappleLiftResultTick &&
       prev.digging === fb.digging &&
       Math.abs(prev.groundDepth - fb.groundDepth) < 0.05 &&
       prev.bucketOpenReady === fb.bucketOpenReady &&
@@ -780,7 +786,7 @@ export function ExcavatorGameWrapper({
       const restoredAuxiliary = {
         ...auxiliaryRef.current,
         ...savedAuxiliary,
-        breakerPedal: false,
+        attachmentPedal: 0 as const,
       };
       auxiliaryRef.current = restoredAuxiliary;
       setAuxiliary(restoredAuxiliary);
@@ -1118,7 +1124,7 @@ export function ExcavatorGameWrapper({
         prev.safetyLocked !== resolved.safetyLocked ||
         prev.blade !== resolved.blade ||
         prev.throttle !== resolved.throttle ||
-        prev.breakerPedal !== resolved.breakerPedal
+        prev.attachmentPedal !== resolved.attachmentPedal
       ) {
         cancelAutoArmPose(autoPoseRef.current);
         setAutoPose({ ...autoPoseRef.current });
@@ -1128,8 +1134,8 @@ export function ExcavatorGameWrapper({
     setAuxiliary(resolved);
     if (resolved.safetyLocked) {
       clearAllInput();
-      if (resolved.breakerPedal) {
-        const unlocked = { ...resolved, breakerPedal: false };
+      if (resolved.attachmentPedal !== 0) {
+        const unlocked = { ...resolved, attachmentPedal: 0 as const };
         auxiliaryRef.current = unlocked;
         setAuxiliary(unlocked);
       }
@@ -1590,6 +1596,34 @@ export function ExcavatorGameWrapper({
     [scheduleHideDumpScorePanel],
   );
 
+  /** Crash 타일 등 — 이전 패널과 합산하지 않고 이번 보상만 표시 */
+  const showStandaloneRewardPanel = useCallback(
+    (
+      score: number,
+      critical: boolean,
+      earnedStars: number,
+      rewardText = "",
+    ) => {
+      if (score > 0) {
+        arcadeScoreRef.current += score;
+        setHud((h) => ({ ...h, score: arcadeScoreRef.current }));
+      }
+
+      const next: DumpScorePanelState = {
+        totalScore: score,
+        critical,
+        rewardText,
+        earnedStars,
+        pendingRewards: 0,
+        pulseKey: (dumpScorePanelRef.current?.pulseKey ?? 0) + 1,
+      };
+      dumpScorePanelRef.current = next;
+      setDumpScorePanel(next);
+      scheduleHideDumpScorePanel();
+    },
+    [scheduleHideDumpScorePanel],
+  );
+
   const adjustDumpScorePanel = useCallback(
     (
       scoreDelta: number,
@@ -1730,17 +1764,25 @@ export function ExcavatorGameWrapper({
               ? rollLocalCrashReward(equipmentStatsRef.current)
               : rollLocalHillReward(equipmentStatsRef.current);
           setPreviewStars((value) => value + local.stars);
-          accumulateDumpScore(local.score, local.critical);
-          const panel = dumpScorePanelRef.current;
-          if (panel) {
-            const next = {
-              ...panel,
-              earnedStars: panel.earnedStars + local.stars,
-              critical: panel.critical || local.critical,
-            };
-            dumpScorePanelRef.current = next;
-            setDumpScorePanel(next);
-            scheduleHideDumpScorePanel();
+          if (kind === "crash") {
+            showStandaloneRewardPanel(
+              local.score,
+              local.critical,
+              local.stars,
+            );
+          } else {
+            accumulateDumpScore(local.score, local.critical);
+            const panel = dumpScorePanelRef.current;
+            if (panel) {
+              const next = {
+                ...panel,
+                earnedStars: panel.earnedStars + local.stars,
+                critical: panel.critical || local.critical,
+              };
+              dumpScorePanelRef.current = next;
+              setDumpScorePanel(next);
+              scheduleHideDumpScorePanel();
+            }
           }
         }
         return;
@@ -1795,6 +1837,22 @@ export function ExcavatorGameWrapper({
               ? event.score
               : 0;
 
+        if (kind === "crash") {
+          if (event?.kind === "stars") {
+            rewardStarsRef.current += event.stars;
+            showStandaloneRewardPanel(score, critical, event.stars);
+          } else if (event?.kind === "coupon") {
+            showCouponDiscovery(event.couponType, event.discountPct);
+            showStandaloneRewardPanel(score, true, 0, "쿠폰 획득!");
+          } else if (typeof data.totalStars === "number") {
+            rewardStarsRef.current += data.totalStars;
+            showStandaloneRewardPanel(score, critical, data.totalStars);
+          } else if (score > 0) {
+            showStandaloneRewardPanel(score, critical, 0);
+          }
+          return;
+        }
+
         if (score > 0) {
           accumulateDumpScore(score, critical);
         }
@@ -1815,10 +1873,7 @@ export function ExcavatorGameWrapper({
               "쿠폰 획득!",
             ),
           });
-        } else if (
-          (kind === "crash" || kind === "hill") &&
-          typeof data.totalStars === "number"
-        ) {
+        } else if (typeof data.totalStars === "number") {
           rewardStarsRef.current += data.totalStars;
           adjustDumpScorePanel(0, {
             critical: critical || dumpScorePanelRef.current?.critical,
@@ -1836,6 +1891,7 @@ export function ExcavatorGameWrapper({
       scheduleHideDumpScorePanel,
       showAttachmentWarning,
       showCouponDiscovery,
+      showStandaloneRewardPanel,
     ],
   );
 
@@ -2134,13 +2190,26 @@ export function ExcavatorGameWrapper({
         />
 
         {mode !== "intro" && mode !== "gameReady" && digFeedback.travelBlockedRaiseArm ? (
-          <div className="pointer-events-none absolute left-1/2 top-[3.25rem] z-[60] w-[min(18rem,88%)] -translate-x-1/2 rounded-xl border border-amber-300/45 bg-amber-500/90 px-3 py-2 text-center text-[11px] font-black leading-snug text-white shadow-xl backdrop-blur-sm">
+          <div className="pointer-events-none absolute left-1/2 top-[3.25rem] z-[60] w-max max-w-[calc(100%_-_1rem)] -translate-x-1/2 whitespace-nowrap rounded-xl border border-amber-300/45 bg-amber-500/90 px-3 py-2 text-center text-[11px] font-black text-white shadow-xl backdrop-blur-sm">
             ⚠️ 붐을 더 들어야 움직일 수 있습니다
           </div>
         ) : null}
 
+        {mode !== "intro" && mode !== "gameReady" && digFeedback.showGripGauge ? (
+          <div
+            className={`pointer-events-none absolute left-1/2 z-[55] -translate-x-1/2 ${
+              digFeedback.travelBlockedRaiseArm ? "top-[5.75rem]" : "top-[3.25rem]"
+            }`}
+          >
+            <GrappleGripGauge
+              adhesion={digFeedback.gripAdhesion}
+              pressure={digFeedback.gripPressure}
+            />
+          </div>
+        ) : null}
+
         {mode === "ride" ? (
-          <div className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-xl border border-sky-200/35 bg-sky-950/75 px-3 py-1.5 text-[11px] font-black text-sky-100 shadow-lg backdrop-blur-sm">
+          <div className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 whitespace-nowrap rounded-xl border border-sky-200/35 bg-sky-950/75 px-3 py-1.5 text-[11px] font-black text-sky-100 shadow-lg backdrop-blur-sm">
             탑승 체험 · 실제 조작 시뮬레이터
           </div>
         ) : null}
@@ -2252,9 +2321,13 @@ export function ExcavatorGameWrapper({
               <div className="rounded-xl border border-sky-200/50 bg-sky-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 집게가능
               </div>
+            ) : digFeedback.grappleNeedsAlignment ? (
+              <div className="whitespace-nowrap rounded-xl border border-orange-200/50 bg-orange-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                버켓 각도를 집게와 맞추세요
+              </div>
             ) : digFeedback.canDropRock ? (
               <div className="rounded-xl border border-violet-200/50 bg-violet-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                투하가능
+                발판 아래쪽: 열기
               </div>
             ) : digFeedback.soilSpilling && hud.bucketLoad > 0.02 ? (
               <div className="rounded-xl border border-amber-200/50 bg-amber-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
@@ -2350,10 +2423,10 @@ export function ExcavatorGameWrapper({
           : null}
 
         {mode === "tutorial" && tutorialStep && (
-          <div className="absolute left-2 top-[5.25rem] z-40 w-[8.75rem] rounded-xl border border-amber-300/20 bg-black/75 p-2 text-white shadow-xl backdrop-blur-sm">
+          <div className="absolute left-2 top-[5.25rem] z-40 w-[min(42rem,calc(100%_-_1rem))] rounded-xl border border-amber-300/20 bg-black/75 p-2 text-white shadow-xl backdrop-blur-sm">
             <div className="min-w-0">
               <p className="text-[10px] font-bold text-amber-300">{tutorialStep.title}</p>
-              <p className="mt-0.5 text-[10px] leading-tight text-white/85">
+              <p className="mt-0.5 whitespace-nowrap text-[clamp(7px,2.35vw,10px)] text-white/85">
                 {tutorialStep.instruction}
               </p>
             </div>

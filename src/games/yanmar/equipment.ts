@@ -30,12 +30,14 @@ export const YANMAR_CRASH_REWARD_CONFIG = {
   xpReward: 1000,
 } as const;
 
-/** Hill(돌) 1개 트럭 적재 보상 — 쿠폰 확률은 하역과 동일, 스타 수량만 별도. */
+/** Hill(돌) 1개 트럭 적재 보상 — 쿠폰 확률은 하역과 동일. */
 export const YANMAR_HILL_REWARD_CONFIG = {
-  baseScoreMin: 90,
-  baseScoreMax: 120,
-  minStarReward: 7,
+  baseScoreMin: 900,
+  baseScoreMax: 1000,
+  minStarReward: 10,
   maxStarReward: 15,
+  xpMin: 900,
+  xpMax: 1000,
 } as const;
 
 export const YANMAR_TRUCK_UPGRADE_COSTS = [
@@ -46,8 +48,14 @@ export const YANMAR_SPECIAL_UPGRADE_COSTS = [
   50, 100, 150, 200, 250, 300, 350, 400, 450, 500,
 ] as const;
 
+export const YANMAR_HILL_ROCK_PICK_COSTS = [
+  75, 150, 225, 300, 500,
+] as const;
+
 export const YANMAR_BASE_BREAKER_DAMAGE = 10;
-export const YANMAR_BASE_HAUL_TRUCK_COOLDOWN_SEC = 10 * 60;
+export const YANMAR_BASE_HAUL_TRUCK_COOLDOWN_SEC = 300;
+export const YANMAR_BASE_HAUL_TRUCK_CAPACITY = 5;
+export const YANMAR_BASE_HILL_BOULDER_COUNT = 5;
 
 export const YANMAR_EQUIPMENT_CONFIG = {
   ARM: {
@@ -92,11 +100,23 @@ export const YANMAR_EQUIPMENT_CONFIG = {
     damagePerLevel: 5,
     description: "콘크리트 데미지 +5",
   },
-  HAUL_TRUCK_SPEED: {
+  GRAPPLE_ADHESION: {
     label: "집게",
     maxLevel: 10,
-    cooldownReductionSecPerLevel: 30,
-    description: "돌지역 회복시간 -30초",
+    adhesionBonusPerLevel: 0.03,
+    description: "밀착감 +3%",
+  },
+  HAUL_TRUCK_SPEED: {
+    label: "돌트럭속도",
+    maxLevel: 10,
+    cooldownReductionPerLevel: 0.05,
+    description: "돌트럭 복귀시간 -5%",
+  },
+  HILL_ROCK_PICK: {
+    label: "돌 고르기",
+    maxLevel: 5,
+    rocksPerLevel: 1,
+    description: "돌지역 돌개수 +1",
   },
 } as const;
 
@@ -115,6 +135,10 @@ export interface YanmarEquipmentStats {
   breakerDamage: number;
   crashRespawnSec: number;
   haulTruckCooldownSec: number;
+  haulTruckCapacity: number;
+  hillBoulderCount: number;
+  /** 집게 강화로 더해지는 밀착감 보너스 (0~0.3). */
+  gripAdhesionBonus: number;
 }
 
 export const DEFAULT_YANMAR_EQUIPMENT_LEVELS: YanmarEquipmentLevels = {
@@ -125,7 +149,9 @@ export const DEFAULT_YANMAR_EQUIPMENT_LEVELS: YanmarEquipmentLevels = {
   TRUCK_CAPACITY: 0,
   TRUCK_SPEED: 0,
   CRASH_RESPAWN: 0,
+  GRAPPLE_ADHESION: 0,
   HAUL_TRUCK_SPEED: 0,
+  HILL_ROCK_PICK: 0,
 };
 
 export const YANMAR_UPGRADE_COSTS = {
@@ -136,7 +162,9 @@ export const YANMAR_UPGRADE_COSTS = {
   TRUCK_CAPACITY: YANMAR_TRUCK_UPGRADE_COSTS,
   TRUCK_SPEED: YANMAR_TRUCK_UPGRADE_COSTS,
   CRASH_RESPAWN: YANMAR_SPECIAL_UPGRADE_COSTS,
+  GRAPPLE_ADHESION: YANMAR_SPECIAL_UPGRADE_COSTS,
   HAUL_TRUCK_SPEED: YANMAR_SPECIAL_UPGRADE_COSTS,
+  HILL_ROCK_PICK: YANMAR_HILL_ROCK_PICK_COSTS,
 } as const satisfies Record<YanmarEquipmentPart, readonly number[]>;
 
 export const YANMAR_EQUIPMENT_RESET_REFUND_RATE = 0.7;
@@ -201,6 +229,8 @@ export function mergeYanmarEquipmentLevelsFromDb(
   rows: Array<{ part: string; level: number }>,
 ): YanmarEquipmentLevels {
   const levels = { ...DEFAULT_YANMAR_EQUIPMENT_LEVELS };
+  let legacyHaulTruckSpeed = 0;
+  let hasGrappleAdhesion = false;
   for (const row of rows) {
     if (row.part === LEGACY_TRUCK_EQUIPMENT_PART) {
       levels.TRUCK_CAPACITY = Math.max(
@@ -209,9 +239,23 @@ export function mergeYanmarEquipmentLevelsFromDb(
       );
       continue;
     }
+    if (row.part === "GRAPPLE_ADHESION") {
+      hasGrappleAdhesion = true;
+    }
+    if (row.part === "HAUL_TRUCK_SPEED") {
+      legacyHaulTruckSpeed = row.level;
+    }
     if (row.part in YANMAR_EQUIPMENT_CONFIG) {
       levels[row.part as YanmarEquipmentPart] = row.level;
     }
+  }
+  // 이전 세션에서 HAUL_TRUCK_SPEED에 저장된 밀착감 강화를 GRAPPLE_ADHESION으로 이전
+  if (!hasGrappleAdhesion && legacyHaulTruckSpeed > 0) {
+    levels.GRAPPLE_ADHESION = Math.min(
+      YANMAR_EQUIPMENT_CONFIG.GRAPPLE_ADHESION.maxLevel,
+      legacyHaulTruckSpeed,
+    );
+    levels.HAUL_TRUCK_SPEED = 0;
   }
   return clampYanmarEquipmentLevels(levels);
 }
@@ -270,6 +314,11 @@ export function calculateYanmarHillScore(
   return Math.round(baseScore * (critical ? stats.criticalMultiplier : 1));
 }
 
+export function rollYanmarHillXp(): number {
+  const { xpMin, xpMax } = YANMAR_HILL_REWARD_CONFIG;
+  return Math.floor(Math.random() * (xpMax - xpMin + 1)) + xpMin;
+}
+
 export function calculateYanmarEquipmentStats(
   levels: Partial<Record<YanmarEquipmentPart, number>>,
 ): YanmarEquipmentStats {
@@ -292,6 +341,9 @@ export function calculateYanmarEquipmentStats(
     breakerDamage: getYanmarBreakerDamage(safeLevels.CRASH_RESPAWN),
     crashRespawnSec: 5 * 60,
     haulTruckCooldownSec: getYanmarHaulTruckCooldownSec(safeLevels.HAUL_TRUCK_SPEED),
+    haulTruckCapacity: YANMAR_BASE_HAUL_TRUCK_CAPACITY,
+    hillBoulderCount: getYanmarHillBoulderCount(safeLevels.HILL_ROCK_PICK),
+    gripAdhesionBonus: getYanmarGripAdhesionBonus(safeLevels.GRAPPLE_ADHESION),
   };
 }
 
@@ -306,16 +358,37 @@ export function getYanmarBreakerDamage(level = 0) {
   );
 }
 
+export function getYanmarGripAdhesionBonus(level = 0) {
+  const safeLevel = Math.max(
+    0,
+    Math.min(YANMAR_EQUIPMENT_CONFIG.GRAPPLE_ADHESION.maxLevel, Math.floor(level)),
+  );
+  return (
+    safeLevel * YANMAR_EQUIPMENT_CONFIG.GRAPPLE_ADHESION.adhesionBonusPerLevel
+  );
+}
+
 export function getYanmarHaulTruckCooldownSec(level = 0) {
   const safeLevel = Math.max(
     0,
     Math.min(YANMAR_EQUIPMENT_CONFIG.HAUL_TRUCK_SPEED.maxLevel, Math.floor(level)),
   );
+  const factor =
+    1 - YANMAR_EQUIPMENT_CONFIG.HAUL_TRUCK_SPEED.cooldownReductionPerLevel;
   return Math.max(
+    30,
+    YANMAR_BASE_HAUL_TRUCK_COOLDOWN_SEC * factor ** safeLevel,
+  );
+}
+
+export function getYanmarHillBoulderCount(level = 0) {
+  const safeLevel = Math.max(
     0,
-    YANMAR_BASE_HAUL_TRUCK_COOLDOWN_SEC -
-      safeLevel *
-        YANMAR_EQUIPMENT_CONFIG.HAUL_TRUCK_SPEED.cooldownReductionSecPerLevel,
+    Math.min(YANMAR_EQUIPMENT_CONFIG.HILL_ROCK_PICK.maxLevel, Math.floor(level)),
+  );
+  return (
+    YANMAR_BASE_HILL_BOULDER_COUNT +
+    safeLevel * YANMAR_EQUIPMENT_CONFIG.HILL_ROCK_PICK.rocksPerLevel
   );
 }
 
@@ -359,8 +432,12 @@ export function getYanmarUpgradePartStatLabel(part: YanmarEquipmentPart): string
       return "트럭복귀";
     case "CRASH_RESPAWN":
       return "데미지";
+    case "GRAPPLE_ADHESION":
+      return "밀착감";
     case "HAUL_TRUCK_SPEED":
-      return "돌지역 회복";
+      return "돌트럭복귀";
+    case "HILL_ROCK_PICK":
+      return "돌개수";
     default:
       return "";
   }
@@ -401,8 +478,12 @@ export function getYanmarUpgradePartStatText(
       return `${label}${Math.round(getYanmarTruckCooldownSec(safeLevel))}초`;
     case "CRASH_RESPAWN":
       return `${label}${getYanmarBreakerDamage(safeLevel)}`;
+    case "GRAPPLE_ADHESION":
+      return `${label}+${Math.round(getYanmarGripAdhesionBonus(safeLevel) * 100)}%`;
     case "HAUL_TRUCK_SPEED":
-      return `${label}${getYanmarHaulTruckCooldownSec(safeLevel)}초`;
+      return `${label}${Math.round(getYanmarHaulTruckCooldownSec(safeLevel))}초`;
+    case "HILL_ROCK_PICK":
+      return `${label}${getYanmarHillBoulderCount(safeLevel)}`;
     default:
       return "";
   }
@@ -444,8 +525,17 @@ export function getYanmarUpgradePartGainText(
     }
     case "CRASH_RESPAWN":
       return `(+${YANMAR_EQUIPMENT_CONFIG.CRASH_RESPAWN.damagePerLevel})`;
-    case "HAUL_TRUCK_SPEED":
-      return `(-${YANMAR_EQUIPMENT_CONFIG.HAUL_TRUCK_SPEED.cooldownReductionSecPerLevel}초)`;
+    case "GRAPPLE_ADHESION":
+      return `(+${Math.round(YANMAR_EQUIPMENT_CONFIG.GRAPPLE_ADHESION.adhesionBonusPerLevel * 100)}%)`;
+    case "HAUL_TRUCK_SPEED": {
+      const saved = Math.round(
+        getYanmarHaulTruckCooldownSec(safeLevel) -
+          getYanmarHaulTruckCooldownSec(safeLevel + 1),
+      );
+      return `(-${saved}초)`;
+    }
+    case "HILL_ROCK_PICK":
+      return `(+${YANMAR_EQUIPMENT_CONFIG.HILL_ROCK_PICK.rocksPerLevel})`;
     default:
       return "";
   }

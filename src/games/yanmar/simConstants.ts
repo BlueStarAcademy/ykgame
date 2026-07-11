@@ -1,5 +1,9 @@
 export const MIN_BUCKET_GROUND_CLEARANCE = 0.05;
 export const MIN_BUCKET_DIG_ZONE_CLEARANCE = -2.15;
+/** 브레이커가 아스팔트/지면 위에 올려진 상태로 유지할 최소 여유. */
+export const MIN_BREAKER_SURFACE_CLEARANCE = 0.02;
+/** 이 높이보다 브레이커 팁이 낮으면 주행 잠금. */
+export const BREAKER_TRAVEL_LOCK_CLEARANCE = 0.28;
 export const EXCAVATOR_MAP_WALL_MARGIN = 4.6;
 export const EXCAVATOR_COLLISION_RADIUS = 1.35;
 

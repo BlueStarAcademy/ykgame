@@ -8,7 +8,9 @@ import {
   YANMAR_TRUCK_UPGRADE_COSTS,
   formatYanmarUpgradeCostSequence,
   getYanmarBreakerDamage,
+  getYanmarGripAdhesionBonus,
   getYanmarHaulTruckCooldownSec,
+  getYanmarHillBoulderCount,
   getYanmarTruckCapacityUnits,
   getYanmarTruckCooldownSec,
   type YanmarEquipmentPart,
@@ -162,14 +164,18 @@ export function getGameProbabilityReport() {
               detail: "암/붐 강화의 크리티컬 확률·배율 적용",
             },
             {
+              label: "경험치",
+              value: `${YANMAR_HILL_REWARD_CONFIG.xpMin}~${YANMAR_HILL_REWARD_CONFIG.xpMax} XP (랜덤)`,
+            },
+            {
               label: "스타 보상",
               value: pct(starChance),
               detail: `${YANMAR_HILL_REWARD_CONFIG.minStarReward}~${YANMAR_HILL_REWARD_CONFIG.maxStarReward} 스타 랜덤 · 쿠폰 확률은 하역과 동일`,
             },
             {
               label: "구역 규칙",
-              value: "돌 5개 · 트럭 적재 10개",
-              detail: "돌을 모두 구역 밖으로 반출하면 구역 소멸 · 5분 후 같은 자리 재생성",
+              value: "돌 5개(기본) · 트럭 적재 5개 · 리젠 300초",
+              detail: "돌 고르기 강화로 돌 개수 증가 · 돌트럭속도 강화로 복귀 단축",
             },
           ],
         },
@@ -229,8 +235,12 @@ export function getGameProbabilityReport() {
                     ? `${getYanmarTruckCooldownSec(0).toFixed(0)}초 → ${getYanmarTruckCooldownSec(config.maxLevel).toFixed(0)}초`
                     : part === "CRASH_RESPAWN"
                       ? `${getYanmarBreakerDamage(0)} → ${getYanmarBreakerDamage(config.maxLevel)}`
+                      : part === "GRAPPLE_ADHESION"
+                        ? `+${Math.round(getYanmarGripAdhesionBonus(config.maxLevel) * 100)}%`
                       : part === "HAUL_TRUCK_SPEED"
-                        ? `${getYanmarHaulTruckCooldownSec(0)}초 → ${getYanmarHaulTruckCooldownSec(config.maxLevel)}초`
+                        ? `${getYanmarHaulTruckCooldownSec(0)}초 → ${Math.round(getYanmarHaulTruckCooldownSec(config.maxLevel))}초`
+                      : part === "HILL_ROCK_PICK"
+                        ? `${getYanmarHillBoulderCount(0)} → ${getYanmarHillBoulderCount(config.maxLevel)}`
                     : part === "ARM"
                       ? pctPoint(YANMAR_EQUIPMENT_CONFIG.ARM.effectPerLevel * config.maxLevel)
                       : part === "BOOM"
@@ -268,9 +278,17 @@ export function getGameProbabilityReport() {
               detail: YANMAR_TRUCK_UPGRADE_COSTS.join(" / "),
             },
             {
-              label: "브레이커 / 집게",
+              label: "브레이커 / 집게 / 돌트럭",
               value: "고정 비용표",
               detail: YANMAR_SPECIAL_UPGRADE_COSTS.join(" / "),
+            },
+            {
+              label: "돌 고르기",
+              value: "고정 비용표",
+              detail: formatYanmarUpgradeCostSequence(
+                "HILL_ROCK_PICK",
+                YANMAR_EQUIPMENT_CONFIG.HILL_ROCK_PICK.maxLevel,
+              ),
             },
             {
               label: "강화 초기화",

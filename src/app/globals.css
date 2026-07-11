@@ -210,7 +210,8 @@ body {
   left: 50%;
   top: 42%;
   z-index: 80;
-  max-width: min(86vw, 18rem);
+  width: max-content;
+  max-width: calc(100vw - 1rem);
   padding: 0.7rem 1.1rem;
   border-radius: 0.9rem;
   border: 1px solid rgba(196, 181, 253, 0.45);
@@ -223,6 +224,7 @@ body {
   font-weight: 800;
   letter-spacing: -0.01em;
   text-align: center;
+  white-space: nowrap;
   pointer-events: none;
   animation: yanmar-pose-save-toast-fade 2.1s ease-out forwards;
   will-change: opacity, transform;
@@ -295,7 +297,8 @@ body {
   left: 50%;
   top: 36%;
   z-index: 88;
-  max-width: min(88vw, 22rem);
+  width: max-content;
+  max-width: calc(100vw - 1rem);
   transform: translate(-50%, -50%);
   border: 1px solid rgba(251, 146, 60, 0.7);
   border-radius: 0.9rem;
@@ -306,10 +309,11 @@ body {
   );
   padding: 0.75rem 1.1rem;
   color: #fff7ed;
-  font-size: 0.78rem;
+  font-size: clamp(0.65rem, 2.4vw, 0.78rem);
   font-weight: 900;
   line-height: 1.35;
   text-align: center;
+  white-space: nowrap;
   pointer-events: none;
   box-shadow:
     0 0.55rem 1.6rem rgba(0, 0, 0, 0.48),
@@ -1765,6 +1769,7 @@ body {
   background: transparent;
   border: none;
   cursor: pointer;
+  pointer-events: auto;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -1774,7 +1779,7 @@ body {
   top: 50%;
   display: grid;
   height: 1.4rem;
-  width: 2.36rem;
+  width: 2.85rem;
   transform: translate(-50%, -50%);
   place-items: center;
   overflow: hidden;
@@ -1819,6 +1824,7 @@ body {
   background: transparent;
   border: none;
   cursor: pointer;
+  pointer-events: auto;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -1828,7 +1834,7 @@ body {
   top: 50%;
   display: flex;
   height: 1.4rem;
-  width: 2.36rem;
+  width: 2.85rem;
   transform: translate(-50%, -50%);
   align-items: center;
   justify-content: center;
@@ -2602,16 +2608,10 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.18rem;
-  border-radius: 0.72rem;
-  border: 1px solid rgba(226, 232, 240, 0.28);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 24%),
-    linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(2, 6, 23, 0.96));
-  box-shadow:
-    inset 0 0.12rem 0.14rem rgba(255, 255, 255, 0.08),
-    inset 0 -0.18rem 0.22rem rgba(0, 0, 0, 0.44),
-    0 0.24rem 0.34rem rgba(0, 0, 0, 0.32);
-  padding: 0.28rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
   color: rgba(255, 255, 255, 0.88);
   pointer-events: auto;
   touch-action: none;
@@ -2623,47 +2623,39 @@ body {
 }
 
 .yanmar-breaker-pedal-button.is-active {
-  border-color: rgba(251, 191, 36, 0.72);
-  box-shadow:
-    inset 0 0.12rem 0.14rem rgba(255, 255, 255, 0.12),
-    inset 0 -0.18rem 0.22rem rgba(0, 0, 0, 0.5),
-    0 0 0.55rem rgba(245, 158, 11, 0.45);
+  box-shadow: none;
 }
 
 .yanmar-breaker-pedal-pad {
   display: block;
-  width: 78%;
-  height: 58%;
-  border-radius: 0.42rem;
-  border: 0.1rem solid rgba(148, 163, 184, 0.55);
-  background:
-    radial-gradient(ellipse at 34% 18%, rgba(255, 255, 255, 0.2), transparent 28%),
-    repeating-linear-gradient(
-      180deg,
-      transparent 0 0.2rem,
-      rgba(148, 163, 184, 0.34) 0.2rem 0.28rem,
-      rgba(2, 6, 23, 0.82) 0.28rem 0.4rem
-    ),
-    linear-gradient(145deg, #374151 0%, #111827 52%, #030712 100%);
-  box-shadow:
-    inset 0 0.1rem 0.12rem rgba(255, 255, 255, 0.14),
-    inset 0 -0.2rem 0.28rem rgba(0, 0, 0, 0.68);
-  transform: translateY(0);
-  transition: transform 80ms ease-out;
+  width: 92%;
+  height: 96%;
+  background-image: url("/images/yanmar/2d/cockpit/attachment-pedal-front.png?v=4");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  transform-origin: center;
+  backface-visibility: hidden;
+  filter: drop-shadow(0 0.18rem 0.16rem rgba(0, 0, 0, 0.78));
+  transform: perspective(6rem) rotateX(0deg);
+  transition:
+    transform 110ms ease-out,
+    filter 110ms ease-out;
 }
 
 .yanmar-breaker-pedal-button.is-active .yanmar-breaker-pedal-pad {
-  transform: translateY(0.14rem) scale(0.97);
-  border-color: rgba(251, 191, 36, 0.7);
-  background:
-    radial-gradient(ellipse at 35% 22%, rgba(255, 255, 255, 0.24), transparent 32%),
-    repeating-linear-gradient(
-      180deg,
-      transparent 0 0.2rem,
-      rgba(251, 191, 36, 0.42) 0.2rem 0.28rem,
-      rgba(2, 6, 23, 0.82) 0.28rem 0.4rem
-    ),
-    linear-gradient(145deg, #92400e 0%, #78350f 48%, #1c1917 100%);
+  filter:
+    brightness(1.12)
+    drop-shadow(0 0.18rem 0.16rem rgba(0, 0, 0, 0.78))
+    drop-shadow(0 0 0.3rem rgba(251, 191, 36, 0.48));
+}
+
+.yanmar-breaker-pedal-button.is-top-active .yanmar-breaker-pedal-pad {
+  transform: perspective(6rem) rotateX(11deg) translateY(0.08rem) scale(0.98);
+}
+
+.yanmar-breaker-pedal-button.is-bottom-active .yanmar-breaker-pedal-pad {
+  transform: perspective(6rem) rotateX(-11deg) translateY(-0.08rem) scale(0.98);
 }
 
 .yanmar-breaker-pedal-caption {

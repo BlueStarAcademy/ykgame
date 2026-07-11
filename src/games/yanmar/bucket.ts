@@ -210,7 +210,7 @@ export function getDozerBladeContactWorld(sim: ExcavatorSimState, blade: number)
   const reach = YANMAR_MACHINE_RIG.dozerBladeReach;
   return {
     x: sim.posX + Math.sin(facing) * reach,
-    y: YANMAR_MACHINE_RIG.excavatorVisualY + localBottomY,
+    y: YANMAR_MACHINE_RIG.excavatorVisualY + sim.posY + localBottomY,
     z: sim.posZ + Math.cos(facing) * reach,
   };
 }
@@ -245,8 +245,19 @@ export interface DigFeedback {
   crashHitDamage: number;
   /** Grapple is near a pickable boulder. */
   canGrab: boolean;
+  /** Rock is in reach, but the bucket is not aligned with the hydraulic thumb. */
+  grappleNeedsAlignment: boolean;
   /** Grapple is carrying a rock over the drop point. */
   canDropRock: boolean;
+  /** Show grip adhesion gauge (clamping or carrying before lift check). */
+  showGripGauge: boolean;
+  /** Locked/live adhesion 0~1. */
+  gripAdhesion: number;
+  /** Pressure from hold time 0~1. */
+  gripPressure: number;
+  /** Boom-lift load check result toast trigger. */
+  grappleLiftResult: null | "success" | "fail";
+  grappleLiftResultTick: number;
   digging: boolean;
   groundDepth: number;
   bucketOpenReady: boolean;
@@ -287,7 +298,13 @@ export function createDigFeedback(): DigFeedback {
     crashHitTick: 0,
     crashHitDamage: 0,
     canGrab: false,
+    grappleNeedsAlignment: false,
     canDropRock: false,
+    showGripGauge: false,
+    gripAdhesion: 0,
+    gripPressure: 0,
+    grappleLiftResult: null,
+    grappleLiftResultTick: 0,
     digging: false,
     groundDepth: 0,
     bucketOpenReady: false,

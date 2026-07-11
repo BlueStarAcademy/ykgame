@@ -7,6 +7,7 @@ import {
   calculateYanmarEquipmentStats,
   calculateYanmarHillScore,
   mergeYanmarEquipmentLevelsFromDb,
+  rollYanmarHillXp,
   YANMAR_HILL_REWARD_CONFIG,
 } from "@/games/yanmar/equipment";
 import {
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
     );
     const critical = Math.random() < stats.criticalChance;
     const score = calculateYanmarHillScore(stats, critical);
-    const xpGained = score;
+    const xpGained = rollYanmarHillXp();
     const reward = rollYanmarReward({
       score,
       minStars: minStarReward,
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
       reward,
       minStars: minStarReward,
       maxStars: maxStarReward,
-      metadata: { eventId, xpGained },
+      metadata: { eventId, xpGained, score, critical },
     });
     const totalStars =
       issuedReward.kind === "stars" ? issuedReward.stars : 0;

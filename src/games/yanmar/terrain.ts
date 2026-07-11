@@ -24,11 +24,18 @@ export const DIG_ZONE_RESPAWN_MS = 10 * 1000;
 export const CRASH_ZONE_RESPAWN_MS = 5 * 60 * 1000;
 export const CRASH_TILE_MAX_HP = 1000;
 export const CRASH_HIT_DAMAGE = 10;
-export const HAUL_TRUCK_COOLDOWN_SEC = 10 * 60;
-export const HAUL_TRUCK_CAPACITY = 10;
+/** 활성 아스팔트 타일 상단이 sampleHeight 위로 올라온 높이 (풀 HP). CrashZoneDecor와 동기. */
+export const CRASH_ASPHALT_SURFACE_TOP = 0.22;
+/** 타일 파괴 진행에 따라 상단이 내려가는 최대량. */
+export const CRASH_ASPHALT_SURFACE_SINK = 0.1;
+/** 아스팔트 박스 중심 Y (풀 HP 기준, sampleHeight 상대). */
+export const CRASH_ASPHALT_BOX_CENTER_Y = 0.12;
+export const CRASH_ASPHALT_BOX_THICKNESS = 0.2;
+export const HAUL_TRUCK_COOLDOWN_SEC = 300;
+export const HAUL_TRUCK_CAPACITY = 5;
 export const HILL_BOULDER_COUNT = 5;
 /** 돌 구역의 돌을 모두 반출한 뒤 구역 재생성까지 대기. */
-export const HILL_ZONE_RESPAWN_MS = 5 * 60 * 1000;
+export const HILL_ZONE_RESPAWN_MS = 300 * 1000;
 /** 채취량은 유지하되 화면에 보이는 지형 침하는 완만하게 제한한다. */
 const DIG_TERRAIN_DEFORMATION_SCALE = 0.45;
 const DIG_TERRAIN_MAX_DEPTH = 0.7;
@@ -74,6 +81,30 @@ export interface HillBoulder {
   delivered: boolean;
   /** 집어서 구역 밖으로 반출되었거나 트럭에 적재됨. */
   extracted: boolean;
+  /** 0~1 — 클수록 밀착감↓ (비주얼 스케일과 동기). */
+  size: number;
+  /** 0~1 — 둥글수록 밀착감↓. */
+  roundness: number;
+  /** 기하 중심 대비 무게중심 X 오프셋. */
+  comOffsetX: number;
+  /** 기하 중심 대비 무게중심 Z 오프셋. */
+  comOffsetZ: number;
+}
+
+/** PremiumBoulder와 동일한 월드 스케일 (size 0→0.72, 1→1.16). */
+export function hillBoulderVisualScale(size: number): number {
+  return 0.72 + Math.max(0, Math.min(1, size)) * 0.44;
+}
+
+export function createHillBoulderAttrs(index: number): Pick<
+  HillBoulder,
+  "size" | "roundness" | "comOffsetX" | "comOffsetZ"
+> {
+  const size = (index % 5) / 4;
+  const roundness = index % 2;
+  const comOffsetX = (((index * 17) % 7) / 7) * 0.35 - 0.175;
+  const comOffsetZ = (((index * 29) % 7) / 7) * 0.35 - 0.175;
+  return { size, roundness, comOffsetX, comOffsetZ };
 }
 
 export interface HaulTruckState {
@@ -759,9 +790,11 @@ function createHillBoulders(
   cycleId: string,
   centerX: number,
   centerZ: number,
+  count = HILL_BOULDER_COUNT,
 ): HillBoulder[] {
-  return Array.from({ length: HILL_BOULDER_COUNT }, (_, index) => {
-    const angle = (index / HILL_BOULDER_COUNT) * Math.PI * 2 + 0.35;
+  const boulderCount = Math.max(1, Math.floor(count));
+  return Array.from({ length: boulderCount }, (_, index) => {
+    const angle = (index / boulderCount) * Math.PI * 2 + 0.35;
     const ring = 7.5 + (index % 2) * 2.4;
     return {
       id: `${cycleId}-rock-${index + 1}`,
@@ -770,6 +803,7 @@ function createHillBoulders(
       active: true,
       delivered: false,
       extracted: false,
+      ...createHillBoulderAttrs(index),
     };
   });
 }
@@ -778,6 +812,7 @@ function createHillZone(
   centerX = 22,
   centerZ = 112,
   haulTruck?: HaulTruckState,
+  boulderCount = HILL_BOULDER_COUNT,
 ): HillZone {
   const cycleId = `hill-${Date.now().toString(36)}-${Math.floor(
     Math.random() * 1_000_000,
@@ -790,7 +825,7 @@ function createHillZone(
     dropX: centerX + 13,
     dropZ: centerZ + 6,
     active: true,
-    boulders: createHillBoulders(cycleId, centerX, centerZ),
+    boulders: createHillBoulders(cycleId, centerX, centerZ, boulderCount),
     haulTruck: haulTruck
       ? { ...haulTruck }
       : {
@@ -829,6 +864,22 @@ export function getCrashTileAt(
   const col = Math.max(0, Math.min(2, Math.floor((localX / zone.width) * 3)));
   const row = Math.max(0, Math.min(2, Math.floor((localZ / zone.depth) * 3)));
   return zone.tiles.find((tile) => tile.row === row && tile.col === col) ?? null;
+}
+
+/** 활성 아스팔트 타일 상단 오프셋. HP가 줄수록 낮아져 브레이커가 박혀 들어가는 느낌을 준다. */
+export function getCrashAsphaltSurfaceOffset(tile: CrashTile | null | undefined): number {
+  if (!tile?.active) return 0;
+  const damage = 1 - tile.hp / Math.max(1, tile.maxHp);
+  return CRASH_ASPHALT_SURFACE_TOP - damage * CRASH_ASPHALT_SURFACE_SINK;
+}
+
+/** 브레이커/도저 접촉용 높이 — 지형 + 활성 아스팔트 상단. */
+export function sampleCrashContactHeight(
+  terrain: TerrainData,
+  wx: number,
+  wz: number,
+): number {
+  return sampleHeight(terrain, wx, wz) + getCrashAsphaltSurfaceOffset(getCrashTileAt(terrain, wx, wz));
 }
 
 export function damageCrashTile(
@@ -904,6 +955,7 @@ export function updateSpecialZones(
   now = Date.now(),
   crashRespawnSec = CRASH_ZONE_RESPAWN_MS / 1000,
   haulTruckCooldownSec = HAUL_TRUCK_COOLDOWN_SEC,
+  hillBoulderCount = HILL_BOULDER_COUNT,
 ) {
   const crash = terrain.crashZone;
   if (crash && !crash.active && crash.clearedAt) {
@@ -925,6 +977,7 @@ export function updateSpecialZones(
       hill.centerX,
       hill.centerZ,
       hill.haulTruck,
+      hillBoulderCount,
     );
     rebakeSpecialSiteSurfaces(terrain);
   }
@@ -950,11 +1003,15 @@ export function updateSpecialZones(
   }
 }
 
-export function addHaulTruckRock(terrain: TerrainData) {
+export function addHaulTruckRock(
+  terrain: TerrainData,
+  capacity = HAUL_TRUCK_CAPACITY,
+) {
   const truck = terrain.hillZone?.haulTruck;
   if (!truck || truck.phase !== "ready") return false;
-  truck.loadCount = Math.min(HAUL_TRUCK_CAPACITY, truck.loadCount + 1);
-  if (truck.loadCount >= HAUL_TRUCK_CAPACITY) {
+  const maxLoad = Math.max(1, Math.floor(capacity));
+  truck.loadCount = Math.min(maxLoad, truck.loadCount + 1);
+  if (truck.loadCount >= maxLoad) {
     truck.phase = "departing";
     truck.phaseElapsed = 0;
   }
