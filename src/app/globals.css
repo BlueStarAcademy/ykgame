@@ -57,8 +57,14 @@ body {
 }
 
 .yanmar-score-panel-value {
-  display: inline-block;
   animation: yanmar-score-panel-value-bump 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.yanmar-score-panel-star {
+  display: block;
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
 }
 
 .yanmar-score-panel-reward {
@@ -1981,6 +1987,74 @@ body {
   column-gap: var(--yanmar-function-gap);
   row-gap: var(--yanmar-function-gap);
   pointer-events: none;
+}
+
+.yanmar-quest-button {
+  position: relative;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  border-color: rgba(253, 230, 138, 0.38);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(146, 64, 14, 0.72), rgba(2, 6, 23, 0.92));
+}
+
+.yanmar-quest-button.is-open {
+  border-color: rgba(251, 191, 36, 0.62);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 32%),
+    linear-gradient(180deg, rgba(180, 83, 9, 0.78), rgba(15, 23, 42, 0.92));
+}
+
+.yanmar-quest-button-icon {
+  position: absolute;
+  left: 50%;
+  top: 0.18rem;
+  display: block;
+  width: 1.95rem;
+  height: 1.95rem;
+  transform: translateX(-50%);
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0.14rem 0.12rem rgba(0, 0, 0, 0.82))
+    drop-shadow(0 0 0.18rem rgba(251, 191, 36, 0.28));
+  transition:
+    transform 130ms ease,
+    filter 130ms ease;
+  pointer-events: none;
+}
+
+.yanmar-quest-button.is-open .yanmar-quest-button-icon {
+  transform: translateX(-50%) rotate(-6deg) scale(1.06);
+  filter:
+    drop-shadow(0 0.14rem 0.12rem rgba(0, 0, 0, 0.82))
+    drop-shadow(0 0 0.34rem rgba(251, 191, 36, 0.55));
+}
+
+.yanmar-quest-button-label {
+  position: absolute;
+  left: 50%;
+  bottom: 0.22rem;
+  transform: translateX(-50%);
+  font-size: 0.46rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.58);
+}
+
+.yanmar-quest-panel-badge {
+  display: block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 0.18rem;
+  border: 1px solid rgba(253, 230, 138, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 40%),
+    linear-gradient(160deg, rgba(217, 119, 6, 0.95), rgba(120, 53, 15, 0.95));
+  box-shadow: 0 0 0.35rem rgba(251, 191, 36, 0.35);
 }
 
 .yanmar-function-menu-toggle {
@@ -5006,14 +5080,16 @@ html.pwa-mode body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  padding: 0 1.15rem 0.4rem;
+  box-sizing: border-box;
   background:
     radial-gradient(ellipse at 50% 78%, rgba(212, 181, 106, 0.16), transparent 55%),
     linear-gradient(180deg, transparent 0%, rgba(8, 9, 12, 0.15) 70%, #08090c 100%);
 }
 
 .yanmar-unlock-machine {
-  width: min(118%, 24rem);
-  max-width: none;
+  width: min(86%, 17.5rem);
+  max-width: 100%;
   height: auto;
   object-fit: contain;
   object-position: center bottom;
@@ -5051,12 +5127,12 @@ html.pwa-mode body {
 
 .yanmar-unlock-attachment-orb {
   position: absolute;
-  right: 0.55rem;
+  right: 1.15rem;
   bottom: 1.15rem;
   display: grid;
   place-items: center;
-  width: 5.1rem;
-  height: 5.1rem;
+  width: 4.6rem;
+  height: 4.6rem;
   border-radius: 50%;
   background:
     radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.16), transparent 42%),
@@ -5229,8 +5305,9 @@ html.pwa-mode body {
   }
 
   .yanmar-unlock-attachment-orb {
-    width: 4.3rem;
-    height: 4.3rem;
+    width: 4rem;
+    height: 4rem;
+    right: 1rem;
     bottom: 0.85rem;
   }
 

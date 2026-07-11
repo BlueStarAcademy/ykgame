@@ -7,7 +7,7 @@ import {
   YANMAR_SPECIAL_UPGRADE_COSTS,
   YANMAR_TRUCK_UPGRADE_COSTS,
   formatYanmarUpgradeCostSequence,
-  getYanmarBreakerDamage,
+  formatYanmarBreakerDamage,
   getYanmarGripAdhesionBonus,
   getYanmarHaulTruckCooldownSec,
   getYanmarHillBoulderCount,
@@ -234,7 +234,7 @@ export function getGameProbabilityReport() {
                   : part === "TRUCK_SPEED"
                     ? `${getYanmarTruckCooldownSec(0).toFixed(0)}초 → ${getYanmarTruckCooldownSec(config.maxLevel).toFixed(0)}초`
                     : part === "CRASH_RESPAWN"
-                      ? `${getYanmarBreakerDamage(0)} → ${getYanmarBreakerDamage(config.maxLevel)}`
+                      ? `${formatYanmarBreakerDamage(0)} → ${formatYanmarBreakerDamage(config.maxLevel)}`
                       : part === "GRAPPLE_ADHESION"
                         ? `+${Math.round(getYanmarGripAdhesionBonus(config.maxLevel) * 100)}%`
                       : part === "HAUL_TRUCK_SPEED"

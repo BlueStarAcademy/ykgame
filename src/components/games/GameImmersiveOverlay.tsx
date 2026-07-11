@@ -132,9 +132,9 @@ export function GameImmersiveOverlay({
           >
             ✕ 종료
           </button>
-          <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 items-center" />
+          <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 flex-1 items-center" />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <div id={GAME_IMMERSIVE_HEADER_RIGHT_ID} className="flex items-center gap-3" />
           {!hideHeaderStats && (
             <span className="text-[10px] opacity-80">

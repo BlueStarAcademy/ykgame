@@ -52,7 +52,10 @@ export const YANMAR_HILL_ROCK_PICK_COSTS = [
   75, 150, 225, 300, 500,
 ] as const;
 
-export const YANMAR_BASE_BREAKER_DAMAGE = 10;
+export const YANMAR_BASE_BREAKER_DAMAGE_MIN = 6;
+export const YANMAR_BASE_BREAKER_DAMAGE_MAX = 10;
+/** @deprecated Use MIN/MAX — kept as max for older references. */
+export const YANMAR_BASE_BREAKER_DAMAGE = YANMAR_BASE_BREAKER_DAMAGE_MAX;
 export const YANMAR_BASE_HAUL_TRUCK_COOLDOWN_SEC = 300;
 export const YANMAR_BASE_HAUL_TRUCK_CAPACITY = 5;
 export const YANMAR_BASE_HILL_BOULDER_COUNT = 5;
@@ -132,6 +135,7 @@ export interface YanmarEquipmentStats {
   criticalChance: number;
   criticalMultiplier: number;
   travelSpeedMultiplier: number;
+  /** Upgrade bonus added to each 6~10 base hit roll. */
   breakerDamage: number;
   crashRespawnSec: number;
   haulTruckCooldownSec: number;
@@ -338,7 +342,7 @@ export function calculateYanmarEquipmentStats(
       safeLevels.BOOM * YANMAR_EQUIPMENT_CONFIG.BOOM.effectPerLevel,
     travelSpeedMultiplier:
       1 + safeLevels.ENGINE * YANMAR_EQUIPMENT_CONFIG.ENGINE.effectPerLevel,
-    breakerDamage: getYanmarBreakerDamage(safeLevels.CRASH_RESPAWN),
+    breakerDamage: getYanmarBreakerDamageBonus(safeLevels.CRASH_RESPAWN),
     crashRespawnSec: 5 * 60,
     haulTruckCooldownSec: getYanmarHaulTruckCooldownSec(safeLevels.HAUL_TRUCK_SPEED),
     haulTruckCapacity: YANMAR_BASE_HAUL_TRUCK_CAPACITY,
@@ -347,15 +351,37 @@ export function calculateYanmarEquipmentStats(
   };
 }
 
-export function getYanmarBreakerDamage(level = 0) {
+/** Upgrade bonus added on top of the 6~10 base roll. */
+export function getYanmarBreakerDamageBonus(level = 0) {
   const safeLevel = Math.max(
     0,
     Math.min(YANMAR_EQUIPMENT_CONFIG.CRASH_RESPAWN.maxLevel, Math.floor(level)),
   );
+  return safeLevel * YANMAR_EQUIPMENT_CONFIG.CRASH_RESPAWN.damagePerLevel;
+}
+
+export function formatYanmarBreakerDamage(level = 0) {
+  const bonus = getYanmarBreakerDamageBonus(level);
+  return `${YANMAR_BASE_BREAKER_DAMAGE_MIN + bonus}~${YANMAR_BASE_BREAKER_DAMAGE_MAX + bonus}`;
+}
+
+/** Roll one breaker hit: base 6~10 + upgrade bonus. */
+export function rollYanmarBreakerDamage(levelOrBonus = 0, opts?: { bonusOnly?: boolean }) {
+  const bonus = opts?.bonusOnly
+    ? Math.max(0, Math.floor(levelOrBonus))
+    : getYanmarBreakerDamageBonus(levelOrBonus);
+  const span =
+    YANMAR_BASE_BREAKER_DAMAGE_MAX - YANMAR_BASE_BREAKER_DAMAGE_MIN + 1;
   return (
-    YANMAR_BASE_BREAKER_DAMAGE +
-    safeLevel * YANMAR_EQUIPMENT_CONFIG.CRASH_RESPAWN.damagePerLevel
+    YANMAR_BASE_BREAKER_DAMAGE_MIN +
+    Math.floor(Math.random() * span) +
+    bonus
   );
+}
+
+/** Max hit damage at this upgrade level (for numeric summaries). */
+export function getYanmarBreakerDamage(level = 0) {
+  return YANMAR_BASE_BREAKER_DAMAGE_MAX + getYanmarBreakerDamageBonus(level);
 }
 
 export function getYanmarGripAdhesionBonus(level = 0) {
@@ -477,7 +503,7 @@ export function getYanmarUpgradePartStatText(
     case "TRUCK_SPEED":
       return `${label}${Math.round(getYanmarTruckCooldownSec(safeLevel))}초`;
     case "CRASH_RESPAWN":
-      return `${label}${getYanmarBreakerDamage(safeLevel)}`;
+      return `${label}${formatYanmarBreakerDamage(safeLevel)}`;
     case "GRAPPLE_ADHESION":
       return `${label}+${Math.round(getYanmarGripAdhesionBonus(safeLevel) * 100)}%`;
     case "HAUL_TRUCK_SPEED":

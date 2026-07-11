@@ -73,7 +73,7 @@ import {
 } from "./dumpTruckState";
 import type { DiggingScoreState } from "./scoring";
 import type { GameMode } from "./tutorial";
-import { calculateYanmarChunkScore, type YanmarEquipmentStats } from "./equipment";
+import { calculateYanmarChunkScore, rollYanmarBreakerDamage, type YanmarEquipmentStats } from "./equipment";
 import { YANMAR_MACHINE_RIG } from "./machineVisualTheme";
 import type { DumpScorePopup, ExcavatorSimState } from "./types";
 import {
@@ -661,7 +661,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     } else if (toolTouchesGround && runtime.attachmentActionCooldown <= 0) {
       const tile = getCrashTileAt(terrain, toolTip.x, toolTip.z);
       if (tile?.active) {
-        const hitDamage = stats.breakerDamage;
+        const hitDamage = rollYanmarBreakerDamage(stats.breakerDamage, {
+          bonusOnly: true,
+        });
         const result = damageCrashTile(terrain, tile.id, hitDamage);
         // Hold-to-hammer: rapid ticks while the foot pedal stays down.
         runtime.attachmentActionCooldown = 0.11;

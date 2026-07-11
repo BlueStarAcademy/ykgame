@@ -60,6 +60,7 @@ export interface DumpScorePanelState {
   critical: boolean;
   rewardText: string;
   earnedStars: number;
+  earnedXp: number;
   pendingRewards: number;
   pulseKey: number;
 }

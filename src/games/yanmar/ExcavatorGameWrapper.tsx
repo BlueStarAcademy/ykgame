@@ -56,6 +56,17 @@ import { DigPoseGraph, GrappleGripGauge } from "./DigHintPanel";
 import { DumpHintPanel } from "./DumpHintPanel";
 import { ControlsGuidePanel } from "./ControlsGuidePanel";
 import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
+import { QuestPanel } from "./QuestPanel";
+import {
+  applyQuestProgress,
+  claimCurrentMission,
+  claimDailyQuest,
+  loadQuestState,
+  questClaimEventId,
+  saveQuestState,
+  type YanmarQuestState,
+} from "./quests/questState";
+import type { QuestMetric } from "./quests/types";
 import { createDigFeedback, type DigFeedback } from "./bucket";
 import {
   loadDumpTruckCooldown,
@@ -98,6 +109,7 @@ import {
   getLoadUnits,
   getYanmarPartResetRefundStars,
   getYanmarUpgradeCost,
+  rollYanmarHillXp,
   type YanmarEquipmentLevels,
   type YanmarEquipmentPart,
   type YanmarEquipmentStats,
@@ -123,10 +135,13 @@ import {
   getYanmarCouponLabel,
 } from "./rewardVisualConfig";
 import { XpProgressBar } from "@/components/ui/XpProgressBar";
-import { getPlayerLevelProgress } from "@/lib/playerLevel";
+import { formatXpProgress, getPlayerLevelProgress } from "@/lib/playerLevel";
 import {
   getCrossedUnlocks,
+  getUnseenUnlocksForLevel,
+  hasSeenPlayerUnlock,
   isAttachmentUnlocked,
+  markPlayerUnlockSeen,
   PRACTICE_FULL_UNLOCK_LEVEL,
   type PlayerUnlockKind,
 } from "@/lib/playerUnlocks";
@@ -243,15 +258,6 @@ function appendRewardText(previous: string, next: string) {
   return `${previous} · ${next}`;
 }
 
-function formatDumpScorePanelReward(panel: DumpScorePanelState) {
-  const starSummary =
-    panel.earnedStars > 0 ? `⭐ ${panel.earnedStars.toLocaleString()}` : "";
-  if (starSummary && panel.rewardText) {
-    return `${starSummary} · ${panel.rewardText}`;
-  }
-  return starSummary || panel.rewardText;
-}
-
 function crashHpBarColor(ratio: number) {
   if (ratio > 0.5) return "bg-emerald-400";
   if (ratio > 0.25) return "bg-orange-400";
@@ -336,26 +342,44 @@ function rollLocalHillReward(stats: YanmarEquipmentStats) {
 function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
   if (!panel) return null;
 
-  const rewardText = formatDumpScorePanelReward(panel);
-
   return (
-    <div className="pointer-events-none absolute left-1/2 top-[4.25rem] z-50 w-[16rem] -translate-x-1/2">
+    <div className="pointer-events-none absolute left-1/2 top-[4.25rem] z-50 w-[min(22rem,92vw)] -translate-x-1/2">
       <div
         key={panel.pulseKey}
-        className={`yanmar-score-panel rounded-xl border px-4 py-2.5 text-center font-black shadow-xl backdrop-blur-md ${
+        className={`yanmar-score-panel rounded-xl border px-3.5 py-2 font-black shadow-xl backdrop-blur-md ${
           panel.critical
             ? "border-yellow-200/70 bg-black/80 text-yellow-300"
-            : "border-white/25 bg-black/78 text-slate-300"
+            : "border-white/25 bg-black/78 text-slate-200"
         }`}
       >
         <div
-          className={`yanmar-score-panel-value ${panel.critical ? "text-sm" : "text-xs"}`}
+          className={`yanmar-score-panel-value flex items-center justify-center gap-2.5 whitespace-nowrap tabular-nums ${
+            panel.critical ? "text-sm" : "text-xs"
+          }`}
         >
-          +{panel.totalScore}
+          <span>{panel.totalScore.toLocaleString()}점</span>
+          <span className={panel.critical ? "text-yellow-200/80" : "text-white/35"} aria-hidden>
+            ·
+          </span>
+          <span>EXP+{panel.earnedXp.toLocaleString()}</span>
+          <span className={panel.critical ? "text-yellow-200/80" : "text-white/35"} aria-hidden>
+            ·
+          </span>
+          <span className="inline-flex items-center gap-0.5">
+            <img
+              src="/images/star-currency.svg"
+              alt=""
+              width={14}
+              height={14}
+              className="yanmar-score-panel-star"
+              draggable={false}
+            />
+            {panel.earnedStars.toLocaleString()}
+          </span>
         </div>
-        {rewardText ? (
-          <div className="yanmar-score-panel-reward mt-1 text-[10px] font-bold text-white/90">
-            {rewardText}
+        {panel.rewardText ? (
+          <div className="yanmar-score-panel-reward mt-1 text-center text-[10px] font-bold text-white/90">
+            {panel.rewardText}
           </div>
         ) : null}
       </div>
@@ -536,6 +560,8 @@ export function ExcavatorGameWrapper({
     message: string;
   } | null>(null);
   const [unlockQueue, setUnlockQueue] = useState<PlayerUnlockKind[]>([]);
+  const unlockSeenOwnerRef = useRef("local");
+  const unlockAnnouncedRef = useRef<Set<PlayerUnlockKind>>(new Set());
   const [terrainRevision, setTerrainRevision] = useState(0);
   const [savePoseCooldownUntil, setSavePoseCooldownUntil] = useState(0);
   const [executePoseCooldownUntil, setExecutePoseCooldownUntil] = useState(0);
@@ -571,6 +597,21 @@ export function ExcavatorGameWrapper({
   const [showMinimap, setShowMinimap] = useState(true);
   const [showDigPoseGraph, setShowDigPoseGraph] = useState(true);
   const [showTutorialMenu, setShowTutorialMenu] = useState(false);
+  const [showQuestPanel, setShowQuestPanel] = useState(false);
+  const [questState, setQuestState] = useState<YanmarQuestState | null>(null);
+  const [questClaimingId, setQuestClaimingId] = useState<string | null>(null);
+  const questStateRef = useRef<YanmarQuestState | null>(null);
+  const questTrackRef = useRef({
+    posX: 0,
+    posZ: 0,
+    swing: 0,
+    swingAccum: 0,
+    bucketLoad: 0,
+    dumpTruckPhase: "" as string,
+    haulTruckPhase: "" as string,
+    grappleLiftTick: 0,
+    ready: false,
+  });
   const [showTouchZones, setShowTouchZones] = useState(false);
   const [showEquipmentUpgrade, setShowEquipmentUpgrade] = useState(false);
   const [upgradingPart, setUpgradingPart] = useState<YanmarEquipmentPart | null>(null);
@@ -988,6 +1029,25 @@ export function ExcavatorGameWrapper({
     [showAttachmentWarning],
   );
 
+  const enqueueUnlockNotices = useCallback((kinds: PlayerUnlockKind[]) => {
+    const ownerId = unlockSeenOwnerRef.current;
+    const fresh = kinds.filter((kind) => {
+      if (unlockAnnouncedRef.current.has(kind)) return false;
+      if (hasSeenPlayerUnlock(ownerId, kind)) return false;
+      return true;
+    });
+    if (fresh.length === 0) return;
+    for (const kind of fresh) {
+      unlockAnnouncedRef.current.add(kind);
+      // Mark as soon as we decide to show — prevents reappearing on every reconnect.
+      markPlayerUnlockSeen(ownerId, kind);
+    }
+    setUnlockQueue((queue) => [
+      ...queue,
+      ...fresh.filter((kind) => !queue.includes(kind)),
+    ]);
+  }, []);
+
   const applyTotalXp = useCallback(
     (nextXp: number, opts?: { announceLevelUp?: boolean }) => {
       const prevLevel = getPlayerLevelProgress(totalXpRef.current).level;
@@ -1001,35 +1061,161 @@ export function ExcavatorGameWrapper({
       }
       if (opts?.announceLevelUp && nextLevel > prevLevel) {
         showLevelUpToast(nextLevel);
-        const unlocked = getCrossedUnlocks(prevLevel, nextLevel);
-        if (unlocked.length > 0) {
-          setUnlockQueue((queue) => [...queue, ...unlocked]);
-        }
+        enqueueUnlockNotices(getCrossedUnlocks(prevLevel, nextLevel));
       }
     },
-    [showLevelUpToast],
+    [enqueueUnlockNotices, showLevelUpToast],
+  );
+
+  const pushQuestProgress = useCallback(
+    (metric: QuestMetric, amount: number) => {
+      if (amount <= 0) return;
+      if (modeRef.current === "intro" || modeRef.current === "ride") return;
+      const current = questStateRef.current;
+      if (!current) return;
+      const next = applyQuestProgress(current, { metric, amount });
+      if (next === current) return;
+      questStateRef.current = next;
+      setQuestState(next);
+      saveQuestState(next);
+    },
+    [],
   );
 
   useEffect(() => {
-    const level = getPlayerLevelProgress(totalXp).level;
-    const available = (["BREAKER", "GRAPPLE"] as PlayerUnlockKind[]).filter(
-      (kind) => {
-        const required = kind === "BREAKER" ? 10 : 15;
-        if (level < required) return false;
-        try {
-          return localStorage.getItem(`ykgame:yanmar:unlock-seen:${kind}`) !== "1";
-        } catch {
-          return true;
+    if (sessionStatus === "loading") return;
+    const ownerId = session?.user?.id ?? "local";
+    const level = getPlayerLevelProgress(
+      session?.user?.totalXp ?? totalXpRef.current,
+    ).level;
+    const loaded = loadQuestState(ownerId, level);
+    questStateRef.current = loaded;
+    setQuestState(loaded);
+    questTrackRef.current.ready = false;
+  }, [session?.user?.id, session?.user?.totalXp, sessionStatus]);
+
+  useEffect(() => {
+    if (mode === "intro" || mode === "ride" || mode === "gameReady") return;
+    if (!session?.user?.id) return;
+    pushQuestProgress("login", 1);
+  }, [mode, pushQuestProgress, session?.user?.id]);
+
+  const grantQuestReward = useCallback(
+    async (opts: {
+      eventId: string;
+      stars: number;
+      xp: number;
+      label: string;
+    }) => {
+      if (session?.user?.id) {
+        const res = await fetch("/api/rewards/yanmar-quest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(opts),
+        });
+        if (res.status === 409) return true;
+        if (!res.ok) throw new Error("quest claim failed");
+        const data = (await res.json()) as {
+          currency?: number;
+          totalXp?: number;
+        };
+        if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
+          setCurrency(data.currency);
+          setPreviewStars(data.currency);
+          void updateSessionRef.current({ user: { currency: data.currency } });
         }
-      },
-    );
-    if (available.length > 0) {
-      setUnlockQueue((queue) => {
-        const unique = available.filter((kind) => !queue.includes(kind));
-        return [...queue, ...unique];
+        if (typeof data.totalXp === "number") {
+          applyTotalXp(data.totalXp, { announceLevelUp: true });
+          void updateSessionRef.current({ user: { totalXp: data.totalXp } });
+        }
+        return true;
+      }
+
+      if (opts.stars > 0) {
+        setPreviewStars((value) => value + opts.stars);
+      }
+      if (opts.xp > 0) {
+        applyTotalXp(totalXpRef.current + opts.xp, { announceLevelUp: true });
+      }
+      return true;
+    },
+    [applyTotalXp, session?.user?.id],
+  );
+
+  const handleClaimDailyQuest = useCallback(
+    async (questId: string) => {
+      const current = questStateRef.current;
+      if (!current || questClaimingId) return;
+      const claimed = claimDailyQuest(current, questId);
+      if (!claimed) return;
+      setQuestClaimingId(`daily:${questId}`);
+      try {
+        await grantQuestReward({
+          eventId: questClaimEventId("daily", current.dayKey, questId),
+          stars: claimed.reward.stars,
+          xp: claimed.reward.xp,
+          label: `일일:${questId}`,
+        });
+        questStateRef.current = claimed.state;
+        setQuestState(claimed.state);
+        saveQuestState(claimed.state);
+      } catch {
+        showAttachmentWarning("퀘스트 보상 수령에 실패했습니다.");
+      } finally {
+        setQuestClaimingId(null);
+      }
+    },
+    [grantQuestReward, questClaimingId, showAttachmentWarning],
+  );
+
+  const handleClaimMissionQuest = useCallback(async () => {
+    const current = questStateRef.current;
+    if (!current || questClaimingId) return;
+    const claimed = claimCurrentMission(current);
+    if (!claimed) return;
+    setQuestClaimingId("mission");
+    try {
+      await grantQuestReward({
+        eventId: questClaimEventId(
+          "mission",
+          current.dayKey,
+          `round-${claimed.roundIndex}`,
+        ),
+        stars: claimed.reward.stars,
+        xp: claimed.reward.xp,
+        label: `미션:${claimed.roundIndex + 1}`,
       });
+      questStateRef.current = claimed.state;
+      setQuestState(claimed.state);
+      saveQuestState(claimed.state);
+    } catch {
+      showAttachmentWarning("미션 보상 수령에 실패했습니다.");
+    } finally {
+      setQuestClaimingId(null);
     }
-  }, [totalXp]);
+  }, [grantQuestReward, questClaimingId, showAttachmentWarning]);
+
+  const handleHornQuest = useCallback(() => {
+    pushQuestProgress("horn", 1);
+  }, [pushQuestProgress]);
+
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    unlockSeenOwnerRef.current = session?.user?.id ?? "local";
+    const level = getPlayerLevelProgress(totalXp).level;
+    const sessionLevel = getPlayerLevelProgress(session?.user?.totalXp ?? 0).level;
+    const effectiveLevel = Math.max(level, sessionLevel);
+    enqueueUnlockNotices(
+      getUnseenUnlocksForLevel(unlockSeenOwnerRef.current, effectiveLevel),
+    );
+  }, [
+    enqueueUnlockNotices,
+    session?.user?.id,
+    session?.user?.totalXp,
+    sessionStatus,
+    totalXp,
+  ]);
 
   const loadEquipment = useCallback(async () => {
     try {
@@ -1197,10 +1383,12 @@ export function ExcavatorGameWrapper({
     velocity.trackTurn = 0;
     velocity.trackLeft = 0;
     velocity.trackRight = 0;
+    questTrackRef.current.ready = false;
   }, []);
 
   const resetYanmarSession = useCallback((opts?: { terrainLevel?: number }) => {
     resetSim(simRef.current, velRef.current);
+    questTrackRef.current.ready = false;
     terrainRef.current = createInitialTerrain(
       false,
       opts?.terrainLevel ?? getPlayerLevelProgress(totalXpRef.current).level,
@@ -1481,6 +1669,78 @@ export function ExcavatorGameWrapper({
     persistGameSession();
     persistDumpTruckCooldown();
 
+    const modeNow = modeRef.current;
+    if (modeNow !== "intro" && modeNow !== "ride" && modeNow !== "gameReady") {
+      const sim = simRef.current;
+      const track = questTrackRef.current;
+      const stats = equipmentStatsRef.current;
+      const fb = digFeedbackRef.current;
+
+      if (!track.ready) {
+        track.posX = sim.posX;
+        track.posZ = sim.posZ;
+        track.swing = sim.swing;
+        track.swingAccum = 0;
+        track.bucketLoad = sim.bucketLoad;
+        track.dumpTruckPhase = dumpTruckStateRef.current.phase;
+        track.haulTruckPhase =
+          terrainRef.current.hillZone?.haulTruck.phase ?? "";
+        track.grappleLiftTick = fb.grappleLiftResultTick;
+        track.ready = true;
+      } else {
+        const travelDelta = Math.hypot(sim.posX - track.posX, sim.posZ - track.posZ);
+        if (travelDelta > 0.0001) {
+          pushQuestProgress("travel", travelDelta);
+        }
+        track.posX = sim.posX;
+        track.posZ = sim.posZ;
+
+        let swingDelta = sim.swing - track.swing;
+        while (swingDelta > Math.PI) swingDelta -= Math.PI * 2;
+        while (swingDelta < -Math.PI) swingDelta += Math.PI * 2;
+        track.swingAccum += Math.abs(swingDelta);
+        track.swing = sim.swing;
+        while (track.swingAccum >= Math.PI) {
+          track.swingAccum -= Math.PI;
+          pushQuestProgress("swing180", 1);
+        }
+
+        const loadDelta = sim.bucketLoad - track.bucketLoad;
+        if (loadDelta > 0.0001) {
+          pushQuestProgress("soilLoad", loadDelta * stats.maxLoadUnits);
+        }
+        track.bucketLoad = sim.bucketLoad;
+
+        const dumpPhase = dumpTruckStateRef.current.phase;
+        if (
+          dumpPhase === "departing" &&
+          track.dumpTruckPhase !== "departing" &&
+          track.dumpTruckPhase !== ""
+        ) {
+          pushQuestProgress("dumpTruckDepart", 1);
+        }
+        track.dumpTruckPhase = dumpPhase;
+
+        const haulPhase = terrainRef.current.hillZone?.haulTruck.phase ?? "";
+        if (
+          haulPhase === "departing" &&
+          track.haulTruckPhase !== "departing" &&
+          track.haulTruckPhase !== ""
+        ) {
+          pushQuestProgress("haulTruckDepart", 1);
+        }
+        track.haulTruckPhase = haulPhase;
+
+        if (
+          fb.grappleLiftResult === "success" &&
+          fb.grappleLiftResultTick !== track.grappleLiftTick
+        ) {
+          pushQuestProgress("rockLoad", 1);
+        }
+        track.grappleLiftTick = fb.grappleLiftResultTick;
+      }
+    }
+
     if (modeRef.current !== "tutorial") return;
     if (tutorialCompletingRef.current) return;
 
@@ -1510,6 +1770,7 @@ export function ExcavatorGameWrapper({
   }, [
     persistDumpTruckCooldown,
     persistGameSession,
+    pushQuestProgress,
     syncDigHud,
     setHud,
     setMode,
@@ -1576,7 +1837,7 @@ export function ExcavatorGameWrapper({
   );
 
   const accumulateDumpScore = useCallback(
-    (score: number, critical: boolean, rewardText = "") => {
+    (score: number, critical: boolean, rewardText = "", earnedXp = 0, earnedStars = 0) => {
       arcadeScoreRef.current += score;
       setHud((h) => ({ ...h, score: arcadeScoreRef.current }));
 
@@ -1585,7 +1846,8 @@ export function ExcavatorGameWrapper({
         totalScore: (previous?.totalScore ?? 0) + score,
         critical: (previous?.critical ?? false) || critical,
         rewardText: appendRewardText(previous?.rewardText ?? "", rewardText),
-        earnedStars: previous?.earnedStars ?? 0,
+        earnedStars: (previous?.earnedStars ?? 0) + earnedStars,
+        earnedXp: (previous?.earnedXp ?? 0) + earnedXp,
         pendingRewards: previous?.pendingRewards ?? 0,
         pulseKey: (previous?.pulseKey ?? 0) + 1,
       };
@@ -1602,6 +1864,7 @@ export function ExcavatorGameWrapper({
       score: number,
       critical: boolean,
       earnedStars: number,
+      earnedXp = 0,
       rewardText = "",
     ) => {
       if (score > 0) {
@@ -1614,6 +1877,7 @@ export function ExcavatorGameWrapper({
         critical,
         rewardText,
         earnedStars,
+        earnedXp,
         pendingRewards: 0,
         pulseKey: (dumpScorePanelRef.current?.pulseKey ?? 0) + 1,
       };
@@ -1627,7 +1891,9 @@ export function ExcavatorGameWrapper({
   const adjustDumpScorePanel = useCallback(
     (
       scoreDelta: number,
-      patch: Partial<Pick<DumpScorePanelState, "rewardText" | "critical" | "earnedStars">> = {},
+      patch: Partial<
+        Pick<DumpScorePanelState, "rewardText" | "critical" | "earnedStars" | "earnedXp">
+      > = {},
       decrementPending = true,
     ) => {
       const previous = dumpScorePanelRef.current;
@@ -1644,6 +1910,7 @@ export function ExcavatorGameWrapper({
         critical: patch.critical ?? previous.critical,
         rewardText: patch.rewardText ?? previous.rewardText,
         earnedStars: patch.earnedStars ?? previous.earnedStars,
+        earnedXp: patch.earnedXp ?? previous.earnedXp,
         pendingRewards: decrementPending
           ? Math.max(0, previous.pendingRewards - 1)
           : previous.pendingRewards,
@@ -1658,23 +1925,21 @@ export function ExcavatorGameWrapper({
 
   const handleDumpScore = useCallback((popup: Omit<DumpScorePopup, "id">) => {
     if (modeRef.current === "ride") return;
+    pushQuestProgress(
+      "soilDump",
+      equipmentStatsRef.current.scoreChunkUnits,
+    );
+    const dumpXp = equipmentStatsRef.current.scoreChunkUnits;
     if (modeRef.current !== "game") {
       const stars = rollOptimisticStarReward();
       setPreviewStars((value) => value + stars);
-      accumulateDumpScore(popup.score, popup.critical);
-      const panel = dumpScorePanelRef.current;
-      if (panel) {
-        const next = { ...panel, earnedStars: panel.earnedStars + stars };
-        dumpScorePanelRef.current = next;
-        setDumpScorePanel(next);
-        scheduleHideDumpScorePanel();
-      }
+      accumulateDumpScore(popup.score, popup.critical, "", dumpXp, stars);
       return;
     }
 
-    // 낙관적 업데이트: API 응답 전에 별·점수를 바로 표시
+    // 낙관적 업데이트: API 응답 전에 별·점수·경험치를 바로 표시
     const optimisticStars = rollOptimisticStarReward();
-    accumulateDumpScore(popup.score, popup.critical);
+    accumulateDumpScore(popup.score, popup.critical, "", dumpXp, optimisticStars);
     rewardStarsRef.current += optimisticStars;
     currencyRef.current += optimisticStars;
     setCurrency(currencyRef.current);
@@ -1682,12 +1947,10 @@ export function ExcavatorGameWrapper({
     if (panel) {
       const next = {
         ...panel,
-        earnedStars: rewardStarsRef.current,
         pendingRewards: panel.pendingRewards + 1,
       };
       dumpScorePanelRef.current = next;
       setDumpScorePanel(next);
-      scheduleHideDumpScorePanel();
     }
 
     void (async () => {
@@ -1700,6 +1963,14 @@ export function ExcavatorGameWrapper({
         if (!res.ok) throw new Error("Reward failed");
         const data = await res.json();
         const event = data.events?.[0] as DumpRewardApiEvent | undefined;
+        const actualXp =
+          typeof data.xpGained === "number" ? data.xpGained : dumpXp;
+        const panelBefore = dumpScorePanelRef.current;
+        const xpDelta = actualXp - dumpXp;
+        const nextEarnedXp = Math.max(
+          0,
+          (panelBefore?.earnedXp ?? dumpXp) + xpDelta,
+        );
 
         if (typeof data.currency === "number") {
           currencyRef.current = data.currency;
@@ -1719,10 +1990,15 @@ export function ExcavatorGameWrapper({
             currencyRef.current += starDelta;
             setCurrency(currencyRef.current);
           }
+          const starsOnPanel = Math.max(
+            0,
+            (dumpScorePanelRef.current?.earnedStars ?? optimisticStars) + starDelta,
+          );
           adjustDumpScorePanel(event ? event.score - popup.score : 0, {
             critical:
               (event?.critical ?? false) || dumpScorePanelRef.current?.critical,
-            earnedStars: rewardStarsRef.current,
+            earnedStars: starsOnPanel,
+            earnedXp: nextEarnedXp,
           });
           return;
         }
@@ -1736,14 +2012,25 @@ export function ExcavatorGameWrapper({
         showCouponDiscovery(event.couponType, event.discountPct);
         adjustDumpScorePanel(event.score - popup.score, {
           critical: true,
-          earnedStars: rewardStarsRef.current,
+          earnedStars: Math.max(
+            0,
+            (dumpScorePanelRef.current?.earnedStars ?? optimisticStars) - optimisticStars,
+          ),
+          earnedXp: nextEarnedXp,
         });
       } catch {
         rewardStarsRef.current = Math.max(0, rewardStarsRef.current - optimisticStars);
         currencyRef.current = Math.max(0, currencyRef.current - optimisticStars);
         setCurrency(currencyRef.current);
         adjustDumpScorePanel(0, {
-          earnedStars: rewardStarsRef.current,
+          earnedStars: Math.max(
+            0,
+            (dumpScorePanelRef.current?.earnedStars ?? optimisticStars) - optimisticStars,
+          ),
+          earnedXp: Math.max(
+            0,
+            (dumpScorePanelRef.current?.earnedXp ?? dumpXp) - dumpXp,
+          ),
           rewardText: appendRewardText(
             dumpScorePanelRef.current?.rewardText ?? "",
             "저장 실패",
@@ -1751,7 +2038,7 @@ export function ExcavatorGameWrapper({
         });
       }
     })();
-  }, [accumulateDumpScore, adjustDumpScorePanel, applyTotalXp, scheduleHideDumpScorePanel, showCouponDiscovery]);
+  }, [accumulateDumpScore, adjustDumpScorePanel, applyTotalXp, pushQuestProgress, showCouponDiscovery]);
 
   const claimSpecialReward = useCallback(
     async (kind: "crash" | "hill", eventId: string) => {
@@ -1763,26 +2050,26 @@ export function ExcavatorGameWrapper({
             kind === "crash"
               ? rollLocalCrashReward(equipmentStatsRef.current)
               : rollLocalHillReward(equipmentStatsRef.current);
+          const localXp =
+            kind === "crash"
+              ? YANMAR_CRASH_REWARD_CONFIG.xpReward
+              : rollYanmarHillXp();
           setPreviewStars((value) => value + local.stars);
           if (kind === "crash") {
             showStandaloneRewardPanel(
               local.score,
               local.critical,
               local.stars,
+              localXp,
             );
           } else {
-            accumulateDumpScore(local.score, local.critical);
-            const panel = dumpScorePanelRef.current;
-            if (panel) {
-              const next = {
-                ...panel,
-                earnedStars: panel.earnedStars + local.stars,
-                critical: panel.critical || local.critical,
-              };
-              dumpScorePanelRef.current = next;
-              setDumpScorePanel(next);
-              scheduleHideDumpScorePanel();
-            }
+            accumulateDumpScore(
+              local.score,
+              local.critical,
+              "",
+              localXp,
+              local.stars,
+            );
           }
         }
         return;
@@ -1836,49 +2123,45 @@ export function ExcavatorGameWrapper({
             : typeof event?.score === "number"
               ? event.score
               : 0;
+        const xpGained =
+          typeof data.xpGained === "number"
+            ? data.xpGained
+            : kind === "crash"
+              ? YANMAR_CRASH_REWARD_CONFIG.xpReward
+              : 0;
 
         if (kind === "crash") {
           if (event?.kind === "stars") {
             rewardStarsRef.current += event.stars;
-            showStandaloneRewardPanel(score, critical, event.stars);
+            showStandaloneRewardPanel(score, critical, event.stars, xpGained);
           } else if (event?.kind === "coupon") {
             showCouponDiscovery(event.couponType, event.discountPct);
-            showStandaloneRewardPanel(score, true, 0, "쿠폰 획득!");
+            showStandaloneRewardPanel(score, true, 0, xpGained, "쿠폰 획득!");
           } else if (typeof data.totalStars === "number") {
             rewardStarsRef.current += data.totalStars;
-            showStandaloneRewardPanel(score, critical, data.totalStars);
-          } else if (score > 0) {
-            showStandaloneRewardPanel(score, critical, 0);
+            showStandaloneRewardPanel(score, critical, data.totalStars, xpGained);
+          } else if (score > 0 || xpGained > 0) {
+            showStandaloneRewardPanel(score, critical, 0, xpGained);
           }
           return;
         }
 
-        if (score > 0) {
-          accumulateDumpScore(score, critical);
-        }
-
-        if (event?.kind === "stars") {
-          rewardStarsRef.current += event.stars;
-          adjustDumpScorePanel(0, {
-            critical: critical || dumpScorePanelRef.current?.critical,
-            earnedStars: rewardStarsRef.current,
-          });
-        } else if (event?.kind === "coupon") {
-          showCouponDiscovery(event.couponType, event.discountPct);
-          adjustDumpScorePanel(0, {
-            critical: true,
-            earnedStars: rewardStarsRef.current,
-            rewardText: appendRewardText(
-              dumpScorePanelRef.current?.rewardText ?? "",
-              "쿠폰 획득!",
-            ),
-          });
-        } else if (typeof data.totalStars === "number") {
-          rewardStarsRef.current += data.totalStars;
-          adjustDumpScorePanel(0, {
-            critical: critical || dumpScorePanelRef.current?.critical,
-            earnedStars: rewardStarsRef.current,
-          });
+        if (score > 0 || xpGained > 0) {
+          const stars =
+            event?.kind === "stars"
+              ? event.stars
+              : typeof data.totalStars === "number"
+                ? data.totalStars
+                : 0;
+          if (event?.kind === "stars" || typeof data.totalStars === "number") {
+            rewardStarsRef.current += stars;
+          }
+          if (event?.kind === "coupon") {
+            showCouponDiscovery(event.couponType, event.discountPct);
+            accumulateDumpScore(score, true, "쿠폰 획득!", xpGained, 0);
+          } else {
+            accumulateDumpScore(score, critical, "", xpGained, stars);
+          }
         }
       } catch {
         showAttachmentWarning("보상 저장에 실패했습니다. 잠시 후 다시 시도하세요.");
@@ -1886,9 +2169,7 @@ export function ExcavatorGameWrapper({
     },
     [
       accumulateDumpScore,
-      adjustDumpScorePanel,
       applyTotalXp,
-      scheduleHideDumpScorePanel,
       showAttachmentWarning,
       showCouponDiscovery,
       showStandaloneRewardPanel,
@@ -1897,9 +2178,10 @@ export function ExcavatorGameWrapper({
 
   const handleCrashTileDestroyed = useCallback(
     (tileId: string) => {
+      pushQuestProgress("asphaltBreak", 1);
       void claimSpecialReward("crash", tileId);
     },
-    [claimSpecialReward],
+    [claimSpecialReward, pushQuestProgress],
   );
 
   const handleHillRockDelivered = useCallback(
@@ -2214,31 +2496,49 @@ export function ExcavatorGameWrapper({
           </div>
         ) : null}
 
-        {mode !== "intro" && mode !== "gameReady" && mode !== "ride" && (
-          <div className="absolute left-2 top-2 z-50 flex w-[7.3125rem] flex-col items-stretch gap-1.5">
+        {mode !== "intro" && mode !== "gameReady" && mode !== "ride" ? (
+          <div className="absolute left-2 top-2 z-50 flex flex-col items-start gap-1.5">
+            <button
+              type="button"
+              className={`yanmar-quest-button yanmar-aux-button touch-none active:scale-95${
+                showQuestPanel ? " is-open" : ""
+              }`}
+              onClick={() => setShowQuestPanel((open) => !open)}
+              aria-expanded={showQuestPanel}
+              aria-label={showQuestPanel ? "퀘스트 닫기" : "퀘스트 열기"}
+            >
+              <img
+                className="yanmar-quest-button-icon"
+                src="/images/yanmar/2d/cockpit/quest-premium.png?v=3"
+                alt=""
+                draggable={false}
+              />
+              <span className="yanmar-quest-button-label">퀘스트</span>
+            </button>
+            <QuestPanel
+              open={showQuestPanel}
+              onClose={() => setShowQuestPanel(false)}
+              playerLevel={getPlayerLevelProgress(totalXp).level}
+              questState={questState}
+              claimingId={questClaimingId}
+              onClaimDaily={(questId) => {
+                void handleClaimDailyQuest(questId);
+              }}
+              onClaimMission={() => {
+                void handleClaimMissionQuest();
+              }}
+            />
             {(mode === "practice" || mode === "tutorial") && (
               <button
                 type="button"
                 onClick={() => setShowTutorialMenu(true)}
-                className="w-full rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
+                className="w-[7.3125rem] rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
               >
                 튜토리얼
               </button>
             )}
-            <div className="flex w-full flex-col items-center gap-1 rounded-lg border border-orange-100/20 bg-black/60 px-2.5 py-2 text-center shadow-lg backdrop-blur-sm">
-              <span className="text-[10px] font-black text-orange-100">적재량</span>
-              <span className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
-                <span
-                  className="block h-full rounded-full bg-orange-300 transition-all duration-150"
-                  style={{ width: `${loadOverlayPercent}%` }}
-                />
-              </span>
-              <span className="w-full text-[9px] font-bold tabular-nums text-orange-50">
-                {loadOverlayUnits}/{equipmentStats.maxLoadUnits} ({Math.round(loadOverlayPercent)}%)
-              </span>
-            </div>
             {showDigPoseGraph ? (
-              <div className="yanmar-dig-pose-panel w-full rounded-sm border border-white/10 bg-black/55 px-2 py-1.5 text-white shadow-xl backdrop-blur-sm">
+              <div className="yanmar-dig-pose-panel w-[7.3125rem] rounded-sm border border-white/10 bg-black/55 px-2 py-1.5 text-white shadow-xl backdrop-blur-sm">
                 <DigPoseGraph
                   boom={hud.boom}
                   arm={hud.arm}
@@ -2248,7 +2548,7 @@ export function ExcavatorGameWrapper({
               </div>
             ) : null}
           </div>
-        )}
+        ) : null}
 
         {loadOverlayEnabled && (
           <div
@@ -2383,23 +2683,31 @@ export function ExcavatorGameWrapper({
                 <>
                   {leftTarget && mode === "game"
                     ? createPortal(
-                        <div className="flex max-w-[min(42vw,12rem)] min-w-0 items-center text-white">
-                          <div className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/25 px-2 py-1">
-                            <div className="flex items-baseline gap-1">
-                              <p className="truncate text-[10px] font-black leading-none">
+                        <div className="flex min-w-0 w-full max-w-full items-center text-white">
+                          <div className="min-w-0 w-full rounded-lg border border-white/15 bg-black/25 px-2 py-1">
+                            <div className="flex min-w-0 items-baseline gap-1">
+                              <p className="min-w-0 truncate text-[10px] font-black leading-none">
                                 {nickname}
                               </p>
                               <span className="shrink-0 text-[9px] font-black text-amber-200">
                                 Lv.{xpProgress.level}
                               </span>
                             </div>
-                            <XpProgressBar
-                              progress={xpProgress}
-                              compact
-                              showLabel={false}
-                              className="mt-0.5"
-                              barClassName="bg-white/20"
-                            />
+                            <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                              <XpProgressBar
+                                progress={xpProgress}
+                                compact
+                                showLabel={false}
+                                className="min-w-[3.5rem] flex-1"
+                                barClassName="bg-white/20"
+                              />
+                              <span
+                                className="shrink-0 text-[8px] font-bold tabular-nums leading-none text-white/80"
+                                title={formatXpProgress(xpProgress)}
+                              >
+                                ({formatXpProgress(xpProgress)})
+                              </span>
+                            </div>
                           </div>
                         </div>,
                         leftTarget,
@@ -2533,14 +2841,6 @@ export function ExcavatorGameWrapper({
         <AttachmentUnlockOverlay
           unlock={unlockQueue[0]}
           onClose={() => {
-            const current = unlockQueue[0];
-            if (current) {
-              try {
-                localStorage.setItem(`ykgame:yanmar:unlock-seen:${current}`, "1");
-              } catch {
-                // Continue even when storage is unavailable.
-              }
-            }
             setUnlockQueue((queue) => queue.slice(1));
           }}
         />
@@ -2636,6 +2936,7 @@ export function ExcavatorGameWrapper({
             tutorialStep={tutorialStep}
             showTouchZones={showTouchZones}
             onOpenEquipmentUpgrade={() => setShowEquipmentUpgrade(true)}
+            onHorn={handleHornQuest}
           />
         )}
 

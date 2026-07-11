@@ -53,6 +53,7 @@ interface CockpitOverlayProps {
   onAttachmentChange: (attachment: AttachmentType) => void;
   onAttachmentWarning?: (message: string) => void;
   onOpenEquipmentUpgrade?: () => void;
+  onHorn?: () => void;
 }
 
 interface JoystickLayout {
@@ -2200,6 +2201,7 @@ export function CockpitOverlay({
   onAttachmentChange,
   onAttachmentWarning,
   onOpenEquipmentUpgrade,
+  onHorn,
 }: CockpitOverlayProps) {
   const highlightLeft =
     tutorialStep?.highlight === "left" || tutorialStep?.highlight === "both";
@@ -2436,7 +2438,10 @@ export function CockpitOverlay({
             isPortrait={isPortrait}
             useDPad={useDPad}
             showTouchZone={showTouchZones}
-            onHorn={playHorn}
+            onHorn={() => {
+              playHorn();
+              onHorn?.();
+            }}
           />
           {onOpenEquipmentUpgrade && mode !== "ride" && mode !== "gameReady" ? (
             <EquipmentUpgradeTouchZone
