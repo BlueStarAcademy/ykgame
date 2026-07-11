@@ -458,11 +458,6 @@ export function EquipmentUpgradePanel({
                 );
               })}
             </div>
-            {attachmentTab === "grapple" ? (
-              <div className="absolute right-2 top-2 z-30 max-w-[calc(100%_-_9rem)] whitespace-nowrap rounded-md border border-amber-200/65 bg-slate-950/82 px-2 py-1 text-[9px] font-black text-amber-100 shadow-md">
-                발판 ↑ 집기 · ↓ 열기 · 집게 강화 시 밀착감 +3%
-              </div>
-            ) : null}
 
             {EXCAVATOR_BODY_PARTS.map((part) => {
               const spot = YANMAR_UPGRADE_VISUALS.excavatorHotspots[part];
