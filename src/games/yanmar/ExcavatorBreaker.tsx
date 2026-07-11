@@ -1,5 +1,6 @@
 "use client";
 
+import type { RefObject } from "react";
 import { RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import {
@@ -90,7 +91,11 @@ function HydraulicHose({ side }: { side: -1 | 1 }) {
 }
 
 /** Procedural hydraulic breaker mounted at the arm-end pivot (local origin). */
-export function ExcavatorBreaker() {
+export function ExcavatorBreaker({
+  chiselRef,
+}: {
+  chiselRef: RefObject<THREE.Group | null>;
+}) {
   return (
     <group>
       <PivotPin x={0} y={0} radius={0.155} width={0.52} />
@@ -157,18 +162,20 @@ export function ExcavatorBreaker() {
           <meshStandardMaterial {...STEEL} />
         </mesh>
         {/* 축과 둥근 날끝을 하나의 연속 곡면으로 만들어 이음새를 없앤다. */}
-        <mesh
-          position={[
-            YANMAR_MACHINE_RIG.breakerTipLocalX + 0.385,
-            YANMAR_MACHINE_RIG.breakerTipLocalY,
-            0,
-          ]}
-          rotation={[0, 0, Math.PI / 2]}
-          castShadow
-        >
-          <latheGeometry args={[BREAKER_TOOL_PROFILE, 32]} />
-          <meshStandardMaterial {...BRIGHT_STEEL} />
-        </mesh>
+        <group ref={chiselRef}>
+          <mesh
+            position={[
+              YANMAR_MACHINE_RIG.breakerTipLocalX + 0.385,
+              YANMAR_MACHINE_RIG.breakerTipLocalY,
+              0,
+            ]}
+            rotation={[0, 0, Math.PI / 2]}
+            castShadow
+          >
+            <latheGeometry args={[BREAKER_TOOL_PROFILE, 32]} />
+            <meshStandardMaterial {...BRIGHT_STEEL} />
+          </mesh>
+        </group>
       </group>
     </group>
   );

@@ -2,9 +2,21 @@ import { randomUUID } from "crypto";
 import type { CouponType, Prisma, PrismaClient } from "@/generated/prisma/client";
 import { YANMAR_REWARD_CONFIG } from "@/games/yanmar/equipment";
 import { getSeasonKey } from "@/lib/games";
+import { createTtlCache } from "@/lib/ttl-cache";
 
 type TxClient = Prisma.TransactionClient;
 type DbClient = PrismaClient | TxClient;
+
+const SEASON_DROP_COUPON_TYPES = [
+  "YK_PARTS_DISCOUNT",
+  "EQUIPMENT_RENTAL_DISCOUNT",
+  "FILTER_SET_EXCHANGE",
+] as const satisfies readonly CouponType[];
+
+type SeasonDropIssuedMap = Record<(typeof SEASON_DROP_COUPON_TYPES)[number], number>;
+
+/** Pre-roll quota peek only — authoritative checks still use advisory locks. */
+const seasonDropIssuedCache = createTtlCache<SeasonDropIssuedMap>(5_000);
 
 export function createBarcodeCode() {
   return `YK-${randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()}`;
@@ -41,6 +53,43 @@ export async function countSeasonGameDropCoupons(
       fromGameDrop: true,
     },
   });
+}
+
+export async function countSeasonGameDropCouponsGrouped(
+  db: DbClient,
+  seasonKey = getSeasonKey(),
+  options?: { bypassCache?: boolean },
+): Promise<SeasonDropIssuedMap> {
+  const empty: SeasonDropIssuedMap = {
+    YK_PARTS_DISCOUNT: 0,
+    EQUIPMENT_RENTAL_DISCOUNT: 0,
+    FILTER_SET_EXCHANGE: 0,
+  };
+
+  if (!options?.bypassCache) {
+    const cached = seasonDropIssuedCache.get(seasonKey);
+    if (cached) return { ...cached };
+  }
+
+  const rows = await db.userCoupon.groupBy({
+    by: ["type"],
+    where: {
+      seasonKey,
+      fromGameDrop: true,
+      type: { in: [...SEASON_DROP_COUPON_TYPES] },
+    },
+    _count: { _all: true },
+  });
+
+  const issued = { ...empty };
+  for (const row of rows) {
+    if (row.type in issued) {
+      issued[row.type as keyof SeasonDropIssuedMap] = row._count._all;
+    }
+  }
+
+  seasonDropIssuedCache.set(seasonKey, issued);
+  return issued;
 }
 
 export async function getSeasonCouponQuota(

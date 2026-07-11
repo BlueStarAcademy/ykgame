@@ -9,6 +9,7 @@ import {
 import {
   cloneDigZones,
   createTerrain,
+  flattenStoneZoneHeights,
   updateDigZoneRespawns,
   type DigZone,
   type CrashZone,
@@ -325,6 +326,7 @@ export function applyGameSessionTerrain(
     terrain.heights.set(snapshot.heights);
     terrain.baseHeights.set(snapshot.baseHeights);
   }
+  flattenStoneZoneHeights(terrain);
   updateDigZoneRespawns(terrain, nowMs);
   return terrain;
 }

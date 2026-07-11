@@ -10,19 +10,19 @@ import {
   YANMAR_CRASH_REWARD_CONFIG,
 } from "@/games/yanmar/equipment";
 import {
-  lockAndCheckRewardEvent,
   isYanmarRewardRateLimited,
   parseRewardEventId,
-  persistYanmarReward,
-  rollYanmarReward,
+  persistYanmarDropRewards,
+  rollYanmarDropRewards,
+  runReplayableRewardEvent,
 } from "@/lib/yanmar-rewards";
 
 const GAME_ID = "yanmar-crash";
 const REQUIRED_LEVEL = 10;
 const { minStarReward, maxStarReward, xpReward } = YANMAR_CRASH_REWARD_CONFIG;
-// 최대 강화 브레이커도 타일 하나를 파괴하는 데 약 1.8초가 걸린다.
-// 타일별 정상 보상은 허용하면서 직접 API 연속 호출은 제한한다.
 const REWARD_MIN_INTERVAL_MS = 1000;
+
+class RewardRateLimitError extends Error {}
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -56,74 +56,90 @@ export async function POST(request: Request) {
       return { status: "level_locked" as const, currentLevel };
     }
 
-    const duplicate = await lockAndCheckRewardEvent(
+    return runReplayableRewardEvent(
       tx,
-      session.user.id,
-      GAME_ID,
-      eventId,
-    );
-    if (duplicate) return { status: "duplicate" as const };
-    if (
-      await isYanmarRewardRateLimited(
-        tx,
-        session.user.id,
-        GAME_ID,
-        REWARD_MIN_INTERVAL_MS,
-      )
-    ) {
-      return { status: "rate_limited" as const };
-    }
+      { userId: session.user.id, gameId: GAME_ID, eventId },
+      async () => {
+        if (
+          await isYanmarRewardRateLimited(
+            tx,
+            session.user.id,
+            GAME_ID,
+            REWARD_MIN_INTERVAL_MS,
+          )
+        ) {
+          throw new RewardRateLimitError();
+        }
 
-    const rows = await tx.userEquipmentUpgrade.findMany({
-      where: { userId: session.user.id, gameId: "yanmar" },
-      select: { part: true, level: true },
-    });
-    const stats = calculateYanmarEquipmentStats(
-      mergeYanmarEquipmentLevelsFromDb(rows),
-    );
-    const critical = Math.random() < stats.criticalChance;
-    const score = calculateYanmarCrashScore(stats, critical);
-    const reward = rollYanmarReward({
-      score,
-      minStars: minStarReward,
-      maxStars: maxStarReward,
-      seasonKey: getSeasonKey(),
-      critical,
-    });
-    const issuedReward = await persistYanmarReward({
-      tx,
-      userId: session.user.id,
-      gameId: GAME_ID,
-      reward,
-      minStars: minStarReward,
-      maxStars: maxStarReward,
-      metadata: { eventId, xpGained: xpReward },
-    });
-    const totalStars =
-      issuedReward.kind === "stars" ? issuedReward.stars : 0;
-    const updated = await tx.user.update({
-      where: { id: session.user.id },
-      data: {
-        totalXp: { increment: xpReward },
-        ...(totalStars > 0 ? { currency: { increment: totalStars } } : {}),
+        const rows = await tx.userEquipmentUpgrade.findMany({
+          where: { userId: session.user.id, gameId: "yanmar" },
+          select: { part: true, level: true },
+        });
+        const stats = calculateYanmarEquipmentStats(
+          mergeYanmarEquipmentLevelsFromDb(rows),
+        );
+        const critical = Math.random() < stats.criticalChance;
+        const score = calculateYanmarCrashScore(stats, critical);
+        const rolled = rollYanmarDropRewards({
+          score,
+          minStars: minStarReward,
+          maxStars: maxStarReward,
+          seasonKey: getSeasonKey(),
+          critical,
+        });
+        const issued = await persistYanmarDropRewards({
+          tx,
+          userId: session.user.id,
+          gameId: GAME_ID,
+          stars: rolled.stars,
+          coupon: rolled.coupon,
+          metadata: { eventId, xpGained: xpReward },
+        });
+        const totalStars = issued.stars.stars;
+        const updated = await tx.user.update({
+          where: { id: session.user.id },
+          data: {
+            totalXp: { increment: xpReward },
+            ...(totalStars > 0 ? { currency: { increment: totalStars } } : {}),
+          },
+          select: { currency: true, totalXp: true },
+        });
+
+        return {
+          eventId,
+          reward: issued.stars,
+          coupon: issued.coupon
+            ? {
+                ...issued.coupon,
+                expiresAt: issued.coupon.expiresAt.toISOString(),
+              }
+            : null,
+          score: issued.stars.score,
+          critical: issued.stars.critical,
+          xpGained: xpReward,
+          totalStars,
+          currency: updated.currency,
+          totalXp: updated.totalXp,
+          level: getPlayerLevelProgress(updated.totalXp).level,
+        };
       },
-      select: { currency: true, totalXp: true },
-    });
-
-    return {
-      status: "success" as const,
-      reward: issuedReward,
-      totalStars,
-      currency: updated.currency,
-      totalXp: updated.totalXp,
-      level: getPlayerLevelProgress(updated.totalXp).level,
-    };
+    );
+  }).catch((error: unknown) => {
+    if (error instanceof RewardRateLimitError) return null;
+    throw error;
   });
 
-  if (result.status === "unauthorized") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!result) {
+    return NextResponse.json(
+      { error: "Crash rewards are being claimed too quickly" },
+      { status: 429 },
+    );
   }
-  if (result.status === "level_locked") {
+
+  if ("status" in result) {
+    if (result.status === "unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       {
         error: `Level ${REQUIRED_LEVEL} required`,
@@ -133,28 +149,5 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   }
-  if (result.status === "duplicate") {
-    return NextResponse.json(
-      { error: "Reward event already claimed", eventId },
-      { status: 409 },
-    );
-  }
-  if (result.status === "rate_limited") {
-    return NextResponse.json(
-      { error: "Crash rewards are being claimed too quickly" },
-      { status: 429 },
-    );
-  }
-
-  return NextResponse.json({
-    eventId,
-    reward: result.reward,
-    score: result.reward.score,
-    critical: result.reward.critical,
-    xpGained: xpReward,
-    totalStars: result.totalStars,
-    currency: result.currency,
-    totalXp: result.totalXp,
-    level: result.level,
-  });
+  return NextResponse.json(result.result);
 }

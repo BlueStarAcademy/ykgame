@@ -22,7 +22,9 @@ import {
   createTerrain,
   digZoneLabel,
   getActiveDigZones,
+  isInCrashZone,
   isInDumpZone,
+  isInHillZone,
   dumpTruckBedDeckWorldY,
   sampleHeight,
   sampleCrashContactHeight,
@@ -1708,13 +1710,12 @@ function ExcavatorArm({
   const bucketRef = useRef<THREE.Group>(null);
   const bucketVisualRef = useRef<THREE.Group>(null);
   const breakerVisualRef = useRef<THREE.Group>(null);
+  const breakerChiselRef = useRef<THREE.Group>(null);
   const grappleVisualRef = useRef<THREE.Group>(null);
   const carriedRockRef = useRef<THREE.Mesh>(null);
   const dirtRef = useRef<THREE.Mesh>(null);
   const tipRef = useRef<THREE.Mesh>(null);
   const bladeRef = useRef<THREE.Group>(null);
-  const breakerVibrationDirection = useMemo(() => new THREE.Vector3(), []);
-  const breakerParentWorldQuaternion = useMemo(() => new THREE.Quaternion(), []);
   const yanmarLogo = useLoader(THREE.TextureLoader, "/images/yanmar/yanmar-logo-white.png");
   const [ykBoomLogo, setYkBoomLogo] = useState<THREE.Texture | null>(null);
 
@@ -1858,9 +1859,8 @@ function ExcavatorArm({
     if (breakerVisualRef.current) {
       const isBreaker = s.attachmentType === "breaker";
       breakerVisualRef.current.visible = isBreaker;
-      if (!isBreaker) {
-        breakerVisualRef.current.position.y = 0;
-      } else {
+      breakerVisualRef.current.position.set(0, 0, 0);
+      if (isBreaker) {
         const boomSwing = aux?.boomSwing ?? DEFAULT_BOOM_SWING;
         const tip = getBreakerTipWorld(s, boomSwing);
         const groundY = sampleCrashContactHeight(terrainRef.current, tip.x, tip.z);
@@ -1870,21 +1870,13 @@ function ExcavatorArm({
           !!getCrashTileAt(terrainRef.current, tip.x, tip.z)?.active;
         const hammering = (aux?.attachmentPedal ?? 0) !== 0 && onAsphalt;
         const t = performance.now();
-        const vibrationOffset = hammering
-          ? Math.sin(t * 0.14) * 0.11 + Math.sin(t * 0.31) * 0.035
-          : 0;
-        const breakerParent = breakerVisualRef.current.parent;
-        if (hammering && breakerParent) {
-          breakerParent.updateWorldMatrix(true, false);
-          breakerParent.getWorldQuaternion(breakerParentWorldQuaternion).invert();
-          breakerVibrationDirection
-            .set(0, 1, 0)
-            .applyQuaternion(breakerParentWorldQuaternion)
-            .multiplyScalar(vibrationOffset);
-          breakerVisualRef.current.position.copy(breakerVibrationDirection);
-        } else {
-          breakerVisualRef.current.position.set(0, 0, 0);
+        if (breakerChiselRef.current) {
+          breakerChiselRef.current.position.x = hammering
+            ? Math.sin(t * 0.17) * 0.026 + Math.sin(t * 0.33) * 0.008
+            : 0;
         }
+      } else if (breakerChiselRef.current) {
+        breakerChiselRef.current.position.x = 0;
       }
     }
     if (grappleVisualRef.current) {
@@ -2019,7 +2011,7 @@ function ExcavatorArm({
                 <ExcavatorBucket dirtRef={dirtRef} />
               </group>
               <group ref={breakerVisualRef}>
-                <ExcavatorBreaker />
+                <ExcavatorBreaker chiselRef={breakerChiselRef} />
               </group>
               <group ref={grappleVisualRef}>
                 <ExcavatorGrapple
@@ -2027,7 +2019,11 @@ function ExcavatorArm({
                 />
                 <mesh
                   ref={carriedRockRef}
-                  position={[-0.78, -0.42, 0]}
+                  position={[
+                    YANMAR_MACHINE_RIG.grappleClampLocalX,
+                    YANMAR_MACHINE_RIG.grappleClampLocalY,
+                    0,
+                  ]}
                   castShadow
                 >
                   <dodecahedronGeometry args={[0.58, 1]} />
@@ -2128,6 +2124,7 @@ function GameCamera({
     ) {
       return;
     }
+    const baseY = Number.isFinite(s.posY) ? s.posY : 0;
     const facing = s.heading + s.swing;
     const forwardX = Math.sin(facing);
     const forwardZ = Math.cos(facing);
@@ -2137,8 +2134,8 @@ function GameCamera({
 
     if (mode === 3) {
       // First-person view: frame the boom so its root sits visually on the control deck.
-      const camY = 2.72;
-      const lookY = 1.68;
+      const camY = 2.72 + baseY;
+      const lookY = 1.68 + baseY;
       const back = 0.96;
       const lookAhead = 5.1;
       const side = 0.36;
@@ -2164,12 +2161,12 @@ function GameCamera({
     if (mode === 1) {
       camera.position.set(
         s.posX - forwardX * 5.9 + sideX * 2.75,
-        3.85,
+        3.85 + baseY,
         s.posZ - forwardZ * 5.9 + sideZ * 2.75,
       );
       camera.lookAt(
         s.posX + forwardX * 2.9 - sideX * 0.45,
-        1.55,
+        1.55 + baseY,
         s.posZ + forwardZ * 2.9 - sideZ * 0.45,
       );
       return;
@@ -2177,12 +2174,12 @@ function GameCamera({
 
     camera.position.set(
       s.posX - forwardX * 11.5 + sideX * 6.2,
-      6.2,
+      6.2 + baseY,
       s.posZ - forwardZ * 11.5 + sideZ * 6.2,
     );
     camera.lookAt(
       s.posX + forwardX * 3.9 - sideX * 0.7,
-      1.55,
+      1.55 + baseY,
       s.posZ + forwardZ * 3.9 - sideZ * 0.7,
     );
   });
@@ -2670,7 +2667,8 @@ function NavigationGuide({
       updateRef.current = now;
 
       const sim = simRef.current;
-      const zones = getActiveDigZones(terrainRef.current);
+      const terrain = terrainRef.current;
+      const zones = getActiveDigZones(terrain);
       const nearestDig =
         zones
           .map((zone) => ({
@@ -2682,56 +2680,86 @@ function NavigationGuide({
         (zone) => Math.hypot(zone.x - sim.posX, zone.z - sim.posZ) < zone.radius,
       );
       const inDump = isInDumpZone(sim.posX, sim.posZ);
-      const crash = terrainRef.current.crashZone;
-      const hill = terrainRef.current.hillZone;
+      const crash = terrain.crashZone;
+      const hill = terrain.hillZone;
+      const inCrash = isInCrashZone(terrain, sim.posX, sim.posZ);
+      const inHill = isInHillZone(terrain, sim.posX, sim.posZ);
+      const nearHillDrop =
+        hill != null &&
+        Math.hypot(sim.posX - hill.dropX, sim.posZ - hill.dropZ) <= 6;
+      // Hide nav once the player has reached the attachment destination.
+      const arrivedAtCrashWork =
+        sim.attachmentType === "breaker" && Boolean(crash?.active) && inCrash;
+      const arrivedAtStoneWork =
+        sim.attachmentType === "grapple" &&
+        Boolean(hill?.active) &&
+        !sim.carriedBoulderId &&
+        inHill;
+      const arrivedAtStoneDrop =
+        sim.attachmentType === "grapple" &&
+        Boolean(sim.carriedBoulderId) &&
+        nearHillDrop;
+
       const guideToCrash =
-        sim.attachmentType === "breaker" && crash?.active;
+        sim.attachmentType === "breaker" && crash?.active && !inCrash;
       const guideToHill =
         sim.attachmentType === "grapple" &&
         hill &&
-        (Boolean(sim.carriedBoulderId) || hill.active);
-      const next =
-        guideToCrash && crash
-          ? {
-              label: "CRASH" as const,
-              x: crash.centerX,
-              z: crash.centerZ,
-              color: "#fbbf24",
-              outline: "#451a03",
-            }
-          : guideToHill && hill
-            ? {
-                label: "STONE" as const,
-                x: sim.carriedBoulderId ? hill.dropX : hill.centerX,
-                z: sim.carriedBoulderId ? hill.dropZ : hill.centerZ,
-                color: "#e2e8f0",
-                outline: "#172554",
-              }
-            : inDig || (!inDump && sim.bucketLoad > 0.08)
-          ? {
-              label: "DUMP" as const,
-              x: DUMP_ZONE.x,
-              z: DUMP_ZONE.z,
-              color: "#8cff91",
-              outline: "#0f421b",
-            }
-          : {
-              label: "DIG" as const,
-              x: nearestDig.x,
-              z: nearestDig.z,
-              color: "#ffd25a",
-              outline: "#603a00",
-            };
+        (sim.carriedBoulderId
+          ? !nearHillDrop
+          : hill.active && !inHill);
 
-      const distance = Math.max(0, Math.hypot(next.x - sim.posX, next.z - sim.posZ));
-      setTarget((current) =>
-        current?.label === next.label &&
-        Math.abs(current.x - next.x) < 0.1 &&
-        Math.abs(current.z - next.z) < 0.1 &&
-        Math.abs(current.distance - distance) < 0.5
-          ? current
-          : { ...next, distance },
-      );
+      const next =
+        arrivedAtCrashWork || arrivedAtStoneWork || arrivedAtStoneDrop
+          ? null
+          : guideToCrash && crash
+            ? {
+                label: "CRASH" as const,
+                x: crash.centerX,
+                z: crash.centerZ,
+                color: "#fbbf24",
+                outline: "#451a03",
+              }
+            : guideToHill && hill
+              ? {
+                  label: "STONE" as const,
+                  x: sim.carriedBoulderId ? hill.dropX : hill.centerX,
+                  z: sim.carriedBoulderId ? hill.dropZ : hill.centerZ,
+                  color: "#e2e8f0",
+                  outline: "#172554",
+                }
+              : inDig || (!inDump && sim.bucketLoad > 0.08)
+                ? {
+                    label: "DUMP" as const,
+                    x: DUMP_ZONE.x,
+                    z: DUMP_ZONE.z,
+                    color: "#8cff91",
+                    outline: "#0f421b",
+                  }
+                : {
+                    label: "DIG" as const,
+                    x: nearestDig.x,
+                    z: nearestDig.z,
+                    color: "#ffd25a",
+                    outline: "#603a00",
+                  };
+
+      if (!next) {
+        setTarget((current) => (current == null ? current : null));
+      } else {
+        const distance = Math.max(
+          0,
+          Math.hypot(next.x - sim.posX, next.z - sim.posZ),
+        );
+        setTarget((current) =>
+          current?.label === next.label &&
+          Math.abs(current.x - next.x) < 0.1 &&
+          Math.abs(current.z - next.z) < 0.1 &&
+          Math.abs(current.distance - distance) < 0.5
+            ? current
+            : { ...next, distance },
+        );
+      }
     }
 
     const group = groupRef.current;

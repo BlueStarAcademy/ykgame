@@ -2,17 +2,22 @@ import {
   DAILY_QUEST_DEFS,
   MISSION_DIFFICULTY_REWARDS,
   QUEST_MISSIONS_PER_DAY,
+  REPEAT_QUEST_DEFS,
   buildMissionTasks,
   getMissionLevelBand,
+  rollDailyQuestTarget,
   rollMissionDifficulty,
   type MissionLevelBand,
 } from "./config";
 import type {
+  DailyQuestDef,
   DailyQuestProgress,
   MissionRound,
   QuestMetric,
   QuestProgressEvent,
   QuestReward,
+  RepeatQuestDef,
+  RepeatQuestProgress,
   YanmarQuestState,
 } from "./types";
 
@@ -34,13 +39,42 @@ export function getQuestDayKey(now = new Date()) {
   }).format(now);
 }
 
-function createDailyProgress(level: number): DailyQuestProgress[] {
-  return DAILY_QUEST_DEFS.filter((def) => level >= def.minLevel).map((def) => ({
+function createDailyItem(def: DailyQuestDef): DailyQuestProgress {
+  return {
     id: def.id,
+    target: rollDailyQuestTarget(def.target),
     progress: 0,
     completed: false,
     claimed: false,
-  }));
+  };
+}
+
+function ensureDailyTarget(
+  item: DailyQuestProgress,
+  def: DailyQuestDef,
+): DailyQuestProgress {
+  if (typeof item.target === "number" && item.target > 0) return item;
+  if (item.completed || item.claimed) {
+    return { ...item, target: Math.max(1, Math.floor(item.progress) || 1) };
+  }
+  return { ...item, target: rollDailyQuestTarget(def.target) };
+}
+
+function createDailyProgress(level: number): DailyQuestProgress[] {
+  return DAILY_QUEST_DEFS.filter((def) => level >= def.minLevel).map(createDailyItem);
+}
+
+function createRepeatItem(def: RepeatQuestDef): RepeatQuestProgress {
+  return {
+    id: def.id,
+    progress: 0,
+    completed: false,
+    claimCount: 0,
+  };
+}
+
+function createRepeatProgress(level: number): RepeatQuestProgress[] {
+  return REPEAT_QUEST_DEFS.filter((def) => level >= def.minLevel).map(createRepeatItem);
 }
 
 function createMissionRounds(band: MissionLevelBand): MissionRound[] {
@@ -66,6 +100,7 @@ export function createQuestState(ownerId: string, level: number): YanmarQuestSta
     ownerId,
     levelBand: band,
     daily: createDailyProgress(level),
+    repeat: createRepeatProgress(level),
     missions: createMissionRounds(band),
     missionsCleared: 0,
   };
@@ -102,15 +137,36 @@ export function loadQuestState(ownerId: string, level: number): YanmarQuestState
     const band = getMissionLevelBand(level);
     // 레벨이 올라 새 일일 퀘스트가 열리면 목록에 합류시킨다.
     const known = new Set(parsed.daily.map((item) => item.id));
-    const mergedDaily = [...parsed.daily];
+    const mergedDaily: DailyQuestProgress[] = [];
+    for (const item of parsed.daily) {
+      const def = DAILY_QUEST_DEFS.find((entry) => entry.id === item.id);
+      if (!def) continue;
+      mergedDaily.push(ensureDailyTarget(item, def));
+    }
     for (const def of DAILY_QUEST_DEFS) {
       if (level >= def.minLevel && !known.has(def.id)) {
-        mergedDaily.push({
-          id: def.id,
-          progress: 0,
-          completed: false,
-          claimed: false,
-        });
+        mergedDaily.push(createDailyItem(def));
+      }
+    }
+
+    const knownRepeat = new Set((parsed.repeat ?? []).map((item) => item.id));
+    const mergedRepeat: RepeatQuestProgress[] = [];
+    for (const item of parsed.repeat ?? []) {
+      const def = REPEAT_QUEST_DEFS.find((entry) => entry.id === item.id);
+      if (!def) continue;
+      mergedRepeat.push({
+        id: item.id,
+        progress: typeof item.progress === "number" ? item.progress : 0,
+        completed: Boolean(item.completed),
+        claimCount:
+          typeof item.claimCount === "number" && item.claimCount >= 0
+            ? Math.floor(item.claimCount)
+            : 0,
+      });
+    }
+    for (const def of REPEAT_QUEST_DEFS) {
+      if (level >= def.minLevel && !knownRepeat.has(def.id)) {
+        mergedRepeat.push(createRepeatItem(def));
       }
     }
 
@@ -118,6 +174,7 @@ export function loadQuestState(ownerId: string, level: number): YanmarQuestState
       ...parsed,
       levelBand: parsed.levelBand ?? band,
       daily: mergedDaily,
+      repeat: mergedRepeat,
       missionsCleared: Math.max(
         0,
         Math.min(
@@ -160,6 +217,23 @@ export function applyQuestProgress(
     if (item.claimed || item.completed) return item;
     const def = DAILY_QUEST_DEFS.find((entry) => entry.id === item.id);
     if (!def || def.metric !== event.metric) return item;
+    const target = item.target > 0 ? item.target : rollDailyQuestTarget(def.target);
+    const next = applyMetric(item.progress, target, event.amount);
+    if (next.progress === item.progress && item.target === target) return item;
+    changed = true;
+    return {
+      ...item,
+      target,
+      progress: next.progress,
+      completed: next.completed,
+    };
+  });
+
+  const repeatSource = state.repeat ?? [];
+  const repeat = repeatSource.map((item) => {
+    if (item.completed) return item;
+    const def = REPEAT_QUEST_DEFS.find((entry) => entry.id === item.id);
+    if (!def || def.metric !== event.metric) return item;
     const next = applyMetric(item.progress, def.target, event.amount);
     if (next.progress === item.progress) return item;
     changed = true;
@@ -199,7 +273,7 @@ export function applyQuestProgress(
   }
 
   if (!changed) return state;
-  return { ...state, daily, missions };
+  return { ...state, daily, missions, repeat };
 }
 
 export function claimDailyQuest(
@@ -217,6 +291,35 @@ export function claimDailyQuest(
       ...state,
       daily: state.daily.map((entry) =>
         entry.id === questId ? { ...entry, claimed: true } : entry,
+      ),
+    },
+  };
+}
+
+export function claimRepeatQuest(
+  state: YanmarQuestState,
+  questId: string,
+): { state: YanmarQuestState; reward: QuestReward; claimIndex: number } | null {
+  const def = REPEAT_QUEST_DEFS.find((entry) => entry.id === questId);
+  if (!def) return null;
+  const item = (state.repeat ?? []).find((entry) => entry.id === questId);
+  if (!item || !item.completed) return null;
+
+  const claimIndex = item.claimCount;
+  return {
+    reward: def.reward,
+    claimIndex,
+    state: {
+      ...state,
+      repeat: (state.repeat ?? []).map((entry) =>
+        entry.id === questId
+          ? {
+              ...entry,
+              progress: 0,
+              completed: false,
+              claimCount: entry.claimCount + 1,
+            }
+          : entry,
       ),
     },
   };
@@ -248,13 +351,37 @@ export function getVisibleDailyQuests(level: number) {
   return DAILY_QUEST_DEFS.filter((def) => level >= def.minLevel);
 }
 
+export function getVisibleRepeatQuests(level: number) {
+  return REPEAT_QUEST_DEFS.filter((def) => level >= def.minLevel);
+}
+
 export function getCurrentMission(state: YanmarQuestState) {
   if (state.missionsCleared >= QUEST_MISSIONS_PER_DAY) return null;
   return state.missions[state.missionsCleared] ?? null;
 }
 
+/** 탭 미수령(완료·미클릭) 보상 개수 */
+export function countClaimableQuestRewards(state: YanmarQuestState | null): {
+  daily: number;
+  mission: number;
+  repeat: number;
+  total: number;
+} {
+  if (!state) {
+    return { daily: 0, mission: 0, repeat: 0, total: 0 };
+  }
+
+  const daily = state.daily.filter((item) => item.completed && !item.claimed).length;
+  const mission = (() => {
+    const current = getCurrentMission(state);
+    return current && current.completed && !current.claimed ? 1 : 0;
+  })();
+  const repeat = (state.repeat ?? []).filter((item) => item.completed).length;
+  return { daily, mission, repeat, total: daily + mission + repeat };
+}
+
 export function questClaimEventId(
-  kind: "daily" | "mission",
+  kind: "daily" | "mission" | "repeat",
   dayKey: string,
   id: string,
 ) {

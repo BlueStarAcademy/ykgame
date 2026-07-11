@@ -1,19 +1,75 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import {
   MISSION_DIFFICULTY_REWARDS,
   QUEST_MISSIONS_PER_DAY,
-  formatQuestReward,
 } from "./quests/config";
 import {
+  countClaimableQuestRewards,
   getCurrentMission,
   getVisibleDailyQuests,
+  getVisibleRepeatQuests,
   type YanmarQuestState,
 } from "./quests/questState";
-import type { QuestTab } from "./quests/types";
+import type { QuestReward, QuestTab } from "./quests/types";
 
+function QuestNotifyBadge({
+  count,
+  className = "",
+}: {
+  count: number;
+  className?: string;
+}) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className={`yanmar-quest-notify-badge ${className}`.trim()}
+      aria-label={`미수령 보상 ${count}개`}
+    >
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
+function QuestRewardDisplay({ reward }: { reward: QuestReward }) {
+  const parts: ReactNode[] = [];
+  if (reward.xp > 0) {
+    parts.push(
+      <span key="xp" className="tabular-nums">
+        {reward.xp.toLocaleString()} EXP
+      </span>,
+    );
+  }
+  if (reward.stars > 0) {
+    parts.push(
+      <span key="stars" className="inline-flex items-center gap-0.5 tabular-nums">
+        <img
+          src="/images/star-currency.svg"
+          alt=""
+          width={12}
+          height={12}
+          className="yanmar-score-panel-star"
+          draggable={false}
+        />
+        {reward.stars.toLocaleString()}
+      </span>,
+    );
+  }
+  if (parts.length === 0) {
+    return <span>보상 없음</span>;
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+      {parts.map((part, index) => (
+        <span key={index} className="inline-flex items-center gap-1.5">
+          {index > 0 ? <span className="text-amber-200/40">+</span> : null}
+          {part}
+        </span>
+      ))}
+    </span>
+  );
+}
 interface QuestPanelProps {
   open: boolean;
   onClose: () => void;
@@ -22,6 +78,7 @@ interface QuestPanelProps {
   claimingId: string | null;
   onClaimDaily: (questId: string) => void;
   onClaimMission: () => void;
+  onClaimRepeat: (questId: string) => void;
 }
 
 function DifficultyStars({ count }: { count: number }) {
@@ -67,6 +124,7 @@ export function QuestPanel({
   claimingId,
   onClaimDaily,
   onClaimMission,
+  onClaimRepeat,
 }: QuestPanelProps) {
   const [tab, setTab] = useState<QuestTab>("daily");
 
@@ -75,8 +133,16 @@ export function QuestPanel({
     const defs = getVisibleDailyQuests(playerLevel);
     return defs.map((def) => {
       const progress = questState.daily.find((item) => item.id === def.id);
+      const target =
+        progress?.target && progress.target > 0
+          ? progress.target
+          : typeof def.target === "number"
+            ? def.target
+            : def.target.min;
       return {
         def,
+        target,
+        title: def.title(target),
         progress: progress?.progress ?? 0,
         completed: progress?.completed ?? false,
         claimed: progress?.claimed ?? false,
@@ -84,13 +150,31 @@ export function QuestPanel({
     });
   }, [playerLevel, questState]);
 
+  const repeatRows = useMemo(() => {
+    if (!questState) return [];
+    const defs = getVisibleRepeatQuests(playerLevel);
+    return defs.map((def) => {
+      const progress = (questState.repeat ?? []).find((item) => item.id === def.id);
+      return {
+        def,
+        progress: progress?.progress ?? 0,
+        completed: progress?.completed ?? false,
+        claimCount: progress?.claimCount ?? 0,
+      };
+    });
+  }, [playerLevel, questState]);
+
   const currentMission = questState ? getCurrentMission(questState) : null;
   const missionsDone = questState?.missionsCleared ?? 0;
+  const claimable = useMemo(
+    () => countClaimableQuestRewards(questState),
+    [questState],
+  );
 
   return (
     <AppModalOverlay open={open} onClose={onClose}>
-      <div className="flex max-h-[min(92dvh,40rem)] w-full flex-col overflow-hidden rounded-2xl border border-amber-200/20 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl landscape:max-h-[min(94dvh,26rem)]">
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+      <div className="flex h-[min(82dvh,36rem)] w-full flex-col overflow-hidden rounded-2xl border border-amber-200/20 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl landscape:h-[min(90dvh,22rem)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="yanmar-quest-panel-badge" aria-hidden />
             <div>
@@ -109,21 +193,23 @@ export function QuestPanel({
           </button>
         </div>
 
-        <div className="flex gap-1 border-b border-white/10 px-3 pt-2">
+        <div className="flex shrink-0 gap-1 border-b border-white/10 px-3 pt-2">
           {TABS.map((item) => {
             const active = tab === item.id;
+            const badgeCount = claimable[item.id];
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setTab(item.id)}
-                className={`relative flex-1 rounded-t-lg px-2 py-2 text-[11px] font-black transition ${
+                className={`relative flex flex-1 items-center justify-center gap-1 rounded-t-lg px-2 py-2 text-[11px] font-black transition ${
                   active
                     ? "bg-white/10 text-amber-100"
                     : "text-white/45 hover:bg-white/5 hover:text-white/75"
                 }`}
               >
-                {item.label}
+                <span>{item.label}</span>
+                <QuestNotifyBadge count={badgeCount} className="is-tab" />
                 {active ? (
                   <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-amber-300" />
                 ) : null}
@@ -132,10 +218,10 @@ export function QuestPanel({
           })}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 [-webkit-overflow-scrolling:touch]">
           {tab === "daily" ? (
             <ul className="space-y-2">
-              {dailyRows.map(({ def, progress, completed, claimed }) => {
+              {dailyRows.map(({ def, title, target, progress, completed, claimed }) => {
                 const claiming = claimingId === `daily:${def.id}`;
                 return (
                   <li
@@ -144,9 +230,9 @@ export function QuestPanel({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-[12px] font-bold text-white">{def.title}</p>
+                        <p className="text-[12px] font-bold text-white">{title}</p>
                         <p className="mt-0.5 text-[10px] font-semibold text-amber-200/80">
-                          {formatQuestReward(def.reward)}
+                          <QuestRewardDisplay reward={def.reward} />
                         </p>
                       </div>
                       {claimed ? (
@@ -165,12 +251,12 @@ export function QuestPanel({
                       ) : (
                         <span className="shrink-0 text-[10px] font-bold tabular-nums text-white/55">
                           {Math.floor(progress).toLocaleString()}/
-                          {def.target.toLocaleString()}
+                          {target.toLocaleString()}
                         </span>
                       )}
                     </div>
                     {!claimed ? (
-                      <ProgressBar value={progress} max={def.target} />
+                      <ProgressBar value={progress} max={target} />
                     ) : null}
                   </li>
                 );
@@ -193,7 +279,7 @@ export function QuestPanel({
               {!currentMission ? (
                 <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-6 text-center">
                   <p className="text-[12px] font-black text-emerald-100">
-                    오늘의 미션 10회를 모두 완료했습니다.
+                    미션 퀘스트 완료
                   </p>
                 </div>
               ) : (
@@ -204,9 +290,9 @@ export function QuestPanel({
                         미션 {currentMission.index + 1}
                       </p>
                       <p className="mt-0.5 text-[10px] font-semibold text-amber-200/85">
-                        {formatQuestReward(
-                          MISSION_DIFFICULTY_REWARDS[currentMission.difficulty],
-                        )}
+                        <QuestRewardDisplay
+                          reward={MISSION_DIFFICULTY_REWARDS[currentMission.difficulty]}
+                        />
                       </p>
                     </div>
                     <DifficultyStars count={currentMission.difficulty} />
@@ -270,17 +356,52 @@ export function QuestPanel({
           ) : null}
 
           {tab === "repeat" ? (
-            <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-8 text-center">
-              <p className="text-[12px] font-bold text-white/70">반복 퀘스트</p>
-              <p className="mt-1.5 text-[11px] font-semibold text-white/40">
-                준비 중입니다.
-              </p>
-            </div>
+            <ul className="space-y-2">
+              {repeatRows.map(({ def, progress, completed, claimCount }) => {
+                const claiming = claimingId === `repeat:${def.id}`;
+                return (
+                  <li
+                    key={def.id}
+                    className="rounded-xl border border-white/10 bg-black/35 px-3 py-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-bold text-white">{def.title}</p>
+                        <p className="mt-0.5 text-[10px] font-semibold text-amber-200/80">
+                          <QuestRewardDisplay reward={def.reward} />
+                          {claimCount > 0 ? (
+                            <span className="ml-1.5 text-white/35">
+                              · {claimCount}회 수령
+                            </span>
+                          ) : null}
+                        </p>
+                      </div>
+                      {completed ? (
+                        <button
+                          type="button"
+                          disabled={claiming}
+                          onClick={() => onClaimRepeat(def.id)}
+                          className="shrink-0 rounded-md border border-amber-300/40 bg-amber-500/90 px-2.5 py-1 text-[10px] font-black text-white disabled:opacity-60"
+                        >
+                          {claiming ? "받는 중" : "보상"}
+                        </button>
+                      ) : (
+                        <span className="shrink-0 text-[10px] font-bold tabular-nums text-white/55">
+                          {Math.floor(progress).toLocaleString()}/
+                          {def.target.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <ProgressBar value={progress} max={def.target} />
+                  </li>
+                );
+              })}
+            </ul>
           ) : null}
         </div>
 
-        <div className="border-t border-white/10 px-4 py-2 text-[9px] font-semibold text-white/35">
-          보상은 스타와 EXP로 지급됩니다.
+        <div className="shrink-0 border-t border-white/10 px-4 py-2 text-[9px] font-semibold text-white/35">
+          일일·미션은 매일 갱신 · 반복은 수령 후 다시 진행됩니다.
         </div>
       </div>
     </AppModalOverlay>

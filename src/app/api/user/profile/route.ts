@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { GAMES, getSeasonKey } from "@/lib/games";
-import { getUserGameStats } from "@/lib/rankings";
+import { AVAILABLE_GAME_IDS, GAMES, getSeasonKey } from "@/lib/games";
+import { getUserGameStatsForGames } from "@/lib/rankings";
 
 export async function GET() {
   const session = await auth();
@@ -27,17 +27,21 @@ export async function GET() {
   }
 
   const seasonKey = getSeasonKey();
-  const gameProgress = await Promise.all(
-    GAMES.map(async (game) => {
-      const stats = await getUserGameStats(game.id, user.id, seasonKey);
-      return {
-        gameId: game.id,
-        score: stats.bestScore,
-        stars: stats.bestStars,
-        playTime: stats.playTime,
-      };
-    }),
+  const statsByGame = await getUserGameStatsForGames(
+    AVAILABLE_GAME_IDS,
+    user.id,
+    seasonKey,
   );
+
+  const gameProgress = GAMES.map((game) => {
+    const stats = statsByGame.get(game.id);
+    return {
+      gameId: game.id,
+      score: stats?.bestScore ?? 0,
+      stars: stats?.bestStars ?? 0,
+      playTime: stats?.playTime ?? 0,
+    };
+  });
 
   const totalStars = gameProgress.reduce((sum, g) => sum + g.stars, 0);
 

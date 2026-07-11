@@ -150,19 +150,14 @@ export function applyCrashAsphaltPad(
   return h + (0.735 - h) * Math.min(1, blend * 0.96);
 }
 
+/** Stone zone stays flat; kept as a no-op for callers/rebake compatibility. */
 export function applyHillZoneHeight(
-  wx: number,
-  wz: number,
+  _wx: number,
+  _wz: number,
   h: number,
-  zone: { centerX: number; centerZ: number; radius: number },
+  _zone: { centerX: number; centerZ: number; radius: number },
 ) {
-  const dist = distance(wx, wz, zone.centerX, zone.centerZ);
-  if (dist >= zone.radius + 8) return h;
-  const t = Math.max(0, Math.min(1, 1 - dist / (zone.radius + 8)));
-  const smooth = t * t * (3 - 2 * t);
-  const plateau = dist < zone.radius * 0.42 ? 1 : Math.max(0, 1 - dist / zone.radius);
-  const target = 0.76 + smooth * 5.2 + plateau * 0.65;
-  return Math.max(h, target);
+  return h;
 }
 
 export function applyExpansionRoads(

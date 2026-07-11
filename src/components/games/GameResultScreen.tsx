@@ -33,6 +33,32 @@ function medal(rank: number) {
   return `${rank}`;
 }
 
+function getDurableScoreSessionId(
+  userId: string,
+  gameId: string,
+  fingerprint: string,
+): { id: string; storageKey: string } {
+  const storageKey = `ykgame:score-submit:v1:${encodeURIComponent(userId)}:${gameId}`;
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(storageKey) ?? "null") as {
+      id?: unknown;
+      fingerprint?: unknown;
+    } | null;
+    if (
+      stored &&
+      typeof stored.id === "string" &&
+      stored.fingerprint === fingerprint
+    ) {
+      return { id: stored.id, storageKey };
+    }
+    const id = window.crypto.randomUUID();
+    window.sessionStorage.setItem(storageKey, JSON.stringify({ id, fingerprint }));
+    return { id, storageKey };
+  } catch {
+    return { id: window.crypto.randomUUID(), storageKey };
+  }
+}
+
 export function GameResultScreen({
   gameId,
   result,
@@ -53,6 +79,7 @@ export function GameResultScreen({
   const [saveFailed, setSaveFailed] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
   const savedRef = useRef(false);
+  const scoreSessionIdRef = useRef<string | null>(null);
   const updateRef = useRef(update);
   const onScoreSavedRef = useRef(onScoreSaved);
 
@@ -65,6 +92,7 @@ export function GameResultScreen({
   }, [onScoreSaved]);
 
   useEffect(() => {
+    if (!session?.user?.id) return;
     if (savedRef.current) return;
     savedRef.current = true;
 
@@ -75,6 +103,25 @@ export function GameResultScreen({
           return;
         }
         setSaveFailed(false);
+        const scoreFingerprint = JSON.stringify({
+          progress: result.progress,
+          playTime: result.playTime,
+          timeLeft: result.timeLeft,
+          arcadeScore: result.arcadeScore,
+          mode: result.mode,
+        });
+        const durableScoreSession = session?.user?.id
+          ? getDurableScoreSessionId(
+              session.user.id,
+              gameId,
+              scoreFingerprint,
+            )
+          : null;
+        const scoreSessionId =
+          scoreSessionIdRef.current ??
+          durableScoreSession?.id ??
+          window.crypto.randomUUID();
+        scoreSessionIdRef.current = scoreSessionId;
         const saveRes = await fetch("/api/scores", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -85,11 +132,19 @@ export function GameResultScreen({
             timeLeft: result.timeLeft,
             arcadeScore: result.arcadeScore,
             mode: result.mode,
+            sessionId: scoreSessionId,
           }),
         });
         const saveData = await saveRes.json();
         if (!saveRes.ok) {
           throw new Error(saveData.error ?? "Failed to save score");
+        }
+        if (durableScoreSession) {
+          try {
+            window.sessionStorage.removeItem(durableScoreSession.storageKey);
+          } catch {
+            // The server already accepted the stable sessionId.
+          }
         }
 
         if (gameId === "yanmar" && typeof result.arcadeScore === "number") {

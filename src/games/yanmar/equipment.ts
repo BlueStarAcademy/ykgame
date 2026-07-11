@@ -13,15 +13,25 @@ export const YANMAR_REWARD_CONFIG = {
   rentalCouponSeasonLimit: 50,
   /** 필터세트 교환쿠폰 — 시즌당 1장 */
   filterSetCouponSeasonLimit: 1,
-  partsCouponChance: 0.005,
-  rentalCouponChance: 0.005,
-  /** 0.0001% = 1e-6 */
-  filterSetCouponChance: 0.000001,
+  /**
+   * 스타와 독립적인 쿠폰 추가 드롭 확률.
+   * 0.00001% = 1e-7
+   */
+  couponDropChance: 0.0000001,
+  /**
+   * 쿠폰 드롭 성공 시 종류 선택 상대 가중치 (합으로 정규화).
+   * 지금은 동일 비중, 추후 종류별 조정 가능.
+   */
+  couponTypeWeights: {
+    FILTER_SET_EXCHANGE: 1,
+    YK_PARTS_DISCOUNT: 1,
+    EQUIPMENT_RENTAL_DISCOUNT: 1,
+  },
   minStarReward: 1,
   maxStarReward: 3,
 } as const;
 
-/** Crash(아스팔트) 타일 1개 파괴 보상 — 쿠폰 확률은 하역과 동일, 스타 수량만 별도. */
+/** Crash(아스팔트) 타일 1개 파괴 보상 — 쿠폰 드롭은 하역과 동일, 스타 수량만 별도. */
 export const YANMAR_CRASH_REWARD_CONFIG = {
   baseScoreMin: 350,
   baseScoreMax: 400,
@@ -30,7 +40,7 @@ export const YANMAR_CRASH_REWARD_CONFIG = {
   xpReward: 1000,
 } as const;
 
-/** Hill(돌) 1개 트럭 적재 보상 — 쿠폰 확률은 하역과 동일. */
+/** Hill(돌) 1개 트럭 적재(하역) 보상 — 쿠폰 드롭은 하역과 동일. */
 export const YANMAR_HILL_REWARD_CONFIG = {
   baseScoreMin: 900,
   baseScoreMax: 1000,

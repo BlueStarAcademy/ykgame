@@ -7,8 +7,9 @@ import {
 export const GRAPPLE_PRESSURE_MAX_SEC = 3;
 /** 운반 중 팁이 이보다 낮으면 주행 잠금. */
 export const GRAPPLE_TRAVEL_LOCK_CLEARANCE = 0.32;
-export const GRAPPLE_BUCKET_ANGLE_MIN = 0.45;
-export const GRAPPLE_BUCKET_ANGLE_MAX = 1.1;
+/** The visible jaws can enclose a rock throughout this practical curl range. */
+export const GRAPPLE_BUCKET_ANGLE_MIN = 0.35;
+export const GRAPPLE_BUCKET_ANGLE_MAX = 1.75;
 const GRAPPLE_BUCKET_ANGLE_OPTIMAL =
   (GRAPPLE_BUCKET_ANGLE_MIN + GRAPPLE_BUCKET_ANGLE_MAX) / 2;
 const GRAPPLE_BUCKET_ANGLE_HALF =
@@ -46,8 +47,21 @@ export function resetGrappleGrip(grip: GrappleGripRuntime) {
 
 export { hillBoulderVisualScale } from "./terrain";
 
+/** Rendered ellipsoid bounds plus clearance for flat-ground grapple pickup. */
+export function hillBoulderGripEnvelope(rock: HillBoulder): {
+  horizontalRadius: number;
+  verticalRadius: number;
+} {
+  const scale = hillBoulderVisualScale(rock.size);
+  return {
+    // Match the old wrap feel (scale * 1.35) with extra reach on flat ground.
+    horizontalRadius: scale * 1.45 + 0.45,
+    verticalRadius: scale * 1.15 + 0.4,
+  };
+}
+
 export function hillBoulderWrapRadius(rock: HillBoulder): number {
-  return hillBoulderVisualScale(rock.size) * 1.35;
+  return hillBoulderGripEnvelope(rock).horizontalRadius;
 }
 
 export function grappleBucketAngleReady(bucket: number): boolean {

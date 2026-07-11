@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createBarcodeCode, getCouponExpiresAt } from "@/lib/coupon";
 import { getSeasonKey } from "@/lib/games";
+import { mutatedExactlyOne } from "@/lib/atomic-mutation";
 
 export async function POST(
   _request: Request,
@@ -14,75 +15,72 @@ export async function POST(
   }
 
   const { mailId } = await params;
-
-  const mail = await prisma.userMail.findFirst({
-    where: { id: mailId, userId: session.user.id },
-  });
-
-  if (!mail) {
-    return NextResponse.json({ error: "Mail not found" }, { status: 404 });
-  }
-
-  if (mail.claimedAt) {
-    return NextResponse.json({ error: "Already claimed" }, { status: 400 });
-  }
-
-  const hasReward =
-    mail.currencyAmount > 0 ||
-    mail.couponType === "FILTER_SET_EXCHANGE" ||
-    (mail.couponType != null && mail.couponDiscountPct != null);
-
-  if (!hasReward) {
-    await prisma.userMail.update({
-      where: { id: mail.id },
-      data: { readAt: mail.readAt ?? new Date(), claimedAt: new Date() },
-    });
-    return NextResponse.json({ currency: session.user.currency, claimed: true });
-  }
-
   const expiresAt = getCouponExpiresAt();
   const seasonKey = getSeasonKey();
 
-  const result = await prisma.$transaction(async (tx) => {
-    if (mail.currencyAmount > 0) {
-      await tx.user.update({
-        where: { id: session.user.id },
-        data: { currency: { increment: mail.currencyAmount } },
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const mail = await tx.userMail.findFirst({
+        where: { id: mailId, userId: session.user.id },
       });
-    }
 
-    if (mail.couponType) {
-      await tx.userCoupon.create({
-        data: {
+      if (!mail) throw new Error("MAIL_NOT_FOUND");
+
+      const claim = await tx.userMail.updateMany({
+        where: {
+          id: mail.id,
           userId: session.user.id,
-          type: mail.couponType,
-          discountPct:
-            mail.couponType === "FILTER_SET_EXCHANGE"
-              ? 0
-              : (mail.couponDiscountPct ?? 0),
-          barcodeCode: createBarcodeCode(),
-          seasonKey,
-          fromGameDrop: false,
-          expiresAt,
+          claimedAt: null,
+        },
+        data: {
+          readAt: mail.readAt ?? new Date(),
+          claimedAt: new Date(),
         },
       });
+
+      if (!mutatedExactlyOne(claim.count)) throw new Error("ALREADY_CLAIMED");
+
+      if (mail.currencyAmount > 0) {
+        await tx.user.update({
+          where: { id: session.user.id },
+          data: { currency: { increment: mail.currencyAmount } },
+        });
+      }
+
+      if (mail.couponType) {
+        await tx.userCoupon.create({
+          data: {
+            userId: session.user.id,
+            type: mail.couponType,
+            discountPct:
+              mail.couponType === "FILTER_SET_EXCHANGE"
+                ? 0
+                : (mail.couponDiscountPct ?? 0),
+            barcodeCode: createBarcodeCode(),
+            seasonKey,
+            fromGameDrop: false,
+            expiresAt,
+          },
+        });
+      }
+
+      const user = await tx.user.findUnique({
+        where: { id: session.user.id },
+        select: { currency: true },
+      });
+
+      return { currency: user?.currency ?? 0 };
+    });
+
+    return NextResponse.json({ currency: result.currency, claimed: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "CLAIM_FAILED";
+    if (message === "MAIL_NOT_FOUND") {
+      return NextResponse.json({ error: "Mail not found" }, { status: 404 });
     }
-
-    await tx.userMail.update({
-      where: { id: mail.id },
-      data: {
-        readAt: mail.readAt ?? new Date(),
-        claimedAt: new Date(),
-      },
-    });
-
-    const user = await tx.user.findUnique({
-      where: { id: session.user.id },
-      select: { currency: true },
-    });
-
-    return { currency: user?.currency ?? 0 };
-  });
-
-  return NextResponse.json({ currency: result.currency, claimed: true });
+    if (message === "ALREADY_CLAIMED") {
+      return NextResponse.json({ error: "Already claimed" }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Claim failed" }, { status: 500 });
+  }
 }

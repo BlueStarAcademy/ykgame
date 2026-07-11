@@ -1,7 +1,6 @@
 import {
   applyCrashAsphaltPad,
   applyExpansionRoads,
-  applyHillZoneHeight,
   applyTruckDeparturePad,
   applyZoneMoundHeight,
   computeBaseTerrainHeight,
@@ -91,9 +90,9 @@ export interface HillBoulder {
   comOffsetZ: number;
 }
 
-/** PremiumBoulder와 동일한 월드 스케일 (size 0→0.72, 1→1.16). */
+/** PremiumBoulder와 동일한 월드 스케일 (size 0→0.55, 1→0.9). */
 export function hillBoulderVisualScale(size: number): number {
-  return 0.72 + Math.max(0, Math.min(1, size)) * 0.44;
+  return 0.55 + Math.max(0, Math.min(1, size)) * 0.35;
 }
 
 export function createHillBoulderAttrs(index: number): Pick<
@@ -108,7 +107,7 @@ export function createHillBoulderAttrs(index: number): Pick<
 }
 
 export interface HaulTruckState {
-  phase: "ready" | "departing" | "cooldown" | "arriving";
+  phase: "ready" | "engineStart" | "departing" | "cooldown" | "arriving";
   loadCount: number;
   cooldownRemaining: number;
   phaseElapsed: number;
@@ -193,7 +192,6 @@ export function createTerrain(
       }
       if (mapTier >= 3 && hillZone) {
         next = applyExpansionRoads(wx, wz, next, mapTier);
-        next = applyHillZoneHeight(wx, wz, next, hillZone);
       }
       heights[idx] = next;
     }
@@ -257,12 +255,53 @@ export function rebakeSpecialSiteSurfaces(terrain: TerrainData) {
           base = applyCrashAsphaltPad(wx, wz, base, terrain.crashZone);
         }
       }
-      if (terrain.mapTier >= 3 && terrain.hillZone) {
-        current = applyHillZoneHeight(wx, wz, current, terrain.hillZone);
-        base = applyHillZoneHeight(wx, wz, base, terrain.hillZone);
-      }
       terrain.heights[index] = current;
       terrain.baseHeights[index] = base;
+    }
+  }
+  flattenStoneZoneHeights(terrain);
+}
+
+/** Strip legacy hill elevation so the stone zone sits on flat ground. */
+export function flattenStoneZoneHeights(terrain: TerrainData) {
+  const zone = terrain.hillZone;
+  if (!zone) return;
+  const influence = zone.radius + 8;
+  const dumpPad = {
+    x: DUMP_ZONE.x,
+    z: DUMP_ZONE.z,
+    radius: DUMP_ZONE.radius + 4,
+  };
+  const truckPad = {
+    groupX: DUMP_TRUCK.groupX,
+    groupZ: DUMP_TRUCK.groupZ,
+    rotation: DUMP_TRUCK.rotation,
+  };
+  for (let gz = 0; gz < terrain.gridSizeZ; gz++) {
+    for (let gx = 0; gx < terrain.gridSizeX; gx++) {
+      const index = gz * terrain.gridSizeX + gx;
+      const wx = terrain.originX + (gx + 0.5) * terrain.cellSize;
+      const wz = terrain.originZ + (gz + 0.5) * terrain.cellSize;
+      if (distance(wx, wz, zone.centerX, zone.centerZ) >= influence) continue;
+      const digZone =
+        terrain.digZones.find(
+          (item) => distance(wx, wz, item.x, item.z) < item.radius,
+        ) ?? null;
+      let next = applyTruckDeparturePad(
+        wx,
+        wz,
+        computeBaseTerrainHeight(wx, wz, digZone, dumpPad),
+        truckPad,
+      );
+      if (terrain.mapTier >= 2) {
+        next = applyExpansionRoads(wx, wz, next, terrain.mapTier);
+        if (terrain.crashZone) {
+          next = applyCrashAsphaltPad(wx, wz, next, terrain.crashZone);
+        }
+      }
+      const dug = Math.max(0, terrain.baseHeights[index] - terrain.heights[index]);
+      terrain.baseHeights[index] = next;
+      terrain.heights[index] = Math.max(0, next - dug);
     }
   }
 }
@@ -795,7 +834,8 @@ function createHillBoulders(
   const boulderCount = Math.max(1, Math.floor(count));
   return Array.from({ length: boulderCount }, (_, index) => {
     const angle = (index / boulderCount) * Math.PI * 2 + 0.35;
-    const ring = 7.5 + (index % 2) * 2.4;
+    // Keep harvestable rocks inside the painted stone ring (radius * 0.55 ≈ 13.75).
+    const ring = 5.2 + (index % 3) * 1.8;
     return {
       id: `${cycleId}-rock-${index + 1}`,
       x: centerX + Math.cos(angle) * ring,
@@ -985,7 +1025,10 @@ export function updateSpecialZones(
   const truck = terrain.hillZone?.haulTruck;
   if (!truck || truck.phase === "ready") return;
   truck.phaseElapsed += dt;
-  if (truck.phase === "departing" && truck.phaseElapsed >= 5) {
+  if (truck.phase === "engineStart" && truck.phaseElapsed >= 2.2) {
+    truck.phase = "departing";
+    truck.phaseElapsed = 0;
+  } else if (truck.phase === "departing" && truck.phaseElapsed >= 5) {
     truck.phase = "cooldown";
     truck.phaseElapsed = 0;
     truck.cooldownRemaining = haulTruckCooldownSec;
@@ -1011,9 +1054,21 @@ export function addHaulTruckRock(
   if (!truck || truck.phase !== "ready") return false;
   const maxLoad = Math.max(1, Math.floor(capacity));
   truck.loadCount = Math.min(maxLoad, truck.loadCount + 1);
-  if (truck.loadCount >= maxLoad) {
-    truck.phase = "departing";
-    truck.phaseElapsed = 0;
-  }
   return true;
+}
+
+export function beginHaulTruckDeparture(
+  terrain: TerrainData,
+  capacity = HAUL_TRUCK_CAPACITY,
+) {
+  const truck = terrain.hillZone?.haulTruck;
+  if (
+    !truck ||
+    truck.phase !== "ready" ||
+    truck.loadCount < Math.max(1, Math.floor(capacity))
+  ) {
+    return;
+  }
+  truck.phase = "engineStart";
+  truck.phaseElapsed = 0;
 }

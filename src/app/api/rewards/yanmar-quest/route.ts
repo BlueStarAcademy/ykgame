@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  lockAndCheckRewardEvent,
   parseRewardEventId,
+  runReplayableRewardEvent,
 } from "@/lib/yanmar-rewards";
 
 const MAX_STARS = 40;
-const MAX_XP = 2000;
+const MAX_XP = 3000;
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -43,54 +43,46 @@ export async function POST(request: Request) {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const already = await lockAndCheckRewardEvent(
+      return runReplayableRewardEvent(
         tx,
-        session.user.id,
-        "yanmar",
-        eventId,
-      );
-      if (already) {
-        return { duplicate: true as const };
-      }
+        { userId: session.user.id, gameId: "yanmar", eventId },
+        async () => {
+          const user = await tx.user.update({
+            where: { id: session.user.id },
+            data: {
+              ...(stars > 0 ? { currency: { increment: stars } } : {}),
+              ...(xp > 0 ? { totalXp: { increment: xp } } : {}),
+            },
+            select: { currency: true, totalXp: true },
+          });
 
-      const user = await tx.user.update({
-        where: { id: session.user.id },
-        data: {
-          ...(stars > 0 ? { currency: { increment: stars } } : {}),
-          ...(xp > 0 ? { totalXp: { increment: xp } } : {}),
-        },
-        select: { currency: true, totalXp: true },
-      });
+          await tx.userRewardInventory.create({
+            data: {
+              userId: session.user.id,
+              gameId: "yanmar",
+              type: "STAR",
+              amount: stars,
+              metadata: {
+                eventId,
+                xp,
+                label,
+                source: "quest",
+              },
+            },
+          });
 
-      await tx.userRewardInventory.create({
-        data: {
-          userId: session.user.id,
-          gameId: "yanmar",
-          type: "STAR",
-          amount: stars,
-          metadata: {
+          return {
             eventId,
+            currency: user.currency,
+            totalXp: user.totalXp,
+            stars,
             xp,
-            label,
-            source: "quest",
-          },
+          };
         },
-      });
-
-      return {
-        duplicate: false as const,
-        currency: user.currency,
-        totalXp: user.totalXp,
-        stars,
-        xp,
-      };
+      );
     });
 
-    if (result.duplicate) {
-      return NextResponse.json({ error: "Already claimed" }, { status: 409 });
-    }
-
-    return NextResponse.json(result);
+    return NextResponse.json(result.result);
   } catch (error) {
     console.error("[yanmar-quest]", error);
     return NextResponse.json({ error: "Reward failed" }, { status: 500 });

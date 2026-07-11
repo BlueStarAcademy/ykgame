@@ -51,6 +51,8 @@ model User {
   isActive             Boolean                @default(true)
   createdAt            DateTime               @default(now())
   gameScores           GameScore[]
+  seasonStats          UserSeasonStats[]
+  rewardEvents         RewardEvent[]
   rewardInventoryItems UserRewardInventory[]
   coupons              UserCoupon[]
   equipmentUpgrades    UserEquipmentUpgrade[]
@@ -61,6 +63,7 @@ model GameScore {
   id        String   @id @default(cuid())
   userId    String
   gameId    String
+  sessionId String?
   score     Int
   stars     Int
   playTime  Int
@@ -68,8 +71,39 @@ model GameScore {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, gameId, sessionId])
   @@index([gameId, monthKey, score])
+  @@index([gameId, monthKey, userId])
   @@index([userId, gameId])
+}
+
+model UserSeasonStats {
+  id            String   @id @default(cuid())
+  userId        String
+  gameId        String
+  seasonKey     String
+  totalScore    Int      @default(0)
+  totalStars    Int      @default(0)
+  totalPlayTime Int      @default(0)
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId, seasonKey])
+  @@index([gameId, seasonKey, totalScore])
+  @@index([userId, gameId, seasonKey])
+}
+
+model RewardEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  gameId    String
+  eventId   String
+  result    Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId, eventId])
+  @@index([userId, createdAt])
 }
 
 model UserRewardInventory {

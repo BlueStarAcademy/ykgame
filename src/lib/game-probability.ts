@@ -28,15 +28,73 @@ function pct(value: number, digits = 2) {
   return `${(value * 100).toFixed(digits)}%`;
 }
 
+function pctFromFraction(value: number, digits = 5) {
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
 function pctPoint(value: number, digits = 1) {
   return `${(value * 100).toFixed(digits)}%p`;
 }
 
 export function getGameProbabilityReport() {
-  const filterChance = YANMAR_REWARD_CONFIG.filterSetCouponChance;
-  const partsChance = YANMAR_REWARD_CONFIG.partsCouponChance;
-  const rentalChance = YANMAR_REWARD_CONFIG.rentalCouponChance;
-  const starChance = 1 - filterChance - partsChance - rentalChance;
+  const couponDropChance = YANMAR_REWARD_CONFIG.couponDropChance;
+  const couponTypeWeights = YANMAR_REWARD_CONFIG.couponTypeWeights;
+  const couponTypeWeightTotal =
+    couponTypeWeights.FILTER_SET_EXCHANGE +
+    couponTypeWeights.YK_PARTS_DISCOUNT +
+    couponTypeWeights.EQUIPMENT_RENTAL_DISCOUNT;
+  const couponTypeShare = (weight: number) =>
+    couponTypeWeightTotal > 0 ? weight / couponTypeWeightTotal : 0;
+  const sharedDropRewardItems = [
+    {
+      label: "스타 보상",
+      value: "100%",
+      detail: `항상 지급 · 하역 ${YANMAR_REWARD_CONFIG.minStarReward}~${YANMAR_REWARD_CONFIG.maxStarReward} 스타 랜덤`,
+    },
+    {
+      label: "쿠폰 추가 드롭",
+      value: pctFromFraction(couponDropChance),
+      detail: "스타와 독립 · 드롭 성공 시 종류는 아래 가중치로 선택",
+    },
+    {
+      label: "필터세트 교환쿠폰",
+      value: pctFromFraction(
+        couponDropChance *
+          couponTypeShare(couponTypeWeights.FILTER_SET_EXCHANGE),
+      ),
+      detail: `상대 가중치 ${couponTypeWeights.FILTER_SET_EXCHANGE} · 쿠폰 드롭 시 약 ${pctFromFraction(couponTypeShare(couponTypeWeights.FILTER_SET_EXCHANGE), 2)} · 시즌 한도 ${YANMAR_REWARD_CONFIG.filterSetCouponSeasonLimit}장`,
+    },
+    {
+      label: "YK건기 부품 할인 쿠폰",
+      value: pctFromFraction(
+        couponDropChance * couponTypeShare(couponTypeWeights.YK_PARTS_DISCOUNT),
+      ),
+      detail: `상대 가중치 ${couponTypeWeights.YK_PARTS_DISCOUNT} · 쿠폰 드롭 시 약 ${pctFromFraction(couponTypeShare(couponTypeWeights.YK_PARTS_DISCOUNT), 2)} · 할인율 ${PARTS_DISCOUNTS.join("% / ")}% 중 랜덤 · 시즌 한도 ${YANMAR_REWARD_CONFIG.partsCouponSeasonLimit}장`,
+    },
+    {
+      label: "중장비 대여 할인 쿠폰",
+      value: pctFromFraction(
+        couponDropChance *
+          couponTypeShare(couponTypeWeights.EQUIPMENT_RENTAL_DISCOUNT),
+      ),
+      detail: `상대 가중치 ${couponTypeWeights.EQUIPMENT_RENTAL_DISCOUNT} · 쿠폰 드롭 시 약 ${pctFromFraction(couponTypeShare(couponTypeWeights.EQUIPMENT_RENTAL_DISCOUNT), 2)} · 할인율 ${RENTAL_DISCOUNTS.join("% / ")}% 중 랜덤 · 시즌 한도 ${YANMAR_REWARD_CONFIG.rentalCouponSeasonLimit}장`,
+    },
+    {
+      label: "쿠폰 유효기간",
+      value: `${YANMAR_REWARD_CONFIG.couponExpiresInDays}일`,
+    },
+    {
+      label: "시즌 쿠폰 한도",
+      value: "종류별 고정",
+      detail:
+        "시즌이 바뀌면 한도가 다시 채워집니다. 한도 소진 시 쿠폰만 생략되며 스타는 이미 지급됩니다.",
+    },
+    {
+      label: "적용 구역",
+      value: "흙 하역 · 아스팔트 파괴 · 돌 트럭 적재/하역",
+      detail: "dump / crash / hill 보상 API 공통 드롭 모델",
+    },
+  ];
   const capacityConfig = YANMAR_EQUIPMENT_CONFIG.TRUCK_CAPACITY;
   const speedConfig = YANMAR_EQUIPMENT_CONFIG.TRUCK_SPEED;
   const maxTruckCapacity = getYanmarTruckCapacityUnits(capacityConfig.maxLevel);
@@ -74,39 +132,8 @@ export function getGameProbabilityReport() {
           ],
         },
         {
-          title: "하역 보상 확률 (1회 롤)",
-          items: [
-            {
-              label: "필터세트 교환쿠폰",
-              value: pct(filterChance, 4),
-              detail: `교환권 · 시즌 한도 ${YANMAR_REWARD_CONFIG.filterSetCouponSeasonLimit}장`,
-            },
-            {
-              label: "YK건기 부품 할인 쿠폰",
-              value: pct(partsChance),
-              detail: `할인율 ${PARTS_DISCOUNTS.join("% / ")}% 중 랜덤 · 시즌 한도 ${YANMAR_REWARD_CONFIG.partsCouponSeasonLimit}장`,
-            },
-            {
-              label: "중장비 대여 할인 쿠폰",
-              value: pct(rentalChance),
-              detail: `할인율 ${RENTAL_DISCOUNTS.join("% / ")}% 중 랜덤 · 시즌 한도 ${YANMAR_REWARD_CONFIG.rentalCouponSeasonLimit}장`,
-            },
-            {
-              label: "스타 보상",
-              value: pct(starChance),
-              detail: `${YANMAR_REWARD_CONFIG.minStarReward}~${YANMAR_REWARD_CONFIG.maxStarReward} 스타 랜덤`,
-            },
-            {
-              label: "쿠폰 유효기간",
-              value: `${YANMAR_REWARD_CONFIG.couponExpiresInDays}일`,
-            },
-            {
-              label: "시즌 쿠폰 한도",
-              value: "종류별 고정",
-              detail:
-                "시즌이 바뀌면 한도가 다시 채워집니다. 한도 소진 시 쿠폰 대신 스타가 지급됩니다.",
-            },
-          ],
+          title: "하역·파괴·돌 하역 보상 확률 (1회 롤)",
+          items: sharedDropRewardItems,
         },
         {
           title: "Crash 아스팔트 파괴 보상 (타일 1개)",
@@ -125,24 +152,14 @@ export function getGameProbabilityReport() {
               value: `×${YANMAR_REWARD_CONFIG.baseCriticalMultiplier}`,
             },
             {
-              label: "필터세트 교환쿠폰",
-              value: pct(filterChance, 4),
-              detail: "하역과 동일 확률",
-            },
-            {
-              label: "YK건기 부품 할인 쿠폰",
-              value: pct(partsChance),
-              detail: "하역과 동일 확률",
-            },
-            {
-              label: "중장비 대여 할인 쿠폰",
-              value: pct(rentalChance),
-              detail: "하역과 동일 확률",
-            },
-            {
               label: "스타 보상",
-              value: pct(starChance),
-              detail: `${YANMAR_CRASH_REWARD_CONFIG.minStarReward}~${YANMAR_CRASH_REWARD_CONFIG.maxStarReward} 스타 랜덤`,
+              value: "100%",
+              detail: `${YANMAR_CRASH_REWARD_CONFIG.minStarReward}~${YANMAR_CRASH_REWARD_CONFIG.maxStarReward} 스타 랜덤 · 항상 지급`,
+            },
+            {
+              label: "쿠폰 추가 드롭",
+              value: pctFromFraction(couponDropChance),
+              detail: "하역과 동일 · 스타와 독립적인 추가 드롭",
             },
             {
               label: "경험치",
@@ -169,8 +186,13 @@ export function getGameProbabilityReport() {
             },
             {
               label: "스타 보상",
-              value: pct(starChance),
-              detail: `${YANMAR_HILL_REWARD_CONFIG.minStarReward}~${YANMAR_HILL_REWARD_CONFIG.maxStarReward} 스타 랜덤 · 쿠폰 확률은 하역과 동일`,
+              value: "100%",
+              detail: `${YANMAR_HILL_REWARD_CONFIG.minStarReward}~${YANMAR_HILL_REWARD_CONFIG.maxStarReward} 스타 랜덤 · 항상 지급`,
+            },
+            {
+              label: "쿠폰 추가 드롭",
+              value: pctFromFraction(couponDropChance),
+              detail: "하역과 동일 · 스타와 독립적인 추가 드롭",
             },
             {
               label: "구역 규칙",

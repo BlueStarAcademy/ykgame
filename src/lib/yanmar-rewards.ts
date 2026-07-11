@@ -5,10 +5,10 @@ import {
   getCouponExpiresAt,
 } from "@/lib/coupon";
 import { YANMAR_REWARD_CONFIG } from "@/games/yanmar/equipment";
+export { parseRewardEventId } from "@/lib/request-idempotency";
 
 const PARTS_DISCOUNTS = [10, 15, 20] as const;
 const RENTAL_DISCOUNTS = [10, 20, 30] as const;
-const EVENT_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
 export type YanmarStarReward = {
   kind: "stars";
@@ -30,10 +30,27 @@ export type YanmarCouponReward = {
 
 export type YanmarReward = YanmarStarReward | YanmarCouponReward;
 
+export type YanmarCouponRemaining = {
+  parts: number;
+  rental: number;
+  filterSet: number;
+};
+
+export type YanmarDropRoll = {
+  stars: YanmarStarReward;
+  coupon: YanmarCouponReward | null;
+};
+
 type RewardMetadata = Record<
   string,
   boolean | number | string | null
 >;
+
+const COUPON_TYPES = [
+  "FILTER_SET_EXCHANGE",
+  "YK_PARTS_DISCOUNT",
+  "EQUIPMENT_RENTAL_DISCOUNT",
+] as const satisfies readonly CouponType[];
 
 export function randomInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -41,12 +58,6 @@ export function randomInt(min: number, max: number) {
 
 function pick<T>(items: readonly T[]) {
   return items[Math.floor(Math.random() * items.length)];
-}
-
-export function parseRewardEventId(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const eventId = value.trim();
-  return EVENT_ID_PATTERN.test(eventId) ? eventId : null;
 }
 
 export function createYanmarStarReward(
@@ -63,73 +74,141 @@ export function createYanmarStarReward(
   };
 }
 
-export function rollYanmarReward({
+function couponDiscountPct(couponType: CouponType): number {
+  if (couponType === "YK_PARTS_DISCOUNT") return pick(PARTS_DISCOUNTS);
+  if (couponType === "EQUIPMENT_RENTAL_DISCOUNT") return pick(RENTAL_DISCOUNTS);
+  return 0;
+}
+
+function remainingForType(
+  couponType: CouponType,
+  remaining: YanmarCouponRemaining | undefined,
+): number {
+  if (!remaining) return 1;
+  if (couponType === "FILTER_SET_EXCHANGE") return remaining.filterSet;
+  if (couponType === "YK_PARTS_DISCOUNT") return remaining.parts;
+  return remaining.rental;
+}
+
+function consumeRemaining(
+  couponType: CouponType,
+  remaining: YanmarCouponRemaining | undefined,
+) {
+  if (!remaining) return;
+  if (couponType === "FILTER_SET_EXCHANGE") remaining.filterSet -= 1;
+  else if (couponType === "YK_PARTS_DISCOUNT") remaining.parts -= 1;
+  else remaining.rental -= 1;
+}
+
+/** Pick among available types by relative weights. */
+export function pickYanmarCouponType(
+  available: readonly CouponType[],
+): CouponType | null {
+  if (available.length === 0) return null;
+  const weights = YANMAR_REWARD_CONFIG.couponTypeWeights;
+  const entries = available.map((type) => ({
+    type,
+    weight: Math.max(0, weights[type] ?? 0),
+  }));
+  const total = entries.reduce((sum, e) => sum + e.weight, 0);
+  if (total <= 0) {
+    return available[Math.floor(Math.random() * available.length)] ?? null;
+  }
+  let roll = Math.random() * total;
+  for (const entry of entries) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.type;
+  }
+  return entries[entries.length - 1]?.type ?? null;
+}
+
+export function rollYanmarCouponDrop({
   score,
-  minStars,
-  maxStars,
-  seasonKey,
   critical = false,
+  seasonKey,
+  remaining,
 }: {
   score: number;
-  minStars: number;
-  maxStars: number;
-  seasonKey: string;
   critical?: boolean;
-}): YanmarReward {
-  const roll = Math.random();
-  const filterChance = YANMAR_REWARD_CONFIG.filterSetCouponChance;
-  const partsChance = YANMAR_REWARD_CONFIG.partsCouponChance;
-  const rentalChance = YANMAR_REWARD_CONFIG.rentalCouponChance;
+  seasonKey: string;
+  remaining?: YanmarCouponRemaining;
+}): YanmarCouponReward | null {
+  if (Math.random() >= YANMAR_REWARD_CONFIG.couponDropChance) return null;
 
-  let couponType: CouponType | null = null;
-  let discountPct = 0;
+  const available = COUPON_TYPES.filter(
+    (type) => remainingForType(type, remaining) > 0,
+  );
+  const couponType = pickYanmarCouponType(available);
+  if (!couponType) return null;
 
-  if (roll < filterChance) {
-    couponType = "FILTER_SET_EXCHANGE";
-  } else if (roll < filterChance + partsChance) {
-    couponType = "YK_PARTS_DISCOUNT";
-    discountPct = pick(PARTS_DISCOUNTS);
-  } else if (roll < filterChance + partsChance + rentalChance) {
-    couponType = "EQUIPMENT_RENTAL_DISCOUNT";
-    discountPct = pick(RENTAL_DISCOUNTS);
-  }
-
-  if (!couponType) {
-    return createYanmarStarReward(score, minStars, maxStars, critical);
-  }
+  consumeRemaining(couponType, remaining);
 
   return {
     kind: "coupon",
     score,
     critical,
     couponType,
-    discountPct,
+    discountPct: couponDiscountPct(couponType),
     barcodeCode: createBarcodeCode(),
     expiresAt: getCouponExpiresAt(),
     seasonKey,
   };
 }
 
-export async function lockAndCheckRewardEvent(
+/** Stars always; coupon optional additional drop. */
+export function rollYanmarDropRewards({
+  score,
+  minStars,
+  maxStars,
+  seasonKey,
+  critical = false,
+  remaining,
+}: {
+  score: number;
+  minStars: number;
+  maxStars: number;
+  seasonKey: string;
+  critical?: boolean;
+  remaining?: YanmarCouponRemaining;
+}): YanmarDropRoll {
+  return {
+    stars: createYanmarStarReward(score, minStars, maxStars, critical),
+    coupon: rollYanmarCouponDrop({ score, critical, seasonKey, remaining }),
+  };
+}
+
+export async function runReplayableRewardEvent<
+  T extends Prisma.InputJsonValue,
+>(
   tx: Prisma.TransactionClient,
-  userId: string,
-  gameId: string,
-  eventId: string,
-) {
+  {
+    userId,
+    gameId,
+    eventId,
+  }: {
+    userId: string;
+    gameId: string;
+    eventId: string;
+  },
+  issue: () => Promise<T>,
+): Promise<{ result: T; replayed: boolean }> {
   const lockKey = `yanmar-reward:${userId}:${gameId}:${eventId}`;
+  // Transaction-scoped locks are safe with PgBouncer transaction pooling.
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
 
-  const existing = await tx.$queryRaw<Array<{ exists: boolean }>>`
-    SELECT EXISTS (
-      SELECT 1
-      FROM "UserRewardInventory"
-      WHERE "userId" = ${userId}
-        AND "gameId" = ${gameId}
-        AND "metadata"->>'eventId' = ${eventId}
-    ) AS "exists"
-  `;
+  const existing = await tx.rewardEvent.findUnique({
+    where: { userId_gameId_eventId: { userId, gameId, eventId } },
+    select: { result: true },
+  });
+  if (existing) {
+    return { result: existing.result as T, replayed: true };
+  }
 
-  return existing[0]?.exists ?? false;
+  const result = await issue();
+  await tx.rewardEvent.create({
+    data: { userId, gameId, eventId, result },
+  });
+  return { result, replayed: false };
 }
 
 export async function isYanmarRewardRateLimited(
@@ -157,76 +236,64 @@ export async function lockAndCanIssueYanmarCoupon(
   seasonKey: string,
 ) {
   const quotaLockKey = `yanmar-coupon:${seasonKey}:${couponType}`;
+  // The season quota lock is also transaction-scoped; never use session locks.
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${quotaLockKey}))`;
   return canIssueSeasonGameDropCoupon(tx, couponType, seasonKey);
 }
 
-export async function persistYanmarReward({
+export async function persistYanmarDropRewards({
   tx,
   userId,
   gameId,
-  reward,
-  minStars,
-  maxStars,
+  stars,
+  coupon,
   metadata,
 }: {
   tx: Prisma.TransactionClient;
   userId: string;
   gameId: string;
-  reward: YanmarReward;
-  minStars: number;
-  maxStars: number;
+  stars: YanmarStarReward;
+  coupon: YanmarCouponReward | null;
   metadata: RewardMetadata;
-}): Promise<YanmarReward> {
-  let issuedReward = reward;
-  let fallbackFromCoupon = false;
+}): Promise<YanmarDropRoll> {
+  let issuedCoupon: YanmarCouponReward | null = null;
 
-  if (issuedReward.kind === "coupon") {
+  if (coupon) {
     const allowed = await lockAndCanIssueYanmarCoupon(
       tx,
-      issuedReward.couponType,
-      issuedReward.seasonKey,
+      coupon.couponType,
+      coupon.seasonKey,
     );
-    if (!allowed) {
-      fallbackFromCoupon = true;
-      issuedReward = createYanmarStarReward(
-        issuedReward.score,
-        minStars,
-        maxStars,
-        issuedReward.critical,
-      );
-    }
-  }
-
-  if (issuedReward.kind === "coupon") {
-    await tx.userCoupon.create({
-      data: {
-        userId,
-        type: issuedReward.couponType,
-        discountPct: issuedReward.discountPct,
-        barcodeCode: issuedReward.barcodeCode,
-        seasonKey: issuedReward.seasonKey,
-        fromGameDrop: true,
-        expiresAt: issuedReward.expiresAt,
-      },
-    });
-    await tx.userRewardInventory.create({
-      data: {
-        userId,
-        gameId,
-        type: "COUPON",
-        amount: issuedReward.discountPct,
-        metadata: {
-          ...metadata,
-          score: issuedReward.score,
-          critical: issuedReward.critical,
-          couponType: issuedReward.couponType,
-          barcodeCode: issuedReward.barcodeCode,
-          seasonKey: issuedReward.seasonKey,
+    if (allowed) {
+      await tx.userCoupon.create({
+        data: {
+          userId,
+          type: coupon.couponType,
+          discountPct: coupon.discountPct,
+          barcodeCode: coupon.barcodeCode,
+          seasonKey: coupon.seasonKey,
+          fromGameDrop: true,
+          expiresAt: coupon.expiresAt,
         },
-      },
-    });
-    return issuedReward;
+      });
+      await tx.userRewardInventory.create({
+        data: {
+          userId,
+          gameId,
+          type: "COUPON",
+          amount: coupon.discountPct,
+          metadata: {
+            ...metadata,
+            score: coupon.score,
+            critical: coupon.critical,
+            couponType: coupon.couponType,
+            barcodeCode: coupon.barcodeCode,
+            seasonKey: coupon.seasonKey,
+          },
+        },
+      });
+      issuedCoupon = coupon;
+    }
   }
 
   await tx.userRewardInventory.create({
@@ -234,14 +301,14 @@ export async function persistYanmarReward({
       userId,
       gameId,
       type: "STAR",
-      amount: issuedReward.stars,
+      amount: stars.stars,
       metadata: {
         ...metadata,
-        score: issuedReward.score,
-        critical: issuedReward.critical,
-        ...(fallbackFromCoupon ? { fallbackFromCoupon: true } : {}),
+        score: stars.score,
+        critical: stars.critical,
       },
     },
   });
-  return issuedReward;
+
+  return { stars, coupon: issuedCoupon };
 }

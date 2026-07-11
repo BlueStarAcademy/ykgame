@@ -192,6 +192,23 @@ body {
   will-change: opacity, transform;
 }
 
+@keyframes yanmar-travel-raise-warn-fade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.yanmar-travel-raise-warn {
+  will-change: opacity;
+}
+
+.yanmar-travel-raise-warn.is-fading {
+  animation: yanmar-travel-raise-warn-fade 3s ease-out forwards;
+}
+
 @keyframes yanmar-pose-save-toast-fade {
   0% {
     opacity: 0;
@@ -2045,6 +2062,46 @@ body {
   text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.58);
 }
 
+.yanmar-quest-notify-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  box-shadow: 0 0 0 1.5px rgba(15, 23, 42, 0.92);
+  pointer-events: none;
+}
+
+.yanmar-quest-notify-badge.is-icon {
+  position: absolute;
+  top: -0.22rem;
+  right: -0.28rem;
+  z-index: 2;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.32rem;
+  font-size: 0.62rem;
+  box-shadow:
+    0 0 0 1.5px rgba(15, 23, 42, 0.95),
+    0 0.1rem 0.25rem rgba(0, 0, 0, 0.45);
+}
+
+.yanmar-quest-notify-badge.is-tab {
+  min-width: 0.95rem;
+  height: 0.95rem;
+  padding: 0 0.24rem;
+  font-size: 0.52rem;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.75);
+}
+
 .yanmar-quest-panel-badge {
   display: block;
   width: 0.7rem;
@@ -3206,6 +3263,10 @@ body {
 .yanmar-layout-portrait .yanmar-dig-pose-panel {
   top: 9.9rem !important;
   right: 0.5rem !important;
+}
+
+.yanmar-layout-portrait .yanmar-mission-hud-panel {
+  max-width: 10.5rem;
 }
 
 .yanmar-layout-portrait .yanmar-zone-legend {

@@ -135,9 +135,6 @@ export function addDumpTruckLoad(
 ) {
   if (state.phase !== "ready") return;
   state.fillUnits = Math.min(capacityUnits, state.fillUnits + loadUnits);
-  if (state.fillUnits >= capacityUnits - 0.5) {
-    beginDumpTruckDeparture(state);
-  }
 }
 
 export function formatDumpTruckReturnTime(seconds: number) {

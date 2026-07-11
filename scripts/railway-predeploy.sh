@@ -34,6 +34,12 @@ if [ -n "$DATABASE_URL" ] && is_placeholder_url "$DATABASE_URL"; then
   exit 1
 fi
 
+if [ -n "$DIRECT_DATABASE_URL" ] && is_placeholder_url "$DIRECT_DATABASE_URL"; then
+  echo "ERROR: DIRECT_DATABASE_URL이 빌드용 placeholder입니다."
+  echo "  예: DIRECT_DATABASE_URL = \${{Postgres.DATABASE_URL}}"
+  exit 1
+fi
+
 echo "==> Resolving database URL..."
 export DATABASE_URL="$(npx tsx scripts/resolve-db-url.ts)"
 
@@ -44,10 +50,15 @@ if is_placeholder_url "$DATABASE_URL"; then
 fi
 
 echo "==> Running database migrations..."
+if [ -n "$DIRECT_DATABASE_URL" ]; then
+  echo "    DIRECT_DATABASE_URL을 migration 전용 연결로 사용합니다."
+else
+  echo "    DIRECT_DATABASE_URL이 없어 DATABASE_URL로 fallback합니다."
+fi
 attempt=1
 max_attempts=5
 while [ "$attempt" -le "$max_attempts" ]; do
-  if npx prisma migrate deploy; then
+  if node scripts/run-prisma-direct.mjs migrate deploy; then
     break
   fi
 

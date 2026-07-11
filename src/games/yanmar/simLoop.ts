@@ -27,6 +27,7 @@ import {
   dumpTruckBedDeckWorldY,
   getMapWorldBounds,
   addHaulTruckRock,
+  beginHaulTruckDeparture,
   damageCrashTile,
   getCrashTileAt,
   isInsideHillZoneCore,
@@ -45,12 +46,20 @@ import {
   DUMP_ZONE,
   DUMP_TRUCK,
 } from "./terrain";
+import {
+  getDumpTruckAlignTarget,
+  getHaulTruckAlignTarget,
+  isAlignedForTruckDump,
+  isBodyTouchingTruck,
+  isFacingTruckBedCenter,
+} from "./truckDumpAlign";
 import { checkAttachmentUse, getZoneAt } from "./attachmentZones";
 import {
   BUCKET_SOIL_HOLD_MIN,
   getBreakerGroundAngleDeg,
   getBreakerTipWorld,
   getBucketBodyContactWorld,
+  getGrappleClampWorld,
   getBucketScraperContactWorld,
   getBucketSoilRetention,
   getBucketTipWorld,
@@ -62,6 +71,7 @@ import {
 import { constrainArmFromDumpTruck, isDumpTruckArmCollisionActive } from "./dumpTruckCollision";
 import {
   addDumpTruckLoad,
+  beginDumpTruckDeparture,
   canDumpTruckAcceptDump,
   getDumpTruckFillRatio,
   getDumpTruckPose,
@@ -90,6 +100,7 @@ import {
   computeGrappleAdhesion,
   createGrappleGripRuntime,
   grappleBucketAngleReady,
+  hillBoulderGripEnvelope,
   hillBoulderWrapRadius,
   resetGrappleGrip,
   GRAPPLE_TRAVEL_LOCK_CLEARANCE,
@@ -186,23 +197,27 @@ function clampControl(value: number, min = -1, max = 1) {
   return Math.max(min, Math.min(max, value));
 }
 
-function isBucketWrappingRock(
-  tip: { x: number; y: number; z: number },
+function isGrappleWrappingRock(
+  point: { x: number; y: number; z: number },
   rock: HillBoulder,
   terrain: TerrainData,
 ): boolean {
-  const scale = hillBoulderVisualScale(rock.size);
+  const visualScale = hillBoulderVisualScale(rock.size);
+  const envelope = hillBoulderGripEnvelope(rock);
   const ground = sampleHeight(terrain, rock.x, rock.z);
-  const xz = Math.hypot(tip.x - rock.x, tip.z - rock.z);
-  if (xz > hillBoulderWrapRadius(rock)) return false;
-  const rockCenterY = ground + scale * 0.55;
-  const yMin = ground + scale * 0.12;
-  const yMax = rockCenterY + scale * 0.9;
-  return tip.y >= yMin && tip.y <= yMax;
+  const xz = Math.hypot(point.x - rock.x, point.z - rock.z);
+  if (xz > envelope.horizontalRadius) return false;
+
+  // Flat-ground friendly vertical window (old hill used a tall band, not a tight ellipsoid).
+  const rockCenterY = ground + visualScale * 0.55;
+  const yMin = ground - 0.05;
+  const yMax = rockCenterY + envelope.verticalRadius;
+  return point.y >= yMin && point.y <= yMax;
 }
 
 function findWrappableHillRock(
   hill: NonNullable<TerrainData["hillZone"]>,
+  clamp: { x: number; y: number; z: number },
   tip: { x: number; y: number; z: number },
   terrain: TerrainData,
 ): HillBoulder | null {
@@ -210,11 +225,17 @@ function findWrappableHillRock(
     .filter((item) => item.active && !item.delivered && !item.extracted)
     .map((item) => ({
       item,
-      distance: Math.hypot(item.x - tip.x, item.z - tip.z),
+      distance: Math.min(
+        Math.hypot(item.x - clamp.x, item.z - clamp.z),
+        Math.hypot(item.x - tip.x, item.z - tip.z),
+      ),
     }))
     .sort((a, b) => a.distance - b.distance);
   for (const candidate of candidates) {
-    if (isBucketWrappingRock(tip, candidate.item, terrain)) {
+    if (
+      isGrappleWrappingRock(clamp, candidate.item, terrain) ||
+      isGrappleWrappingRock(tip, candidate.item, terrain)
+    ) {
       return candidate.item;
     }
   }
@@ -244,7 +265,9 @@ function bucketClearance(sim: ExcavatorSimState, terrain: TerrainData, boomSwing
   const tip =
     sim.attachmentType === "breaker"
       ? getBreakerTipWorld(sim, boomSwing)
-      : getBucketBodyContactWorld(sim, boomSwing);
+      : sim.attachmentType === "grapple"
+        ? getGrappleClampWorld(sim, boomSwing)
+        : getBucketBodyContactWorld(sim, boomSwing);
   const groundH =
     sim.attachmentType === "breaker"
       ? sampleCrashContactHeight(terrain, tip.x, tip.z)
@@ -313,9 +336,16 @@ function applyTruckDump(
     1.2,
     runtime.dumpSoilVisual.intensity + amount * 6.5,
   );
-  runtime.dumpSoilVisual.spawnX = mouth.x;
+  const visualDropPoint = clampToDumpTruckBed(
+    mouth.x,
+    mouth.z,
+    0.7,
+    truckPose.groupX,
+    truckPose.groupZ,
+  );
+  runtime.dumpSoilVisual.spawnX = visualDropPoint.x;
   runtime.dumpSoilVisual.spawnY = Math.max(bucketReachY, bedDeckY + 0.35);
-  runtime.dumpSoilVisual.spawnZ = mouth.z;
+  runtime.dumpSoilVisual.spawnZ = visualDropPoint.z;
   if (isGame) {
     score.dumped += amount;
     const progress = Math.min(100, Math.round((score.dumped / score.target) * 100));
@@ -440,13 +470,14 @@ export function tickExcavatorSim(params: SimTickParams) {
   const breakerNearGround =
     sim.attachmentType === "breaker" &&
     beforeControlBucket.clearance < BREAKER_TRAVEL_LOCK_CLEARANCE;
-  const grappleCarryNearGround =
+  // Grapple matches breaker: travel is locked while the jaws sit too low,
+  // and also while a carried rock has not finished the lift check.
+  const grappleNearGround =
     sim.attachmentType === "grapple" &&
-    !!sim.carriedBoulderId &&
     (beforeControlBucket.clearance < GRAPPLE_TRAVEL_LOCK_CLEARANCE ||
-      !runtime.grappleGrip.liftChecked);
+      (!!sim.carriedBoulderId && !runtime.grappleGrip.liftChecked));
   const toolBlocksTravel =
-    bucketAnchoredToGround || breakerNearGround || grappleCarryNearGround;
+    bucketAnchoredToGround || breakerNearGround || grappleNearGround;
   const wantsTravel =
     allowed.travel &&
     (Math.abs(rawInput.travel.left) > 0.08 || Math.abs(rawInput.travel.right) > 0.08);
@@ -617,10 +648,21 @@ export function tickExcavatorSim(params: SimTickParams) {
   }
   const scraper = getBucketScraperContactWorld(sim, boomSwing);
   const bucketTip = getBucketTipWorld(sim, boomSwing);
+  const grappleClamp = getGrappleClampWorld(sim, boomSwing);
   const toolTip =
     sim.attachmentType === "breaker"
       ? getBreakerTipWorld(sim, boomSwing)
-      : bucketTip;
+      : sim.attachmentType === "grapple"
+        ? grappleClamp
+        : bucketTip;
+  const toolZoneRaw = getZoneAt(toolTip.x, toolTip.z, terrain);
+  const toolZone =
+    sim.attachmentType === "grapple" && toolZoneRaw !== "hill"
+      ? getZoneAt(bucketTip.x, bucketTip.z, terrain) === "hill" ||
+        getZoneAt(sim.posX, sim.posZ, terrain) === "hill"
+        ? "hill"
+        : toolZoneRaw
+      : toolZoneRaw;
   const bedDeckY = dumpTruckBedDeckWorldY();
   const minDumpHeight = bedDeckY + DUMP_TRUCK.dumpMinHeightAboveDeck;
   const truckBedCenter = dumpTruckBedCenterWorld(truckPose.groupX, truckPose.groupZ);
@@ -631,7 +673,6 @@ export function tickExcavatorSim(params: SimTickParams) {
   const activeDigZones = getActiveDigZones(terrain);
   const scraperInDigZone = isInDigZone(scraper.x, scraper.z, terrain);
   const tipInDigZone = isInDigZone(bucketTip.x, bucketTip.z, terrain);
-  const toolZone = getZoneAt(toolTip.x, toolTip.z, terrain);
   const toolGround =
     sim.attachmentType === "breaker"
       ? sampleCrashContactHeight(terrain, toolTip.x, toolTip.z)
@@ -690,19 +731,22 @@ export function tickExcavatorSim(params: SimTickParams) {
     sim.attachmentType === "grapple" &&
     hillForGrapple?.active &&
     !sim.carriedBoulderId
-      ? findWrappableHillRock(hillForGrapple, bucketTip, terrain)
+      ? findWrappableHillRock(hillForGrapple, grappleClamp, bucketTip, terrain)
       : null;
 
   if (sim.attachmentType === "grapple") {
     const permission = checkAttachmentUse("grapple", toolZone, "grab");
     const closing = grapplePedal > 0;
     const opening = grapplePedal < 0;
+    // Rocks only exist in the stone zone — allow wrap contact even if the clamp
+    // samples just outside the painted radius after terrain flatten.
+    const canGrab = permission.allowed || wrappableRock != null;
 
-    if (grapplePedal !== 0 && !permission.allowed && toolTouchesGround) {
+    if (grapplePedal !== 0 && !canGrab && toolTouchesGround) {
       warnAttachment(permission.message);
     }
 
-    if (permission.allowed && runtime.attachmentActionCooldown <= 0) {
+    if (canGrab && runtime.attachmentActionCooldown <= 0) {
       if (hillForGrapple?.active && !sim.carriedBoulderId && closing) {
         if (wrappableRock && !angleReady) {
           warnAttachment("버켓 각도를 집게와 맞춰주세요.");
@@ -714,8 +758,8 @@ export function tickExcavatorSim(params: SimTickParams) {
           runtime.grappleGrip.contactElapsed = 0;
           runtime.grappleGrip.comFactor = computeComAlignFactor(
             wrappableRock,
-            bucketTip.x,
-            bucketTip.z,
+            grappleClamp.x,
+            grappleClamp.z,
           );
           const initial = computeGrappleAdhesion({
             rock: wrappableRock,
@@ -729,9 +773,17 @@ export function tickExcavatorSim(params: SimTickParams) {
           runtime.attachmentActionCooldown = 0.2;
         }
       } else if (hillForGrapple && sim.carriedBoulderId && opening) {
-        const atDrop =
-          Math.hypot(bucketTip.x - hillForGrapple.dropX, bucketTip.z - hillForGrapple.dropZ) <=
-          5;
+        const atDrop = isAlignedForTruckDump(
+          sim.posX,
+          sim.posZ,
+          sim.heading,
+          sim.swing,
+          getHaulTruckAlignTarget(
+            hillForGrapple.dropX,
+            hillForGrapple.dropZ,
+            hillForGrapple.haulTruck.phase === "ready",
+          ),
+        );
         const rock = hillForGrapple.boulders.find(
           (item) => item.id === sim.carriedBoulderId,
         );
@@ -755,7 +807,7 @@ export function tickExcavatorSim(params: SimTickParams) {
           warnAttachment("붐을 들어 적재 판정을 완료하세요.");
           runtime.attachmentActionCooldown = 0.45;
         } else if (!atDrop && rock) {
-          placeCarriedRockOnGround(rock, bucketTip, terrain);
+          placeCarriedRockOnGround(rock, grappleClamp, terrain);
           sim.carriedBoulderId = null;
           resetGrappleGrip(runtime.grappleGrip);
           runtime.attachmentActionCooldown = 0.35;
@@ -772,8 +824,15 @@ export function tickExcavatorSim(params: SimTickParams) {
       if (carried && closing && !g.liftChecked) {
         g.locked = false;
         g.contactElapsed += dt;
-        if (Math.hypot(bucketTip.x - carried.x, bucketTip.z - carried.z) <= hillBoulderWrapRadius(carried) * 1.8) {
-          g.comFactor = computeComAlignFactor(carried, bucketTip.x, bucketTip.z);
+        if (
+          Math.hypot(grappleClamp.x - carried.x, grappleClamp.z - carried.z) <=
+          hillBoulderWrapRadius(carried) * 1.8
+        ) {
+          g.comFactor = computeComAlignFactor(
+            carried,
+            grappleClamp.x,
+            grappleClamp.z,
+          );
         }
         const next = computeGrappleAdhesion({
           rock: carried,
@@ -797,7 +856,8 @@ export function tickExcavatorSim(params: SimTickParams) {
   // 밀착감 확정 + 팁이 충분히 들린 뒤 낙하 판정
   {
     const grip = runtime.grappleGrip;
-    const carryClearance = bucketClearance(sim, terrain, boomSwing).clearance;
+    const carryGround = sampleHeight(terrain, grappleClamp.x, grappleClamp.z);
+    const carryClearance = grappleClamp.y - carryGround;
     if (
       sim.attachmentType === "grapple" &&
       sim.carriedBoulderId &&
@@ -821,9 +881,9 @@ export function tickExcavatorSim(params: SimTickParams) {
         }
         sim.carriedBoulderId = null;
         runtime.digDust.active = true;
-        runtime.digDust.x = bucketTip.x;
-        runtime.digDust.y = bucketTip.y;
-        runtime.digDust.z = bucketTip.z;
+        runtime.digDust.x = grappleClamp.x;
+        runtime.digDust.y = grappleClamp.y;
+        runtime.digDust.z = grappleClamp.z;
         const failTick = grip.liftResultTick;
         resetGrappleGrip(grip);
         grip.liftResult = "fail";
@@ -858,6 +918,60 @@ export function tickExcavatorSim(params: SimTickParams) {
     bucketMouthCenter.x,
     bucketMouthCenter.z,
   );
+  const dumpAlignTarget = getDumpTruckAlignTarget(
+    truckPose.groupX,
+    truckPose.groupZ,
+    truckPose.present,
+  );
+  const dumpBodyTouching = dumpAlignTarget
+    ? isBodyTouchingTruck(sim.posX, sim.posZ, dumpAlignTarget)
+    : false;
+  const dumpFacingBed = dumpAlignTarget
+    ? isFacingTruckBedCenter(
+        sim.posX,
+        sim.posZ,
+        sim.heading,
+        sim.swing,
+        dumpAlignTarget.bedCenterX,
+        dumpAlignTarget.bedCenterZ,
+      )
+    : false;
+  const alignedForDumpTruck = isAlignedForTruckDump(
+    sim.posX,
+    sim.posZ,
+    sim.heading,
+    sim.swing,
+    dumpAlignTarget,
+  );
+  const haulTruckPresent =
+    !!terrain.hillZone && terrain.hillZone.haulTruck.phase === "ready";
+  const haulAlignTarget = terrain.hillZone
+    ? getHaulTruckAlignTarget(
+        terrain.hillZone.dropX,
+        terrain.hillZone.dropZ,
+        haulTruckPresent,
+      )
+    : null;
+  const haulBodyTouching = haulAlignTarget
+    ? isBodyTouchingTruck(sim.posX, sim.posZ, haulAlignTarget)
+    : false;
+  const haulFacingBed = haulAlignTarget
+    ? isFacingTruckBedCenter(
+        sim.posX,
+        sim.posZ,
+        sim.heading,
+        sim.swing,
+        haulAlignTarget.bedCenterX,
+        haulAlignTarget.bedCenterZ,
+      )
+    : false;
+  const alignedForHaulTruck = isAlignedForTruckDump(
+    sim.posX,
+    sim.posZ,
+    sim.heading,
+    sim.swing,
+    haulAlignTarget,
+  );
   const bucketNearDumpTarget =
     Math.hypot(bucketMouthCenter.x - truckBedCenter.x, bucketMouthCenter.z - truckBedCenter.z) <=
     DUMP_ZONE.radius + 1.2;
@@ -871,8 +985,21 @@ export function tickExcavatorSim(params: SimTickParams) {
   const bucketContactsInDump =
     isInDumpZone(scraper.x, scraper.z) || isInDumpZone(bucketTip.x, bucketTip.z);
   const bucketReadyOverTruck = bucketNearDumpTarget && (bucketAboveBed || bucketOpening);
-  const inDump = bodyInDumpZone || bucketContactsInDump || bucketOverTruck || bucketReadyOverTruck;
-  const inTruckDumpTarget = bucketOverTruck || bucketReadyOverTruck;
+  const inDump =
+    bodyInDumpZone ||
+    bucketContactsInDump ||
+    bucketOverTruck ||
+    bucketReadyOverTruck ||
+    alignedForDumpTruck;
+  // 흙트럭·돌트럭 공통: 차체 밀착 + 정면이 짐칸 중심
+  const inTruckDumpTarget = alignedForDumpTruck;
+  if (!inDump && truckState.fillUnits >= stats.truckCapacityUnits - 0.5) {
+    beginDumpTruckDeparture(truckState);
+  }
+  const haulTruckDropZone = terrain.hillZone;
+  if (haulTruckDropZone && !haulBodyTouching) {
+    beginHaulTruckDeparture(terrain, stats.haulTruckCapacity);
+  }
   const bucketInWorkRange = scraperDepthBelow > -1.4 && scraperDepthBelow < 2.6;
   const tipOnGround = scraperDepthBelow > -1.2 && scraperDepthBelow < 2.6;
   const curled = isBucketCurled(sim.boom, sim.bucket);
@@ -936,16 +1063,13 @@ export function tickExcavatorSim(params: SimTickParams) {
     breakerAngleReady &&
     !!crashTileAtTip?.active;
 
-  const hillZone = terrain.hillZone;
   const canGrab =
     sim.attachmentType === "grapple" &&
-    toolZone === "hill" &&
     angleReady &&
     !sim.carriedBoulderId &&
     !!wrappableRock;
   const grappleNeedsAlignment =
     sim.attachmentType === "grapple" &&
-    toolZone === "hill" &&
     !sim.carriedBoulderId &&
     !!wrappableRock &&
     !angleReady;
@@ -953,8 +1077,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     sim.attachmentType === "grapple" &&
     !!sim.carriedBoulderId &&
     runtime.grappleGrip.liftChecked &&
-    !!hillZone &&
-    Math.hypot(bucketTip.x - hillZone.dropX, bucketTip.z - hillZone.dropZ) <= 5;
+    alignedForHaulTruck;
   const showGripGauge =
     sim.attachmentType === "grapple" &&
     !!sim.carriedBoulderId &&
@@ -1021,8 +1144,17 @@ export function tickExcavatorSim(params: SimTickParams) {
         .filter((zone) => zone.etaSec > 0)
     : [];
   fb.canDump = inTruckDumpTarget && sim.bucketLoad > 0.02 && truckCanAccept;
+  fb.dumpBodyTouching =
+    sim.attachmentType === "grapple" ? haulBodyTouching : dumpBodyTouching;
+  fb.dumpFacingBed =
+    sim.attachmentType === "grapple" ? haulFacingBed : dumpFacingBed;
   fb.raiseArmForDump =
-    inDump && sim.bucketLoad > 0.02 && bucketOverTruck && !bucketAboveBed && !bucketOpening;
+    inDump &&
+    sim.bucketLoad > 0.02 &&
+    dumpBodyTouching &&
+    dumpFacingBed &&
+    !bucketAboveBed &&
+    !bucketOpening;
   fb.travelBlockedRaiseArm = toolBlocksTravel && wantsTravel;
 
   const isGame = mode === "game";

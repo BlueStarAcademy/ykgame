@@ -11,6 +11,9 @@ export const YANMAR_MACHINE_RIG = {
   breakerRotationZ: -0.08,
   breakerTipLocalX: -2.18,
   breakerTipLocalY: -0.15,
+  /** Bucket-local grip point — between thumb and teeth, slightly toward the tip. */
+  grappleClampLocalX: -1.05,
+  grappleClampLocalY: -0.28,
   /** 블레이드 0=상승, 1=하강 시 그룹 Y 하강량 */
   dozerBladeDrop: 0.55,
   dozerBladeGroupBaseY: 0.72,

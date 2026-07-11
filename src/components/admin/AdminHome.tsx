@@ -26,6 +26,13 @@ const MENU_ITEMS = [
     color: "border-violet-200 bg-gradient-to-br from-violet-50 to-white",
   },
   {
+    href: "/admin/quests",
+    emoji: "📋",
+    title: "퀘스트 정보",
+    desc: "일일·미션 퀘스트 규칙·보상·과제 풀",
+    color: "border-cyan-200 bg-gradient-to-br from-cyan-50 to-white",
+  },
+  {
     href: "/admin/workshops",
     emoji: "🏗️",
     title: "작업장 정보",

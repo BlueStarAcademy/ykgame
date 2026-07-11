@@ -2,7 +2,8 @@
 
 interface DumpHintPanelProps {
   bucketLoad: number;
-  inDumpZone: boolean;
+  dumpBodyTouching: boolean;
+  dumpFacingBed: boolean;
   canDump: boolean;
   raiseArmForDump: boolean;
   truckCooldownRemaining?: number;
@@ -12,7 +13,8 @@ interface DumpHintPanelProps {
 
 export function DumpHintPanel({
   bucketLoad,
-  inDumpZone,
+  dumpBodyTouching,
+  dumpFacingBed,
   canDump,
   raiseArmForDump,
   truckCooldownRemaining = 0,
@@ -21,35 +23,43 @@ export function DumpHintPanel({
 }: DumpHintPanelProps) {
   if (!show) return null;
 
+  const aligned = dumpBodyTouching && dumpFacingBed;
+
   const steps = [
     {
       ok: bucketLoad >= 0.1,
-      label: bucketLoad >= 0.1 ? `흙 적재 ${Math.round(bucketLoad * 100)}%` : "흙이 없습니다 — 6번부터 다시",
+      label:
+        bucketLoad >= 0.1
+          ? `흙 적재 ${Math.round(bucketLoad * 100)}%`
+          : "흙이 없습니다 — 6번부터 다시",
     },
     {
-      ok: inDumpZone,
-      label: inDumpZone ? "초록 하역 구역 안" : "주행·스윙으로 초록 구역 이동",
+      ok: dumpBodyTouching,
+      label: dumpBodyTouching
+        ? "차체가 트럭에 붙음"
+        : "트럭 옆에 차체를 붙이세요",
     },
     {
-      ok: !raiseArmForDump && (canDump || inDumpZone),
-      label: raiseArmForDump
-        ? "우조이스틱 뒤로 — 붐·암 들어 트럭 칸 위로"
-        : inDumpZone
-          ? "트럭 칸 위 — 버켓 위치 맞춤"
-          : "트럭 쪽으로 스윙·주행",
+      ok: dumpFacingBed,
+      label: dumpFacingBed
+        ? "정면이 짐칸 중심을 향함"
+        : "스윙으로 정면을 짐칸 중심에 맞추세요",
     },
     {
-      ok: truckCooldownRemaining <= 0 && truckCanAccept && (canDump || inDumpZone),
+      ok:
+        truckCooldownRemaining <= 0 &&
+        truckCanAccept &&
+        (canDump || aligned),
       label:
         truckCooldownRemaining > 0
           ? `다음 트럭 대기 ${Math.ceil(truckCooldownRemaining)}초`
           : !truckCanAccept
-            ? "트럭 만차 — 출발 중"
+            ? "트럭 만차 — 하역 구역을 벗어나면 출발"
             : canDump
               ? "우조이스틱 오른쪽으로 버켓 펴기"
               : raiseArmForDump
                 ? "먼저 붐·암을 들어올리세요"
-                : "트럭 칸 위로 버켓·차체를 더 올려주세요",
+                : "차체 밀착과 정면 방향을 맞춰주세요",
     },
   ];
 

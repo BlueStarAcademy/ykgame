@@ -29,11 +29,8 @@ export async function POST(request: Request) {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({
-        where: { id: session.user.id },
-        select: { currency: true },
-      });
-      if (!user) throw new Error("USER_NOT_FOUND");
+      const lockKey = `equipment-upgrade:${session.user.id}:yanmar:${part}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
 
       const current = await tx.userEquipmentUpgrade.findUnique({
         where: {
@@ -50,31 +47,33 @@ export async function POST(request: Request) {
 
       const nextLevel = currentLevel + 1;
       const cost = getYanmarUpgradeCost(part, nextLevel);
-      if (user.currency < cost) throw new Error("NOT_ENOUGH_STARS");
 
-      const [updated, updatedUser] = await Promise.all([
-        tx.userEquipmentUpgrade.upsert({
-          where: {
-            userId_gameId_part: {
-              userId: session.user.id,
-              gameId: "yanmar",
-              part,
-            },
-          },
-          create: {
+      const chargedUsers = await tx.$queryRaw<Array<{ currency: number }>>`
+        UPDATE "User"
+        SET "currency" = "currency" - ${cost}
+        WHERE "id" = ${session.user.id}
+          AND "currency" >= ${cost}
+        RETURNING "currency"
+      `;
+      const chargedUser = chargedUsers[0];
+      if (!chargedUser) throw new Error("NOT_ENOUGH_STARS");
+
+      const updated = await tx.userEquipmentUpgrade.upsert({
+        where: {
+          userId_gameId_part: {
             userId: session.user.id,
             gameId: "yanmar",
             part,
-            level: nextLevel,
           },
-          update: { level: nextLevel },
-        }),
-        tx.user.update({
-          where: { id: session.user.id },
-          data: { currency: { decrement: cost } },
-          select: { currency: true },
-        }),
-      ]);
+        },
+        create: {
+          userId: session.user.id,
+          gameId: "yanmar",
+          part,
+          level: nextLevel,
+        },
+        update: { level: nextLevel },
+      });
 
       const rows = await tx.userEquipmentUpgrade.findMany({
         where: { userId: session.user.id, gameId: "yanmar" },
@@ -84,7 +83,7 @@ export async function POST(request: Request) {
 
       return {
         upgraded: updated,
-        currency: updatedUser.currency,
+        currency: chargedUser.currency,
         levels,
         stats: calculateYanmarEquipmentStats(levels),
       };

@@ -77,6 +77,19 @@ export function getBucketTipWorld(sim: ExcavatorSimState, boomSwing = 0): Bucket
   return bucketPointWorld(sim, boomSwing, -BUCKET_LEN, 0);
 }
 
+/** Visual center between the hydraulic thumb and bucket teeth. */
+export function getGrappleClampWorld(
+  sim: ExcavatorSimState,
+  boomSwing = 0,
+): BucketTip {
+  return bucketPointWorld(
+    sim,
+    boomSwing,
+    YANMAR_MACHINE_RIG.grappleClampLocalX,
+    YANMAR_MACHINE_RIG.grappleClampLocalY,
+  );
+}
+
 export const MIN_BREAKER_GROUND_ANGLE_DEG = 70;
 
 /** 시각 모델의 실제 정 끝점과 동일한 브레이커 접촉점. */
@@ -271,6 +284,10 @@ export interface DigFeedback {
   /** 자세 때문에 흙이 쏟아지는 중 */
   soilSpilling: boolean;
   canDump: boolean;
+  /** 트럭 차체에 몸체가 붙은 상태 */
+  dumpBodyTouching: boolean;
+  /** 정면이 트럭 짐칸 중심을 향함 */
+  dumpFacingBed: boolean;
   /** 하역 구역인데 붐·암을 더 들어올려야 함 */
   raiseArmForDump: boolean;
   /** 주행 레버 입력 중 버킷/암이 낮아 이동 불가 */
@@ -316,6 +333,8 @@ export function createDigFeedback(): DigFeedback {
     soilRetention: 1,
     soilSpilling: false,
     canDump: false,
+    dumpBodyTouching: false,
+    dumpFacingBed: false,
     raiseArmForDump: false,
     travelBlockedRaiseArm: false,
     truckPresent: true,

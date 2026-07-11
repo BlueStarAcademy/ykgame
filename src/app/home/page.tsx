@@ -1,10 +1,10 @@
 import { GameCard } from "@/components/home/GameCard";
 import { HomeProfilePanel } from "@/components/home/HomeProfilePanel";
 import { AppShell } from "@/components/layout/AppShell";
-import { GAMES, getSeasonInfo } from "@/lib/games";
+import { AVAILABLE_GAME_IDS, GAMES, getSeasonInfo } from "@/lib/games";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getUserGameStats } from "@/lib/rankings";
+import { getUserGameStatsForGames } from "@/lib/rankings";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -23,32 +23,43 @@ export default async function HomePage() {
   const totalXp = user?.totalXp ?? 0;
   const season = getSeasonInfo();
 
-  const gameStatsList = await Promise.all(
-    GAMES.map(async (game) => {
-      const stats = await getUserGameStats(game.id, session.user.id, season.key);
-      return { gameId: game.id, ...stats };
+  const statsByGame = await getUserGameStatsForGames(
+    AVAILABLE_GAME_IDS,
+    session.user.id,
+    season.key,
+  );
+
+  const progressByGame = new Map(
+    AVAILABLE_GAME_IDS.map((gameId) => {
+      const stats = statsByGame.get(gameId);
+      return [
+        gameId,
+        {
+          score: stats?.bestScore ?? 0,
+          stars: stats?.bestStars ?? 0,
+          playTime: stats?.playTime ?? 0,
+        },
+      ] as const;
     }),
   );
-  const progressByGame = new Map(
-    gameStatsList.map((stats) => [
-      stats.gameId,
-      {
-        score: stats.bestScore,
-        stars: stats.bestStars,
-        playTime: stats.playTime,
-      },
+  const rankByGame = new Map(
+    AVAILABLE_GAME_IDS.map((gameId) => [
+      gameId,
+      statsByGame.get(gameId)?.rank ?? null,
     ]),
   );
-  const rankByGame = new Map(gameStatsList.map((stats) => [stats.gameId, stats.rank]));
 
-  const rankedGames = gameStatsList
-    .map((stats) => {
-      const game = GAMES.find((item) => item.id === stats.gameId);
-      return game ? { ...stats, brandKo: game.brandKo } : null;
-    })
-    .filter((item): item is NonNullable<typeof item> => item != null && item.rank != null)
+  const rankedGames = AVAILABLE_GAME_IDS.map((gameId) => {
+    const game = GAMES.find((item) => item.id === gameId);
+    const stats = statsByGame.get(gameId);
+    if (!game || !stats || stats.rank == null) return null;
+    return { gameId, brandKo: game.brandKo, ...stats };
+  })
+    .filter((item): item is NonNullable<typeof item> => item != null)
     .sort((a, b) => {
-      const rankDiff = (a.rank ?? Number.POSITIVE_INFINITY) - (b.rank ?? Number.POSITIVE_INFINITY);
+      const rankDiff =
+        (a.rank ?? Number.POSITIVE_INFINITY) -
+        (b.rank ?? Number.POSITIVE_INFINITY);
       if (rankDiff !== 0) return rankDiff;
       return b.bestScore - a.bestScore;
     });

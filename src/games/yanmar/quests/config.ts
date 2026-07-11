@@ -1,79 +1,117 @@
 import type {
   DailyQuestDef,
+  DailyQuestTargetSpec,
   MissionTaskDef,
   MissionTaskKind,
   QuestMetric,
   QuestReward,
+  RepeatQuestDef,
 } from "./types";
 
 export const QUEST_MISSIONS_PER_DAY = 10;
 
+/** 클리어·수령 후 진행도가 초기화되어 다시 반복 가능한 퀘스트 */
+export const REPEAT_QUEST_DEFS: readonly RepeatQuestDef[] = [
+  {
+    id: "repeat-soil-dump-10000",
+    title: "흙 하역하기 10000",
+    metric: "soilDump",
+    target: 10000,
+    minLevel: 1,
+    reward: { stars: 5, xp: 0 },
+  },
+  {
+    id: "repeat-asphalt-10",
+    title: "아스팔트 부수기 10개",
+    metric: "asphaltBreak",
+    target: 10,
+    minLevel: 10,
+    reward: { stars: 5, xp: 0 },
+  },
+  {
+    id: "repeat-rock-dump-10",
+    title: "돌 하역하기 10개",
+    metric: "rockDump",
+    target: 10,
+    minLevel: 15,
+    reward: { stars: 5, xp: 0 },
+  },
+  {
+    id: "repeat-travel-10000",
+    title: "주행거리 10000m",
+    metric: "travel",
+    target: 10000,
+    minLevel: 1,
+    reward: { stars: 5, xp: 0 },
+  },
+];
+
 export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
   {
     id: "daily-login",
-    title: "로그인 하기",
+    title: () => "로그인 하기",
     metric: "login",
     target: 1,
     minLevel: 1,
     reward: { stars: 10, xp: 0 },
   },
   {
-    id: "daily-horn-5",
-    title: "경적 울리기 5회",
+    id: "daily-horn",
+    title: (t) => `경적 울리기 ${t}회`,
     metric: "horn",
-    target: 5,
+    target: { min: 1, max: 5 },
     minLevel: 1,
     reward: { stars: 10, xp: 0 },
   },
   {
-    id: "daily-soil-load-3000",
-    title: "흙 3000 적재하기",
+    id: "daily-soil-load",
+    title: (t) => `흙 ${t.toLocaleString()} 적재하기`,
     metric: "soilLoad",
+    target: { min: 3000, max: 5000, step: 100 },
+    minLevel: 1,
+    reward: { stars: 10, xp: 1000 },
+  },
+  {
+    id: "daily-truck-depart",
+    title: (t) => `트럭 출발 ${t}회`,
+    metric: "dumpTruckDepart",
+    target: { min: 2, max: 5 },
+    minLevel: 1,
+    reward: { stars: 10, xp: 1000 },
+  },
+  {
+    id: "daily-travel-3000",
+    title: (t) => `주행거리 ${t}m`,
+    metric: "travel",
     target: 3000,
     minLevel: 1,
-    reward: { stars: 10, xp: 200 },
-  },
-  {
-    id: "daily-truck-depart-3",
-    title: "트럭 출발 3회",
-    metric: "dumpTruckDepart",
-    target: 3,
-    minLevel: 1,
-    reward: { stars: 10, xp: 200 },
-  },
-  {
-    id: "daily-travel-100",
-    title: "주행거리 100m",
-    metric: "travel",
-    target: 100,
-    minLevel: 1,
-    reward: { stars: 10, xp: 200 },
+    reward: { stars: 10, xp: 1000 },
   },
   {
     id: "daily-asphalt-9",
-    title: "아스팔트 부수기 9회",
+    title: (t) => `아스팔트 부수기 ${t}회`,
     metric: "asphaltBreak",
     target: 9,
     minLevel: 10,
-    reward: { stars: 10, xp: 300 },
+    reward: { stars: 10, xp: 1500 },
   },
   {
     id: "daily-rock-load-5",
-    title: "돌 적재 성공하기 5회",
+    title: (t) => `돌 적재 성공하기 ${t}회`,
     metric: "rockLoad",
     target: 5,
     minLevel: 15,
-    reward: { stars: 10, xp: 500 },
+    reward: { stars: 10, xp: 2000 },
   },
 ] as const;
 
-/** 난이도 1~5 보상 (1=EXP500/스타20, 5=EXP2000/스타40) */
+/** 난이도 1~5 보상 (1=EXP1000/스타10, 5=EXP3000/스타30) */
 export const MISSION_DIFFICULTY_REWARDS: Record<1 | 2 | 3 | 4 | 5, QuestReward> = {
-  1: { xp: 500, stars: 20 },
-  2: { xp: 875, stars: 25 },
-  3: { xp: 1250, stars: 30 },
-  4: { xp: 1625, stars: 35 },
-  5: { xp: 2000, stars: 40 },
+  1: { xp: 1000, stars: 10 },
+  2: { xp: 1500, stars: 15 },
+  3: { xp: 2000, stars: 20 },
+  4: { xp: 2500, stars: 25 },
+  5: { xp: 3000, stars: 30 },
 };
 
 export type MissionLevelBand = "under10" | "lv10" | "lv15";
@@ -103,7 +141,8 @@ type MissionPoolEntry = {
   required: boolean;
 };
 
-const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
+/** 관리자 문서·미션 생성 공용 풀. */
+export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
   under10: [
     {
       kind: "soilDump",
@@ -254,6 +293,21 @@ function rollTarget(min: number, max: number, difficulty: number, maxDiff: numbe
   const low = Math.max(min, Math.floor(center - spread));
   const high = Math.min(max, Math.ceil(center + spread));
   return randomInt(low, high);
+}
+
+export function rollDailyQuestTarget(spec: DailyQuestTargetSpec): number {
+  if (typeof spec === "number") return spec;
+  const step = spec.step ?? 1;
+  if (step <= 1) return randomInt(spec.min, spec.max);
+  const steps = Math.floor((spec.max - spec.min) / step);
+  return spec.min + randomInt(0, Math.max(0, steps)) * step;
+}
+
+export function describeDailyQuestTarget(spec: DailyQuestTargetSpec): string {
+  if (typeof spec === "number") return spec.toLocaleString();
+  const step = spec.step ?? 1;
+  const range = `${spec.min.toLocaleString()} ~ ${spec.max.toLocaleString()}`;
+  return step > 1 ? `${range} (${step}단위)` : range;
 }
 
 export function buildMissionTasks(

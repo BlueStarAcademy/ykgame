@@ -1,22 +1,23 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { countSeasonGameDropCouponsGrouped } from "@/lib/coupon";
 import {
-  createBarcodeCode,
-  getCouponExpiresAt,
-} from "@/lib/coupon";
-import { lockAndCanIssueYanmarCoupon } from "@/lib/yanmar-rewards";
+  lockAndCanIssueYanmarCoupon,
+  parseRewardEventId,
+  rollYanmarDropRewards,
+  runReplayableRewardEvent,
+} from "@/lib/yanmar-rewards";
 import { getSeasonKey } from "@/lib/games";
+import { withHotApiObservability } from "@/lib/hot-api-observability";
+import { consumeDumpRateLimit } from "@/lib/redis-token-bucket";
 import {
   mergeYanmarEquipmentLevelsFromDb,
   YANMAR_REWARD_CONFIG,
   calculateYanmarEquipmentStats,
   calculateYanmarChunkScore,
 } from "@/games/yanmar/equipment";
-import type { CouponType } from "@/generated/prisma/client";
-
-const PARTS_DISCOUNTS = [10, 15, 20] as const;
-const RENTAL_DISCOUNTS = [10, 20, 30] as const;
+import type { CouponType, Prisma } from "@/generated/prisma/client";
 
 type DumpStarEvent = {
   kind: "stars";
@@ -38,97 +39,79 @@ type DumpCouponEvent = {
 
 type DumpRewardEvent = DumpCouponEvent | DumpStarEvent;
 
-function randomInt(min: number, max: number) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function pick<T>(items: readonly T[]) {
-  return items[Math.floor(Math.random() * items.length)];
-}
-
-function createStarEvent(score: number, critical: boolean): DumpStarEvent {
-  return {
-    kind: "stars",
-    score,
-    critical,
-    stars: randomInt(
-      YANMAR_REWARD_CONFIG.minStarReward,
-      YANMAR_REWARD_CONFIG.maxStarReward,
-    ),
-  };
-}
-
-function rollRewardEvent(
-  score: number,
-  critical: boolean,
-  remaining: { parts: number; rental: number; filterSet: number },
-  seasonKey: string,
-): DumpRewardEvent {
-  const roll = Math.random();
-  const filterChance = YANMAR_REWARD_CONFIG.filterSetCouponChance;
-  const partsChance = YANMAR_REWARD_CONFIG.partsCouponChance;
-  const rentalChance = YANMAR_REWARD_CONFIG.rentalCouponChance;
-
-  // 희귀 쿠폰을 먼저 판정 (0.0001%)
-  if (roll < filterChance) {
-    if (remaining.filterSet <= 0) return createStarEvent(score, critical);
-    remaining.filterSet -= 1;
-    return {
-      kind: "coupon",
-      score,
-      critical,
-      couponType: "FILTER_SET_EXCHANGE",
-      discountPct: 0,
-      barcodeCode: createBarcodeCode(),
-      expiresAt: getCouponExpiresAt(),
-      seasonKey,
-    };
-  }
-
-  if (roll < filterChance + partsChance) {
-    if (remaining.parts <= 0) return createStarEvent(score, critical);
-    remaining.parts -= 1;
-    return {
-      kind: "coupon",
-      score,
-      critical,
-      couponType: "YK_PARTS_DISCOUNT",
-      discountPct: pick(PARTS_DISCOUNTS),
-      barcodeCode: createBarcodeCode(),
-      expiresAt: getCouponExpiresAt(),
-      seasonKey,
-    };
-  }
-
-  if (roll < filterChance + partsChance + rentalChance) {
-    if (remaining.rental <= 0) return createStarEvent(score, critical);
-    remaining.rental -= 1;
-    return {
-      kind: "coupon",
-      score,
-      critical,
-      couponType: "EQUIPMENT_RENTAL_DISCOUNT",
-      discountPct: pick(RENTAL_DISCOUNTS),
-      barcodeCode: createBarcodeCode(),
-      expiresAt: getCouponExpiresAt(),
-      seasonKey,
-    };
-  }
-
-  return createStarEvent(score, critical);
-}
-
-export async function POST(request: Request) {
+export const POST = withHotApiObservability(
+  "/api/rewards/yanmar-dump",
+  async (request, _routeContext, observation) => {
   const session = await auth();
   if (!session?.user) {
+    observation.setMetadata({
+      outcome: "unauthorized",
+      errorCode: "UNAUTHORIZED",
+    });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { chunkCount } = (await request.json()) as { chunkCount?: unknown };
+  const body = (await request.json().catch(() => null)) as {
+    chunkCount?: unknown;
+    eventId?: unknown;
+  } | null;
+  const eventId = parseRewardEventId(body?.eventId);
+  if (!eventId) {
+    observation.setMetadata({
+      outcome: "invalid_request",
+      errorCode: "INVALID_EVENT_ID",
+    });
+    return NextResponse.json(
+      {
+        error:
+          "eventId is required and must be 1-128 letters, numbers, dots, underscores, colons, or hyphens",
+      },
+      { status: 400 },
+    );
+  }
+  const chunkCount = body?.chunkCount;
   const safeChunkCount =
     typeof chunkCount === "number"
-      ? Math.max(1, Math.min(10, Math.floor(chunkCount)))
+      ? Math.max(1, Math.min(20, Math.floor(chunkCount)))
       : 1;
+  observation.setMetadata({ batchSize: safeChunkCount });
+
+  const existing = await prisma.rewardEvent.findUnique({
+    where: {
+      userId_gameId_eventId: {
+        userId: session.user.id,
+        gameId: "yanmar-dump",
+        eventId,
+      },
+    },
+    select: { result: true },
+  });
+  if (existing) {
+    observation.setMetadata({ outcome: "success", replayed: true });
+    return NextResponse.json(existing.result);
+  }
+
+  // Rate limiting happens before opening a DB transaction. The Redis Lua script
+  // records eventId atomically, so concurrent retries consume tokens only once.
+  const rateLimit = await consumeDumpRateLimit(
+    session.user.id,
+    eventId,
+    safeChunkCount,
+  );
+  if (rateLimit.bypassed) {
+    observation.setMetadata({ rateLimitBypassed: true });
+  }
+  if (!rateLimit.allowed) {
+    observation.setMetadata({
+      outcome: "rate_limited",
+      replayed: false,
+      errorCode: "DUMP_RATE_LIMITED",
+    });
+    return NextResponse.json(
+      { error: "Too many dump chunks" },
+      { status: 429, headers: { "Retry-After": "1" } },
+    );
+  }
 
   const rows = await prisma.userEquipmentUpgrade.findMany({
     where: { userId: session.user.id, gameId: "yanmar" },
@@ -138,128 +121,107 @@ export async function POST(request: Request) {
   const stats = calculateYanmarEquipmentStats(levels);
   const seasonKey = getSeasonKey();
 
-  const [partsIssued, rentalIssued, filterSetIssued] = await Promise.all([
-    prisma.userCoupon.count({
-      where: {
-        type: "YK_PARTS_DISCOUNT",
-        seasonKey,
-        fromGameDrop: true,
-      },
-    }),
-    prisma.userCoupon.count({
-      where: {
-        type: "EQUIPMENT_RENTAL_DISCOUNT",
-        seasonKey,
-        fromGameDrop: true,
-      },
-    }),
-    prisma.userCoupon.count({
-      where: {
-        type: "FILTER_SET_EXCHANGE",
-        seasonKey,
-        fromGameDrop: true,
-      },
-    }),
-  ]);
+  const issued = await countSeasonGameDropCouponsGrouped(prisma, seasonKey);
 
   const remaining = {
-    parts: Math.max(0, YANMAR_REWARD_CONFIG.partsCouponSeasonLimit - partsIssued),
+    parts: Math.max(
+      0,
+      YANMAR_REWARD_CONFIG.partsCouponSeasonLimit - issued.YK_PARTS_DISCOUNT,
+    ),
     rental: Math.max(
       0,
-      YANMAR_REWARD_CONFIG.rentalCouponSeasonLimit - rentalIssued,
+      YANMAR_REWARD_CONFIG.rentalCouponSeasonLimit -
+        issued.EQUIPMENT_RENTAL_DISCOUNT,
     ),
     filterSet: Math.max(
       0,
-      YANMAR_REWARD_CONFIG.filterSetCouponSeasonLimit - filterSetIssued,
+      YANMAR_REWARD_CONFIG.filterSetCouponSeasonLimit -
+        issued.FILTER_SET_EXCHANGE,
     ),
   };
 
-  const plannedEvents = Array.from({ length: safeChunkCount }, () => {
+  const plannedChunks = Array.from({ length: safeChunkCount }, () => {
     const critical = Math.random() < stats.criticalChance;
     const score = calculateYanmarChunkScore(stats, critical);
-    return rollRewardEvent(score, critical, remaining, seasonKey);
+    const { stars, coupon } = rollYanmarDropRewards({
+      score,
+      minStars: YANMAR_REWARD_CONFIG.minStarReward,
+      maxStars: YANMAR_REWARD_CONFIG.maxStarReward,
+      seasonKey,
+      critical,
+      remaining,
+    });
+    return { score, stars, coupon };
   });
 
-  /** 1 dump score chunk ≈ scoreChunkUnits of soil → same amount of lifetime XP */
+  /** 1 dump score chunk == scoreChunkUnits of soil == same amount of lifetime XP */
   const xpGained = stats.scoreChunkUnits * safeChunkCount;
 
   const result = await prisma.$transaction(async (tx) => {
-    const responseEvents: DumpRewardEvent[] = [];
-    let totalStars = 0;
-    let totalScore = 0;
+    return runReplayableRewardEvent(
+      tx,
+      { userId: session.user.id, gameId: "yanmar-dump", eventId },
+      async () => {
+        const responseEvents: DumpRewardEvent[] = [];
+        const starInventoryRows: Prisma.UserRewardInventoryCreateManyInput[] = [];
+        let totalStars = 0;
+        let totalScore = 0;
 
-    for (const planned of plannedEvents) {
-      totalScore += planned.score;
+    for (const { score, stars, coupon } of plannedChunks) {
+      totalScore += score;
+      totalStars += stars.stars;
+      responseEvents.push(stars);
+      starInventoryRows.push({
+        userId: session.user.id,
+        gameId: "yanmar",
+        type: "STAR",
+        amount: stars.stars,
+        metadata: {
+          score: stars.score,
+          critical: stars.critical,
+        },
+      });
 
-      if (planned.kind === "coupon") {
-        const allowed = await lockAndCanIssueYanmarCoupon(
-          tx,
-          planned.couponType,
-          seasonKey,
-        );
-        if (!allowed) {
-          const fallback = createStarEvent(planned.score, planned.critical);
-          totalStars += fallback.stars;
-          responseEvents.push(fallback);
-          await tx.userRewardInventory.create({
-            data: {
-              userId: session.user.id,
-              gameId: "yanmar",
-              type: "STAR",
-              amount: fallback.stars,
-              metadata: {
-                score: planned.score,
-                critical: planned.critical,
-                fallbackFromCoupon: true,
-              },
-            },
-          });
-          continue;
-        }
+      if (!coupon) continue;
 
-        await tx.userCoupon.create({
-          data: {
-            userId: session.user.id,
-            type: planned.couponType,
-            discountPct: planned.discountPct,
-            barcodeCode: planned.barcodeCode,
-            seasonKey: planned.seasonKey,
-            fromGameDrop: true,
-            expiresAt: planned.expiresAt,
+      const allowed = await lockAndCanIssueYanmarCoupon(
+        tx,
+        coupon.couponType,
+        seasonKey,
+      );
+      if (!allowed) continue;
+
+      await tx.userCoupon.create({
+        data: {
+          userId: session.user.id,
+          type: coupon.couponType,
+          discountPct: coupon.discountPct,
+          barcodeCode: coupon.barcodeCode,
+          seasonKey: coupon.seasonKey,
+          fromGameDrop: true,
+          expiresAt: coupon.expiresAt,
+        },
+      });
+      await tx.userRewardInventory.create({
+        data: {
+          userId: session.user.id,
+          gameId: "yanmar",
+          type: "COUPON",
+          amount: coupon.discountPct,
+          metadata: {
+            couponType: coupon.couponType,
+            barcodeCode: coupon.barcodeCode,
+            score: coupon.score,
+            critical: coupon.critical,
+            seasonKey: coupon.seasonKey,
           },
-        });
-        await tx.userRewardInventory.create({
-          data: {
-            userId: session.user.id,
-            gameId: "yanmar",
-            type: "COUPON",
-            amount: planned.discountPct,
-            metadata: {
-              couponType: planned.couponType,
-              barcodeCode: planned.barcodeCode,
-              score: planned.score,
-              critical: planned.critical,
-              seasonKey: planned.seasonKey,
-            },
-          },
-        });
-        responseEvents.push(planned);
-      } else {
-        totalStars += planned.stars;
-        responseEvents.push(planned);
-        await tx.userRewardInventory.create({
-          data: {
-            userId: session.user.id,
-            gameId: "yanmar",
-            type: "STAR",
-            amount: planned.stars,
-            metadata: {
-              score: planned.score,
-              critical: planned.critical,
-            },
-          },
-        });
-      }
+        },
+      });
+      responseEvents.push({ ...coupon, score: 0 });
+    }
+
+    if (starInventoryRows.length > 0) {
+      await tx.userRewardInventory.createMany({ data: starInventoryRows });
     }
 
     const updated = await tx.user.update({
@@ -271,22 +233,28 @@ export async function POST(request: Request) {
       select: { currency: true, totalXp: true },
     });
 
-    return {
-      events: responseEvents,
-      totalStars,
-      totalScore,
-      currency: updated.currency,
-      totalXp: updated.totalXp,
-    };
+        return {
+          eventId,
+          events: responseEvents.map((event) =>
+            event.kind === "coupon"
+              ? { ...event, expiresAt: event.expiresAt.toISOString() }
+              : event,
+          ),
+          totalStars,
+          totalScore,
+          xpGained,
+          currency: updated.currency,
+          totalXp: updated.totalXp,
+          stats,
+        } as unknown as Prisma.InputJsonValue;
+      },
+    );
   });
 
-  return NextResponse.json({
-    events: result.events,
-    totalStars: result.totalStars,
-    totalScore: result.totalScore,
-    xpGained,
-    currency: result.currency,
-    totalXp: result.totalXp,
-    stats,
+  observation.setMetadata({
+    outcome: "success",
+    replayed: result.replayed,
   });
-}
+  return NextResponse.json(result.result);
+  },
+);
