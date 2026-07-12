@@ -107,6 +107,7 @@ import {
   createDumpTruckState,
   formatDumpTruckReturnTime,
   getDumpTruckPose,
+  resetDumpTruckState,
   type DumpTruckPose,
 } from "./dumpTruckState";
 import { expandTerrainForLevel, type TerrainData } from "./terrain";
@@ -138,18 +139,23 @@ import {
 } from "./scoring";
 import {
   ALL_CONTROLS,
-  checkTutorialStepComplete,
+  advanceTutorialProgress,
+  createTutorialPhaseProgress,
+  getTutorialInstruction,
+  getTutorialWaypoint,
   TUTORIAL_STEPS,
   waypointDistance,
   type GameMode,
+  type TutorialPhaseProgress,
   type TutorialStep,
+  type TutorialWaypoint,
 } from "./tutorial";
 import {
   getYanmarCouponImage,
   getYanmarCouponLabel,
 } from "./rewardVisualConfig";
 import { XpProgressBar } from "@/components/ui/XpProgressBar";
-import { formatXpProgress, getPlayerLevelProgress } from "@/lib/playerLevel";
+import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import {
   getCrossedUnlocks,
   getUnseenUnlocksForLevel,
@@ -212,9 +218,7 @@ function TutorialSelectModal({
     <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm landscape:items-start landscape:overflow-y-auto landscape:py-2">
       <div className="flex max-h-[min(92dvh,40rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-2xl landscape:max-h-[min(94dvh,22rem)]">
         <div className="shrink-0 bg-gradient-to-br from-red-600 to-red-800 px-4 py-3 text-white">
-          <p className="text-[10px] font-semibold uppercase tracking-widest opacity-80">Practice</p>
-          <h2 className="mt-1 text-base font-black">튜토리얼 선택</h2>
-          <p className="mt-1 text-[11px] opacity-85">원하는 조작만 골라서 연습할 수 있습니다.</p>
+          <h2 className="text-base font-black">튜토리얼 선택</h2>
         </div>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
           <button
@@ -227,25 +231,19 @@ function TutorialSelectModal({
             }`}
           >
             자유동작
-            <span className="mt-0.5 block text-[10px] font-medium text-gray-500">
-              브레이커·집게·전체 맵 포함, 모든 기능을 자유롭게 사용
-            </span>
           </button>
           {TUTORIAL_STEPS.map((step, index) => (
             <button
               key={step.id}
               type="button"
               onClick={() => onSelect(index)}
-              className={`w-full rounded-xl border px-3 py-2 text-left text-xs ${
+              className={`w-full rounded-xl border px-3 py-2 text-left text-xs font-bold ${
                 activeId === step.id
                   ? "border-amber-300 bg-amber-50 text-amber-800"
                   : "border-gray-200 text-gray-700 hover:bg-gray-50"
               }`}
             >
-              <span className="font-bold">{step.title}</span>
-              <span className="mt-0.5 block text-[10px] leading-tight text-gray-500">
-                {step.instruction}
-              </span>
+              {step.title}
             </button>
           ))}
         </div>
@@ -671,6 +669,11 @@ export function ExcavatorGameWrapper({
   const tutorialHillDeliverRef = useRef(0);
   const tutorialCompletingRef = useRef(false);
   const tutorialIndexRef = useRef(0);
+  const tutorialPhaseRef = useRef<TutorialPhaseProgress | null>(null);
+  const tutorialWaypointRef = useRef<TutorialWaypoint | null>(null);
+  const tutorialGuideRef = useRef("");
+  const [tutorialGuide, setTutorialGuide] = useState("");
+  const [tutorialHasWaypoint, setTutorialHasWaypoint] = useState(false);
   const digFeedbackRef = useRef<DigFeedback>(createDigFeedback());
   const [digFeedback, setDigFeedback] = useState<DigFeedback>(createDigFeedback());
   const dumpTruckStateRef = useRef(createDumpTruckState());
@@ -793,7 +796,6 @@ export function ExcavatorGameWrapper({
     if (crashHitChanged) {
       const delta = fb.crashHitTick - lastSyncedCrashHitTickRef.current;
       if (delta > 0) {
-        if (modeRef.current === "tutorial") tutorialCrashHitsRef.current += delta;
         const now = performance.now();
         if (now - lastBreakerVibrationAtRef.current >= 2000) {
           lastBreakerVibrationAtRef.current = now;
@@ -1196,7 +1198,15 @@ export function ExcavatorGameWrapper({
   const pushQuestProgress = useCallback(
     (metric: QuestMetric, amount: number) => {
       if (amount <= 0) return;
-      if (modeRef.current === "intro" || modeRef.current === "ride") return;
+      const modeNow = modeRef.current;
+      if (
+        modeNow === "intro" ||
+        modeNow === "ride" ||
+        modeNow === "practice" ||
+        modeNow === "tutorial"
+      ) {
+        return;
+      }
       const current = questStateRef.current;
       if (!current) return;
       const next = applyQuestProgress(current, { metric, amount });
@@ -1221,7 +1231,15 @@ export function ExcavatorGameWrapper({
   }, [session?.user?.id, session?.user?.totalXp, sessionStatus]);
 
   useEffect(() => {
-    if (mode === "intro" || mode === "ride" || mode === "gameReady") return;
+    if (
+      mode === "intro" ||
+      mode === "ride" ||
+      mode === "gameReady" ||
+      mode === "practice" ||
+      mode === "tutorial"
+    ) {
+      return;
+    }
     if (!session?.user?.id) return;
     pushQuestProgress("login", 1);
   }, [mode, pushQuestProgress, session?.user?.id]);
@@ -1583,6 +1601,8 @@ export function ExcavatorGameWrapper({
     setTerrainRevision((key) => key + 1);
     tutorialStepRef.current = null;
     setTutorialIndex(0);
+    setShowQuestPanel(false);
+    setShowShopPanel(false);
     setShowTutorialMenu(true);
     setMode("practice");
   }, [resetYanmarSession, setMode, setShowTutorialMenu, setTutorialIndex]);
@@ -1715,20 +1735,58 @@ export function ExcavatorGameWrapper({
     tutorialCompletingRef.current = false;
     tutorialCrashHitsRef.current = 0;
     tutorialHillDeliverRef.current = 0;
+    tutorialDumpRef.current = 0;
     tutorialIndexRef.current = index;
     tutorialStepRef.current = step;
+    const phase = createTutorialPhaseProgress(simRef.current);
+    phase.lastLiftTick = digFeedbackRef.current.grappleLiftResultTick;
+    tutorialPhaseRef.current = phase;
+    const guide = step ? getTutorialInstruction(step, phase) : "";
+    tutorialGuideRef.current = guide;
+    setTutorialGuide(guide);
+    tutorialWaypointRef.current = step
+      ? (getTutorialWaypoint(step, phase) ?? null)
+      : null;
+    setTutorialHasWaypoint(tutorialWaypointRef.current != null);
     if (step?.startPose) {
       const sim = simRef.current;
       sim.posX = step.startPose.x;
       sim.posZ = step.startPose.z;
       if (step.startPose.heading != null) sim.heading = step.startPose.heading;
+      phase.lastX = sim.posX;
+      phase.lastZ = sim.posZ;
+      phase.lastHeading = sim.heading;
     }
     if (step?.startAttachment) {
       simRef.current.attachmentType = step.startAttachment;
       simRef.current.carriedBoulderId = null;
       setAttachmentType(step.startAttachment);
     }
+
+    resetDumpTruckState(dumpTruckStateRef.current);
+    if (step?.id === "dump") {
+      const stats = equipmentStatsRef.current;
+      // 한 번 하역하면 만차가 되어, 구역을 벗어나면 트럭이 출발하도록 미리 채움
+      dumpTruckStateRef.current.fillUnits = Math.max(
+        0,
+        stats.truckCapacityUnits - Math.max(8, stats.maxLoadUnits * 0.15),
+      );
+    }
+    if (step?.id === "rockDump") {
+      const hill = terrainRef.current.hillZone;
+      const capacity = Math.max(
+        1,
+        Math.floor(equipmentStatsRef.current.haulTruckCapacity),
+      );
+      if (hill) {
+        hill.haulTruck.loadCount = Math.max(0, capacity - 1);
+      }
+    }
+    dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
+
     setTutorialIndex(index);
+    setShowQuestPanel(false);
+    setShowShopPanel(false);
     setShowTutorialMenu(false);
     setMode("tutorial");
   }, [resetYanmarSession, setMode, setShowTutorialMenu, setTutorialIndex]);
@@ -1738,6 +1796,13 @@ export function ExcavatorGameWrapper({
     terrainRef.current = createInitialTerrain(true, PRACTICE_FULL_UNLOCK_LEVEL);
     setTerrainRevision((key) => key + 1);
     tutorialStepRef.current = null;
+    tutorialPhaseRef.current = null;
+    tutorialWaypointRef.current = null;
+    tutorialGuideRef.current = "";
+    setTutorialGuide("");
+    setTutorialHasWaypoint(false);
+    setShowQuestPanel(false);
+    setShowShopPanel(false);
     setShowTutorialMenu(false);
     setMode("practice");
   }, [resetYanmarSession, setMode, setShowTutorialMenu]);
@@ -1823,28 +1888,59 @@ export function ExcavatorGameWrapper({
     if (tutorialCompletingRef.current) return;
 
     const step = tutorialStepRef.current;
-    if (!step) return;
+    const phase = tutorialPhaseRef.current;
+    if (!step || !phase) return;
 
-    if (
-      checkTutorialStepComplete(step, simRef.current, {
-        dumped: tutorialDumpRef.current,
-        crashHits: tutorialCrashHitsRef.current,
-        hillDelivered: tutorialHillDeliverRef.current,
-      })
-    ) {
+    phase.dumped = tutorialDumpRef.current;
+    phase.asphaltBroken = tutorialCrashHitsRef.current;
+    phase.hillDelivered = tutorialHillDeliverRef.current;
+
+    const fb = digFeedbackRef.current;
+    const prevPhase = phase.phase;
+    const done = advanceTutorialProgress(step, simRef.current, phase, {
+      input: inputRef.current,
+      gripPressure: fb.gripPressure,
+      carryingRock: fb.carryingRock,
+      grappleLiftResult: fb.grappleLiftResult,
+      grappleLiftResultTick: fb.grappleLiftResultTick,
+      dumpTruckPhase: dumpTruckStateRef.current.phase,
+      haulTruckPhase: terrainRef.current.hillZone?.haulTruck.phase ?? "",
+      breakerTipReady: fb.canStrike,
+    });
+
+    const guide = getTutorialInstruction(step, phase);
+    if (guide !== tutorialGuideRef.current || phase.phase !== prevPhase) {
+      tutorialGuideRef.current = guide;
+      setTutorialGuide(guide);
+    }
+
+    const wp = getTutorialWaypoint(step, phase) ?? null;
+    const hadWp = tutorialWaypointRef.current != null;
+    tutorialWaypointRef.current = wp;
+    if (wp != null !== hadWp) {
+      setTutorialHasWaypoint(wp != null);
+    }
+    if (wp) {
+      const goalDist = Math.round(waypointDistance(simRef.current, wp));
+      setHud((h) => (h.goalDist === goalDist ? h : { ...h, goalDist }));
+    } else if (hadWp) {
+      setHud((h) => (h.goalDist === 0 ? h : { ...h, goalDist: 0 }));
+    }
+
+    if (done) {
       tutorialCompletingRef.current = true;
       setStepCompleteFlash(true);
       window.setTimeout(() => setStepCompleteFlash(false), 600);
       window.setTimeout(() => {
         tutorialCompletingRef.current = false;
         tutorialStepRef.current = null;
+        tutorialPhaseRef.current = null;
+        tutorialWaypointRef.current = null;
+        tutorialGuideRef.current = "";
+        setTutorialGuide("");
         setMode("practice");
       }, 900);
     }
-
-    if (step.waypoint == null) return;
-    const goalDist = Math.round(waypointDistance(simRef.current, step.waypoint));
-    setHud((h) => (h.goalDist === goalDist ? h : { ...h, goalDist }));
   }, [
     persistDumpTruckCooldown,
     persistGameSession,
@@ -2558,6 +2654,9 @@ export function ExcavatorGameWrapper({
 
   const handleCrashTileDestroyed = useCallback(
     (tileId: string) => {
+      if (modeRef.current === "tutorial") {
+        tutorialCrashHitsRef.current += 1;
+      }
       pushQuestProgress("asphaltBreak", 1);
       void claimSpecialReward("crash", tileId);
     },
@@ -2810,7 +2909,10 @@ export function ExcavatorGameWrapper({
   const loadOverlayPercent = Math.max(0, Math.min(100, hud.bucketLoad * 100));
   const loadOverlayUnits = getLoadUnits(hud.bucketLoad, equipmentStats.maxLoadUnits);
   const showBucketLoad = attachmentType === "bucket" && loadOverlayUnits > 0;
-  const questClaimableCount = countClaimableQuestRewards(questState).total;
+  const questsDisabled = mode === "practice" || mode === "tutorial";
+  const questClaimableCount = questsDisabled
+    ? 0
+    : countClaimableQuestRewards(questState).total;
 
   return (
     <div
@@ -2888,84 +2990,88 @@ export function ExcavatorGameWrapper({
 
         {mode !== "intro" && mode !== "gameReady" && mode !== "ride" ? (
           <div className="absolute left-2 top-2 z-50 flex flex-col items-start gap-1.5">
-            <div className="pointer-events-auto flex items-start gap-1.5">
-              <button
-                type="button"
-                className={`yanmar-quest-button yanmar-aux-button touch-none active:scale-95${
-                  showQuestPanel ? " is-open" : ""
-                }`}
-                onClick={() => {
-                  setShowShopPanel(false);
-                  setShowQuestPanel((open) => !open);
-                }}
-                aria-expanded={showQuestPanel}
-                aria-label={
-                  showQuestPanel
-                    ? "퀘스트 닫기"
-                    : questClaimableCount > 0
-                      ? `퀘스트 열기, 미수령 보상 ${questClaimableCount}개`
-                      : "퀘스트 열기"
-                }
-              >
-                <img
-                  className="yanmar-quest-button-icon"
-                  src="/images/yanmar/2d/cockpit/quest-premium.png?v=3"
-                  alt=""
-                  draggable={false}
-                />
-                <span className="yanmar-quest-button-label">퀘스트</span>
-                {questClaimableCount > 0 ? (
-                  <span
-                    className="yanmar-quest-notify-badge is-icon"
-                    aria-hidden
+            {!questsDisabled ? (
+              <>
+                <div className="pointer-events-auto flex items-start gap-1.5">
+                  <button
+                    type="button"
+                    className={`yanmar-quest-button yanmar-aux-button touch-none active:scale-95${
+                      showQuestPanel ? " is-open" : ""
+                    }`}
+                    onClick={() => {
+                      setShowShopPanel(false);
+                      setShowQuestPanel((open) => !open);
+                    }}
+                    aria-expanded={showQuestPanel}
+                    aria-label={
+                      showQuestPanel
+                        ? "퀘스트 닫기"
+                        : questClaimableCount > 0
+                          ? `퀘스트 열기, 미수령 보상 ${questClaimableCount}개`
+                          : "퀘스트 열기"
+                    }
                   >
-                    {questClaimableCount > 9 ? "9+" : questClaimableCount}
-                  </span>
-                ) : null}
-              </button>
-              <button
-                type="button"
-                className={`yanmar-shop-button yanmar-aux-button touch-none active:scale-95${
-                  showShopPanel ? " is-open" : ""
-                }`}
-                onClick={() => {
-                  setShowQuestPanel(false);
-                  setShowShopPanel((open) => !open);
-                }}
-                aria-expanded={showShopPanel}
-                aria-label={showShopPanel ? "상점 닫기" : "상점 열기"}
-              >
-                <img
-                  className="yanmar-shop-button-icon"
-                  src="/images/yanmar/2d/cockpit/shop-premium.png?v=4"
-                  alt=""
-                  draggable={false}
+                    <img
+                      className="yanmar-quest-button-icon"
+                      src="/images/yanmar/2d/cockpit/quest-premium.png?v=3"
+                      alt=""
+                      draggable={false}
+                    />
+                    <span className="yanmar-quest-button-label">퀘스트</span>
+                    {questClaimableCount > 0 ? (
+                      <span
+                        className="yanmar-quest-notify-badge is-icon"
+                        aria-hidden
+                      >
+                        {questClaimableCount > 9 ? "9+" : questClaimableCount}
+                      </span>
+                    ) : null}
+                  </button>
+                  <button
+                    type="button"
+                    className={`yanmar-shop-button yanmar-aux-button touch-none active:scale-95${
+                      showShopPanel ? " is-open" : ""
+                    }`}
+                    onClick={() => {
+                      setShowQuestPanel(false);
+                      setShowShopPanel((open) => !open);
+                    }}
+                    aria-expanded={showShopPanel}
+                    aria-label={showShopPanel ? "상점 닫기" : "상점 열기"}
+                  >
+                    <img
+                      className="yanmar-shop-button-icon"
+                      src="/images/yanmar/2d/cockpit/shop-premium.png?v=4"
+                      alt=""
+                      draggable={false}
+                    />
+                    <span className="yanmar-shop-button-label">상점</span>
+                  </button>
+                </div>
+                <QuestPanel
+                  open={showQuestPanel}
+                  onClose={() => setShowQuestPanel(false)}
+                  playerLevel={getPlayerLevelProgress(totalXp).level}
+                  questState={questState}
+                  claimingId={questClaimingId}
+                  onClaimDaily={(questId) => {
+                    void handleClaimDailyQuest(questId);
+                  }}
+                  onClaimMission={() => {
+                    void handleClaimMissionQuest();
+                  }}
+                  onClaimRepeat={(questId) => {
+                    void handleClaimRepeatQuest(questId);
+                  }}
                 />
-                <span className="yanmar-shop-button-label">상점</span>
-              </button>
-            </div>
-            <QuestPanel
-              open={showQuestPanel}
-              onClose={() => setShowQuestPanel(false)}
-              playerLevel={getPlayerLevelProgress(totalXp).level}
-              questState={questState}
-              claimingId={questClaimingId}
-              onClaimDaily={(questId) => {
-                void handleClaimDailyQuest(questId);
-              }}
-              onClaimMission={() => {
-                void handleClaimMissionQuest();
-              }}
-              onClaimRepeat={(questId) => {
-                void handleClaimRepeatQuest(questId);
-              }}
-            />
-            <ShopPanel
-              open={showShopPanel}
-              onClose={() => setShowShopPanel(false)}
-              stars={previewStars}
-            />
-            {(mode === "practice" || mode === "tutorial") && (
+                <ShopPanel
+                  open={showShopPanel}
+                  onClose={() => setShowShopPanel(false)}
+                  stars={previewStars}
+                />
+              </>
+            ) : null}
+            {questsDisabled ? (
               <button
                 type="button"
                 onClick={() => setShowTutorialMenu(true)}
@@ -2973,7 +3079,7 @@ export function ExcavatorGameWrapper({
               >
                 튜토리얼
               </button>
-            )}
+            ) : null}
             {showDigPoseGraph ? (
               <div className="yanmar-dig-pose-panel w-[7.3125rem] rounded-sm border border-white/10 bg-black/55 px-2 py-1.5 text-white shadow-xl backdrop-blur-sm">
                 <DigPoseGraph
@@ -3171,7 +3277,7 @@ export function ExcavatorGameWrapper({
                   {leftTarget && mode === "game"
                     ? createPortal(
                         <div className="flex min-w-0 w-full max-w-full items-center text-white">
-                          <div className="min-w-0 w-full rounded-lg border border-white/15 bg-black/25 px-2 py-1">
+                          <div className="flex min-w-0 w-full flex-col gap-0.5 rounded-lg border border-white/15 bg-black/25 px-2 py-1">
                             <div className="flex min-w-0 items-baseline gap-1">
                               <p className="min-w-0 truncate text-[10px] font-black leading-none">
                                 {nickname}
@@ -3179,20 +3285,24 @@ export function ExcavatorGameWrapper({
                               <span className="shrink-0 text-[9px] font-black text-amber-200">
                                 Lv.{xpProgress.level}
                               </span>
+                              <span
+                                className="ml-auto shrink-0 text-[8px] font-bold tabular-nums leading-none text-white/80"
+                                title={`${xpProgress.currentXp.toLocaleString()}/${xpProgress.requiredXp.toLocaleString()}`}
+                              >
+                                {xpProgress.currentXp.toLocaleString()}/
+                                {xpProgress.requiredXp.toLocaleString()}
+                              </span>
                             </div>
-                            <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                            <div className="flex min-w-0 items-center gap-1.5">
                               <XpProgressBar
                                 progress={xpProgress}
                                 compact
                                 showLabel={false}
-                                className="min-w-[3.5rem] flex-1"
+                                className="min-w-0 flex-1"
                                 barClassName="bg-white/20"
                               />
-                              <span
-                                className="shrink-0 text-[8px] font-bold tabular-nums leading-none text-white/80"
-                                title={formatXpProgress(xpProgress)}
-                              >
-                                ({formatXpProgress(xpProgress)})
+                              <span className="shrink-0 text-[8px] font-bold tabular-nums leading-none text-white/80">
+                                {xpProgress.progressPct}%
                               </span>
                             </div>
                           </div>
@@ -3221,8 +3331,8 @@ export function ExcavatorGameWrapper({
           <div className="absolute left-2 top-[5.25rem] z-40 w-[min(42rem,calc(100%_-_1rem))] rounded-xl border border-amber-300/20 bg-black/75 p-2 text-white shadow-xl backdrop-blur-sm">
             <div className="min-w-0">
               <p className="text-[10px] font-bold text-amber-300">{tutorialStep.title}</p>
-              <p className="mt-0.5 whitespace-nowrap text-[clamp(7px,2.35vw,10px)] text-white/85">
-                {tutorialStep.instruction}
+              <p className="mt-0.5 text-[clamp(7px,2.35vw,10px)] leading-snug text-white/85">
+                {tutorialGuide || tutorialStep.instruction}
               </p>
             </div>
             <button
@@ -3270,13 +3380,14 @@ export function ExcavatorGameWrapper({
                   simRef={simRef}
                   terrainRef={terrainRef}
                   tutorialStepRef={tutorialStepRef}
+                  tutorialWaypointRef={tutorialWaypointRef}
                   visible
                   embedded
                   displaySize={88}
                 />
               ) : null}
             </div>
-            {mode !== "ride" && mode !== "gameReady" ? (
+            {mode !== "ride" && mode !== "gameReady" && !questsDisabled ? (
               <MissionHudPanel
                 questState={questState}
                 claiming={questClaimingId === "mission"}
@@ -3303,7 +3414,7 @@ export function ExcavatorGameWrapper({
           />
         ) : null}
 
-        {mode === "tutorial" && tutorialStep?.waypoint && (
+        {mode === "tutorial" && tutorialHasWaypoint && (
           <div className="absolute left-2 top-[12.25rem] z-20 rounded-lg bg-sky-600/85 px-2 py-1 text-[10px] font-semibold text-white">
             목표까지 {hud.goalDist}m
           </div>
@@ -3386,6 +3497,7 @@ export function ExcavatorGameWrapper({
               auxiliaryRef={auxiliaryRef}
               autoPoseRef={autoPoseRef}
               tutorialStepRef={tutorialStepRef}
+              tutorialWaypointRef={tutorialWaypointRef}
               tutorialDumpRef={tutorialDumpRef}
               digFeedbackRef={digFeedbackRef}
               dumpTruckStateRef={dumpTruckStateRef}

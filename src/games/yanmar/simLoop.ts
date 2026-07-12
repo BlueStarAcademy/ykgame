@@ -35,6 +35,7 @@ import {
   getCrashTileAt,
   isInsideHillZoneCore,
   isInHillZone,
+  isInDumpTruckBed,
   markHillRockExtracted,
   tryClearHillZone,
   digZoneLabel,
@@ -825,9 +826,18 @@ export function tickExcavatorSim(params: SimTickParams) {
     beforeControlBucket.clearance < minBucketClearance - 0.02;
   const worsenedGroundPenetration =
     clearance < beforeControlBucket.clearance - 0.002;
+  const bucketOverDumpBed = isInDumpTruckBed(
+    bucketContact.tip.x,
+    bucketContact.tip.z,
+    0.35,
+    truckPose.groupX,
+    truckPose.groupZ,
+  );
   // 굴착지 소진으로 지면이 복구되어 버킷이 순간적으로 묻힌 경우,
   // 더 깊게 파고드는 조작만 막고 지면에서 빠져나오는 조작은 허용한다.
+  // 짐칸 위에서는 지형 높이(트럭 아래) 기준으로 하역 버켓 개방이 막히지 않게 한다.
   if (
+    !bucketOverDumpBed &&
     clearance < minBucketClearance - 0.02 &&
     (!wasAlreadyBelowGround || worsenedGroundPenetration)
   ) {
@@ -1288,11 +1298,12 @@ export function tickExcavatorSim(params: SimTickParams) {
     ? Math.max(manualDigPoseScore / 4, autoDigPoseScore)
     : manualDigPoseScore / 4;
   // Position-ready for dig loading (marker); actual fill still needs curling motion.
+  const loadCap = mode === "tutorial" ? 1 : 0.98;
   const canLoad =
     sim.attachmentType === "bucket" &&
     inZone &&
     bucketInWorkRange &&
-    sim.bucketLoad < 0.98 &&
+    sim.bucketLoad < loadCap &&
     soilRetention >= BUCKET_SOIL_HOLD_MIN &&
     (poseReadiness >= 0.5 || (isAutoArm && autoDigPoseScore >= 0.25));
 

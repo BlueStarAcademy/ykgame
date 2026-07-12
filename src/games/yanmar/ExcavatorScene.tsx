@@ -66,7 +66,7 @@ import {
   type DumpTruckRuntimeState,
 } from "./dumpTruckState";
 import type { DiggingScoreState } from "./scoring";
-import type { GameMode, TutorialStep } from "./tutorial";
+import type { GameMode, TutorialStep, TutorialWaypoint } from "./tutorial";
 import type { YanmarEquipmentStats } from "./equipment";
 import {
   createRockTexture,
@@ -108,6 +108,7 @@ interface ExcavatorSceneProps {
   auxiliaryRef: React.RefObject<AuxiliaryControlState>;
   autoPoseRef: React.RefObject<AutoPoseState>;
   tutorialStepRef: React.RefObject<TutorialStep | null>;
+  tutorialWaypointRef?: React.RefObject<TutorialWaypoint | null>;
   tutorialDumpRef: React.MutableRefObject<number>;
   digFeedbackRef: React.MutableRefObject<DigFeedback>;
   dumpTruckStateRef: React.MutableRefObject<DumpTruckRuntimeState>;
@@ -2391,8 +2392,10 @@ function SimLoop({
 
 function WaypointMarker({
   tutorialStepRef,
+  tutorialWaypointRef,
 }: {
   tutorialStepRef: React.RefObject<TutorialStep | null>;
+  tutorialWaypointRef?: React.RefObject<TutorialWaypoint | null>;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Mesh>(null);
@@ -2400,7 +2403,8 @@ function WaypointMarker({
   useFrame((state, delta) => {
     const group = groupRef.current;
     const ring = ringRef.current;
-    const wp = tutorialStepRef.current?.waypoint;
+    const wp =
+      tutorialWaypointRef?.current ?? tutorialStepRef.current?.waypoint ?? null;
     if (!group) return;
     if (wp) {
       group.visible = true;
@@ -3651,7 +3655,10 @@ function SceneContent(props: ExcavatorSceneProps) {
         terrainRef={props.terrainRef}
         cameraMode={props.cameraMode}
       />
-      <WaypointMarker tutorialStepRef={props.tutorialStepRef} />
+      <WaypointMarker
+        tutorialStepRef={props.tutorialStepRef}
+        tutorialWaypointRef={props.tutorialWaypointRef}
+      />
       <AuxiliarySceneEffects auxiliaryRef={props.auxiliaryRef} />
       <GameCamera
         simRef={props.simRef}

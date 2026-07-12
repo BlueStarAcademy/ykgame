@@ -21,10 +21,10 @@ function ShopProductCard({ item }: { item: ShopItem }) {
         />
         <h3 className="yanmar-shop-card-title">{item.name}</h3>
       </div>
-      <p className="yanmar-shop-card-effect">
-        <span className="yanmar-shop-card-effect-main">{item.effect}</span>
-        <span className="yanmar-shop-card-effect-time">{item.durationLabel}</span>
-      </p>
+      <div className="yanmar-shop-card-effect">
+        <p className="yanmar-shop-card-effect-main">{item.effect}</p>
+        <p className="yanmar-shop-card-effect-time">{item.durationLabel}</p>
+      </div>
       <button type="button" className="yanmar-shop-card-buy">
         <img
           src="/images/star-currency.svg"

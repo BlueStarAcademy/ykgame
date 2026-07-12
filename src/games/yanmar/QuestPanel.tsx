@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import {
   MISSION_DIFFICULTY_REWARDS,
@@ -8,7 +8,9 @@ import {
 } from "./quests/config";
 import {
   countClaimableQuestRewards,
+  formatQuestResetCountdown,
   getCurrentMission,
+  getMsUntilNextQuestReset,
   getVisibleDailyQuests,
   getVisibleRepeatQuests,
   type YanmarQuestState,
@@ -127,6 +129,19 @@ export function QuestPanel({
   onClaimRepeat,
 }: QuestPanelProps) {
   const [tab, setTab] = useState<QuestTab>("daily");
+  const [resetCountdown, setResetCountdown] = useState(() =>
+    formatQuestResetCountdown(getMsUntilNextQuestReset()),
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const tick = () => {
+      setResetCountdown(formatQuestResetCountdown(getMsUntilNextQuestReset()));
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [open]);
 
   const dailyRows = useMemo(() => {
     if (!questState) return [];
@@ -177,12 +192,13 @@ export function QuestPanel({
         <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="yanmar-quest-panel-badge" aria-hidden />
-            <div>
-              <h2 className="text-sm font-black text-amber-100">퀘스트</h2>
-              <p className="text-[10px] font-semibold text-white/45">
-                Lv.{playerLevel} · 매일 자정(KST) 갱신
-              </p>
-            </div>
+            <h2 className="text-sm font-black text-amber-100">퀘스트</h2>
+            <span
+              className="text-[10px] font-bold tabular-nums text-white/55"
+              title="일일 퀘스트 초기화까지 남은 시간"
+            >
+              초기화 {resetCountdown}
+            </span>
           </div>
           <button
             type="button"

@@ -39,6 +39,25 @@ export function getQuestDayKey(now = new Date()) {
   }).format(now);
 }
 
+/** 다음 일일 퀘스트 초기화(KST 자정)까지 남은 ms */
+export function getMsUntilNextQuestReset(now = new Date()) {
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const year = kst.getUTCFullYear();
+  const month = kst.getUTCMonth();
+  const day = kst.getUTCDate();
+  const nextMidnightUtc = Date.UTC(year, month, day + 1, 0, 0, 0, 0) - 9 * 60 * 60 * 1000;
+  return Math.max(0, nextMidnightUtc - now.getTime());
+}
+
+/** `H:MM:SS` — 초기화까지 남은 시간 */
+export function formatQuestResetCountdown(ms: number) {
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function createDailyItem(def: DailyQuestDef): DailyQuestProgress {
   return {
     id: def.id,

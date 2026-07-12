@@ -1,5 +1,5 @@
 import type { ExcavatorSimState } from "./ExcavatorScene";
-import type { ControlMask } from "./controls";
+import type { ControlMask, ExcavatorControlState } from "./controls";
 import { ALL_CONTROLS } from "./controls";
 import type { AttachmentType } from "./types";
 
@@ -23,6 +23,7 @@ export interface TutorialWaypoint {
 export interface TutorialStep {
   id: string;
   title: string;
+  /** 선택 모달·초기 안내용 대표 문구 */
   instruction: string;
   highlight: TutorialHighlight;
   allowed: ControlMask;
@@ -31,105 +32,144 @@ export interface TutorialStep {
   startAttachment?: AttachmentType;
   /** 시작 시 굴착기 위치 (미설정 시 기본 스폰) */
   startPose?: { x: number; z: number; heading?: number };
-  swingTarget?: number;
-  armMin?: number;
-  armMax?: number;
-  boomMin?: number;
-  bucketMax?: number;
-  loadMin?: number;
-  dumpMin?: number;
-  /** 브레이커 성공 타격 횟수 */
-  crashHitsMin?: number;
-  /** 집게로 돌 하역 횟수 */
-  hillDeliverMin?: number;
 }
 
-export interface TutorialProgress {
+/** 단계별 서브 진행 (매 튜토리얼 시작 시 리셋) */
+export interface TutorialPhaseProgress {
+  phase: number;
+  travelDist: number;
+  headingAccum: number;
+  lastX: number;
+  lastZ: number;
+  lastHeading: number;
   dumped: number;
-  crashHits: number;
+  asphaltBroken: number;
   hillDelivered: number;
+  rockLiftJudged: boolean;
+  rockLiftSuccess: boolean;
+  dumpTruckDeparted: boolean;
+  haulTruckDeparted: boolean;
+  lastLiftTick: number;
 }
+
+export interface TutorialTickExtras {
+  input: ExcavatorControlState;
+  gripPressure: number;
+  carryingRock: boolean;
+  grappleLiftResult: null | "success" | "fail";
+  grappleLiftResultTick: number;
+  dumpTruckPhase: string;
+  haulTruckPhase: string;
+  breakerTipReady: boolean;
+}
+
+const TRAVEL_FWD_WP: TutorialWaypoint = { x: -18, z: -10, radius: 3 };
+const TRAVEL_REV_WP: TutorialWaypoint = { x: -18, z: -20, radius: 3.5 };
+const TRAVEL_SIDE_DIST = 2.2;
+const TRAVEL_TURN_RAD = 0.55;
+const LEVER_ON = 0.55;
+const LEVER_OFF = 0.22;
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "travel",
     title: "1. 주행",
-    instruction: "좌우 주행 레버를 둘 다 앞으로 — 파란 목표 링까지 이동",
+    instruction: "전진·좌/우 레버·후진을 모두 연습합니다",
     highlight: "travel",
     allowed: { leftX: false, leftY: false, rightX: false, rightY: false, travel: true },
-    waypoint: { x: -18, z: -10, radius: 3 },
+    waypoint: TRAVEL_FWD_WP,
   },
   {
     id: "swing",
     title: "2. 스윙",
-    instruction: "좌 조이스틱 좌측 — 상부체 선회",
+    instruction: "좌·우측 스윙을 모두 연습합니다",
     highlight: "left",
     allowed: { leftX: true, leftY: false, rightX: false, rightY: false, travel: false },
-    swingTarget: 0.45,
   },
   {
     id: "arm",
     title: "3. 암",
-    instruction: "좌 조이스틱 앞 — 암 뻗기",
+    instruction: "암 뻗기·당김으로 제자리까지 연습합니다",
     highlight: "left",
     allowed: { leftX: false, leftY: true, rightX: false, rightY: false, travel: false },
-    armMax: -0.35,
   },
   {
     id: "boom",
     title: "4. 붐",
-    instruction: "우 조이스틱 앞 — 붐 하강 (버켓을 아래로)",
+    instruction: "붐 하강·상승을 모두 연습합니다",
     highlight: "right",
     allowed: { leftX: false, leftY: false, rightX: false, rightY: true, travel: false },
-    boomMin: 0.75,
   },
   {
     id: "bucket",
     title: "5. 버켓",
-    instruction: "우 조이스틱 좌 — 버켓 말기",
+    instruction: "버켓 펴기·말기를 모두 연습합니다",
     highlight: "right",
     allowed: { leftX: false, leftY: false, rightX: true, rightY: false, travel: false },
-    bucketMax: 0.35,
   },
   {
     id: "dig",
     title: "6. 굴착",
-    instruction: "버켓을 반쯤 열고 흙더미에 깊이 넣은 뒤, 버켓을 30도쯤 말며 암을 안쪽으로 당겨 적재 35% 이상",
+    instruction: "흙을 버켓에 100%까지 적재합니다",
     highlight: "both",
     allowed: { ...ALL_CONTROLS },
-    loadMin: 0.35,
   },
   {
     id: "dump",
     title: "7. 하역",
-    instruction: "초록 구역에서 우 조이스틱 우측 — 버켓 펴기",
+    instruction: "트럭에 하역한 뒤 비켜서 출발까지 확인합니다",
     highlight: "both",
     allowed: { ...ALL_CONTROLS },
-    dumpMin: 0.12,
   },
   {
     id: "breaker",
     title: "8. 브레이커",
-    instruction:
-      "Crash 구역에서 브레이커 팁을 수직에 가깝게 세운 뒤, 하이라이트된 발판을 밟아 타격하세요",
+    instruction: "아스팔트에 대고 발판을 유지해 깨뜨립니다",
     highlight: "breaker",
     allowed: { ...ALL_CONTROLS },
     startAttachment: "breaker",
     startPose: { x: 96, z: 12, heading: Math.PI / 2 },
-    crashHitsMin: 8,
   },
   {
-    id: "grapple",
-    title: "9. 집게",
-    instruction:
-      "버켓 각도를 집게와 맞춘 뒤 발판 위쪽으로 돌을 집고, 트럭에서 아래쪽을 밟아 여세요",
+    id: "rockLoad",
+    title: "9. 돌 적재",
+    instruction: "돌을 집어 밀착감 최대 후 붐 상승 판정까지",
     highlight: "breaker",
     allowed: { ...ALL_CONTROLS },
     startAttachment: "grapple",
     startPose: { x: 22, z: 98, heading: 0 },
-    hillDeliverMin: 1,
+  },
+  {
+    id: "rockDump",
+    title: "10. 돌 하역",
+    instruction: "적재한 돌을 트럭에 하역하고 출발까지 확인합니다",
+    highlight: "breaker",
+    allowed: { ...ALL_CONTROLS },
+    startAttachment: "grapple",
+    startPose: { x: 22, z: 98, heading: 0 },
   },
 ];
+
+export function createTutorialPhaseProgress(
+  sim: ExcavatorSimState,
+): TutorialPhaseProgress {
+  return {
+    phase: 0,
+    travelDist: 0,
+    headingAccum: 0,
+    lastX: sim.posX,
+    lastZ: sim.posZ,
+    lastHeading: sim.heading,
+    dumped: 0,
+    asphaltBroken: 0,
+    hillDelivered: 0,
+    rockLiftJudged: false,
+    rockLiftSuccess: false,
+    dumpTruckDeparted: false,
+    haulTruckDeparted: false,
+    lastLiftTick: 0,
+  };
+}
 
 export function isAtWaypoint(sim: ExcavatorSimState, wp: TutorialWaypoint) {
   const dx = sim.posX - wp.x;
@@ -143,33 +183,238 @@ export function waypointDistance(sim: ExcavatorSimState, wp: TutorialWaypoint) {
   return Math.sqrt(dx * dx + dz * dz);
 }
 
-/** 단계 id별로만 판정 — 이전 단계 조건이 남아 오완료되는 것 방지 */
-export function checkTutorialStepComplete(
-  step: TutorialStep,
+function normalizeAngle(rad: number) {
+  let a = rad;
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
+function accumulateTravel(
+  progress: TutorialPhaseProgress,
   sim: ExcavatorSimState,
-  progress: TutorialProgress,
-): boolean {
+) {
+  const dx = sim.posX - progress.lastX;
+  const dz = sim.posZ - progress.lastZ;
+  const dist = Math.hypot(dx, dz);
+  const dHeading = Math.abs(normalizeAngle(sim.heading - progress.lastHeading));
+  progress.lastX = sim.posX;
+  progress.lastZ = sim.posZ;
+  progress.lastHeading = sim.heading;
+  return { dist, dHeading };
+}
+
+function advancePhase(progress: TutorialPhaseProgress) {
+  progress.phase += 1;
+  progress.travelDist = 0;
+  progress.headingAccum = 0;
+}
+
+export function getTutorialInstruction(
+  step: TutorialStep,
+  progress: TutorialPhaseProgress,
+): string {
   switch (step.id) {
     case "travel":
-      return step.waypoint != null && isAtWaypoint(sim, step.waypoint);
+      switch (progress.phase) {
+        case 0:
+          return "좌우 주행 레버를 둘 다 앞으로 — 파란 목표 링까지 전진";
+        case 1:
+          return "왼쪽 레버만 앞으로 밀어 선회·이동해 보세요";
+        case 2:
+          return "오른쪽 레버만 앞으로 밀어 선회·이동해 보세요";
+        default:
+          return "좌우 레버를 둘 다 뒤로 밀어 후진해 보세요 (목표 링까지)";
+      }
     case "swing":
-      return step.swingTarget != null && sim.swing >= step.swingTarget;
+      return progress.phase === 0
+        ? "좌 조이스틱 좌측 — 좌측으로 스윙"
+        : "좌 조이스틱 우측 — 우측으로 스윙";
     case "arm":
-      return step.armMax != null && sim.arm >= step.armMax;
+      return progress.phase === 0
+        ? "좌 조이스틱 앞 — 암 뻗기"
+        : "좌 조이스틱 뒤 — 암을 당겨 제자리로";
     case "boom":
-      return step.boomMin != null && sim.boom >= step.boomMin;
+      return progress.phase === 0
+        ? "우 조이스틱 앞 — 붐 하강"
+        : "우 조이스틱 뒤 — 붐 상승";
     case "bucket":
-      return step.bucketMax != null && sim.bucket <= step.bucketMax;
+      return progress.phase === 0
+        ? "우 조이스틱 우측 — 버켓 펴기"
+        : "우 조이스틱 좌측 — 버켓 말기";
     case "dig":
-      return step.loadMin != null && sim.bucketLoad >= step.loadMin;
+      return "버켓을 반쯤 열고 흙더미에 넣은 뒤, 말며 암을 당겨 적재 100%까지";
     case "dump":
-      return step.dumpMin != null && progress.dumped >= step.dumpMin;
+      return progress.phase === 0
+        ? "트럭에 차체를 붙이고 정면을 맞춘 뒤, 우 조이스틱 우측으로 버켓을 펴 하역"
+        : "트럭에서 비켜나면 트럭이 출발합니다 — 출발할 때까지 확인";
     case "breaker":
-      return step.crashHitsMin != null && progress.crashHits >= step.crashHitsMin;
-    case "grapple":
-      return (
-        step.hillDeliverMin != null && progress.hillDelivered >= step.hillDeliverMin
-      );
+      return progress.phase === 0
+        ? "Crash 구역에서 브레이커 팁을 아스팔트에 수직에 가깝게 대세요"
+        : "하이라이트된 발판을 클릭한 채 유지 — 아스팔트가 깨질 때까지";
+    case "rockLoad":
+      switch (progress.phase) {
+        case 0:
+          return "버켓 각도를 집게에 맞춘 뒤 발판 위쪽으로 돌을 집으세요";
+        case 1:
+          return "집게 발판을 위쪽으로 3초간 유지해 밀착감을 최대로 올리세요";
+        default:
+          return "발판을 떼고 붐을 올려 적재 성공/실패 판정을 확인하세요";
+      }
+    case "rockDump":
+      switch (progress.phase) {
+        case 0:
+          return "돌을 성공적으로 적재한 뒤 돌트럭으로 이동하세요";
+        case 1:
+          return "트럭에서 발판 아래쪽을 밟아 돌을 하역하세요";
+        default:
+          return "트럭에서 비켜나면 트럭이 출발합니다 — 출발할 때까지 확인";
+      }
+    default:
+      return step.instruction;
+  }
+}
+
+export function getTutorialWaypoint(
+  step: TutorialStep,
+  progress: TutorialPhaseProgress,
+): TutorialWaypoint | undefined {
+  if (step.id !== "travel") return step.waypoint;
+  if (progress.phase === 0) return TRAVEL_FWD_WP;
+  if (progress.phase >= 3) return TRAVEL_REV_WP;
+  return undefined;
+}
+
+/**
+ * 서브 단계를 갱신하고, 해당 튜토리얼이 모두 끝났으면 true.
+ */
+export function advanceTutorialProgress(
+  step: TutorialStep,
+  sim: ExcavatorSimState,
+  progress: TutorialPhaseProgress,
+  extras: TutorialTickExtras,
+): boolean {
+  const { dist, dHeading } = accumulateTravel(progress, sim);
+  const travel = extras.input.travel;
+  const leftOnlyFwd =
+    travel.left > LEVER_ON && Math.abs(travel.right) < LEVER_OFF;
+  const rightOnlyFwd =
+    travel.right > LEVER_ON && Math.abs(travel.left) < LEVER_OFF;
+
+  if (
+    extras.grappleLiftResultTick !== progress.lastLiftTick &&
+    extras.grappleLiftResult != null
+  ) {
+    progress.lastLiftTick = extras.grappleLiftResultTick;
+    progress.rockLiftJudged = true;
+    if (extras.grappleLiftResult === "success") {
+      progress.rockLiftSuccess = true;
+    }
+  }
+
+  if (
+    (extras.dumpTruckPhase === "engineStart" ||
+      extras.dumpTruckPhase === "departing") &&
+    progress.dumped > 0
+  ) {
+    progress.dumpTruckDeparted = true;
+  }
+  if (
+    (extras.haulTruckPhase === "engineStart" ||
+      extras.haulTruckPhase === "departing") &&
+    progress.hillDelivered > 0
+  ) {
+    progress.haulTruckDeparted = true;
+  }
+
+  switch (step.id) {
+    case "travel": {
+      if (progress.phase === 0) {
+        if (isAtWaypoint(sim, TRAVEL_FWD_WP)) advancePhase(progress);
+      } else if (progress.phase === 1) {
+        if (leftOnlyFwd) {
+          progress.travelDist += dist;
+          progress.headingAccum += dHeading;
+        }
+        if (
+          progress.travelDist >= TRAVEL_SIDE_DIST ||
+          progress.headingAccum >= TRAVEL_TURN_RAD
+        ) {
+          advancePhase(progress);
+        }
+      } else if (progress.phase === 2) {
+        if (rightOnlyFwd) {
+          progress.travelDist += dist;
+          progress.headingAccum += dHeading;
+        }
+        if (
+          progress.travelDist >= TRAVEL_SIDE_DIST ||
+          progress.headingAccum >= TRAVEL_TURN_RAD
+        ) {
+          advancePhase(progress);
+        }
+      } else if (progress.phase === 3) {
+        const bothRev =
+          travel.left < -LEVER_ON && travel.right < -LEVER_ON;
+        if (bothRev) progress.travelDist += dist;
+        if (
+          progress.travelDist >= 3.2 ||
+          isAtWaypoint(sim, TRAVEL_REV_WP)
+        ) {
+          return true;
+        }
+      }
+      return false;
+    }
+    case "swing": {
+      if (progress.phase === 0 && sim.swing >= 0.45) advancePhase(progress);
+      else if (progress.phase === 1 && sim.swing <= -0.45) return true;
+      return false;
+    }
+    case "arm": {
+      if (progress.phase === 0 && sim.arm >= -0.35) advancePhase(progress);
+      else if (progress.phase === 1 && sim.arm <= -0.85) return true;
+      return false;
+    }
+    case "boom": {
+      if (progress.phase === 0 && sim.boom >= 0.75) advancePhase(progress);
+      else if (progress.phase === 1 && sim.boom <= 0.4) return true;
+      return false;
+    }
+    case "bucket": {
+      if (progress.phase === 0 && sim.bucket >= 1.8) advancePhase(progress);
+      else if (progress.phase === 1 && sim.bucket <= 0.45) return true;
+      return false;
+    }
+    case "dig":
+      return sim.bucketLoad >= 0.995;
+    case "dump": {
+      if (progress.phase === 0 && progress.dumped >= 0.08) advancePhase(progress);
+      else if (progress.phase === 1 && progress.dumpTruckDeparted) return true;
+      return false;
+    }
+    case "breaker": {
+      if (progress.phase === 0 && extras.breakerTipReady) advancePhase(progress);
+      else if (progress.phase === 1 && progress.asphaltBroken >= 1) return true;
+      return false;
+    }
+    case "rockLoad": {
+      if (progress.rockLiftJudged) return true;
+      if (!extras.carryingRock) progress.phase = 0;
+      else if (extras.gripPressure < 0.98) progress.phase = 1;
+      else progress.phase = 2;
+      return false;
+    }
+    case "rockDump": {
+      if (progress.phase === 0) {
+        if (progress.rockLiftSuccess && extras.carryingRock) advancePhase(progress);
+      } else if (progress.phase === 1) {
+        if (progress.hillDelivered >= 1) advancePhase(progress);
+      } else if (progress.phase === 2 && progress.haulTruckDeparted) {
+        return true;
+      }
+      return false;
+    }
     default:
       return false;
   }

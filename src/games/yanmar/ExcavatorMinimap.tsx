@@ -4,12 +4,13 @@ import { useEffect, useRef } from "react";
 import type { ExcavatorSimState } from "./ExcavatorScene";
 import type { TerrainData } from "./terrain";
 import { DUMP_ZONE, getActiveDigZones, getMapWorldBounds } from "./terrain";
-import type { TutorialStep } from "./tutorial";
+import type { TutorialStep, TutorialWaypoint } from "./tutorial";
 
 interface ExcavatorMinimapProps {
   simRef: React.RefObject<ExcavatorSimState>;
   terrainRef: React.RefObject<TerrainData>;
   tutorialStepRef: React.RefObject<TutorialStep | null>;
+  tutorialWaypointRef?: React.RefObject<TutorialWaypoint | null>;
   visible: boolean;
   /** 가로 HUD 스택 안에 넣을 때 absolute 포지션 제거 */
   embedded?: boolean;
@@ -64,6 +65,7 @@ export function ExcavatorMinimap({
   simRef,
   terrainRef,
   tutorialStepRef,
+  tutorialWaypointRef,
   visible,
   embedded = false,
   displaySize = DEFAULT_DISPLAY_SIZE,
@@ -88,7 +90,8 @@ export function ExcavatorMinimap({
       const context = ctx;
       const sim = simRef.current;
       const terrain = terrainRef.current;
-      const wp = tutorialStepRef.current?.waypoint;
+      const wp =
+        tutorialWaypointRef?.current ?? tutorialStepRef.current?.waypoint ?? null;
       const bounds = getMapWorldBounds(terrain);
 
       context.clearRect(0, 0, size, size);
@@ -286,7 +289,7 @@ export function ExcavatorMinimap({
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
     };
-  }, [visible, displaySize, simRef, terrainRef, tutorialStepRef]);
+  }, [visible, displaySize, simRef, terrainRef, tutorialStepRef, tutorialWaypointRef]);
 
   if (!visible) return null;
 
