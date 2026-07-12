@@ -44,8 +44,6 @@ interface EquipmentUpgradePanelProps {
 const HOTSPOT_WRAPPER_SIZE = { width: "4.1rem", height: "3.75rem" };
 const UPGRADE_BAR_DURATION_MS = 2000;
 const UPGRADE_SUCCESS_TOAST_MS = 3000;
-/** 모달 오픈 터치가 강화/초기화 버튼으로 이어지지 않도록 막는 시간 */
-const OPEN_ACTION_GUARD_MS = 1000;
 
 type PendingUpgrade = {
   part: YanmarEquipmentPart;
@@ -281,14 +279,12 @@ export function EquipmentUpgradePanel({
   const [upgradeSuccess, setUpgradeSuccess] = useState<UpgradeSuccess | null>(null);
   const [upgradeFail, setUpgradeFail] = useState<UpgradeFail | null>(null);
   const [successToastKey, setSuccessToastKey] = useState(0);
-  const [openActionsLocked, setOpenActionsLocked] = useState(true);
   const [displayLevels, setDisplayLevels] = useState(levels);
   const [displayFailBonuses, setDisplayFailBonuses] = useState(failBonuses);
   const barTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const failTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const openGuardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const upgradeSessionRef = useRef<UpgradeSession | null>(null);
   const levelsRef = useRef(levels);
   const failBonusesRef = useRef(failBonuses);
@@ -367,34 +363,8 @@ export function EquipmentUpgradePanel({
   useEffect(() => {
     return () => {
       clearUpgradeTimers();
-      if (openGuardTimerRef.current) {
-        clearTimeout(openGuardTimerRef.current);
-        openGuardTimerRef.current = null;
-      }
     };
   }, [clearUpgradeTimers]);
-
-  useEffect(() => {
-    if (openGuardTimerRef.current) {
-      clearTimeout(openGuardTimerRef.current);
-      openGuardTimerRef.current = null;
-    }
-    if (!open) {
-      setOpenActionsLocked(true);
-      return;
-    }
-    setOpenActionsLocked(true);
-    openGuardTimerRef.current = setTimeout(() => {
-      setOpenActionsLocked(false);
-      openGuardTimerRef.current = null;
-    }, OPEN_ACTION_GUARD_MS);
-    return () => {
-      if (openGuardTimerRef.current) {
-        clearTimeout(openGuardTimerRef.current);
-        openGuardTimerRef.current = null;
-      }
-    };
-  }, [open]);
 
   useEffect(() => {
     levelsRef.current = levels;
@@ -467,7 +437,6 @@ export function EquipmentUpgradePanel({
   }, []);
 
   const handleUpgradeClick = useCallback(() => {
-    if (openActionsLocked) return;
     const part = selected;
     const currentLevel = displayLevels[part];
     const config = YANMAR_EQUIPMENT_CONFIG[part];
@@ -502,7 +471,6 @@ export function EquipmentUpgradePanel({
       tryShowUpgradeSuccess();
     }, UPGRADE_BAR_DURATION_MS);
   }, [
-    openActionsLocked,
     selected,
     displayLevels,
     pendingUpgrade,
@@ -513,9 +481,8 @@ export function EquipmentUpgradePanel({
   ]);
 
   const handleResetClick = useCallback(() => {
-    if (openActionsLocked) return;
     onResetEquipment(selected);
-  }, [openActionsLocked, onResetEquipment, selected]);
+  }, [onResetEquipment, selected]);
 
   if (!open) return null;
 
@@ -532,12 +499,10 @@ export function EquipmentUpgradePanel({
     upgradingPart === selected ||
     activeUpgradeBarPart === selected;
   const upgradeDisabled =
-    openActionsLocked ||
     isUpgradingSelected ||
     maxed ||
     (!previewMode && balance < getYanmarUpgradeCost(selected, displayLevels[selected] + 1));
   const resetDisabled =
-    openActionsLocked ||
     displayLevels[selected] <= 0 ||
     resettingEquipment ||
     isUpgradingSelected;

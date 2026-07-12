@@ -7,7 +7,7 @@ export const TICKER_WIN_FEED_LIMIT = 12;
 
 export type TickerFeedItem = {
   id: string;
-  kind: "notice" | "coupon" | "stars" | "practice";
+  kind: "notice" | "coupon" | "practice";
   message: string;
   createdAt: string | null;
 };
@@ -30,21 +30,9 @@ export function formatTickerCouponMessage(
   return `🎉 ${name}님이 ${label} ${discountPct}%를 획득했습니다!`;
 }
 
-export function formatTickerStarsMessage(
-  nickname: string | null | undefined,
-  stars: number,
-  critical = false,
-) {
-  const name = displayName(nickname);
-  if (critical) {
-    return `⭐ ${name}님이 크리티컬로 스타 ${stars.toLocaleString()}개를 획득했습니다!`;
-  }
-  return `⭐ ${name}님이 스타 ${stars.toLocaleString()}개에 당첨되었습니다!`;
-}
-
 export async function publishTickerWinEvents(
   events: Array<{
-    kind: "coupon" | "stars";
+    kind: "coupon";
     message: string;
     nickname: string;
   }>,
@@ -76,7 +64,10 @@ export async function getTickerFeed(options?: {
       select: { id: true, message: true, updatedAt: true },
     }),
     prisma.tickerWinEvent.findMany({
-      where: { createdAt: { gte: cutoff } },
+      where: {
+        createdAt: { gte: cutoff },
+        kind: "coupon",
+      },
       orderBy: { createdAt: "desc" },
       take: TICKER_WIN_FEED_LIMIT,
       select: { id: true, kind: true, message: true, createdAt: true },
@@ -108,7 +99,7 @@ export async function getTickerFeed(options?: {
   for (const win of wins) {
     items.push({
       id: `win:${win.id}`,
-      kind: win.kind === "coupon" ? "coupon" : "stars",
+      kind: "coupon",
       message: win.message,
       createdAt: win.createdAt.toISOString(),
     });

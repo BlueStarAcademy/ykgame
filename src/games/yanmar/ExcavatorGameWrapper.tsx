@@ -377,7 +377,6 @@ function rollLocalHillReward(stats: YanmarEquipmentStats) {
 
 function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
   if (!panel) return null;
-  if (typeof document === "undefined") return null;
 
   const showScore = panel.totalScore > 0;
   const showXp = panel.earnedXp > 0;
@@ -386,71 +385,65 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
 
   const sepClass = panel.critical ? "text-yellow-200/80" : "text-white/35";
 
-  return createPortal(
+  return (
     <div
-      className={`pointer-events-none fixed left-1/2 z-[340] w-[min(22rem,92vw)] -translate-x-1/2 ${
-        panel.critical ? "top-[5.1rem]" : "top-[4.25rem]"
+      key={panel.pulseKey}
+      className={`yanmar-score-panel relative w-max max-w-[min(20rem,90vw)] rounded-xl border px-4 py-2.5 font-black shadow-xl backdrop-blur-md ${
+        panel.critical
+          ? "yanmar-score-panel-critical border-yellow-200/80 bg-black/85 text-yellow-300 shadow-[0_0_28px_rgba(250,204,21,0.35)]"
+          : "border-white/25 bg-black/78 text-slate-200"
       }`}
-    >      <div
-        key={panel.pulseKey}
-        className={`yanmar-score-panel relative rounded-xl border px-3.5 py-2 font-black shadow-xl backdrop-blur-md ${
-          panel.critical
-            ? "yanmar-score-panel-critical border-yellow-200/80 bg-black/85 text-yellow-300 shadow-[0_0_28px_rgba(250,204,21,0.35)]"
-            : "border-white/25 bg-black/78 text-slate-200"
-        }`}
-      >
-        {panel.critical ? (
-          <div
-            key={`crit-${panel.pulseKey}`}
-            className="yanmar-score-critical-label pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-[118%]"
-            aria-hidden
-          >
-            CRITICAL
-          </div>
-        ) : null}
-        {showScore || showXp || showStars ? (
-          <div
-            className={`yanmar-score-panel-value flex items-center justify-center gap-2.5 whitespace-nowrap tabular-nums ${
-              panel.critical ? "text-sm" : "text-xs"
-            }`}
-          >
-            {showScore ? (
-              <span>{panel.totalScore.toLocaleString()}점</span>
-            ) : null}
-            {showScore && (showXp || showStars) ? (
-              <span className={sepClass} aria-hidden>
-                ·
-              </span>
-            ) : null}
-            {showXp ? <span>EXP+{panel.earnedXp.toLocaleString()}</span> : null}
-            {showXp && showStars ? (
-              <span className={sepClass} aria-hidden>
-                ·
-              </span>
-            ) : null}
-            {showStars ? (
-              <span className="inline-flex items-center gap-0.5">
-                <img
-                  src="/images/star-currency.svg"
-                  alt=""
-                  width={14}
-                  height={14}
-                  className="yanmar-score-panel-star"
-                  draggable={false}
-                />
-                {panel.earnedStars.toLocaleString()}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-        {panel.rewardText ? (
-          <div className="yanmar-score-panel-reward mt-1 text-center text-[10px] font-bold text-white/90">
-            {panel.rewardText}
-          </div>
-        ) : null}
-      </div>
-    </div>,
-    document.body,
+    >
+      {panel.critical ? (
+        <div
+          key={`crit-${panel.pulseKey}`}
+          className="yanmar-score-critical-label pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-[118%]"
+          aria-hidden
+        >
+          CRITICAL
+        </div>
+      ) : null}
+      {showScore || showXp || showStars ? (
+        <div
+          className={`yanmar-score-panel-value flex items-center justify-center gap-2.5 whitespace-nowrap tabular-nums ${
+            panel.critical ? "text-base" : "text-sm"
+          }`}
+        >
+          {showScore ? (
+            <span>{panel.totalScore.toLocaleString()}점</span>
+          ) : null}
+          {showScore && (showXp || showStars) ? (
+            <span className={sepClass} aria-hidden>
+              ·
+            </span>
+          ) : null}
+          {showXp ? <span>EXP+{panel.earnedXp.toLocaleString()}</span> : null}
+          {showXp && showStars ? (
+            <span className={sepClass} aria-hidden>
+              ·
+            </span>
+          ) : null}
+          {showStars ? (
+            <span className="inline-flex items-center gap-0.5">
+              <img
+                src="/images/star-currency.svg"
+                alt=""
+                width={16}
+                height={16}
+                className="yanmar-score-panel-star"
+                draggable={false}
+              />
+              {panel.earnedStars.toLocaleString()}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      {panel.rewardText ? (
+        <div className="yanmar-score-panel-reward mt-1 text-center text-[11px] font-bold text-white/90">
+          {panel.rewardText}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -462,26 +455,24 @@ function CouponDiscoveryOverlay({ discovery }: { discovery: CouponDiscoveryState
   return (
     <div
       key={discovery.pulseKey}
-      className="pointer-events-none absolute inset-x-0 top-[5.5rem] z-[58] flex justify-center px-3"
+      className="yanmar-coupon-discovery w-max max-w-[min(18rem,90vw)] rounded-2xl border-2 border-yellow-200/80 bg-gradient-to-b from-amber-500/95 via-orange-500/95 to-red-600/95 px-4 py-3.5 text-center text-white shadow-[0_0_32px_rgba(251,191,36,0.45)] backdrop-blur-md"
     >
-      <div className="yanmar-coupon-discovery w-[min(18rem,92%)] rounded-2xl border-2 border-yellow-200/80 bg-gradient-to-b from-amber-500/95 via-orange-500/95 to-red-600/95 px-4 py-3 text-center text-white shadow-[0_0_32px_rgba(251,191,36,0.45)] backdrop-blur-md">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={getYanmarCouponImage(discovery.couponType)}
-          alt=""
-          width={120}
-          height={72}
-          className="mx-auto h-[4.5rem] w-auto drop-shadow-lg"
-          draggable={false}
-          aria-hidden
-        />
-        <p className="mt-2 text-sm font-black tracking-tight text-yellow-50">축하합니다!</p>
-        <p className="mt-1 text-[11px] font-bold leading-snug text-white">
-          {discovery.couponType === "FILTER_SET_EXCHANGE"
-            ? `${label}을 발견했습니다!!`
-            : `${label} ${discovery.discountPct}% 할인 쿠폰을 발견했습니다!!`}
-        </p>
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={getYanmarCouponImage(discovery.couponType)}
+        alt=""
+        width={140}
+        height={84}
+        className="mx-auto h-[5.25rem] w-auto drop-shadow-lg"
+        draggable={false}
+        aria-hidden
+      />
+      <p className="mt-2 text-base font-black tracking-tight text-yellow-50">축하합니다!</p>
+      <p className="mt-1 text-xs font-bold leading-snug text-white">
+        {discovery.couponType === "FILTER_SET_EXCHANGE"
+          ? `${label}을 발견했습니다!!`
+          : `${label} ${discovery.discountPct}% 할인 쿠폰을 발견했습니다!!`}
+      </p>
     </div>
   );
 }
@@ -3837,7 +3828,7 @@ export function ExcavatorGameWrapper({
         )}
 
         {mode !== "intro" && (mode !== "gameReady" || showMinimap) && (
-          <div className="absolute right-1.5 top-1.5 z-30 flex items-start gap-1">
+          <div className="absolute right-1.5 top-1.5 z-30 flex items-start gap-1 pointer-events-auto">
             <ActiveShopBuffIcons
               buffs={activeShopBuffs}
               onChange={persistActiveShopBuffs}
@@ -3901,8 +3892,15 @@ export function ExcavatorGameWrapper({
           </div>
         )}
 
-        {mode !== "intro" && <RewardPopupOverlay panel={dumpScorePanel} />}
-        {mode !== "intro" && <CouponDiscoveryOverlay discovery={couponDiscovery} />}
+        {mode !== "intro" && (dumpScorePanel || couponDiscovery) ? (
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 z-[58] flex max-w-[calc(100%-1rem)] -translate-x-1/2 -translate-y-1/2 flex-row flex-wrap items-center justify-center gap-2.5"
+            aria-live="polite"
+          >
+            <RewardPopupOverlay panel={dumpScorePanel} />
+            <CouponDiscoveryOverlay discovery={couponDiscovery} />
+          </div>
+        ) : null}
         {mode !== "intro" && poseSaveToastVisible ? (
           <div key={poseSaveToastKey} className="yanmar-pose-save-toast" role="status">
             현재 자세가 저장되었습니다.

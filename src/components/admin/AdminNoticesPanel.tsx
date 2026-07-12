@@ -155,7 +155,7 @@ export function AdminNoticesPanel() {
   return (
     <AdminShell
       title="전광판 공지"
-      subtitle="게임 상단 전광판에 표시할 공지를 작성·정렬합니다. 쿠폰·스타 당첨 알림과 함께 순환됩니다."
+      subtitle="게임 상단 전광판에 표시할 공지를 작성·정렬합니다. 쿠폰 획득 알림과 함께 순환됩니다."
     >
       <div className="space-y-4">
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

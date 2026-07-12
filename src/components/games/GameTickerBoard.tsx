@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 type TickerFeedItem = {
   id: string;
-  kind: "notice" | "coupon" | "stars" | "practice";
+  kind: "notice" | "coupon" | "practice";
   message: string;
   createdAt: string | null;
 };

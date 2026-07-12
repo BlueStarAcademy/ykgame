@@ -19,7 +19,6 @@ import {
 } from "@/lib/yanmar-rewards";
 import {
   formatTickerCouponMessage,
-  formatTickerStarsMessage,
   publishTickerWinEvents,
 } from "@/lib/ticker";
 
@@ -158,44 +157,27 @@ export async function POST(request: Request) {
 
   if (!result.replayed) {
     const payload = result.result as {
-      reward?: { stars?: number; critical?: boolean };
       coupon?: {
         couponType: import("@/generated/prisma/client").CouponType;
         discountPct: number;
       } | null;
-      totalStars?: number;
     };
-    const nickname = session.user.nickname ?? session.user.loginId;
-    const tickerEvents: Array<{
-      kind: "coupon" | "stars";
-      message: string;
-      nickname: string;
-    }> = [];
     if (payload.coupon) {
-      tickerEvents.push({
-        kind: "coupon",
-        nickname,
-        message: formatTickerCouponMessage(
+      const nickname = session.user.nickname ?? session.user.loginId;
+      void publishTickerWinEvents([
+        {
+          kind: "coupon",
           nickname,
-          payload.coupon.couponType,
-          payload.coupon.discountPct,
-        ),
+          message: formatTickerCouponMessage(
+            nickname,
+            payload.coupon.couponType,
+            payload.coupon.discountPct,
+          ),
+        },
+      ]).catch((error) => {
+        console.error("[ticker] hill publish failed:", error);
       });
     }
-    if ((payload.totalStars ?? payload.reward?.stars ?? 0) > 0) {
-      tickerEvents.push({
-        kind: "stars",
-        nickname,
-        message: formatTickerStarsMessage(
-          nickname,
-          payload.totalStars ?? payload.reward?.stars ?? 0,
-          Boolean(payload.reward?.critical),
-        ),
-      });
-    }
-    void publishTickerWinEvents(tickerEvents).catch((error) => {
-      console.error("[ticker] hill publish failed:", error);
-    });
   }
 
   return NextResponse.json(result.result);

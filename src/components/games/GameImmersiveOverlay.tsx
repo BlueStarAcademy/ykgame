@@ -108,7 +108,7 @@ export function GameImmersiveOverlay({
         }}
       >
       <div
-        className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 px-3 py-2 text-white"
+        className="relative z-10 grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 px-3 py-2 text-white pointer-events-auto"
         style={{ backgroundColor: headerColor }}
       >
         <div className="flex min-w-0 max-w-full items-center gap-2 justify-self-stretch overflow-hidden">
@@ -130,8 +130,11 @@ export function GameImmersiveOverlay({
           id={GAME_IMMERSIVE_HEADER_CENTER_ID}
           className="z-[1] flex shrink-0 items-center justify-center justify-self-center"
         />
-        <div className="flex min-w-0 max-w-full items-center justify-end gap-2 justify-self-stretch overflow-hidden">
-          <div id={GAME_IMMERSIVE_HEADER_RIGHT_ID} className="flex min-w-0 items-center justify-end gap-3 overflow-hidden" />
+        <div className="flex shrink-0 items-center justify-end gap-2 justify-self-end">
+          <div
+            id={GAME_IMMERSIVE_HEADER_RIGHT_ID}
+            className="flex shrink-0 items-center justify-end gap-2"
+          />
           {!hideHeaderStats && (
             <span className="shrink-0 text-[10px] opacity-80">
               {myRank ? `#${myRank}` : "-"} · {bestScore > 0 ? `${bestScore}점` : "0점"}

@@ -71,17 +71,37 @@ export function YanmarGameSettingsMenu({
       setHeaderSlot(null);
       return;
     }
-    setHeaderSlot(document.getElementById(GAME_IMMERSIVE_HEADER_RIGHT_ID));
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const findSlot = () => {
+      if (cancelled) return;
+      const el = document.getElementById(GAME_IMMERSIVE_HEADER_RIGHT_ID);
+      if (el) {
+        setHeaderSlot(el);
+        return;
+      }
+      attempts += 1;
+      if (attempts < 20) {
+        requestAnimationFrame(findSlot);
+      }
+    };
+
+    findSlot();
+    return () => {
+      cancelled = true;
+    };
   }, [immersive]);
 
   if (!show) return null;
 
   const menu = (
-    <div className="relative shrink-0">
+    <div className="relative z-[70] shrink-0 pointer-events-auto">
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white hover:bg-white/30"
+        className="relative z-[70] flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20 text-white hover:bg-white/30"
         aria-label="메뉴"
         aria-expanded={open}
       >
@@ -89,7 +109,7 @@ export function YanmarGameSettingsMenu({
           src="/images/yanmar/2d/cockpit/menu-premium.png?v=1"
           alt=""
           draggable={false}
-          className="h-5 w-5 object-contain"
+          className="pointer-events-none h-5 w-5 object-contain"
         />
       </button>
       {open ? (
@@ -177,5 +197,5 @@ export function YanmarGameSettingsMenu({
     return createPortal(menu, headerSlot);
   }
 
-  return <div className="absolute right-2 top-2 z-50">{menu}</div>;
+  return <div className="absolute right-2 top-2 z-[70] pointer-events-auto">{menu}</div>;
 }
