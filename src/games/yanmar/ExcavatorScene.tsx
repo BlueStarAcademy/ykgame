@@ -41,6 +41,8 @@ import {
   DUMP_ZONE,
   DUMP_TRUCK,
   DUMP_TRUCK_BED,
+  DUMP_TRUCK_BODY_LOCAL_Y,
+  DUMP_TRUCK_GROUP_Y,
 } from "./terrain";
 import type { DigFeedback } from "./bucket";
 import {
@@ -3108,9 +3110,9 @@ function DumpTruckWorldHud({
 
     if (group) {
       if (state.phase === "cooldown") {
-        group.position.set(DUMP_TRUCK_BED.x, 3.35, DUMP_TRUCK_BED.z);
+        group.position.set(DUMP_TRUCK_BED.x, DUMP_TRUCK_GROUP_Y + 2.9, DUMP_TRUCK_BED.z);
       } else {
-        group.position.set(pose.groupX, 3.35, pose.groupZ);
+        group.position.set(pose.groupX, DUMP_TRUCK_GROUP_Y + 2.9, pose.groupZ);
       }
       group.visible =
         state.phase === "cooldown" ||
@@ -3245,11 +3247,11 @@ function DumpTruck({
     const state = stateRef.current;
     const pose = getDumpTruckPose(state);
     const motion = getDumpTruckMotionProgress(state);
-    group.position.set(pose.groupX, 0.55, pose.groupZ);
+    group.position.set(pose.groupX, DUMP_TRUCK_GROUP_Y, pose.groupZ);
     group.rotation.y = DUMP_TRUCK_BED.rotation + pose.rotationYOffset;
     group.visible = isDumpTruckVisible(state);
 
-    body.position.y = 0.78;
+    body.position.y = DUMP_TRUCK_BODY_LOCAL_Y;
     body.rotation.z = 0;
     body.rotation.y = 0;
 
@@ -3265,7 +3267,8 @@ function DumpTruck({
 
     if (motion.kind === "engineStart") {
       const ramp = Math.min(1, motion.t * 2.4);
-      body.position.y = 0.78 + Math.sin(state.phaseElapsed * 28) * 0.022 * ramp;
+      body.position.y =
+        DUMP_TRUCK_BODY_LOCAL_Y + Math.sin(state.phaseElapsed * 28) * 0.022 * ramp;
       body.rotation.z = Math.sin(state.phaseElapsed * 19) * 0.012 * ramp;
     } else if (
       motion.kind === "arriving" &&
@@ -3274,7 +3277,7 @@ function DumpTruck({
       const parkT = (motion.t - 0.86) / 0.14;
       const settle = Math.sin(parkT * Math.PI) * (1 - parkT);
       body.rotation.y = settle * 0.018;
-      body.position.y = 0.78 - settle * 0.012;
+      body.position.y = DUMP_TRUCK_BODY_LOCAL_Y - settle * 0.012;
     }
 
     const travelDelta = Math.hypot(

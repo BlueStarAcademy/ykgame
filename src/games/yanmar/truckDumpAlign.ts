@@ -38,11 +38,11 @@ export const HAUL_TRUCK_ALIGN = {
     halfX: 1.56,
     halfZ: 3.45,
   },
-  /** 붐·암 충돌용 높이·짐칸 공동 */
-  solidMinY: 0.55,
-  solidMaxY: 3.15,
-  cavityMinY: 1.55,
-  cavityMaxY: 3.15,
+  /** 붐·암 충돌용 높이·짐칸 공동 (휠 바닥=그룹 원점 기준) */
+  solidMinY: 0.5,
+  solidMaxY: 3.1,
+  cavityMinY: 1.5,
+  cavityMaxY: 3.1,
   cavityHalfX: 1.95,
   cavityHalfZ: 1.45,
   cavityCenterLocalX: -1.05,

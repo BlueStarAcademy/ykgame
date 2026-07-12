@@ -9,6 +9,11 @@ import {
   YANMAR_MACHINE_COLORS as COLOR,
   YANMAR_MACHINE_MATERIALS as MATERIAL,
 } from "./machineVisualTheme";
+import {
+  DUMP_TRUCK_BODY_LOCAL_Y,
+  DUMP_TRUCK_WHEEL_CENTER_LOCAL_Y,
+  DUMP_TRUCK_WHEEL_RADIUS,
+} from "./terrain";
 
 const WHEEL_POSITIONS = [
   { x: -2.7, z: -1.46 },
@@ -31,7 +36,7 @@ function TruckWheel({
   wheelRefs: React.MutableRefObject<(THREE.Group | null)[]>;
 }) {
   return (
-    <group position={[x, 0.4, z]}>
+    <group position={[x, DUMP_TRUCK_WHEEL_CENTER_LOCAL_Y, z]}>
       <group
         ref={(node) => {
           wheelRefs.current[index] = node;
@@ -39,7 +44,14 @@ function TruckWheel({
       >
         <group rotation={[Math.PI / 2, 0, 0]}>
           <mesh castShadow>
-            <cylinderGeometry args={[0.52, 0.52, 0.4, 32]} />
+            <cylinderGeometry
+              args={[
+                DUMP_TRUCK_WHEEL_RADIUS,
+                DUMP_TRUCK_WHEEL_RADIUS,
+                0.4,
+                32,
+              ]}
+            />
             <meshStandardMaterial color={COLOR.rubber} {...MATERIAL.rubber} />
           </mesh>
           <mesh>
@@ -259,7 +271,7 @@ export function PremiumDumpTruckModel({
   useLayoutEffect(() => () => sideMark?.dispose(), [sideMark]);
 
   return (
-    <group ref={bodyRef} position={[0.3, 0.78, 0]}>
+    <group ref={bodyRef} position={[0.3, DUMP_TRUCK_BODY_LOCAL_Y, 0]}>
       <RoundedBox args={[5.5, 0.34, 2.74]} radius={0.09} smoothness={6} position={[-0.62, 0.04, 0]} castShadow>
         <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
       </RoundedBox>

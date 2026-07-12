@@ -414,6 +414,22 @@ export function sampleHeight(terrain: TerrainData, wx: number, wz: number): numb
 /** 굴착·덤프 구역 (확장 맵 기준) */
 export const DIG_ZONE = { x: 4, z: 18, radius: 12 };
 
+/**
+ * 덤프트럭 주차 패드 지형 높이 (applyTruckDeparturePad target).
+ * PremiumDumpTruckModel: bodyY 0.78 + wheelCenter 0.4 − radius 0.52 = 휠 바닥 로컬 0.66
+ */
+export const DUMP_TRUCK_GROUND_Y = 0.71;
+export const DUMP_TRUCK_BODY_LOCAL_Y = 0.78;
+export const DUMP_TRUCK_WHEEL_CENTER_LOCAL_Y = 0.4;
+export const DUMP_TRUCK_WHEEL_RADIUS = 0.52;
+export const DUMP_TRUCK_WHEEL_BOTTOM_LOCAL_Y =
+  DUMP_TRUCK_BODY_LOCAL_Y +
+  DUMP_TRUCK_WHEEL_CENTER_LOCAL_Y -
+  DUMP_TRUCK_WHEEL_RADIUS;
+/** outer group world Y — 휠이 주차 패드에 닿도록 */
+export const DUMP_TRUCK_GROUP_Y =
+  DUMP_TRUCK_GROUND_Y - DUMP_TRUCK_WHEEL_BOTTOM_LOCAL_Y;
+
 /** DumpTruck.tsx 외부 group — ExcavatorScene 3D 모델과 동일 */
 export const DUMP_TRUCK = {
   groupX: 33.27,
@@ -428,8 +444,12 @@ export const DUMP_TRUCK = {
   margin: 0.45,
   /** 버킷을 펼 때 차체 위치 여유 */
   bodyMargin: 0.85,
-  /** 적재함 상단 덱 높이 (DumpTruck.tsx 메시: 0.55+0.78+0.30) */
-  bedDeckWorldY: 1.63,
+  /**
+   * 적재함 덱 상단 월드 Y
+   * groupY + bodyY + DumpBed(1.05) + floor(-0.36) + halfH(0.08)
+   */
+  bedDeckWorldY:
+    DUMP_TRUCK_GROUP_Y + DUMP_TRUCK_BODY_LOCAL_Y + 1.05 - 0.36 + 0.08,
   /** 칸 위에서 하역 판정 최소 높이 (덱 대비) */
   dumpMinHeightAboveDeck: -0.4,
 } as const;
@@ -440,12 +460,12 @@ export const DUMP_TRUCK_SOLID = {
   centerLocalZ: 0,
   halfX: 3.22,
   halfZ: 1.62,
-  minY: 0.9,
-  maxY: 3.12,
+  minY: DUMP_TRUCK_GROUND_Y + 0.08,
+  maxY: DUMP_TRUCK_GROUP_Y + DUMP_TRUCK_BODY_LOCAL_Y + 2.55,
   cavityHalfX: DUMP_TRUCK.bedWidth / 2 - 0.18,
   cavityHalfZ: DUMP_TRUCK.bedDepth / 2 - 0.15,
-  cavityMinY: 1.05,
-  cavityMaxY: 2.82,
+  cavityMinY: DUMP_TRUCK.bedDeckWorldY - 0.55,
+  cavityMaxY: DUMP_TRUCK.bedDeckWorldY + 1.15,
 } as const;
 
 export function dumpTruckLocalToWorld(

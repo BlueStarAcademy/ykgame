@@ -44,6 +44,8 @@ interface EquipmentUpgradePanelProps {
 const HOTSPOT_WRAPPER_SIZE = { width: "4.1rem", height: "3.75rem" };
 const UPGRADE_BAR_DURATION_MS = 2000;
 const UPGRADE_SUCCESS_TOAST_MS = 3000;
+/** 모달 오픈 터치가 강화/초기화 버튼으로 이어지지 않도록 막는 시간 */
+const OPEN_ACTION_GUARD_MS = 1000;
 
 type PendingUpgrade = {
   part: YanmarEquipmentPart;
@@ -279,12 +281,17 @@ export function EquipmentUpgradePanel({
   const [upgradeSuccess, setUpgradeSuccess] = useState<UpgradeSuccess | null>(null);
   const [upgradeFail, setUpgradeFail] = useState<UpgradeFail | null>(null);
   const [successToastKey, setSuccessToastKey] = useState(0);
+  const [openActionsLocked, setOpenActionsLocked] = useState(true);
+  const [displayLevels, setDisplayLevels] = useState(levels);
+  const [displayFailBonuses, setDisplayFailBonuses] = useState(failBonuses);
   const barTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const failTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openGuardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const upgradeSessionRef = useRef<UpgradeSession | null>(null);
   const levelsRef = useRef(levels);
+  const failBonusesRef = useRef(failBonuses);
 
   const activeAttachment = getUpgradeAttachmentTab(attachmentTab);
   const showHaulTruckPanel = attachmentTab === "grapple";
@@ -322,10 +329,21 @@ export function EquipmentUpgradePanel({
     if (!session?.barDone) return;
     if (session.attemptResult === undefined) return;
 
+    // 게이지 종료 + 결과 확정 후에야 UI 수치/정보 반영
+    setDisplayLevels(levelsRef.current);
+    setDisplayFailBonuses(failBonusesRef.current);
+    setPendingUpgrade(null);
+
     if (session.attemptResult === true) {
       setUpgradeFail(null);
       setUpgradeSuccess({ part: session.part, level: session.toLevel });
       setSuccessToastKey((key) => key + 1);
+      setBumpPart(session.part);
+      if (bumpTimerRef.current) clearTimeout(bumpTimerRef.current);
+      bumpTimerRef.current = setTimeout(() => {
+        setBumpPart(null);
+        bumpTimerRef.current = null;
+      }, 700);
       upgradeSessionRef.current = null;
       return;
     }
@@ -347,16 +365,68 @@ export function EquipmentUpgradePanel({
   }, []);
 
   useEffect(() => {
-    return () => clearUpgradeTimers();
+    return () => {
+      clearUpgradeTimers();
+      if (openGuardTimerRef.current) {
+        clearTimeout(openGuardTimerRef.current);
+        openGuardTimerRef.current = null;
+      }
+    };
   }, [clearUpgradeTimers]);
+
+  useEffect(() => {
+    if (openGuardTimerRef.current) {
+      clearTimeout(openGuardTimerRef.current);
+      openGuardTimerRef.current = null;
+    }
+    if (!open) {
+      setOpenActionsLocked(true);
+      return;
+    }
+    setOpenActionsLocked(true);
+    openGuardTimerRef.current = setTimeout(() => {
+      setOpenActionsLocked(false);
+      openGuardTimerRef.current = null;
+    }, OPEN_ACTION_GUARD_MS);
+    return () => {
+      if (openGuardTimerRef.current) {
+        clearTimeout(openGuardTimerRef.current);
+        openGuardTimerRef.current = null;
+      }
+    };
+  }, [open]);
 
   useEffect(() => {
     levelsRef.current = levels;
   }, [levels]);
 
   useEffect(() => {
+    failBonusesRef.current = failBonuses;
+  }, [failBonuses]);
+
+  useEffect(() => {
+    if (
+      pendingUpgrade != null ||
+      activeUpgradeBarPart != null ||
+      upgradeSuccess != null ||
+      upgradeFail != null
+    ) {
+      return;
+    }
+    setDisplayLevels(levels);
+    setDisplayFailBonuses(failBonuses);
+  }, [
+    levels,
+    failBonuses,
+    pendingUpgrade,
+    activeUpgradeBarPart,
+    upgradeSuccess,
+    upgradeFail,
+  ]);
+
+  useEffect(() => {
     tryShowUpgradeSuccess();
-  }, [levels, upgradingPart, activeUpgradeBarPart, tryShowUpgradeSuccess]);
+  }, [levels, failBonuses, upgradingPart, activeUpgradeBarPart, tryShowUpgradeSuccess]);
 
   useEffect(() => {
     if (!upgradeSuccess) return;
@@ -390,31 +460,6 @@ export function EquipmentUpgradePanel({
     };
   }, [upgradeFail, successToastKey]);
 
-  const getDisplayLevel = useCallback(
-    (part: YanmarEquipmentPart) => {
-      if (pendingUpgrade?.part === part) {
-        return pendingUpgrade.toLevel;
-      }
-      return levels[part];
-    },
-    [levels, pendingUpgrade],
-  );
-
-  useEffect(() => {
-    if (!pendingUpgrade) return;
-
-    const synced = levels[pendingUpgrade.part] >= pendingUpgrade.toLevel;
-    const failed =
-      upgradingPart === null &&
-      activeUpgradeBarPart === null &&
-      levels[pendingUpgrade.part] < pendingUpgrade.toLevel;
-
-    if (synced || failed) {
-      const timer = setTimeout(() => setPendingUpgrade(null), 0);
-      return () => clearTimeout(timer);
-    }
-  }, [levels, pendingUpgrade, upgradingPart, activeUpgradeBarPart]);
-
   const handleAttachmentTabChange = useCallback((tab: UpgradeAttachmentTab) => {
     const next = getUpgradeAttachmentTab(tab);
     setAttachmentTab(tab);
@@ -422,8 +467,9 @@ export function EquipmentUpgradePanel({
   }, []);
 
   const handleUpgradeClick = useCallback(() => {
+    if (openActionsLocked) return;
     const part = selected;
-    const currentLevel = levels[part];
+    const currentLevel = displayLevels[part];
     const config = YANMAR_EQUIPMENT_CONFIG[part];
     if (currentLevel >= config.maxLevel || pendingUpgrade || activeUpgradeBarPart) return;
 
@@ -433,7 +479,9 @@ export function EquipmentUpgradePanel({
     setPendingUpgrade({ part, toLevel });
     setUpgradeBarKey((key) => key + 1);
     setActiveUpgradeBarPart(part);
-    setBumpPart(part);
+    setBumpPart(null);
+    setUpgradeSuccess(null);
+    setUpgradeFail(null);
     upgradeSessionRef.current = { part, toLevel, barDone: false, attemptResult: undefined };
 
     const result = onUpgrade(part);
@@ -453,12 +501,21 @@ export function EquipmentUpgradePanel({
       barTimerRef.current = null;
       tryShowUpgradeSuccess();
     }, UPGRADE_BAR_DURATION_MS);
+  }, [
+    openActionsLocked,
+    selected,
+    displayLevels,
+    pendingUpgrade,
+    activeUpgradeBarPart,
+    onUpgrade,
+    clearUpgradeTimers,
+    tryShowUpgradeSuccess,
+  ]);
 
-    bumpTimerRef.current = setTimeout(() => {
-      setBumpPart(null);
-      bumpTimerRef.current = null;
-    }, 700);
-  }, [selected, levels, pendingUpgrade, activeUpgradeBarPart, onUpgrade, clearUpgradeTimers, tryShowUpgradeSuccess]);
+  const handleResetClick = useCallback(() => {
+    if (openActionsLocked) return;
+    onResetEquipment(selected);
+  }, [openActionsLocked, onResetEquipment, selected]);
 
   if (!open) return null;
 
@@ -466,7 +523,7 @@ export function EquipmentUpgradePanel({
   const practiceMode = mode === "practice";
   const balance = previewMode ? previewStars : currency;
   const config = YANMAR_EQUIPMENT_CONFIG[selected];
-  const level = getDisplayLevel(selected);
+  const level = displayLevels[selected];
   const nextLevel = level + 1;
   const cost = getYanmarUpgradeCost(selected, nextLevel);
   const maxed = level >= config.maxLevel;
@@ -475,21 +532,22 @@ export function EquipmentUpgradePanel({
     upgradingPart === selected ||
     activeUpgradeBarPart === selected;
   const upgradeDisabled =
+    openActionsLocked ||
     isUpgradingSelected ||
     maxed ||
-    (!previewMode && balance < getYanmarUpgradeCost(selected, levels[selected] + 1));
+    (!previewMode && balance < getYanmarUpgradeCost(selected, displayLevels[selected] + 1));
   const resetDisabled =
-    levels[selected] <= 0 || resettingEquipment || isUpgradingSelected;
-  const resetRefundStars = getYanmarPartResetRefundStars(selected, levels[selected]);
+    openActionsLocked ||
+    displayLevels[selected] <= 0 ||
+    resettingEquipment ||
+    isUpgradingSelected;
+  const resetRefundStars = getYanmarPartResetRefundStars(selected, displayLevels[selected]);
   const refundRateLabel = `${Math.round(YANMAR_EQUIPMENT_RESET_REFUND_RATE * 100)}%`;
-  const attachmentPartLevel = getDisplayLevel(activeAttachment.part);
+  const attachmentPartLevel = displayLevels[activeAttachment.part];
   const attachmentPartConfig = YANMAR_EQUIPMENT_CONFIG[activeAttachment.part];
-  const failBonus = failBonuses[selected] ?? 0;
-  const actualLevel = levels[selected];
+  const failBonus = displayFailBonuses[selected] ?? 0;
   const baseSuccessRate =
-    actualLevel >= config.maxLevel
-      ? 1
-      : getYanmarUpgradeSuccessRate(actualLevel + 1, 0);
+    level >= config.maxLevel ? 1 : getYanmarUpgradeSuccessRate(level + 1, 0);
 
   return (
     <div className="absolute inset-0 z-[80] flex flex-col bg-black/65 backdrop-blur-sm">
@@ -563,7 +621,7 @@ export function EquipmentUpgradePanel({
 
             {EXCAVATOR_BODY_PARTS.map((part) => {
               const spot = YANMAR_UPGRADE_VISUALS.excavatorHotspots[part];
-              const partLevel = getDisplayLevel(part);
+              const partLevel = displayLevels[part];
               const partConfig = YANMAR_EQUIPMENT_CONFIG[part];
               const isSelected = selected === part;
               return (
@@ -627,7 +685,7 @@ export function EquipmentUpgradePanel({
                 </div>
                 <div className="flex min-w-0 flex-1 items-center gap-2 self-center">
                   {truckUpgrades.map(({ part, label }) => {
-                    const partLevel = getDisplayLevel(part);
+                    const partLevel = displayLevels[part];
                     const partConfig = YANMAR_EQUIPMENT_CONFIG[part];
                     return (
                       <div
@@ -708,7 +766,7 @@ export function EquipmentUpgradePanel({
               </button>
               <button
                 type="button"
-                onClick={() => onResetEquipment(selected)}
+                onClick={handleResetClick}
                 disabled={resetDisabled}
                 className="inline-flex min-w-0 flex-col items-center justify-center rounded-lg bg-red-600 px-3 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:bg-gray-300"
                 aria-label={`${config.label} 강화 초기화`}
@@ -717,7 +775,7 @@ export function EquipmentUpgradePanel({
                   "초기화중"
                 ) : practiceMode ? (
                   "초기화"
-                ) : levels[selected] > 0 ? (
+                ) : displayLevels[selected] > 0 ? (
                   <>
                     <span>초기화</span>
                     <span className="mt-0.5 inline-flex items-center">
@@ -736,7 +794,7 @@ export function EquipmentUpgradePanel({
             {activeUpgradeBarPart === selected ? (
               <UpgradeProgressBar barKey={upgradeBarKey} />
             ) : null}
-            {!previewMode && !maxed && balance < getYanmarUpgradeCost(selected, levels[selected] + 1) ? (
+            {!previewMode && !maxed && balance < getYanmarUpgradeCost(selected, displayLevels[selected] + 1) ? (
               <p className="mt-1 text-center text-[10px] text-red-500">스타가 부족합니다.</p>
             ) : null}
           </div>

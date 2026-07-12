@@ -251,7 +251,7 @@ export function HillZoneDecor({
         : null}
 
       {/* Reinforced hilltop loading apron. */}
-      <group position={[zone.dropX, dropY + 0.06, zone.dropZ]}>
+      <group position={[zone.dropX, dropY, zone.dropZ]}>
         {showQuarry ? (
           <>
             <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>

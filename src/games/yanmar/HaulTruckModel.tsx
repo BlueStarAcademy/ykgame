@@ -16,8 +16,9 @@ import {
 } from "./machineVisualTheme";
 
 function PremiumWheel({ x, z }: { x: number; z: number }) {
+  // radius 0.76 → 중심을 0.76에 두면 휠 바닥이 그룹 원점(지면)에 붙음
   return (
-    <group position={[x, 0.78, z]}>
+    <group position={[x, 0.76, z]}>
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.76, 0.76, 0.5, 28]} />
         <meshStandardMaterial color={COLORS.rubber} {...MATERIALS.rubber} />

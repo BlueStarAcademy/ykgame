@@ -104,6 +104,7 @@ export function applyTruckDeparturePad(
   truck: { groupX: number; groupZ: number; rotation: number },
 ) {
   const { startX, startZ, endX, endZ } = getDumpTruckLaneSegment();
+  // DUMP_TRUCK_GROUND_Y 와 동일 — terrain 순환 import 방지로 상수 유지
   const target = 0.71;
 
   const padDist = Math.hypot(wx - truck.groupX, wz - truck.groupZ);
