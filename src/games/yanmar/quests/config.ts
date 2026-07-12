@@ -105,13 +105,13 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
   },
 ] as const;
 
-/** 난이도 1~5 보상 (1=EXP1000/스타10, 5=EXP3000/스타30) */
+/** 난이도 1~5 보상 (경험치·스타·점수) */
 export const MISSION_DIFFICULTY_REWARDS: Record<1 | 2 | 3 | 4 | 5, QuestReward> = {
-  1: { xp: 1000, stars: 10 },
-  2: { xp: 1500, stars: 15 },
-  3: { xp: 2000, stars: 20 },
-  4: { xp: 2500, stars: 25 },
-  5: { xp: 3000, stars: 30 },
+  1: { xp: 2000, stars: 10, score: 2000 },
+  2: { xp: 3000, stars: 15, score: 3000 },
+  3: { xp: 4000, stars: 20, score: 5000 },
+  4: { xp: 5000, stars: 25, score: 7500 },
+  5: { xp: 6000, stars: 30, score: 10000 },
 };
 
 export type MissionLevelBand = "under10" | "lv10" | "lv15";
@@ -346,6 +346,7 @@ export function formatQuestReward(reward: QuestReward) {
   const parts: string[] = [];
   if (reward.xp > 0) parts.push(`${reward.xp.toLocaleString()} EXP`);
   if (reward.stars > 0) parts.push(`${reward.stars} 스타`);
+  if ((reward.score ?? 0) > 0) parts.push(`${reward.score!.toLocaleString()}점`);
   return parts.join(" + ") || "보상 없음";
 }
 

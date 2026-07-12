@@ -285,6 +285,68 @@ export function getTutorialWaypoint(
   return undefined;
 }
 
+/** 해당 튜토리얼의 서브 단계 수 (완료 판정 포함) */
+export function getTutorialPhaseCount(step: TutorialStep): number {
+  switch (step.id) {
+    case "travel":
+      return 4;
+    case "swing":
+    case "arm":
+    case "boom":
+    case "bucket":
+    case "dump":
+    case "breaker":
+      return 2;
+    case "rockLoad":
+    case "rockDump":
+      return 3;
+    case "dig":
+    default:
+      return 1;
+  }
+}
+
+/** 방금 끝낸 서브 단계(completedPhase) 성공 문구 */
+export function getTutorialPhaseSuccessLabel(
+  step: TutorialStep,
+  completedPhase: number,
+): string {
+  switch (step.id) {
+    case "travel":
+      return (
+        ["전진 성공!", "왼쪽 레버 성공!", "오른쪽 레버 성공!", "후진 성공!"][
+          completedPhase
+        ] ?? "성공!"
+      );
+    case "swing":
+      return completedPhase === 0 ? "좌측 스윙 성공!" : "우측 스윙 성공!";
+    case "arm":
+      return completedPhase === 0 ? "암 뻗기 성공!" : "암 당김 성공!";
+    case "boom":
+      return completedPhase === 0 ? "붐 하강 성공!" : "붐 상승 성공!";
+    case "bucket":
+      return completedPhase === 0 ? "버켓 펴기 성공!" : "버켓 말기 성공!";
+    case "dig":
+      return "적재 100% 성공!";
+    case "dump":
+      return completedPhase === 0 ? "하역 성공!" : "트럭 출발 확인!";
+    case "breaker":
+      return completedPhase === 0 ? "접촉 성공!" : "아스팔트 파괴 성공!";
+    case "rockLoad":
+      return (
+        ["돌 집기 성공!", "밀착감 최대!", "적재 판정 확인!"][completedPhase] ??
+        "성공!"
+      );
+    case "rockDump":
+      return (
+        ["돌 적재 성공!", "돌 하역 성공!", "트럭 출발 확인!"][completedPhase] ??
+        "성공!"
+      );
+    default:
+      return "성공!";
+  }
+}
+
 /**
  * 서브 단계를 갱신하고, 해당 튜토리얼이 모두 끝났으면 true.
  */

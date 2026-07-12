@@ -209,24 +209,32 @@ body {
   animation: yanmar-travel-raise-warn-fade 3s ease-out forwards;
 }
 
-@keyframes yanmar-pose-save-toast-fade {
+@keyframes yanmar-tutorial-flash-pop {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.94);
+    transform: scale(0.86);
   }
-  12% {
+  18% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1.06);
   }
-  70% {
+  34% {
+    transform: scale(1);
+  }
+  78% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1.02);
   }
 }
+
+.yanmar-tutorial-flash {
+  animation: yanmar-tutorial-flash-pop 0.85s ease-out forwards;
+}
+
 
 .yanmar-pose-save-toast {
   position: absolute;

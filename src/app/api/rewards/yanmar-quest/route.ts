@@ -7,7 +7,7 @@ import {
 } from "@/lib/yanmar-rewards";
 
 const MAX_STARS = 40;
-const MAX_XP = 3000;
+const MAX_XP = 6000;
 
 export async function POST(request: Request) {
   const session = await auth();

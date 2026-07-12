@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
@@ -36,6 +37,7 @@ import {
 } from "./ExcavatorScene";
 import type {
   AttachmentType,
+  CameraLookOffset,
   CameraMode,
   CouponDiscoveryState,
   DumpScorePopup,
@@ -142,6 +144,8 @@ import {
   advanceTutorialProgress,
   createTutorialPhaseProgress,
   getTutorialInstruction,
+  getTutorialPhaseCount,
+  getTutorialPhaseSuccessLabel,
   getTutorialWaypoint,
   TUTORIAL_STEPS,
   waypointDistance,
@@ -263,6 +267,10 @@ function TutorialSelectModal({
 
 const DUMP_SCORE_PANEL_DURATION_MS = 9500;
 const COUPON_DISCOVERY_DURATION_MS = 8200;
+const FREE_LOOK_SENSITIVITY = 0.0045;
+const FREE_LOOK_PITCH_MIN = -0.55;
+const FREE_LOOK_PITCH_MAX = 0.42;
+const FREE_LOOK_TRAVEL_THRESHOLD = 0.08;
 
 function appendRewardText(previous: string, next: string) {
   if (!next) return previous;
@@ -626,7 +634,18 @@ export function ExcavatorGameWrapper({
     phase: "hold" | "fade";
   } | null>(null);
   const [previewStars, setPreviewStars] = useState(() => session?.user?.currency ?? 0);
-  const [stepCompleteFlash, setStepCompleteFlash] = useState(false);
+  const [tutorialFlash, setTutorialFlash] = useState<{
+    kind: "phase" | "complete";
+    message: string;
+    key: number;
+  } | null>(null);
+  const [tutorialPhaseDisplay, setTutorialPhaseDisplay] = useState({
+    current: 1,
+    total: 1,
+  });
+  const tutorialFlashTimersRef = useRef<number[]>([]);
+  const tutorialUiPauseUntilRef = useRef(0);
+  const tutorialCelebratedPhaseRef = useRef(-1);
   const [showControlsGuide, setShowControlsGuide] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showMinimap, setShowMinimap] = useState(true);
@@ -656,6 +675,12 @@ export function ExcavatorGameWrapper({
   const [cameraMode, setCameraMode] = useState<CameraMode>(
     initialPlayMode === "ride" ? 3 : 1,
   );
+  const lookOffsetRef = useRef<CameraLookOffset>({ yaw: 0, pitch: 0 });
+  const freeLookDragRef = useRef<{
+    pointerId: number | null;
+    lastX: number;
+    lastY: number;
+  }>({ pointerId: null, lastX: 0, lastY: 0 });
   const gameFrameStyle: CSSProperties | undefined = immersive
     ? {
         width: "100%",
@@ -999,6 +1024,70 @@ export function ExcavatorGameWrapper({
   }, []);
 
   const inputRef = useRef(input);
+
+  const clearFreeLook = useCallback(() => {
+    lookOffsetRef.current.yaw = 0;
+    lookOffsetRef.current.pitch = 0;
+    freeLookDragRef.current.pointerId = null;
+  }, []);
+
+  const isFreeLookTraveling = useCallback(() => {
+    const travel = inputRef.current.travel;
+    return (
+      Math.abs(travel.left) > FREE_LOOK_TRAVEL_THRESHOLD ||
+      Math.abs(travel.right) > FREE_LOOK_TRAVEL_THRESHOLD
+    );
+  }, []);
+
+  const onFreeLookPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      if (isFreeLookTraveling()) return;
+      freeLookDragRef.current = {
+        pointerId: event.pointerId,
+        lastX: event.clientX,
+        lastY: event.clientY,
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [isFreeLookTraveling],
+  );
+
+  const onFreeLookPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = freeLookDragRef.current;
+      if (drag.pointerId !== event.pointerId) return;
+      if (isFreeLookTraveling()) {
+        clearFreeLook();
+        return;
+      }
+      const dx = event.clientX - drag.lastX;
+      const dy = event.clientY - drag.lastY;
+      drag.lastX = event.clientX;
+      drag.lastY = event.clientY;
+      const look = lookOffsetRef.current;
+      look.yaw -= dx * FREE_LOOK_SENSITIVITY;
+      look.pitch = Math.max(
+        FREE_LOOK_PITCH_MIN,
+        Math.min(
+          FREE_LOOK_PITCH_MAX,
+          look.pitch - dy * FREE_LOOK_SENSITIVITY,
+        ),
+      );
+    },
+    [clearFreeLook, isFreeLookTraveling],
+  );
+
+  const onFreeLookPointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (freeLookDragRef.current.pointerId !== event.pointerId) return;
+      freeLookDragRef.current.pointerId = null;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    },
+    [],
+  );
 
   const modeRef = useRef<GameMode>(mode);
 
@@ -1727,7 +1816,97 @@ export function ExcavatorGameWrapper({
     }
   }, [enterRideMode, enterPracticeMode, startGameDirect]);
 
+  const clearTutorialFlashTimers = useCallback(() => {
+    for (const id of tutorialFlashTimersRef.current) {
+      window.clearTimeout(id);
+    }
+    tutorialFlashTimersRef.current = [];
+    tutorialUiPauseUntilRef.current = 0;
+    setTutorialFlash(null);
+  }, []);
+
+  const showTutorialPhaseSuccess = useCallback(
+    (message: string, nextGuide: string, phaseIndex: number, phaseTotal: number) => {
+      clearTutorialFlashTimers();
+      const flashKey = Date.now();
+      setTutorialFlash({ kind: "phase", message, key: flashKey });
+      setTutorialPhaseDisplay({
+        current: Math.min(phaseIndex + 1, phaseTotal),
+        total: phaseTotal,
+      });
+      tutorialUiPauseUntilRef.current = performance.now() + 900;
+      const hideId = window.setTimeout(() => {
+        setTutorialFlash((current) =>
+          current?.key === flashKey ? null : current,
+        );
+        tutorialGuideRef.current = nextGuide;
+        setTutorialGuide(nextGuide);
+      }, 750);
+      const unlockId = window.setTimeout(() => {
+        tutorialUiPauseUntilRef.current = 0;
+      }, 900);
+      tutorialFlashTimersRef.current.push(hideId, unlockId);
+    },
+    [clearTutorialFlashTimers],
+  );
+
+  const showTutorialComplete = useCallback(
+    (finalPhaseLabel?: string, phaseTotal = 1) => {
+      clearTutorialFlashTimers();
+      tutorialCompletingRef.current = true;
+      tutorialUiPauseUntilRef.current = performance.now() + 2200;
+      setTutorialPhaseDisplay({ current: phaseTotal, total: phaseTotal });
+
+      const runComplete = () => {
+        const flashKey = Date.now();
+        setTutorialFlash({
+          kind: "complete",
+          message: "튜토리얼 완료!",
+          key: flashKey,
+        });
+        tutorialGuideRef.current = "모든 단계를 완료했습니다";
+        setTutorialGuide("모든 단계를 완료했습니다");
+        const hideId = window.setTimeout(() => {
+          setTutorialFlash((current) =>
+            current?.key === flashKey ? null : current,
+          );
+        }, 1100);
+        const doneId = window.setTimeout(() => {
+          tutorialCompletingRef.current = false;
+          tutorialUiPauseUntilRef.current = 0;
+          tutorialStepRef.current = null;
+          tutorialPhaseRef.current = null;
+          tutorialWaypointRef.current = null;
+          tutorialGuideRef.current = "";
+          tutorialCelebratedPhaseRef.current = -1;
+          setTutorialGuide("");
+          setTutorialHasWaypoint(false);
+          setMode("practice");
+        }, 1400);
+        tutorialFlashTimersRef.current.push(hideId, doneId);
+      };
+
+      if (finalPhaseLabel) {
+        const phaseKey = Date.now();
+        setTutorialFlash({
+          kind: "phase",
+          message: finalPhaseLabel,
+          key: phaseKey,
+        });
+        const toCompleteId = window.setTimeout(() => {
+          runComplete();
+        }, 850);
+        tutorialFlashTimersRef.current.push(toCompleteId);
+      } else {
+        runComplete();
+      }
+    },
+    [clearTutorialFlashTimers, setMode],
+  );
+
   const startTutorial = useCallback((index: number) => {
+    clearTutorialFlashTimers();
+    tutorialCelebratedPhaseRef.current = -1;
     resetYanmarSession({ terrainLevel: PRACTICE_FULL_UNLOCK_LEVEL });
     terrainRef.current = createInitialTerrain(true, PRACTICE_FULL_UNLOCK_LEVEL);
     setTerrainRevision((key) => key + 1);
@@ -1744,6 +1923,10 @@ export function ExcavatorGameWrapper({
     const guide = step ? getTutorialInstruction(step, phase) : "";
     tutorialGuideRef.current = guide;
     setTutorialGuide(guide);
+    setTutorialPhaseDisplay({
+      current: 1,
+      total: step ? getTutorialPhaseCount(step) : 1,
+    });
     tutorialWaypointRef.current = step
       ? (getTutorialWaypoint(step, phase) ?? null)
       : null;
@@ -1789,9 +1972,16 @@ export function ExcavatorGameWrapper({
     setShowShopPanel(false);
     setShowTutorialMenu(false);
     setMode("tutorial");
-  }, [resetYanmarSession, setMode, setShowTutorialMenu, setTutorialIndex]);
+  }, [
+    clearTutorialFlashTimers,
+    resetYanmarSession,
+    setMode,
+    setShowTutorialMenu,
+    setTutorialIndex,
+  ]);
 
   const startFreePractice = useCallback(() => {
+    clearTutorialFlashTimers();
     resetYanmarSession({ terrainLevel: PRACTICE_FULL_UNLOCK_LEVEL });
     terrainRef.current = createInitialTerrain(true, PRACTICE_FULL_UNLOCK_LEVEL);
     setTerrainRevision((key) => key + 1);
@@ -1799,13 +1989,14 @@ export function ExcavatorGameWrapper({
     tutorialPhaseRef.current = null;
     tutorialWaypointRef.current = null;
     tutorialGuideRef.current = "";
+    tutorialCelebratedPhaseRef.current = -1;
     setTutorialGuide("");
     setTutorialHasWaypoint(false);
     setShowQuestPanel(false);
     setShowShopPanel(false);
     setShowTutorialMenu(false);
     setMode("practice");
-  }, [resetYanmarSession, setMode, setShowTutorialMenu]);
+  }, [clearTutorialFlashTimers, resetYanmarSession, setMode, setShowTutorialMenu]);
 
   const handleSimTick = useCallback(() => {
     syncDigHud();
@@ -1895,6 +2086,11 @@ export function ExcavatorGameWrapper({
     phase.asphaltBroken = tutorialCrashHitsRef.current;
     phase.hillDelivered = tutorialHillDeliverRef.current;
 
+    // 성공 연출 중에는 다음 단계 판정을 잠시 멈춰 안내를 읽을 시간을 준다
+    if (performance.now() < tutorialUiPauseUntilRef.current) {
+      return;
+    }
+
     const fb = digFeedbackRef.current;
     const prevPhase = phase.phase;
     const done = advanceTutorialProgress(step, simRef.current, phase, {
@@ -1907,12 +2103,6 @@ export function ExcavatorGameWrapper({
       haulTruckPhase: terrainRef.current.hillZone?.haulTruck.phase ?? "",
       breakerTipReady: fb.canStrike,
     });
-
-    const guide = getTutorialInstruction(step, phase);
-    if (guide !== tutorialGuideRef.current || phase.phase !== prevPhase) {
-      tutorialGuideRef.current = guide;
-      setTutorialGuide(guide);
-    }
 
     const wp = getTutorialWaypoint(step, phase) ?? null;
     const hadWp = tutorialWaypointRef.current != null;
@@ -1928,27 +2118,40 @@ export function ExcavatorGameWrapper({
     }
 
     if (done) {
-      tutorialCompletingRef.current = true;
-      setStepCompleteFlash(true);
-      window.setTimeout(() => setStepCompleteFlash(false), 600);
-      window.setTimeout(() => {
-        tutorialCompletingRef.current = false;
-        tutorialStepRef.current = null;
-        tutorialPhaseRef.current = null;
-        tutorialWaypointRef.current = null;
-        tutorialGuideRef.current = "";
-        setTutorialGuide("");
-        setMode("practice");
-      }, 900);
+      const finalLabel = getTutorialPhaseSuccessLabel(step, prevPhase);
+      showTutorialComplete(finalLabel, getTutorialPhaseCount(step));
+      return;
+    }
+
+    if (phase.phase > prevPhase && phase.phase > tutorialCelebratedPhaseRef.current) {
+      tutorialCelebratedPhaseRef.current = phase.phase;
+      const successLabel = getTutorialPhaseSuccessLabel(step, prevPhase);
+      const nextGuide = getTutorialInstruction(step, phase);
+      showTutorialPhaseSuccess(
+        successLabel,
+        nextGuide,
+        phase.phase,
+        getTutorialPhaseCount(step),
+      );
+      return;
+    }
+
+    // rockLoad처럼 안내만 바뀌는 경우(성공 연출 없이 상태 추적)
+    if (phase.phase !== prevPhase) {
+      const guide = getTutorialInstruction(step, phase);
+      if (guide !== tutorialGuideRef.current) {
+        tutorialGuideRef.current = guide;
+        setTutorialGuide(guide);
+      }
     }
   }, [
     persistDumpTruckCooldown,
     persistGameSession,
     pushQuestProgress,
+    showTutorialComplete,
+    showTutorialPhaseSuccess,
     syncDigHud,
     setHud,
-    setMode,
-    setStepCompleteFlash,
   ]);
 
   const handleProgress = useCallback(
@@ -2126,7 +2329,7 @@ export function ExcavatorGameWrapper({
         rewardStarsRef.current += claimed.reward.stars;
       }
       showStandaloneRewardPanel(
-        0,
+        claimed.reward.score ?? 0,
         false,
         claimed.reward.stars,
         claimed.reward.xp,
@@ -3329,12 +3532,25 @@ export function ExcavatorGameWrapper({
 
         {mode === "tutorial" && tutorialStep && (
           <div className="absolute left-2 top-[5.25rem] z-40 w-[min(42rem,calc(100%_-_1rem))] rounded-xl border border-amber-300/20 bg-black/75 p-2 text-white shadow-xl backdrop-blur-sm">
-            <div className="min-w-0">
+            <div className="flex items-center justify-between gap-2">
               <p className="text-[10px] font-bold text-amber-300">{tutorialStep.title}</p>
-              <p className="mt-0.5 text-[clamp(7px,2.35vw,10px)] leading-snug text-white/85">
-                {tutorialGuide || tutorialStep.instruction}
+              <p className="shrink-0 text-[9px] font-semibold tabular-nums text-white/55">
+                {tutorialPhaseDisplay.current}/{tutorialPhaseDisplay.total}
               </p>
             </div>
+            <p
+              className={`mt-0.5 text-[clamp(7px,2.35vw,10px)] leading-snug ${
+                tutorialFlash?.kind === "phase"
+                  ? "font-bold text-emerald-300"
+                  : tutorialFlash?.kind === "complete"
+                    ? "font-bold text-amber-200"
+                    : "text-white/85"
+              }`}
+            >
+              {tutorialFlash
+                ? `✓ ${tutorialFlash.message}`
+                : tutorialGuide || tutorialStep.instruction}
+            </p>
             <button
               type="button"
               onClick={startFreePractice}
@@ -3361,7 +3577,10 @@ export function ExcavatorGameWrapper({
               {mode !== "gameReady" ? (
                 <button
                   type="button"
-                  onClick={() => setCameraMode((current) => ((current % 3) + 1) as CameraMode)}
+                  onClick={() => {
+                    clearFreeLook();
+                    setCameraMode((current) => ((current % 3) + 1) as CameraMode);
+                  }}
                   className="flex h-6 w-full items-center justify-center gap-0.5 border-b border-white/10 px-1 text-[9px] font-black whitespace-nowrap text-white hover:bg-white/10"
                   aria-label={`카메라 ${cameraMode}번 시점`}
                 >
@@ -3474,10 +3693,19 @@ export function ExcavatorGameWrapper({
           onShowRanking={onShowRanking}
         />
 
-        {stepCompleteFlash && (
-          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
-            <div className="rounded-xl bg-emerald-500/90 px-4 py-2 text-sm font-bold text-white shadow-lg">
-              ✓ 완료!
+        {tutorialFlash && (
+          <div
+            key={tutorialFlash.key}
+            className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center"
+          >
+            <div
+              className={`yanmar-tutorial-flash rounded-xl px-5 py-2.5 text-sm font-black text-white shadow-lg ${
+                tutorialFlash.kind === "complete"
+                  ? "bg-amber-500/95"
+                  : "bg-emerald-500/95"
+              }`}
+            >
+              ✓ {tutorialFlash.message}
             </div>
           </div>
         )}
@@ -3509,8 +3737,21 @@ export function ExcavatorGameWrapper({
               onAttachmentWarning={showAttachmentWarning}
               onSimTick={handleSimTick}
               cameraMode={cameraMode}
+              lookOffsetRef={lookOffsetRef}
             />
           </div>
+        )}
+
+        {mode !== "intro" && mode !== "gameReady" && (
+          <div
+            className="absolute inset-0 z-[5] touch-none"
+            style={{ pointerEvents: "auto" }}
+            onPointerDown={onFreeLookPointerDown}
+            onPointerMove={onFreeLookPointerMove}
+            onPointerUp={onFreeLookPointerUp}
+            onPointerCancel={onFreeLookPointerUp}
+            aria-hidden
+          />
         )}
 
         {mode !== "intro" && (

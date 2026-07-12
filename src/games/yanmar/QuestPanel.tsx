@@ -58,6 +58,13 @@ function QuestRewardDisplay({ reward }: { reward: QuestReward }) {
       </span>,
     );
   }
+  if ((reward.score ?? 0) > 0) {
+    parts.push(
+      <span key="score" className="tabular-nums">
+        {reward.score!.toLocaleString()}점
+      </span>,
+    );
+  }
   if (parts.length === 0) {
     return <span>보상 없음</span>;
   }
@@ -100,10 +107,20 @@ function DifficultyStars({ count }: { count: number }) {
   );
 }
 
-function ProgressBar({ value, max }: { value: number; max: number }) {
+function ProgressBar({
+  value,
+  max,
+  className = "",
+}: {
+  value: number;
+  max: number;
+  className?: string;
+}) {
   const pct = max <= 0 ? 0 : Math.min(100, Math.round((value / max) * 100));
   return (
-    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/12">
+    <div
+      className={`h-1.5 overflow-hidden rounded-full bg-white/12 ${className}`.trim()}
+    >
       <div
         className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-300 transition-[width] duration-200"
         style={{ width: `${pct}%` }}
@@ -244,16 +261,27 @@ export function QuestPanel({
                     key={def.id}
                     className="rounded-xl border border-white/10 bg-black/35 px-3 py-2.5"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-bold text-white">{title}</p>
-                        <p className="mt-0.5 text-[10px] font-semibold text-amber-200/80">
-                          <QuestRewardDisplay reward={def.reward} />
-                        </p>
-                      </div>
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <p className="min-w-0 truncate text-[12px] font-bold text-white">
+                        {title}
+                      </p>
+                      <p className="shrink-0 text-[10px] font-semibold text-amber-200/80">
+                        <QuestRewardDisplay reward={def.reward} />
+                      </p>
+                    </div>
+                    <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                      <ProgressBar
+                        value={
+                          claimed || completed
+                            ? Math.max(progress, target)
+                            : progress
+                        }
+                        max={target}
+                        className="min-w-0 flex-1"
+                      />
                       {claimed ? (
-                        <span className="shrink-0 rounded-md bg-emerald-500/20 px-2 py-1 text-[10px] font-black text-emerald-200">
-                          완료
+                        <span className="shrink-0 text-[10px] font-bold tabular-nums text-emerald-300">
+                          {target.toLocaleString()}/{target.toLocaleString()}
                         </span>
                       ) : completed ? (
                         <button
@@ -271,9 +299,6 @@ export function QuestPanel({
                         </span>
                       )}
                     </div>
-                    {!claimed ? (
-                      <ProgressBar value={progress} max={target} />
-                    ) : null}
                   </li>
                 );
               })}
@@ -290,7 +315,13 @@ export function QuestPanel({
                   {missionsDone}/{QUEST_MISSIONS_PER_DAY}
                 </span>
               </div>
-              <ProgressBar value={missionsDone} max={QUEST_MISSIONS_PER_DAY} />
+              <div className="flex items-center gap-2 px-0.5">
+                <ProgressBar
+                  value={missionsDone}
+                  max={QUEST_MISSIONS_PER_DAY}
+                  className="min-w-0 flex-1"
+                />
+              </div>
 
               {!currentMission ? (
                 <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-6 text-center">
@@ -301,17 +332,17 @@ export function QuestPanel({
               ) : (
                 <div className="rounded-xl border border-amber-200/20 bg-black/40 px-3 py-3">
                   <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[11px] font-black text-white">
-                        미션 {currentMission.index + 1}
-                      </p>
-                      <p className="mt-0.5 text-[10px] font-semibold text-amber-200/85">
+                    <p className="text-[11px] font-black text-white">
+                      미션 {currentMission.index + 1}
+                    </p>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <p className="text-[10px] font-semibold text-amber-200/85">
                         <QuestRewardDisplay
                           reward={MISSION_DIFFICULTY_REWARDS[currentMission.difficulty]}
                         />
                       </p>
+                      <DifficultyStars count={currentMission.difficulty} />
                     </div>
-                    <DifficultyStars count={currentMission.difficulty} />
                   </div>
 
                   <ul className="mt-3 space-y-2">
@@ -323,8 +354,8 @@ export function QuestPanel({
                           key={task.id}
                           className="rounded-lg border border-white/8 bg-white/5 px-2.5 py-2"
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="min-w-0 text-[11px] font-bold text-white/90">
+                          <div className="flex min-w-0 items-center justify-between gap-2">
+                            <p className="min-w-0 truncate text-[11px] font-bold text-white/90">
                               {task.required ? (
                                 <span className="mr-1 text-[9px] font-black text-orange-300">
                                   필수
@@ -332,19 +363,23 @@ export function QuestPanel({
                               ) : null}
                               {task.label}
                             </p>
+                          </div>
+                          <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                            <ProgressBar
+                              value={done ? Math.max(value, task.target) : value}
+                              max={task.target}
+                              className="min-w-0 flex-1"
+                            />
                             <span
                               className={`shrink-0 text-[10px] font-bold tabular-nums ${
                                 done ? "text-emerald-300" : "text-white/50"
                               }`}
                             >
                               {done
-                                ? "완료"
+                                ? `${task.target.toLocaleString()}/${task.target.toLocaleString()}`
                                 : `${Math.floor(value).toLocaleString()}/${task.target.toLocaleString()}`}
                             </span>
                           </div>
-                          {!done ? (
-                            <ProgressBar value={value} max={task.target} />
-                          ) : null}
                         </li>
                       );
                     })}
@@ -380,18 +415,25 @@ export function QuestPanel({
                     key={def.id}
                     className="rounded-xl border border-white/10 bg-black/35 px-3 py-2.5"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-bold text-white">{def.title}</p>
-                        <p className="mt-0.5 text-[10px] font-semibold text-amber-200/80">
-                          <QuestRewardDisplay reward={def.reward} />
-                          {claimCount > 0 ? (
-                            <span className="ml-1.5 text-white/35">
-                              · {claimCount}회 수령
-                            </span>
-                          ) : null}
-                        </p>
-                      </div>
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <p className="min-w-0 truncate text-[12px] font-bold text-white">
+                        {def.title}
+                      </p>
+                      <p className="shrink-0 text-[10px] font-semibold text-amber-200/80">
+                        <QuestRewardDisplay reward={def.reward} />
+                        {claimCount > 0 ? (
+                          <span className="ml-1.5 text-white/35">
+                            · {claimCount}회 수령
+                          </span>
+                        ) : null}
+                      </p>
+                    </div>
+                    <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                      <ProgressBar
+                        value={progress}
+                        max={def.target}
+                        className="min-w-0 flex-1"
+                      />
                       {completed ? (
                         <button
                           type="button"
@@ -408,16 +450,11 @@ export function QuestPanel({
                         </span>
                       )}
                     </div>
-                    <ProgressBar value={progress} max={def.target} />
                   </li>
                 );
               })}
             </ul>
           ) : null}
-        </div>
-
-        <div className="shrink-0 border-t border-white/10 px-4 py-2 text-[9px] font-semibold text-white/35">
-          일일·미션은 매일 갱신 · 반복은 수령 후 다시 진행됩니다.
         </div>
       </div>
     </AppModalOverlay>

@@ -84,7 +84,13 @@ import { MapSiteDecor } from "./mapDecor";
 import { CrashZoneDecor } from "./CrashZoneDecor";
 import { HillZoneDecor } from "./HillZoneDecor";
 import { hillBoulderVisualScale } from "./terrain";
-import type { CameraMode, DumpScorePopup, ExcavatorSimState, AutoPoseState } from "./types";
+import type {
+  CameraLookOffset,
+  CameraMode,
+  DumpScorePopup,
+  ExcavatorSimState,
+  AutoPoseState,
+} from "./types";
 import {
   createSimLoopRuntime,
   tickExcavatorSim,
@@ -120,6 +126,7 @@ interface ExcavatorSceneProps {
   onAttachmentWarning: (message: string) => void;
   onSimTick: () => void;
   cameraMode: CameraMode;
+  lookOffsetRef: React.MutableRefObject<CameraLookOffset>;
 }
 
 function TerrainMesh({
@@ -978,8 +985,7 @@ function RedLinkPanel({
           {hasLogo ? (
             <mesh
               position={[logoX!, 0.04, side * 0.068]}
-              rotation={[0, 0, logoRotation]}
-              scale={[-1, 1, 1]}
+              rotation={[0, side < 0 ? Math.PI : 0, logoRotation]}
               renderOrder={12}
             >
               <planeGeometry args={[logoWidth, logoHeight]} />
@@ -990,7 +996,7 @@ function RedLinkPanel({
                 toneMapped={false}
                 depthTest
                 depthWrite={false}
-                side={THREE.DoubleSide}
+                side={THREE.FrontSide}
                 polygonOffset
                 polygonOffsetFactor={-2}
                 polygonOffsetUnits={-2}
@@ -2233,14 +2239,30 @@ function ExcavatorGroundContact({
   );
 }
 
+const FREE_LOOK_TRAVEL_THRESHOLD = 0.08;
+const FREE_LOOK_RESET_RATE = 10;
+const FREE_LOOK_MIN_GROUND_CLEARANCE = 0.9;
+
 function GameCamera({
   simRef,
   mode,
+  lookOffsetRef,
+  inputRef,
+  terrainRef,
 }: {
   simRef: React.MutableRefObject<ExcavatorSimState>;
   mode: CameraMode;
+  lookOffsetRef: React.MutableRefObject<CameraLookOffset>;
+  inputRef: React.RefObject<ExcavatorControlState>;
+  terrainRef: React.MutableRefObject<TerrainData>;
 }) {
-  useFrame(({ camera }) => {
+  const orbitScratch = useRef({
+    offset: new THREE.Vector3(),
+    right: new THREE.Vector3(),
+    up: new THREE.Vector3(0, 1, 0),
+  });
+
+  useFrame(({ camera }, delta) => {
     const s = simRef.current;
     if (
       !Number.isFinite(s.posX) ||
@@ -2258,10 +2280,15 @@ function GameCamera({
     const sideZ = -Math.sin(facing);
     const persp = camera as THREE.PerspectiveCamera;
 
+    let camX: number;
+    let camY: number;
+    let camZ: number;
+    let lookX: number;
+    let lookY: number;
+    let lookZ: number;
+
     if (mode === 3) {
       // First-person: pull back just enough that the dozer blade peeks into the lower frame.
-      const camY = 2.9 + baseY;
-      const lookY = 1.5 + baseY;
       const back = 1.48;
       const lookAhead = 5.1;
       const side = 0.36;
@@ -2270,44 +2297,77 @@ function GameCamera({
         persp.fov = fov;
         persp.updateProjectionMatrix();
       }
-      const camX = s.posX - forwardX * back + sideX * side;
-      const camZ = s.posZ - forwardZ * back + sideZ * side;
+      camX = s.posX - forwardX * back + sideX * side;
+      camY = 2.9 + baseY;
+      camZ = s.posZ - forwardZ * back + sideZ * side;
+      lookX = s.posX + forwardX * lookAhead - sideX * 0.22;
+      lookY = 1.5 + baseY;
+      lookZ = s.posZ + forwardZ * lookAhead - sideZ * 0.22;
+    } else {
+      if (Math.abs(persp.fov - 58) > 0.01) {
+        persp.fov = 58;
+        persp.updateProjectionMatrix();
+      }
+
+      if (mode === 1) {
+        camX = s.posX - forwardX * 5.9 + sideX * 2.75;
+        camY = 3.85 + baseY;
+        camZ = s.posZ - forwardZ * 5.9 + sideZ * 2.75;
+        lookX = s.posX + forwardX * 2.9 - sideX * 0.45;
+        lookY = 1.55 + baseY;
+        lookZ = s.posZ + forwardZ * 2.9 - sideZ * 0.45;
+      } else {
+        camX = s.posX - forwardX * 11.5 + sideX * 6.2;
+        camY = 6.2 + baseY;
+        camZ = s.posZ - forwardZ * 11.5 + sideZ * 6.2;
+        lookX = s.posX + forwardX * 3.9 - sideX * 0.7;
+        lookY = 1.55 + baseY;
+        lookZ = s.posZ + forwardZ * 3.9 - sideZ * 0.7;
+      }
+    }
+
+    const look = lookOffsetRef.current;
+    const travel = inputRef.current?.travel;
+    const wantsTravel =
+      travel != null &&
+      (Math.abs(travel.left) > FREE_LOOK_TRAVEL_THRESHOLD ||
+        Math.abs(travel.right) > FREE_LOOK_TRAVEL_THRESHOLD);
+
+    if (wantsTravel && (look.yaw !== 0 || look.pitch !== 0)) {
+      const k = 1 - Math.exp(-FREE_LOOK_RESET_RATE * Math.max(delta, 0));
+      look.yaw += (0 - look.yaw) * k;
+      look.pitch += (0 - look.pitch) * k;
+      if (Math.abs(look.yaw) < 0.0005) look.yaw = 0;
+      if (Math.abs(look.pitch) < 0.0005) look.pitch = 0;
+    }
+
+    if (look.yaw !== 0 || look.pitch !== 0) {
+      const { offset, right, up } = orbitScratch.current;
+      offset.set(camX - lookX, camY - lookY, camZ - lookZ);
+      offset.applyAxisAngle(up, look.yaw);
+      right.crossVectors(up, offset);
+      if (right.lengthSq() < 1e-8) {
+        right.set(1, 0, 0);
+      } else {
+        right.normalize();
+      }
+      offset.applyAxisAngle(right, look.pitch);
+      camera.position.set(lookX + offset.x, lookY + offset.y, lookZ + offset.z);
+    } else {
       camera.position.set(camX, camY, camZ);
-      const lookX = s.posX + forwardX * lookAhead - sideX * 0.22;
-      const lookZ = s.posZ + forwardZ * lookAhead - sideZ * 0.22;
-      camera.lookAt(lookX, lookY, lookZ);
-      return;
     }
 
-    if (Math.abs(persp.fov - 58) > 0.01) {
-      persp.fov = 58;
-      persp.updateProjectionMatrix();
-    }
-
-    if (mode === 1) {
-      camera.position.set(
-        s.posX - forwardX * 5.9 + sideX * 2.75,
-        3.85 + baseY,
-        s.posZ - forwardZ * 5.9 + sideZ * 2.75,
-      );
-      camera.lookAt(
-        s.posX + forwardX * 2.9 - sideX * 0.45,
-        1.55 + baseY,
-        s.posZ + forwardZ * 2.9 - sideZ * 0.45,
-      );
-      return;
-    }
-
-    camera.position.set(
-      s.posX - forwardX * 11.5 + sideX * 6.2,
-      6.2 + baseY,
-      s.posZ - forwardZ * 11.5 + sideZ * 6.2,
+    const groundY = sampleHeight(
+      terrainRef.current,
+      camera.position.x,
+      camera.position.z,
     );
-    camera.lookAt(
-      s.posX + forwardX * 3.9 - sideX * 0.7,
-      1.55 + baseY,
-      s.posZ + forwardZ * 3.9 - sideZ * 0.7,
-    );
+    const minCamY = groundY + FREE_LOOK_MIN_GROUND_CLEARANCE;
+    if (Number.isFinite(minCamY) && camera.position.y < minCamY) {
+      camera.position.y = minCamY;
+    }
+
+    camera.lookAt(lookX, lookY, lookZ);
   });
   return null;
 }
@@ -3484,30 +3544,64 @@ function WorksiteSetDressing({
   );
 }
 
+function createSkyVaultTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 8;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return new THREE.Texture();
+  }
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, "#5fa8dc");
+  gradient.addColorStop(0.35, "#8ec6e8");
+  gradient.addColorStop(0.7, "#b7d9ee");
+  gradient.addColorStop(1, "#cfe4f0");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function Cloud({
   x,
   y,
   z,
   scale = 1,
+  opacity = 0.78,
 }: {
   x: number;
   y: number;
   z: number;
   scale?: number;
+  opacity?: number;
 }) {
   const puffs = [
-    [-1.2, 0, 0, 0.9],
-    [-0.45, 0.15, 0.08, 1.15],
-    [0.45, 0.1, -0.04, 1],
-    [1.15, -0.04, 0.02, 0.72],
+    [-1.55, 0.02, 0.08, 0.95],
+    [-0.85, 0.32, -0.18, 1.28],
+    [-0.15, 0.48, 0.06, 1.42],
+    [0.7, 0.3, -0.12, 1.18],
+    [1.45, 0.04, 0.14, 0.88],
+    [0.2, -0.18, 0.22, 0.92],
+    [0.95, -0.12, -0.28, 0.78],
+    [-0.45, -0.08, -0.3, 0.72],
   ] as const;
 
   return (
-    <group position={[x, y, z]} scale={[scale, scale, scale]}>
+    <group position={[x, y, z]} scale={[scale, scale * 0.72, scale]}>
       {puffs.map(([px, py, pz, s], i) => (
         <mesh key={i} position={[px, py, pz]}>
-          <sphereGeometry args={[1.05 * s, 16, 10]} />
-          <meshBasicMaterial color="#f6fbff" transparent opacity={0.74} depthWrite={false} />
+          <sphereGeometry args={[1.05 * s, 18, 12]} />
+          <meshBasicMaterial
+            color={i % 3 === 0 ? "#f4f9ff" : "#eef6fd"}
+            transparent
+            opacity={opacity * (0.72 + (i % 4) * 0.06)}
+            depthWrite={false}
+          />
         </mesh>
       ))}
     </group>
@@ -3520,6 +3614,7 @@ function CinematicBackdrop() {
     PREMIUM_SITE_TEXTURES.backdrop,
   );
   const texture = useMemo(() => loadedTexture.clone(), [loadedTexture]);
+  const skyVaultTexture = useMemo(() => createSkyVaultTexture(), []);
   useLayoutEffect(() => {
     texture.colorSpace = THREE.SRGBColorSpace;
     // A mirrored repeat avoids the visible hard cuts produced by four flat
@@ -3531,43 +3626,95 @@ function CinematicBackdrop() {
     texture.magFilter = THREE.LinearFilter;
     texture.minFilter = THREE.LinearMipmapLinearFilter;
     texture.needsUpdate = true;
-    return () => texture.dispose();
-  }, [texture]);
+    return () => {
+      texture.dispose();
+      skyVaultTexture.dispose();
+    };
+  }, [texture, skyVaultTexture]);
 
   return (
-    <mesh
-      position={[48, 62, 48]}
-      rotation={[0, Math.PI * 0.18, 0]}
-      renderOrder={-10}
-    >
-      <cylinderGeometry args={[170, 170, 130, 128, 1, true]} />
-      <meshBasicMaterial
-        map={texture}
-        color="#ffffff"
-        fog={false}
-        toneMapped={false}
-        side={THREE.BackSide}
-        depthWrite={false}
-      />
-    </mesh>
+    <group>
+      <mesh
+        position={[48, 62, 48]}
+        rotation={[0, Math.PI * 0.18, 0]}
+        renderOrder={-10}
+      >
+        <cylinderGeometry args={[170, 170, 130, 128, 1, true]} />
+        <meshBasicMaterial
+          map={texture}
+          color="#ffffff"
+          fog={false}
+          toneMapped={false}
+          side={THREE.BackSide}
+          depthWrite={false}
+        />
+      </mesh>
+      {/* Close the open cylinder top so free-look upward never shows a hole. */}
+      <mesh position={[48, 127, 48]} scale={[1, 0.55, 1]} renderOrder={-11}>
+        <sphereGeometry args={[170, 64, 28, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
+        <meshBasicMaterial
+          map={skyVaultTexture}
+          fog={false}
+          toneMapped={false}
+          side={THREE.BackSide}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
   );
 }
 
 function SunnySky() {
   return (
     <>
-      <mesh position={[34, 35, -60]} rotation={[0, -0.42, 0]}>
-        <circleGeometry args={[4.2, 40]} />
-        <meshBasicMaterial color="#fff1a6" transparent opacity={0.95} depthWrite={false} />
-      </mesh>
-      <mesh position={[34, 35, -60]} rotation={[0, -0.42, 0]}>
-        <circleGeometry args={[7.2, 40]} />
-        <meshBasicMaterial color="#ffd66b" transparent opacity={0.18} depthWrite={false} />
-      </mesh>
-      <Cloud x={-34} y={24} z={-55} scale={2.8} />
-      <Cloud x={-8} y={28} z={-72} scale={2.2} />
-      <Cloud x={28} y={23} z={-48} scale={1.8} />
-      <Cloud x={44} y={30} z={-78} scale={2.5} />
+      <Billboard position={[48, 46, -78]} follow lockX={false} lockY={false} lockZ={false}>
+        <mesh renderOrder={-8}>
+          <circleGeometry args={[11.5, 48]} />
+          <meshBasicMaterial
+            color="#ffd27a"
+            transparent
+            opacity={0.1}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh renderOrder={-7}>
+          <circleGeometry args={[7.2, 48]} />
+          <meshBasicMaterial
+            color="#ffe29a"
+            transparent
+            opacity={0.22}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh renderOrder={-6}>
+          <circleGeometry args={[4.4, 48]} />
+          <meshBasicMaterial
+            color="#fff1b8"
+            transparent
+            opacity={0.55}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh renderOrder={-5}>
+          <circleGeometry args={[2.55, 48]} />
+          <meshBasicMaterial
+            color="#fffdf2"
+            transparent
+            opacity={0.96}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      </Billboard>
+      <Cloud x={-42} y={26} z={-58} scale={3.1} opacity={0.8} />
+      <Cloud x={-14} y={31} z={-76} scale={2.55} opacity={0.74} />
+      <Cloud x={18} y={24} z={-52} scale={2.15} opacity={0.78} />
+      <Cloud x={46} y={33} z={-82} scale={2.9} opacity={0.76} />
+      <Cloud x={68} y={28} z={-40} scale={2.35} opacity={0.7} />
+      <Cloud x={-58} y={29} z={-28} scale={2.2} opacity={0.72} />
     </>
   );
 }
@@ -3584,8 +3731,8 @@ function SceneContent(props: ExcavatorSceneProps) {
   const terrainRevision = props.terrainRevision ?? 0;
   return (
     <>
-      <color attach="background" args={["#b8d6e8"]} />
-      <fog attach="fog" args={["#c7d9df", 125, 295]} />
+      <color attach="background" args={["#8ec6e8"]} />
+      <fog attach="fog" args={["#c5dce8", 140, 310]} />
       <hemisphereLight args={["#f1f7f7", "#8f6644", 0.86]} />
       <ambientLight intensity={0.28} />
       <directionalLight
@@ -3663,6 +3810,9 @@ function SceneContent(props: ExcavatorSceneProps) {
       <GameCamera
         simRef={props.simRef}
         mode={props.cameraMode}
+        lookOffsetRef={props.lookOffsetRef}
+        inputRef={props.inputRef}
+        terrainRef={props.terrainRef}
       />
       <SimLoop {...props} />
     </>
@@ -3684,7 +3834,7 @@ export function ExcavatorScene(props: ExcavatorSceneProps) {
         stencil: false,
       }}
       dpr={[1, 1.5]}
-      camera={{ fov: 58, near: 0.1, far: 320 }}
+      camera={{ fov: 58, near: 0.1, far: 420 }}
       style={{ width: "100%", height: "100%" }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;

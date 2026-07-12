@@ -55,6 +55,13 @@ function CompactQuestReward({ reward }: { reward: QuestReward }) {
       </span>,
     );
   }
+  if ((reward.score ?? 0) > 0) {
+    parts.push(
+      <span key="score" className="whitespace-nowrap tabular-nums">
+        {reward.score!.toLocaleString()}점
+      </span>,
+    );
+  }
   if (parts.length === 0) return null;
   return (
     <span className="inline-flex items-center gap-x-1 whitespace-nowrap">
@@ -150,11 +157,14 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
                           }`}
                         >
                           {done
-                            ? "완료"
+                            ? `${task.target.toLocaleString()}/${task.target.toLocaleString()}`
                             : `${Math.floor(value).toLocaleString()}/${task.target.toLocaleString()}`}
                         </span>
                       </div>
-                      {!done ? <TaskProgressBar value={value} max={task.target} /> : null}
+                      <TaskProgressBar
+                        value={done ? Math.max(value, task.target) : value}
+                        max={task.target}
+                      />
                     </li>
                   );
                 })}

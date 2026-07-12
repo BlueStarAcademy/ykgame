@@ -16,6 +16,8 @@ export type QuestMetric =
 export type QuestReward = {
   stars: number;
   xp: number;
+  /** 미션 등 아케이드 점수 보상 (선택) */
+  score?: number;
 };
 
 /** 고정 목표, 또는 min~max(step 단위) 랜덤 목표 */

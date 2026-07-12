@@ -65,11 +65,11 @@ export function getQuestAdminReport() {
 
   const difficultyRows = (
     Object.entries(MISSION_DIFFICULTY_REWARDS) as Array<
-      [string, { xp: number; stars: number }]
+      [string, { xp: number; stars: number; score?: number }]
     >
   ).map(([diff, reward]) => ({
     level: `난이도 ${diff}`,
-    value: formatReward(reward.stars, reward.xp),
+    value: formatQuestReward(reward),
   }));
 
   const bandSections = (["under10", "lv10", "lv15"] as MissionLevelBand[]).map(

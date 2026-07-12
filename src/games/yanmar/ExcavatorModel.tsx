@@ -590,8 +590,7 @@ export function PremiumExcavatorLink({
           {logo && logoX != null ? (
             <mesh
               position={[logoX, 0.025, side * 0.07]}
-              rotation={[0, 0, logoRotation]}
-              scale={[-1, 1, 1]}
+              rotation={[0, side < 0 ? Math.PI : 0, logoRotation]}
               renderOrder={12}
             >
               <planeGeometry args={[logoWidth, logoHeight]} />
@@ -601,7 +600,7 @@ export function PremiumExcavatorLink({
                 alphaTest={0.3}
                 toneMapped={false}
                 depthWrite={false}
-                side={THREE.DoubleSide}
+                side={THREE.FrontSide}
               />
             </mesh>
           ) : null}

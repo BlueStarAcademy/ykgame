@@ -1,5 +1,11 @@
 export type CameraMode = 1 | 2 | 3;
 
+/** Drag free-look offsets applied around the default chase look-at. */
+export interface CameraLookOffset {
+  yaw: number;
+  pitch: number;
+}
+
 export type AttachmentType = "bucket" | "breaker" | "grapple";
 
 export interface ExcavatorSimState {
