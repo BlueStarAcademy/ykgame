@@ -44,14 +44,19 @@ export interface SavedArmPose {
   bucket: number;
 }
 
-export const AUTO_POSE_SLOT_COUNT = 2;
-export type AutoPoseSlotIndex = 0 | 1;
+export const AUTO_POSE_SLOT_COUNT = 4;
+export type AutoPoseSlotIndex = 0 | 1 | 2 | 3;
 
 export type AutoPoseJoint = "arm" | "boom" | "bucket";
 
 export interface AutoPoseState {
-  /** 저장 슬롯 (최대 2개) */
-  slots: [SavedArmPose | null, SavedArmPose | null];
+  /** 저장 슬롯 (최대 4개) */
+  slots: [
+    SavedArmPose | null,
+    SavedArmPose | null,
+    SavedArmPose | null,
+    SavedArmPose | null,
+  ];
   /** 실행 중인 슬롯 (실행 시작 시 설정) */
   activeSlot: AutoPoseSlotIndex;
   /** 현재 실행 대상 자세 (= slots[activeSlot]) */

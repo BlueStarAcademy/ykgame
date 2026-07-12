@@ -46,6 +46,13 @@ const MENU_ITEMS = [
     desc: "재화 지급 및 우편 발송",
     color: "border-amber-200 bg-gradient-to-br from-amber-50 to-white",
   },
+  {
+    href: "/admin/notices",
+    emoji: "📢",
+    title: "전광판 공지",
+    desc: "게임 상단 전광판 공지 작성·순서·표시 관리",
+    color: "border-rose-200 bg-gradient-to-br from-rose-50 to-white",
+  },
 ];
 
 export function AdminHome() {

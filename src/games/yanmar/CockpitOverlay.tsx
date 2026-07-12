@@ -74,8 +74,11 @@ function getJoystickZoneMetrics(isPortrait: boolean) {
 }
 
 /** 인게임 D-pad 크기 — GameJoystick / MainDPadVisual 과 동일 */
-const DPAD_SIZE = "clamp(5rem, 24vw, 6.8rem)";
-const DPAD_BOTTOM = "calc(0.1rem - var(--yanmar-controls-sink, 0rem))";
+const DPAD_SIZE = "clamp(6.2rem, 30vw, 8.4rem)";
+/** 하단 여유를 둬 프레임 overflow에 잘리지 않게 */
+const DPAD_BOTTOM = "calc(0.28rem - var(--yanmar-controls-sink, 0rem))";
+/** 좌·우 끝 붙임 (살짝만 안쪽) */
+const DPAD_EDGE = "0.2rem";
 
 function getAuxMenuButtonSize(isPortrait: boolean) {
   return isPortrait ? "2.85rem" : "2.75rem";
@@ -102,24 +105,30 @@ const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cx: 0.453, cy: 0.79 },
   travelRight: { ...COCKPIT_LAYOUT.travelRight, cx: 0.548, cy: 0.79 },
   travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cx: 0.5, cy: 0.79 },
-  rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.1, cy: 0.165 },
-  // Midpoint between left D-pad (11.5%) and travel levers (50%).
-  breakerPedal: { ...COCKPIT_LAYOUT.breakerPedal, cx: 0.3075, cy: 0.79 },
+  // Under travel levers — clearly separated L/R foot pedals.
+  rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.595, cy: 0.92 },
+  breakerPedal: { ...COCKPIT_LAYOUT.breakerPedal, cx: 0.405, cy: 0.92 },
   hydraulicSpeed: { ...COCKPIT_LAYOUT.hydraulicSpeed, cx: 0.1, cy: 0.275 },
-  blade: { ...COCKPIT_LAYOUT.blade, cx: 0.695, cy: 0.79 },
+  blade: { ...COCKPIT_LAYOUT.blade, cx: 0.1, cy: 0.165 },
   horn: { ...COCKPIT_LAYOUT.horn, cx: 0.9, cy: 0.495 },
 };
 
 const FUNCTION_MENU_OPEN_DELAYS_MS = {
   safety: 0,
   rpm: 50,
-  pedal: 100,
+  blade: 100,
 } as const;
 const FUNCTION_MENU_CLOSE_DELAYS_MS = {
-  pedal: 0,
+  blade: 0,
   rpm: 35,
   safety: 70,
 } as const;
+
+/** Travel levers sit above the dual foot-pedal row. */
+const TRAVEL_BASELINE =
+  "calc(100% - var(--yanmar-travel-baseline, 4.55rem))";
+const FOOT_PEDAL_BASELINE =
+  "calc(100% - var(--yanmar-foot-pedal-baseline, 1.35rem))";
 
 const AUTO_POSE_SLOT_ORDER = Array.from(
   { length: AUTO_POSE_SLOT_COUNT },
@@ -240,9 +249,11 @@ function VisualLever({
         ? v * -22
         : v * -48;
   // Keep the stick root inside the lever lane when pulled/pushed.
-  const travelPivotThrowRem = 0.22;
-  const travelStickTiltX = -12 - pushDepth * 8 + pullDepth * 42;
-  const travelHeadTiltX = 10 - pushDepth * 4 - pullDepth * 36;
+  const travelPivotThrowRem = 0.3;
+  // Pull (후진/당김): stick leans toward camera, knob folds further downward.
+  const travelStickTiltX = -12 - pushDepth * 8 + pullDepth * 58;
+  const travelHeadTiltX = 10 - pushDepth * 4 - pullDepth * 68;
+  const travelHeadDrop = pullDepth * 0.14 - pushDepth * 0.04;
   const motionClass = v > 0.16 ? "is-pushed" : v < -0.16 ? "is-pulled" : "is-neutral";
   const stickTransform = isTravel
     ? `translate3d(-50%, 0, 0.22rem) rotateX(${travelStickTiltX}deg)`
@@ -300,7 +311,8 @@ function VisualLever({
             style={
               isTravel
                 ? {
-                    transform: `translateX(-50%) translateZ(0.12rem) perspective(5rem) rotateX(${travelHeadTiltX}deg)`,
+                    transform: `translateX(-50%) translateY(${travelHeadDrop}rem) translateZ(0.12rem) perspective(5rem) rotateX(${travelHeadTiltX}deg)`,
+                    transformOrigin: "50% 92%",
                   }
                 : undefined
             }
@@ -328,7 +340,7 @@ function VisualTravelLevers({
         className="yanmar-premium-dual-travel-panel"
         style={{
           left: `${layout.travelBoth.cx * 100}%`,
-          top: "calc(100% - var(--yanmar-travel-baseline, 2.45rem))",
+          top: TRAVEL_BASELINE,
         }}
         aria-hidden
       >
@@ -343,7 +355,7 @@ function VisualTravelLevers({
       </div>
       <VisualLever
         cx={layout.travelLeft.cx}
-        cy="calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
+        cy={TRAVEL_BASELINE}
         value={left}
         color="dark"
         highlighted={highlighted}
@@ -351,7 +363,7 @@ function VisualTravelLevers({
       />
       <VisualLever
         cx={layout.travelRight.cx}
-        cy="calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
+        cy={TRAVEL_BASELINE}
         value={right}
         color="dark"
         highlighted={highlighted}
@@ -361,32 +373,41 @@ function VisualTravelLevers({
   );
 }
 
-function VisualPedal({
-  value,
-  layout,
+function PremiumFootPedalArt({
+  accent = "amber",
+  leftActive = false,
+  rightActive = false,
 }: {
-  value: number;
-  layout: CockpitLayout;
+  accent?: "amber" | "cyan";
+  leftActive?: boolean;
+  rightActive?: boolean;
 }) {
-  const top = Math.max(0, value);
-  const bottom = Math.max(0, -value);
-  const pedal = layout.rightPedal;
-  const pressOffset = (top - bottom) * 0.22;
-
   return (
     <div
-      className="yanmar-visual-part yanmar-visual-pedal"
-      style={{
-        left: `${(pedal.cx + 0.03) * 100}%`,
-        top: `${pedal.cy * 100}%`,
-      }}
+      className={`yanmar-premium-foot-pedal-art yanmar-premium-foot-pedal-art-${accent} pointer-events-none`}
+      aria-hidden
     >
-      <div
-        className="yanmar-pedal-pad"
-        style={{
-          transform: `translate(-50%, ${pressOffset}rem)`,
-        }}
-      />
+      <span className="yanmar-premium-foot-pedal-bay">
+        <span className="yanmar-premium-foot-pedal-inset" />
+        <span className="yanmar-premium-lever-bolt bolt-tl" />
+        <span className="yanmar-premium-lever-bolt bolt-tr" />
+        <span className="yanmar-premium-lever-bolt bolt-bl" />
+        <span className="yanmar-premium-lever-bolt bolt-br" />
+        <span className="yanmar-premium-foot-pedal-hinge" />
+        <span
+          className={`yanmar-premium-foot-pedal-rocker ${
+            leftActive ? "is-left-active" : rightActive ? "is-right-active" : ""
+          }`}
+        >
+          <span className="yanmar-premium-foot-pedal-half is-left">
+            <span className="yanmar-premium-foot-pedal-tread" />
+          </span>
+          <span className="yanmar-premium-foot-pedal-spine" />
+          <span className="yanmar-premium-foot-pedal-half is-right">
+            <span className="yanmar-premium-foot-pedal-tread" />
+          </span>
+        </span>
+      </span>
     </div>
   );
 }
@@ -455,25 +476,28 @@ function MainDPadVisual({
         screenOverlay
           ? {
               position: "absolute",
-              left: side === "left" ? "11.5%" : "88.5%",
+              left: side === "left" ? DPAD_EDGE : "auto",
+              right: side === "right" ? DPAD_EDGE : "auto",
               top: "auto",
               bottom: DPAD_BOTTOM,
               width: DPAD_SIZE,
               aspectRatio: "1",
-              transform: "translate3d(-50%, 0, 0)",
+              transform: "translate3d(0, 0, 0)",
               zIndex: 70,
               pointerEvents: "none",
-              filter: "drop-shadow(0 9px 7px rgba(2, 6, 23, 0.62))",
+              filter: "drop-shadow(0 8px 6px rgba(2, 6, 23, 0.55))",
+              overflow: "visible",
             }
           : {
               position: "absolute",
               left: `${layout.cx * 100}%`,
               top: `${(layout.cy - centerYOffset) * 100}%`,
-              width: "clamp(5.4rem, 24vw, 6.8rem)",
+              width: DPAD_SIZE,
               aspectRatio: "1",
               transform: "translate3d(-50%, -50%, 0)",
               zIndex: 70,
               pointerEvents: "none",
+              overflow: "visible",
             }
       }
       aria-hidden
@@ -877,14 +901,15 @@ function GameJoystick({
         style={{
           left: useDPad
             ? side === "left"
-              ? "11.5%"
-              : "88.5%"
+              ? DPAD_EDGE
+              : "auto"
             : `${layout.cx * 100}%`,
+          right: useDPad && side === "right" ? DPAD_EDGE : "auto",
           top: useDPad ? "auto" : `${(layout.cy - joystickZone.centerYOffset) * 100}%`,
           bottom: useDPad ? DPAD_BOTTOM : "auto",
           width: useDPad ? DPAD_SIZE : joystickZone.width,
           height: useDPad ? DPAD_SIZE : joystickZone.height,
-          transform: useDPad ? "translateX(-50%)" : "translate(-50%, -50%)",
+          transform: useDPad ? "none" : "translate(-50%, -50%)",
         }}
         onPointerDown={handleStart}
         onPointerMove={handleMove}
@@ -1003,9 +1028,7 @@ function TravelLever({
         className={`absolute z-40 touch-none rounded-xl ${!enabled ? "pointer-events-none" : ""}`}
         style={{
           left: `calc(${layout.cx * 100}% + ${hitboxCenterOffset})`,
-          top: isPortrait
-            ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
-            : `calc(${layout.cy * 100}%)`,
+          top: isPortrait ? TRAVEL_BASELINE : `calc(${layout.cy * 100}%)`,
           width: hitboxWidth,
           height: hitboxHeight,
           transform: "translate(-50%, -50%)",
@@ -1114,9 +1137,7 @@ function DualTravelCenter({
       className={`absolute z-30 touch-none rounded-xl ${!enabled ? "pointer-events-none" : ""}`}
       style={{
         left: `${layout.cx * 100}%`,
-        top: isPortrait
-          ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
-          : `calc(${layout.cy * 100}%)`,
+        top: isPortrait ? TRAVEL_BASELINE : `calc(${layout.cy * 100}%)`,
         width: isPortrait ? "10%" : "12.5%",
         height: isPortrait
           ? "calc(var(--yanmar-travel-stick-h, 2.45rem) * 2.4)"
@@ -1253,6 +1274,7 @@ function BladeLever({
   layout,
   isPortrait,
   onChange,
+  embedded = false,
 }: {
   value: number;
   enabled: boolean;
@@ -1260,6 +1282,7 @@ function BladeLever({
   layout: CockpitLayout;
   isPortrait: boolean;
   onChange: (value: number) => void;
+  embedded?: boolean;
 }) {
   const blade = layout.blade;
   const zoneRef = useRef<HTMLDivElement>(null);
@@ -1364,6 +1387,52 @@ function BladeLever({
     pointer.finish(e.pointerId);
   };
 
+  if (embedded) {
+    return (
+      <div
+        className={`yanmar-blade-lever-embedded relative h-full w-full touch-none ${
+          !enabled ? "is-disabled" : ""
+        }`}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <div className="yanmar-blade-lever-visual yanmar-blade-lever-visual-embedded pointer-events-none" aria-hidden>
+          <VisualLever
+            cx={0.5}
+            cy={0.5}
+            value={stick}
+            color="dark"
+            variant="travel"
+          />
+          <span className="yanmar-blade-lever-label">블레이드</span>
+        </div>
+        <div
+          ref={zoneRef}
+          className={`yanmar-blade-lever absolute inset-0 z-50 touch-none rounded-xl ${
+            !enabled ? "pointer-events-none is-disabled" : ""
+          }`}
+          style={{ WebkitTouchCallout: "none" }}
+          onPointerDown={handleStart}
+          onPointerMove={handleMove}
+          onPointerUp={handleEnd}
+          onPointerCancel={handleEnd}
+          onLostPointerCapture={() => {
+            pointer.finish();
+          }}
+          onContextMenu={(e) => e.preventDefault()}
+          aria-label="블레이드 레버"
+        >
+          {showTouchZone ? (
+            <>
+              <div className="pointer-events-none absolute inset-0 rounded-xl border border-amber-200/65 bg-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 top-1/3 border-t border-white/25" />
+              <div className="pointer-events-none absolute inset-x-0 top-2/3 border-t border-white/25" />
+            </>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div
@@ -1372,7 +1441,7 @@ function BladeLever({
         }`}
         style={{
           left: `${blade.cx * 100}%`,
-          top: "calc(100% - var(--yanmar-travel-baseline, 2.45rem) - 0.14rem)",
+          top: TRAVEL_BASELINE,
           transform: "translate(-50%, -50%)",
         }}
         aria-hidden
@@ -1393,9 +1462,7 @@ function BladeLever({
         } ${isPortrait ? "yanmar-blade-lever-portrait" : ""}`}
         style={{
           left: `${blade.cx * 100}%`,
-          top: isPortrait
-            ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem) - 0.14rem)"
-            : `${blade.cy * 100}%`,
+          top: isPortrait ? TRAVEL_BASELINE : `${blade.cy * 100}%`,
           width: isPortrait ? "10%" : "6.6%",
           height: isPortrait ? "40%" : "58%",
           transform: "translate(-50%, -50%)",
@@ -1433,6 +1500,7 @@ function AttachmentPedalControl({
   onRequireAttachment,
   layout,
   isPortrait,
+  attachmentType,
 }: {
   direction: -1 | 0 | 1;
   /** True when breaker/grapple is equipped and safety lock is off. */
@@ -1445,8 +1513,12 @@ function AttachmentPedalControl({
   onRequireAttachment?: () => void;
   layout: CockpitLayout;
   isPortrait: boolean;
+  attachmentType: AttachmentType;
 }) {
   const pedal = layout.breakerPedal;
+  const isBreaker = attachmentType === "breaker";
+  const isGrapple = attachmentType === "grapple";
+
   const setDirection = (next: -1 | 0 | 1) => {
     if (next === 0) {
       onChange(0);
@@ -1459,13 +1531,24 @@ function AttachmentPedalControl({
     onChange(next);
   };
 
-  const press = (
+  const pressSide = (
     e: React.PointerEvent<HTMLButtonElement>,
-    next: -1 | 1,
+    side: "left" | "right",
   ) => {
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
-    setDirection(next);
+    if (isBreaker) {
+      // 브레이커: 왼쪽만 작동
+      if (side === "left") setDirection(1);
+      else setDirection(0);
+      return;
+    }
+    if (isGrapple) {
+      // 집게: 왼쪽=벌림(-1), 오른쪽=집기(1)
+      setDirection(side === "left" ? -1 : 1);
+      return;
+    }
+    onRequireAttachment?.();
   };
 
   const release = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -1480,57 +1563,59 @@ function AttachmentPedalControl({
     setDirection(0);
   };
 
+  const leftActive =
+    (isBreaker && direction > 0) || (isGrapple && direction < 0);
+  const rightActive = isGrapple && direction > 0;
+
   return (
     <div
-      aria-label="브레이커 및 집게 양방향 발판"
+      aria-label="브레이커 및 집게 좌우 발판"
       aria-disabled={!canOperate}
-      className={`yanmar-breaker-pedal-button select-none absolute z-40 ${
+      className={`yanmar-breaker-pedal-button yanmar-premium-foot-pedal select-none absolute z-40 ${
         direction !== 0 ? "is-active" : ""
       } ${
-        direction > 0
-          ? "is-top-active"
-          : direction < 0
-            ? "is-bottom-active"
-            : ""
+        leftActive ? "is-left-active" : rightActive ? "is-right-active" : ""
       } ${dimmed ? "is-disabled" : ""} ${highlighted ? "yanmar-visual-highlight" : ""} ${
         isPortrait ? "yanmar-breaker-pedal-button-portrait" : ""
       }`}
       style={{
         left: `${pedal.cx * 100}%`,
-        top: isPortrait
-          ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
-          : `${pedal.cy * 100}%`,
-        width: isPortrait ? "3.05rem" : "2.9rem",
-        height: isPortrait ? "4.45rem" : "4.1rem",
+        top: FOOT_PEDAL_BASELINE,
+        width: isPortrait ? "4.05rem" : "3.85rem",
+        height: isPortrait ? "2.55rem" : "2.4rem",
         transform: "translate(-50%, -50%)",
       }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/images/yanmar/2d/cockpit/attachment-pedal-front.png?v=4"
-        alt=""
-        className="yanmar-breaker-pedal-pad pointer-events-none object-contain"
-        style={{ backgroundImage: "none" }}
-        draggable={false}
-        aria-hidden
+      <PremiumFootPedalArt
+        accent="amber"
+        leftActive={leftActive}
+        rightActive={rightActive}
       />
       <button
         type="button"
-        className="absolute inset-x-[15%] top-[5%] h-[43%] rounded-t-[0.55rem]"
-        aria-label="발판 위쪽: 집게 닫기 또는 브레이커 작동"
-        aria-pressed={direction > 0}
-        onPointerDown={(event) => press(event, 1)}
+        className="absolute inset-y-[10%] left-[5%] w-[42%] rounded-l-[0.45rem]"
+        aria-label={
+          isBreaker
+            ? "발판 왼쪽: 브레이커 작동"
+            : "발판 왼쪽: 집게 열기"
+        }
+        aria-pressed={leftActive}
+        onPointerDown={(event) => pressSide(event, "left")}
         onPointerUp={release}
         onPointerCancel={release}
         onLostPointerCapture={() => setDirection(0)}
       />
       <button
         type="button"
-        className="absolute inset-x-[15%] bottom-[5%] h-[43%] rounded-b-[0.55rem]"
-        aria-label="발판 아래쪽: 집게 열기 또는 브레이커 작동"
-        aria-pressed={direction < 0}
-        onPointerDown={(event) => press(event, -1)}
+        className="absolute inset-y-[10%] right-[5%] w-[42%] rounded-r-[0.45rem]"
+        aria-label={
+          isBreaker
+            ? "발판 오른쪽: 브레이커에서는 사용하지 않음"
+            : "발판 오른쪽: 집게 닫기"
+        }
+        aria-pressed={rightActive}
+        onPointerDown={(event) => pressSide(event, "right")}
         onPointerUp={release}
         onPointerCancel={release}
         onLostPointerCapture={() => setDirection(0)}
@@ -1551,17 +1636,14 @@ function PedalSwingControl({
   onChange,
   layout,
   isPortrait,
-  embedded = false,
 }: {
   activeValue: number;
   showTouchZone: boolean;
   onChange: (value: number) => void;
   layout: CockpitLayout;
   isPortrait: boolean;
-  embedded?: boolean;
 }) {
   const pedal = layout.rightPedal;
-  const touchCx = embedded ? pedal.cx : isPortrait ? pedal.cx : pedal.cx + 0.03;
   const valueRef = useRef(activeValue);
   const directionRef = useRef(0);
   const frameRef = useRef<number | null>(null);
@@ -1646,78 +1728,60 @@ function PedalSwingControl({
     stopAnimation();
   };
 
-  const topPressAmount = Math.max(0, activeValue);
-  const bottomPressAmount = Math.max(0, -activeValue);
-  const pedalSizeStyle = embedded
-    ? { width: "100%", height: "100%" }
-    : isPortrait
-      ? { width: "2.85rem", height: "4.55rem" }
-      : { width: "2.55rem", height: "5rem" };
-
   return (
     <div
-      className={`yanmar-pedal-button select-none ${
-        embedded ? "relative h-full w-full" : "absolute z-40"
+      className={`yanmar-breaker-pedal-button yanmar-premium-foot-pedal yanmar-boom-swing-pedal select-none absolute z-40 ${
+        pressedDirection !== 0 ? "is-active" : ""
       } ${
-        pressedDirection > 0 ? "is-top-active" : pressedDirection < 0 ? "is-bottom-active" : ""
-      } ${isPortrait ? "yanmar-pedal-button-portrait" : ""}`}
+        pressedDirection < 0
+          ? "is-left-active"
+          : pressedDirection > 0
+            ? "is-right-active"
+            : ""
+      } ${isPortrait ? "yanmar-breaker-pedal-button-portrait" : ""}`}
       style={{
         WebkitTouchCallout: "none",
-        ...(embedded
-          ? pedalSizeStyle
-          : {
-              left: `${touchCx * 100}%`,
-              top: `${pedal.cy * 100}%`,
-              ...pedalSizeStyle,
-              transform: "translate(-50%, -50%)",
-            }),
+        left: `${pedal.cx * 100}%`,
+        top: FOOT_PEDAL_BASELINE,
+        width: isPortrait ? "4.05rem" : "3.85rem",
+        height: isPortrait ? "2.55rem" : "2.4rem",
+        transform: "translate(-50%, -50%)",
       }}
       onContextMenu={(e) => e.preventDefault()}
-      aria-label="우측 페달 붐 스윙"
+      aria-label="붐 스윙 발판"
     >
-      {embedded && (
-        <span className="yanmar-visual-pedal-nested pointer-events-none" aria-hidden>
-          <span
-            className="yanmar-menu-control-art yanmar-menu-control-art-pedal"
-            style={{
-              transform: `translate(-50%, calc(-50% + ${(topPressAmount - bottomPressAmount) * 0.12}rem))`,
-            }}
-          />
-        </span>
-      )}
+      <PremiumFootPedalArt
+        accent="cyan"
+        leftActive={pressedDirection < 0}
+        rightActive={pressedDirection > 0}
+      />
       {showTouchZone && (
-        <div className="pointer-events-none absolute inset-0 rounded-lg border border-amber-200/65 bg-transparent">
-          <span className="absolute inset-x-[8%] top-[6%] h-[42%] rounded-t-lg border border-amber-100/35" />
-          <span className="absolute inset-x-[8%] bottom-[6%] h-[42%] rounded-b-lg border border-amber-100/35" />
+        <div className="pointer-events-none absolute inset-0 rounded-lg border border-cyan-200/65 bg-transparent">
+          <span className="absolute inset-y-[8%] left-[6%] w-[42%] rounded-l-lg border border-cyan-100/35" />
+          <span className="absolute inset-y-[8%] right-[6%] w-[42%] rounded-r-lg border border-cyan-100/35" />
         </div>
       )}
       <button
         type="button"
-        className="yanmar-pedal-button-half yanmar-pedal-button-top absolute inset-x-[8%] top-[6%] h-[42%] rounded-t-lg transition-transform duration-300 ease-out"
-        style={{
-          transform: `translateY(${topPressAmount * 0.35}rem) scale(${1 - topPressAmount * 0.03})`,
-        }}
-        onPointerDown={(e) => press(e, 1)}
-        onPointerUp={release}
-        onPointerCancel={release}
-        onLostPointerCapture={handleLostCapture}
-        onContextMenu={(e) => e.preventDefault()}
-        aria-pressed={pressedDirection > 0}
-        aria-label="우측 페달 위쪽: 암 우측 회전"
-      />
-      <button
-        type="button"
-        className="yanmar-pedal-button-half yanmar-pedal-button-bottom absolute inset-x-[8%] bottom-[6%] h-[42%] rounded-b-lg transition-transform duration-300 ease-out"
-        style={{
-          transform: `translateY(${-bottomPressAmount * 0.35}rem) scale(${1 - bottomPressAmount * 0.03})`,
-        }}
+        className="absolute inset-y-[10%] left-[5%] w-[42%] rounded-l-[0.45rem]"
         onPointerDown={(e) => press(e, -1)}
         onPointerUp={release}
         onPointerCancel={release}
         onLostPointerCapture={handleLostCapture}
         onContextMenu={(e) => e.preventDefault()}
         aria-pressed={pressedDirection < 0}
-        aria-label="우측 페달 아래쪽: 암 좌측 회전"
+        aria-label="발판 왼쪽: 암 좌측 회전"
+      />
+      <button
+        type="button"
+        className="absolute inset-y-[10%] right-[5%] w-[42%] rounded-r-[0.45rem]"
+        onPointerDown={(e) => press(e, 1)}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onLostPointerCapture={handleLostCapture}
+        onContextMenu={(e) => e.preventDefault()}
+        aria-pressed={pressedDirection > 0}
+        aria-label="발판 오른쪽: 암 우측 회전"
       />
     </div>
   );
@@ -1821,7 +1885,7 @@ function FunctionMenu({
   const toggleCy = AUX_MENU_TOGGLE_CY;
   const buttonSize = getAuxMenuButtonSize(isPortrait);
   const gap = "0.42rem";
-  const pedalHeight = `calc(${buttonSize} * 2 + ${gap})`;
+  const bladeHeight = `calc(${buttonSize} * 2 + ${gap})`;
 
   return (
     <div
@@ -1908,25 +1972,26 @@ function FunctionMenu({
         </div>
 
         <div
-          className="yanmar-function-menu-item yanmar-function-menu-item-pedal"
+          className="yanmar-function-menu-item yanmar-function-menu-item-blade"
           style={{
             width: buttonSize,
-            height: pedalHeight,
+            height: bladeHeight,
             transitionDelay: `${
               expanded
-                ? FUNCTION_MENU_OPEN_DELAYS_MS.pedal
-                : FUNCTION_MENU_CLOSE_DELAYS_MS.pedal
+                ? FUNCTION_MENU_OPEN_DELAYS_MS.blade
+                : FUNCTION_MENU_CLOSE_DELAYS_MS.blade
             }ms`,
           }}
         >
-          <PedalSwingControl
-            activeValue={auxiliary.boomSwing}
+          <BladeLever
+            value={auxiliary.blade}
+            enabled={!auxiliary.safetyLocked}
             showTouchZone={showTouchZones}
             layout={layout}
             isPortrait={isPortrait}
             embedded
-            onChange={(boomSwing) =>
-              onAuxiliaryChange((current) => ({ ...current, boomSwing }))
+            onChange={(blade) =>
+              onAuxiliaryChange((current) => ({ ...current, blade }))
             }
           />
         </div>
@@ -1999,64 +2064,101 @@ function AutoMenuActionButton({
 interface AutoMenuProps {
   expanded: boolean;
   onToggle: () => void;
-  layout: CockpitLayout;
-  isPortrait: boolean;
+  buttonSize: string;
   showTouchZones: boolean;
   autoPose: AutoPoseState;
   onSavePose: (slot: AutoPoseSlotIndex) => void;
   onExecutePose: (slot: AutoPoseSlotIndex) => void;
   savePoseDisabled?: boolean;
   executePoseDisabled?: boolean;
+  isPortrait: boolean;
 }
 
-function HornButton({
+function HornAutoCluster({
   layout,
   isPortrait,
   showTouchZones,
   onHorn,
+  autoExpanded,
+  onAutoToggle,
+  autoPose,
+  onSavePose,
+  onExecutePose,
+  savePoseDisabled = false,
+  executePoseDisabled = false,
 }: {
   layout: CockpitLayout;
   isPortrait: boolean;
   showTouchZones: boolean;
   onHorn: () => void;
+  autoExpanded: boolean;
+  onAutoToggle: () => void;
+  autoPose: AutoPoseState;
+  onSavePose: (slot: AutoPoseSlotIndex) => void;
+  onExecutePose: (slot: AutoPoseSlotIndex) => void;
+  savePoseDisabled?: boolean;
+  executePoseDisabled?: boolean;
 }) {
   const buttonSize = getAuxMenuButtonSize(isPortrait);
-  const autoCx = layout.horn.cx;
+  const anchorCx = layout.horn.cx;
   const toggleCy = AUX_MENU_TOGGLE_CY;
 
   return (
-    <button
-      type="button"
-      className={`yanmar-horn-standalone yanmar-aux-button touch-none active:scale-95${
-        isPortrait ? " yanmar-aux-button-portrait" : ""
-      }`}
+    <div
+      className="yanmar-horn-auto-cluster"
       style={{
-        left: `calc(${autoCx * 100}% - ${buttonSize} - ${HORN_AUTO_GAP})`,
+        left: `${anchorCx * 100}%`,
         top: `${toggleCy * 100}%`,
-        width: buttonSize,
-        height: buttonSize,
+        // 클러스터 우측(자동) 버튼 중심이 horn.cx 에 오도록
+        transform: `translate(calc(-1 * (${buttonSize} * 1.5 + ${HORN_AUTO_GAP})), -50%)`,
+        gap: HORN_AUTO_GAP,
       }}
-      onClick={onHorn}
-      aria-label="경적"
     >
-      <img
-        className="yanmar-horn-standalone-icon"
-        src="/images/yanmar/2d/cockpit/horn-hud-premium.png?v=2"
-        alt=""
-        draggable={false}
+      <button
+        type="button"
+        className={`yanmar-horn-standalone yanmar-aux-button touch-none active:scale-95${
+          isPortrait ? " yanmar-aux-button-portrait" : ""
+        }`}
+        style={{
+          width: buttonSize,
+          height: buttonSize,
+          minWidth: buttonSize,
+          minHeight: buttonSize,
+        }}
+        onClick={onHorn}
+        aria-label="경적"
+      >
+        <img
+          className="yanmar-horn-standalone-icon"
+          src="/images/yanmar/2d/cockpit/horn-hud-premium.png?v=2"
+          alt=""
+          draggable={false}
+        />
+        <span className="yanmar-horn-standalone-label">경적</span>
+        {showTouchZones ? (
+          <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-amber-200/65 bg-transparent" />
+        ) : null}
+      </button>
+      <AutoMenu
+        expanded={autoExpanded}
+        onToggle={onAutoToggle}
+        buttonSize={buttonSize}
+        isPortrait={isPortrait}
+        showTouchZones={showTouchZones}
+        autoPose={autoPose}
+        onSavePose={onSavePose}
+        onExecutePose={onExecutePose}
+        savePoseDisabled={savePoseDisabled}
+        executePoseDisabled={executePoseDisabled}
       />
-      <span className="yanmar-horn-standalone-label">경적</span>
-      {showTouchZones ? (
-        <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-amber-200/65 bg-transparent" />
-      ) : null}
-    </button>
+    </div>
   );
 }
 
 function AutoMenu({
   expanded,
   onToggle,
-  layout,
+  buttonSize,
   isPortrait,
   showTouchZones,
   autoPose,
@@ -2065,16 +2167,14 @@ function AutoMenu({
   savePoseDisabled = false,
   executePoseDisabled = false,
 }: AutoMenuProps) {
-  const anchorCx = layout.horn.cx;
-  const toggleCy = AUX_MENU_TOGGLE_CY;
-  const buttonSize = getAuxMenuButtonSize(isPortrait);
-
   return (
     <div
       className="yanmar-auto-menu"
       style={{
-        left: `${anchorCx * 100}%`,
-        top: `${toggleCy * 100}%`,
+        width: buttonSize,
+        height: buttonSize,
+        minWidth: buttonSize,
+        minHeight: buttonSize,
       }}
     >
       <div className={`yanmar-auto-menu-items ${expanded ? "is-expanded" : ""}`}>
@@ -2148,6 +2248,8 @@ function AutoMenu({
         style={{
           width: buttonSize,
           height: buttonSize,
+          minWidth: buttonSize,
+          minHeight: buttonSize,
         }}
         onClick={onToggle}
         aria-expanded={expanded}
@@ -2262,7 +2364,7 @@ export function CockpitOverlay({
       </div>
 
       {useDPad ? (
-        <div className="pointer-events-none absolute inset-0 z-[60]">
+        <div className="pointer-events-none absolute inset-0 z-[60] overflow-visible">
           <MainDPadVisual
             side="left"
             value={input.left}
@@ -2320,16 +2422,6 @@ export function CockpitOverlay({
               }))
             }
           />
-          <BladeLever
-            value={auxiliary.blade}
-            enabled={!auxiliary.safetyLocked}
-            showTouchZone={showTouchZones}
-            layout={layout}
-            isPortrait={isPortrait}
-            onChange={(blade) =>
-              onAuxiliaryChange((current) => ({ ...current, blade }))
-            }
-          />
           <DualTravelCenter
             layout={layout.travelBoth}
             enabled={travelEnabled && travelLock !== "sides"}
@@ -2358,6 +2450,7 @@ export function CockpitOverlay({
             showTouchZone={showTouchZones}
             layout={layout}
             isPortrait={isPortrait}
+            attachmentType={attachmentType}
             onRequireAttachment={
               pedalAttachmentEquipped
                 ? undefined
@@ -2373,6 +2466,15 @@ export function CockpitOverlay({
               }))
             }
           />
+          <PedalSwingControl
+            activeValue={auxiliary.boomSwing}
+            showTouchZone={showTouchZones}
+            layout={layout}
+            isPortrait={isPortrait}
+            onChange={(boomSwing) =>
+              onAuxiliaryChange((current) => ({ ...current, boomSwing }))
+            }
+          />
           <FunctionMenu
             expanded={functionMenuExpanded}
             onToggle={() => setFunctionMenuExpanded((open) => !open)}
@@ -2386,7 +2488,7 @@ export function CockpitOverlay({
             unlockAllAttachments={unlockAllAttachments}
             onAttachmentChange={onAttachmentChange}
           />
-          <HornButton
+          <HornAutoCluster
             layout={layout}
             isPortrait={isPortrait}
             showTouchZones={showTouchZones}
@@ -2394,13 +2496,8 @@ export function CockpitOverlay({
               playHorn();
               onHorn?.();
             }}
-          />
-          <AutoMenu
-            expanded={autoMenuExpanded}
-            onToggle={() => setAutoMenuExpanded((open) => !open)}
-            layout={layout}
-            isPortrait={isPortrait}
-            showTouchZones={showTouchZones}
+            autoExpanded={autoMenuExpanded}
+            onAutoToggle={() => setAutoMenuExpanded((open) => !open)}
             autoPose={autoPose}
             onSavePose={onSavePose}
             onExecutePose={onExecutePose}

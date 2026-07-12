@@ -13,6 +13,7 @@ import {
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
 import {
+  GAME_IMMERSIVE_HEADER_CENTER_ID,
   GAME_IMMERSIVE_HEADER_LEFT_ID,
   GAME_IMMERSIVE_HEADER_RIGHT_ID,
 } from "@/components/games/GameImmersiveOverlay";
@@ -971,7 +972,12 @@ export function ExcavatorGameWrapper({
     }
 
     const savedSlots = loadAutoPoseSlotsForSession(userId);
-    autoPoseRef.current.slots = [savedSlots[0], savedSlots[1]];
+    autoPoseRef.current.slots = [
+      savedSlots[0],
+      savedSlots[1],
+      savedSlots[2],
+      savedSlots[3],
+    ];
     autoPoseRef.current.saved = savedSlots[autoPoseRef.current.activeSlot];
     // 실행 중이면 유지하고, 아니면 저장된 슬롯만 복원한다.
     if (!autoPoseRef.current.executing) {
@@ -1659,10 +1665,9 @@ export function ExcavatorGameWrapper({
       arm: sim.arm,
       bucket: sim.bucket,
     };
-    autoPoseRef.current.slots = [
-      slot === 0 ? pose : autoPoseRef.current.slots[0],
-      slot === 1 ? pose : autoPoseRef.current.slots[1],
-    ];
+    autoPoseRef.current.slots = autoPoseRef.current.slots.map((existing, index) =>
+      index === slot ? pose : existing,
+    ) as typeof autoPoseRef.current.slots;
     if (autoPoseRef.current.executing && autoPoseRef.current.activeSlot === slot) {
       cancelAutoArmPose(autoPoseRef.current);
       autoPoseRef.current.saved = { ...pose };
@@ -1746,7 +1751,12 @@ export function ExcavatorGameWrapper({
     const prevActiveSlot = autoPoseRef.current.activeSlot;
     autoPoseRef.current = createAutoPoseState();
     autoPoseRef.current.activeSlot = prevActiveSlot;
-    autoPoseRef.current.slots = [persistedSlots[0], persistedSlots[1]];
+    autoPoseRef.current.slots = [
+      persistedSlots[0],
+      persistedSlots[1],
+      persistedSlots[2],
+      persistedSlots[3],
+    ];
     autoPoseRef.current.saved = persistedSlots[prevActiveSlot];
     setAutoPose({
       ...autoPoseRef.current,
@@ -3354,7 +3364,7 @@ export function ExcavatorGameWrapper({
         ) : null}
 
         {mode !== "intro" && mode !== "gameReady" && mode !== "ride" ? (
-          <div className="absolute left-2 top-2 z-50 flex flex-col items-start gap-1.5">
+          <div className="absolute left-1 top-2 z-50 flex flex-col items-start gap-1.5">
             {!questsDisabled ? (
               <>
                 <div className="pointer-events-auto flex items-start gap-1.5">
@@ -3508,21 +3518,34 @@ export function ExcavatorGameWrapper({
                 />
               </div>
             ) : null}
+            {!questsDisabled ? (
+              <div className="pointer-events-auto w-[7.3125rem]">
+                <MissionHudPanel
+                  questState={questState}
+                  claiming={questClaimingId === "mission"}
+                  onClaim={() => {
+                    void handleClaimMissionQuest();
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
 
         {mode !== "intro" && mode !== "ride" && (
           <div className="pointer-events-none absolute left-1/2 top-2 z-50 flex -translate-x-1/2 flex-col items-center gap-1">
-            <div className="flex min-w-[5.5rem] flex-col items-center rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-white shadow-lg backdrop-blur-sm">
-              <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/70">
-                {mode === "game" ? "누적 점수" : "점수"}
-              </span>
-              <span className="mt-0.5 text-sm font-black tabular-nums text-yellow-100">
-                {(
-                  mode === "game" ? seasonScoreBase + hud.score : hud.score
-                ).toLocaleString()}
-              </span>
-            </div>
+            {!(immersive && headerHudReady) ? (
+              <div className="flex min-w-[5.5rem] flex-col items-center rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-white shadow-lg backdrop-blur-sm">
+                <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/70">
+                  {mode === "game" ? "누적 점수" : "점수"}
+                </span>
+                <span className="mt-0.5 text-sm font-black tabular-nums text-yellow-100">
+                  {(
+                    mode === "game" ? seasonScoreBase + hud.score : hud.score
+                  ).toLocaleString()}
+                </span>
+              </div>
+            ) : null}
             {showBucketLoad ? (
               <div className="min-w-[7.5rem] rounded-xl border border-orange-200/45 bg-black/65 px-2.5 py-1.5 text-center text-white shadow-lg backdrop-blur-sm">
                 <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-orange-100">
@@ -3585,7 +3608,7 @@ export function ExcavatorGameWrapper({
               </div>
             ) : digFeedback.canDropRock ? (
               <div className="rounded-xl border border-violet-200/50 bg-violet-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                발판 아래쪽: 열기
+                발판 왼쪽: 열기
               </div>
             ) : attachmentType === "grapple" &&
               digFeedback.carryingRock &&
@@ -3682,50 +3705,77 @@ export function ExcavatorGameWrapper({
         {headerHudReady && mode !== "intro" && mode !== "ride"
           ? (() => {
               const leftTarget = document.getElementById(GAME_IMMERSIVE_HEADER_LEFT_ID);
+              const centerTarget = document.getElementById(
+                GAME_IMMERSIVE_HEADER_CENTER_ID,
+              );
               const rightTarget = document.getElementById(GAME_IMMERSIVE_HEADER_RIGHT_ID);
-              if (!leftTarget && !rightTarget) return null;
+              if (!leftTarget && !centerTarget && !rightTarget) return null;
               const ownedStars = mode === "game" ? currency : previewStars;
               const xpProgress = getPlayerLevelProgress(
                 mode === "game" ? totalXp : session?.user?.totalXp ?? totalXp,
               );
               const nickname =
                 session?.user?.nickname ?? session?.user?.loginId ?? "PLAYER";
+              const displayScore =
+                mode === "game" ? seasonScoreBase + hud.score : hud.score;
               return (
                 <>
                   {leftTarget && mode === "game"
                     ? createPortal(
-                        <div className="flex min-w-0 w-full max-w-full items-center text-white">
+                        <div className="flex min-w-0 w-full max-w-full items-center overflow-hidden text-white">
                           <div className="flex h-8 min-w-0 w-full flex-col justify-center gap-0.5 rounded-lg border border-white/15 bg-black/25 px-2">
                             <div className="flex min-w-0 items-baseline gap-1">
-                              <p className="min-w-0 truncate text-[10px] font-black leading-none">
+                              <p
+                                className="min-w-0 truncate text-[10px] font-black leading-none"
+                                title={nickname}
+                              >
                                 {nickname}
                               </p>
                               <span className="shrink-0 text-[9px] font-black text-amber-200">
                                 Lv.{xpProgress.level}
                               </span>
-                              <span
-                                className="ml-auto shrink-0 text-[8px] font-bold tabular-nums leading-none text-white/80"
-                                title={`${xpProgress.currentXp.toLocaleString()}/${xpProgress.requiredXp.toLocaleString()}`}
-                              >
-                                {xpProgress.currentXp.toLocaleString()}/
-                                {xpProgress.requiredXp.toLocaleString()}
-                              </span>
                             </div>
-                            <div className="flex min-w-0 items-center gap-1.5">
+                            <div className="relative min-w-0 w-full overflow-hidden">
                               <XpProgressBar
                                 progress={xpProgress}
                                 compact
                                 showLabel={false}
-                                className="min-w-0 flex-1"
-                                barClassName="bg-white/20"
+                                className="min-w-0 w-full"
+                                barClassName="!h-2.5 bg-white/20"
                               />
-                              <span className="shrink-0 text-[8px] font-bold tabular-nums leading-none text-white/80">
-                                {xpProgress.progressPct}%
+                              <span
+                                className="pointer-events-none absolute inset-0 flex items-center justify-end px-1.5 text-[7px] font-black leading-none tabular-nums text-white"
+                                style={{
+                                  textShadow:
+                                    "0 0 2px rgba(0,0,0,0.95), 0 1px 1px rgba(0,0,0,0.85)",
+                                }}
+                                title={`${xpProgress.currentXp.toLocaleString()}/${xpProgress.requiredXp.toLocaleString()}(${xpProgress.progressPct}%)`}
+                              >
+                                <span className="truncate">
+                                  {xpProgress.currentXp.toLocaleString()}/
+                                  {xpProgress.requiredXp.toLocaleString()}
+                                  <span className="text-amber-100">
+                                    ({xpProgress.progressPct}%)
+                                  </span>
+                                </span>
                               </span>
                             </div>
                           </div>
                         </div>,
                         leftTarget,
+                      )
+                    : null}
+                  {centerTarget
+                    ? createPortal(
+                        <div className="inline-flex h-8 w-max min-w-[6.5rem] max-w-[10.5rem] flex-col items-center justify-center rounded-lg border border-white/20 bg-black/30 px-2.5 text-white shadow-sm">
+                          <span className="text-[8px] font-bold uppercase leading-none tracking-[0.12em] text-white/75">
+                            {mode === "game" ? "누적 점수" : "점수"}
+                          </span>
+                          <span className="mt-0.5 max-w-full truncate text-[13px] font-black leading-none tabular-nums text-yellow-100">
+                            {displayScore.toLocaleString()}
+                          </span>
+                        </div>,
+                        centerTarget,
                       )
                     : null}
                   {rightTarget
@@ -3826,15 +3876,6 @@ export function ExcavatorGameWrapper({
                 />
               ) : null}
             </div>
-            {mode !== "ride" && mode !== "gameReady" && !questsDisabled ? (
-              <MissionHudPanel
-                questState={questState}
-                claiming={questClaimingId === "mission"}
-                onClaim={() => {
-                  void handleClaimMissionQuest();
-                }}
-              />
-            ) : null}
             </div>
           </div>
         )}

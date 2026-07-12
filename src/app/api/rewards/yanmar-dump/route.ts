@@ -8,6 +8,11 @@ import {
   rollYanmarDropRewards,
   runReplayableRewardEvent,
 } from "@/lib/yanmar-rewards";
+import {
+  formatTickerCouponMessage,
+  formatTickerStarsMessage,
+  publishTickerWinEvents,
+} from "@/lib/ticker";
 import { getSeasonKey } from "@/lib/games";
 import { withHotApiObservability } from "@/lib/hot-api-observability";
 import { consumeDumpRateLimit } from "@/lib/redis-token-bucket";
@@ -255,6 +260,51 @@ export const POST = withHotApiObservability(
     outcome: "success",
     replayed: result.replayed,
   });
+
+  if (!result.replayed) {
+    const payload = result.result as {
+      events?: DumpRewardEvent[];
+      totalStars?: number;
+    };
+    const nickname = session.user.nickname ?? session.user.loginId;
+    const tickerEvents: Array<{
+      kind: "coupon" | "stars";
+      message: string;
+      nickname: string;
+    }> = [];
+
+    for (const event of payload.events ?? []) {
+      if (event.kind !== "coupon") continue;
+      tickerEvents.push({
+        kind: "coupon",
+        nickname,
+        message: formatTickerCouponMessage(
+          nickname,
+          event.couponType,
+          event.discountPct,
+        ),
+      });
+    }
+
+    const criticalStars = (payload.events ?? [])
+      .filter(
+        (event): event is DumpStarEvent =>
+          event.kind === "stars" && event.critical,
+      )
+      .reduce((sum, event) => sum + event.stars, 0);
+    if (criticalStars > 0) {
+      tickerEvents.push({
+        kind: "stars",
+        nickname,
+        message: formatTickerStarsMessage(nickname, criticalStars, true),
+      });
+    }
+
+    void publishTickerWinEvents(tickerEvents).catch((error) => {
+      console.error("[ticker] dump publish failed:", error);
+    });
+  }
+
   return NextResponse.json(result.result);
   },
 );

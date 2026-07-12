@@ -255,9 +255,9 @@ export function getTutorialInstruction(
     case "rockLoad":
       switch (progress.phase) {
         case 0:
-          return "버켓 각도를 집게에 맞춘 뒤 발판 위쪽으로 돌을 집으세요";
+          return "버켓 각도를 집게에 맞춘 뒤 발판 오른쪽으로 돌을 집으세요";
         case 1:
-          return "집게 발판을 위쪽으로 3초간 유지해 밀착감을 최대로 올리세요";
+          return "집게 발판을 오른쪽으로 3초간 유지해 밀착감을 최대로 올리세요";
         default:
           return "발판을 떼고 붐을 올려 적재 성공/실패 판정을 확인하세요";
       }
@@ -266,7 +266,7 @@ export function getTutorialInstruction(
         case 0:
           return "돌을 성공적으로 적재한 뒤 돌트럭으로 이동하세요";
         case 1:
-          return "트럭에서 발판 아래쪽을 밟아 돌을 하역하세요";
+          return "트럭에서 발판 왼쪽을 밟아 돌을 하역하세요";
         default:
           return "트럭에서 비켜나면 트럭이 출발합니다 — 출발할 때까지 확인";
       }

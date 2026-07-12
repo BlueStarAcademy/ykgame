@@ -107,7 +107,7 @@ export function ExcavatorGrapple({
     const follow = 1 - Math.exp(-delta * 0.625);
     currentOpenRef.current += (target - currentOpenRef.current) * follow;
     if (thumbRef.current) {
-      // 발판 하단(열기) 최대 벌림 ≈ 92° (암과 겹침 최소화)
+      // 발판 좌측(열기) 최대 벌림 ≈ 92° (암과 겹침 최소화)
       thumbRef.current.rotation.z = -currentOpenRef.current * (92 * Math.PI) / 180;
     }
   });

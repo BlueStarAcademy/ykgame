@@ -126,7 +126,7 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
       </button>
 
       {expanded ? (
-        <div className="absolute right-0 top-full z-20 mt-1 w-max min-w-full rounded-xl border border-white/15 bg-black/60 px-1.5 py-1.5 shadow-lg backdrop-blur-sm">
+        <div className="absolute left-0 top-full z-20 mt-1 w-max min-w-full rounded-xl border border-white/15 bg-black/60 px-1.5 py-1.5 shadow-lg backdrop-blur-sm">
           {!mission ? (
             <p className="whitespace-nowrap text-center text-[8px] font-black text-emerald-200">
               미션 퀘스트 완료

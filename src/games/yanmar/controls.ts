@@ -1,6 +1,6 @@
 /** 얀마 SV08-1 조작 매핑 — YK건기 조작 도면 기준 */
 
-import type { AutoPoseState } from "./types";
+import type { AutoPoseSlotIndex, AutoPoseState } from "./types";
 
 export const YANMAR_ASSETS = {
   controlsGuide: "/images/yanmar/controls-guide.webp",
@@ -16,12 +16,13 @@ export const COCKPIT_LAYOUT = {
   travelRight: { cx: 0.532, cy: 0.75, radius: 0.043, travel: 0.062 },
   travelBoth: { cx: 0.5, cy: 0.75, radius: 0.052, travel: 0.062 },
   hydraulicSpeed: { cx: 0.665, cy: 0.77, radius: 0.038, travel: 0.032 },
-  rightPedal: { cx: 0.735, cy: 0.68, width: 0.052, height: 0.62 },
-  /** 좌측 패드와 주행 레버 사이 — 브레이커·집게 양방향 발판 */
-  breakerPedal: { cx: 0.28, cy: 0.76, width: 0.048, height: 0.28 },
+  /** 주행 레버 아래 우측 — 붐 스윙 좌/우 발판 */
+  rightPedal: { cx: 0.595, cy: 0.92, width: 0.09, height: 0.14 },
+  /** 주행 레버 아래 좌측 — 브레이커·집게 좌/우 발판 */
+  breakerPedal: { cx: 0.405, cy: 0.92, width: 0.09, height: 0.14 },
   boomSwing: { cx: 0.34, cy: 0.45, radius: 0.04, travel: 0.045 },
-  /** 우측 조이스틱과 우측 주행 레버 사이 */
-  blade: { cx: 0.72, cy: 0.76, radius: 0.038, travel: 0.055 },
+  /** 기능 메뉴 안 — 도저 블레이드 레버 */
+  blade: { cx: 0.1, cy: 0.165, radius: 0.038, travel: 0.055 },
   throttle: { cx: 0.39, cy: 0.45, radius: 0.038, travel: 0.04 },
   horn: { cx: 0.905, cy: 0.2, radius: 0.014 },
 } as const;
@@ -48,7 +49,7 @@ export interface AuxiliaryControlState {
   throttle: number;
   highSpeed: boolean;
   safetyLocked: boolean;
-  /** 위=1, 아래=-1. 브레이커는 양쪽 모두 타격, 집게는 위 닫기·아래 열기. */
+  /** 좌=-1(열기), 우=1(닫기). 브레이커는 좌측만 타격. */
   attachmentPedal: -1 | 0 | 1;
   /** 0=닫힘, 1=완전히 열림. */
   grappleOpen: number;
@@ -419,7 +420,7 @@ export const AUTO_POSE_JOINT_ORDER = ["arm", "boom", "bucket"] as const;
 
 export function createAutoPoseState(): AutoPoseState {
   return {
-    slots: [null, null],
+    slots: [null, null, null, null],
     activeSlot: 0,
     saved: null,
     executing: false,
@@ -599,7 +600,7 @@ export function hasManualControlInput(
 
 export function startAutoArmPose(
   autoPose: AutoPoseState,
-  slot: 0 | 1 = autoPose.activeSlot,
+  slot: AutoPoseSlotIndex = autoPose.activeSlot,
 ) {
   const pose = autoPose.slots[slot];
   if (!pose) return false;

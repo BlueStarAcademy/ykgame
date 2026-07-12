@@ -639,10 +639,9 @@ function LinkPin({
 const YANMAR_LOGO_ASPECT = 512 / 62;
 const YK_LABEL_ASPECT = 512 / 160;
 const YANMAR_LOGO_WIDTH = 1.24;
-/** 운전석 옆 차체: Yanmar + ViO17-1 (차체 측면 중앙에 맞춤) */
-const YANMAR_CAB_MODEL_NAME = "ViO17-1";
-const YANMAR_CAB_BRAND_WIDTH = 0.78;
-const YANMAR_CAB_BRAND_X = 0;
+/** 운전석 옆 차체: ViO 17HD 모델 마크 (차체 측면 중앙) */
+const VIO_SIDE_BRAND_WIDTH = 1.18;
+const VIO_SIDE_BRAND_X = -0.06;
 const REAR_BODY_PANEL_X = -1.715;
 const REAR_BODY_PANEL_Z = -0.36;
 const YANMAR_REAR_BODY_Z = -0.24;
@@ -771,66 +770,145 @@ function createYanmarRearLabelTexture() {
   return texture;
 }
 
-/** 운전석 옆 차체용: Yanmar 로고 우측에 모델명(ViO17-1)을 붙인 데칼. */
-function createYanmarCabSideBrandTexture(source: THREE.Texture): {
+/**
+ * 운전석 옆 차체용 ViO 17HD 마크.
+ * ViO + 큰 17 + 우측 하단 HD, 흰 필·검정 외곽·미세 상단 그라데이션.
+ */
+function createVio17HdSideBrandTexture(): {
   texture: THREE.Texture;
   aspect: number;
 } | null {
   if (typeof document === "undefined") return null;
-  const img = source.image as CanvasImageSource | undefined;
-  if (!img) return null;
 
-  const logoW =
-    "naturalWidth" in img && typeof img.naturalWidth === "number" && img.naturalWidth > 0
-      ? img.naturalWidth
-      : "width" in img && typeof img.width === "number"
-        ? img.width
-        : 512;
-  const logoH =
-    "naturalHeight" in img && typeof img.naturalHeight === "number" && img.naturalHeight > 0
-      ? img.naturalHeight
-      : "height" in img && typeof img.height === "number"
-        ? img.height
-        : 62;
-  if (logoW <= 0 || logoH <= 0) return null;
-
-  const scale = 2;
-  const gap = Math.round(logoH * 0.42);
+  const scale = 8;
+  const baseWidth = 760;
+  const baseHeight = 240;
   const canvas = document.createElement("canvas");
+  canvas.width = baseWidth * scale;
+  canvas.height = baseHeight * scale;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  ctx.font = `900 ${Math.round(logoH * 0.72)}px Arial, "Helvetica Neue", sans-serif`;
-  const modelWidth = Math.ceil(ctx.measureText(YANMAR_CAB_MODEL_NAME).width);
-  const padX = Math.round(logoH * 0.12);
-  const padY = Math.round(logoH * 0.18);
-  canvas.width = (logoW + gap + modelWidth + padX * 2) * scale;
-  canvas.height = (logoH + padY * 2) * scale;
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
-  ctx.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
-
-  ctx.drawImage(img, padX, padY, logoW, logoH);
-
-  ctx.font = `900 ${Math.round(logoH * 0.72)}px Arial, "Helvetica Neue", sans-serif`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.clearRect(0, 0, baseWidth, baseHeight);
   ctx.lineJoin = "round";
-  ctx.shadowColor = "rgba(0,0,0,0.55)";
-  ctx.shadowBlur = 2;
-  ctx.shadowOffsetY = 1;
-  const modelX = padX + logoW + gap;
-  const modelY = padY + logoH * 0.52;
-  ctx.lineWidth = Math.max(2, logoH * 0.06);
-  ctx.strokeStyle = "rgba(15,23,42,0.88)";
-  ctx.strokeText(YANMAR_CAB_MODEL_NAME, modelX, modelY);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(YANMAR_CAB_MODEL_NAME, modelX, modelY);
+  ctx.lineCap = "round";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+
+  const fontStack =
+    'Arial Black, Impact, "Helvetica Neue", Arial, sans-serif';
+  // Mild italic shear matching the factory mark.
+  const shear = -0.18;
+
+  const setFont = (size: number) => {
+    ctx.font = `900 ${size}px ${fontStack}`;
+  };
+
+  const measure = (text: string, size: number) => {
+    setFont(size);
+    return ctx.measureText(text).width;
+  };
+
+  const vioSize = 86;
+  const numSize = 162;
+  const hdSize = 62;
+  const vioW = measure("ViO", vioSize);
+  const numW = measure("17", numSize);
+  const hdW = measure("HD", hdSize);
+  const gapVioNum = 8;
+  const hdOffset = numW * 0.88;
+  const contentW = vioW + gapVioNum + Math.max(numW, hdOffset + hdW);
+  const originX = (baseWidth - contentW) / 2 + 12;
+  const numX = originX + vioW + gapVioNum;
+  const baseline = 178;
+
+  const makeFill = (top: number, bottom: number) => {
+    const gradient = ctx.createLinearGradient(0, top, 0, bottom);
+    gradient.addColorStop(0, "#ffffff");
+    gradient.addColorStop(0.12, "#ffffff");
+    gradient.addColorStop(0.88, "#ffffff");
+    gradient.addColorStop(1, "#f4f7fa");
+    return gradient;
+  };
+
+  // Factory ViO mark: charcoal → silver → white vertical fill.
+  const makeVioFill = (top: number, bottom: number) => {
+    const gradient = ctx.createLinearGradient(0, top, 0, bottom);
+    gradient.addColorStop(0, "#2a3036");
+    gradient.addColorStop(0.2, "#6a737c");
+    gradient.addColorStop(0.45, "#c5ced6");
+    gradient.addColorStop(0.7, "#f5f7f9");
+    gradient.addColorStop(1, "#ffffff");
+    return gradient;
+  };
+
+  const drawMark = (
+    text: string,
+    x: number,
+    y: number,
+    size: number,
+    strokeWidth: number,
+    fill: "white" | "vio" = "white",
+  ) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.transform(1, 0, shear, 1, 0, 0);
+    setFont(size);
+
+    // Strong black outline for red-body contrast.
+    ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+    ctx.shadowBlur = 1.5;
+    ctx.shadowOffsetX = 1.2;
+    ctx.shadowOffsetY = 1.8;
+    ctx.lineWidth = strokeWidth * 1.15;
+    ctx.strokeStyle = "#000000";
+    ctx.strokeText(text, 0, 0);
+
+    ctx.shadowColor = "transparent";
+    ctx.lineWidth = Math.max(1.5, strokeWidth * 0.28);
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+    ctx.strokeText(text, 0, 0);
+
+    const top = -size * 0.86;
+    const bottom = size * 0.1;
+    ctx.fillStyle =
+      fill === "vio" ? makeVioFill(top, bottom) : makeFill(top, bottom);
+    ctx.fillText(text, 0, 0);
+
+    if (fill === "vio") {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(-size * 0.2, -size * 0.62, size * 4, size * 0.22);
+      ctx.clip();
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(text, 0, 0);
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(-size * 0.15, -size * 0.92, size * 4, size * 0.3);
+      ctx.clip();
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(text, 0, 0);
+      ctx.restore();
+    }
+
+    ctx.restore();
+  };
+
+  drawMark("ViO", originX, baseline - 34, vioSize, 12, "vio");
+  drawMark("17", numX, baseline, numSize, 18);
+  drawMark("HD", numX + hdOffset, baseline + 2, hdSize, 9);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
-  configureDecalTexture(texture);
-  texture.generateMipmaps = true;
-  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  // Keep non-mipmapped linear filtering so the side mark stays crisp at close range.
+  configureDecalTexture(texture, 16);
   return {
     texture,
     aspect: canvas.width / canvas.height,
@@ -1894,52 +1972,27 @@ function ExcavatorArm({
   const bladeRef = useRef<THREE.Group>(null);
   const yanmarLogo = useLoader(THREE.TextureLoader, "/images/yanmar/yanmar-logo-white.png");
   const [ykBoomLogo, setYkBoomLogo] = useState<THREE.Texture | null>(null);
-  const [yanmarCabBrand, setYanmarCabBrand] = useState<{
+  const [vioSideBrand, setVioSideBrand] = useState<{
     texture: THREE.Texture;
     aspect: number;
   } | null>(null);
 
   useLayoutEffect(() => {
     configureDecalTexture(yanmarLogo);
-    let cancelled = false;
-    let owned: THREE.Texture | null = null;
-
-    const build = () => {
-      if (cancelled) return;
-      const brand = createYanmarCabSideBrandTexture(yanmarLogo);
-      if (!brand) {
-        setYanmarCabBrand(null);
-        return;
-      }
-      owned?.dispose();
-      owned = brand.texture;
-      setYanmarCabBrand(brand);
-    };
-
-    const img = yanmarLogo.image as HTMLImageElement | ImageBitmap | undefined;
-    if (
-      img &&
-      "complete" in img &&
-      typeof img.complete === "boolean" &&
-      !img.complete &&
-      "addEventListener" in img
-    ) {
-      img.addEventListener("load", build);
-      return () => {
-        cancelled = true;
-        img.removeEventListener("load", build);
-        owned?.dispose();
-        setYanmarCabBrand(null);
-      };
-    }
-
-    build();
-    return () => {
-      cancelled = true;
-      owned?.dispose();
-      setYanmarCabBrand(null);
-    };
   }, [yanmarLogo]);
+
+  useLayoutEffect(() => {
+    const brand = createVio17HdSideBrandTexture();
+    if (!brand) {
+      setVioSideBrand(null);
+      return;
+    }
+    setVioSideBrand(brand);
+    return () => {
+      brand.texture.dispose();
+      setVioSideBrand(null);
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const texture = createYkGeongiLabelTexture("horizontal");
@@ -2191,16 +2244,16 @@ function ExcavatorArm({
         <group ref={machineBodyRef} visible={cameraMode !== 3}>
           <PremiumExcavatorBody
             velRef={velRef}
-            yanmarLogo={yanmarCabBrand?.texture ?? yanmarLogo}
+            yanmarLogo={vioSideBrand?.texture}
             yanmarLogoWidth={
-              yanmarCabBrand ? YANMAR_CAB_BRAND_WIDTH : 0.72
+              vioSideBrand ? VIO_SIDE_BRAND_WIDTH : 0.72
             }
             yanmarLogoHeight={
-              yanmarCabBrand
-                ? logoHeightForWidth(YANMAR_CAB_BRAND_WIDTH, yanmarCabBrand.aspect)
+              vioSideBrand
+                ? logoHeightForWidth(VIO_SIDE_BRAND_WIDTH, vioSideBrand.aspect)
                 : 0.087
             }
-            yanmarLogoX={yanmarCabBrand ? YANMAR_CAB_BRAND_X : 0}
+            yanmarLogoX={vioSideBrand ? VIO_SIDE_BRAND_X : 0}
             ykLogo={ykBoomLogo ?? undefined}
             upperBodyRef={upperBodyYawRef}
           />

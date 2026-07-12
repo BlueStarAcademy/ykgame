@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { GameTickerBoard } from "@/components/games/GameTickerBoard";
 import { useGameFullscreen } from "@/hooks/useGameFullscreen";
 import {
   enableInGamePortrait,
@@ -10,9 +11,8 @@ import {
 import { enablePwaMode } from "@/lib/pwa-mode";
 
 export const GAME_IMMERSIVE_HEADER_LEFT_ID = "game-immersive-header-left";
+export const GAME_IMMERSIVE_HEADER_CENTER_ID = "game-immersive-header-center";
 export const GAME_IMMERSIVE_HEADER_RIGHT_ID = "game-immersive-header-right";
-
-const PRACTICE_TICKER_MESSAGE = "연습모드에서는 재화나 점수가 누적되지 않습니다.";
 
 interface ImmersiveFullscreenControl {
   canFullscreen: boolean;
@@ -26,19 +26,6 @@ const ImmersiveFullscreenContext = createContext<ImmersiveFullscreenControl | nu
 
 export function useImmersiveFullscreenControl() {
   return useContext(ImmersiveFullscreenContext);
-}
-
-function PracticeModeTicker() {
-  return (
-    <div className="yanmar-practice-ticker shrink-0 overflow-hidden py-1.5" aria-live="polite">
-      <div className="yanmar-practice-ticker-track">
-        <span className="yanmar-practice-ticker-item">{PRACTICE_TICKER_MESSAGE}</span>
-        <span className="yanmar-practice-ticker-item" aria-hidden>
-          {PRACTICE_TICKER_MESSAGE}
-        </span>
-      </div>
-    </div>
-  );
 }
 
 interface GameImmersiveOverlayProps {
@@ -121,10 +108,10 @@ export function GameImmersiveOverlay({
         }}
       >
       <div
-        className="flex shrink-0 items-center justify-between px-3 py-2 text-white"
+        className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 px-3 py-2 text-white"
         style={{ backgroundColor: headerColor }}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex min-w-0 max-w-full items-center gap-2 justify-self-stretch overflow-hidden">
           {!hideExitButton ? (
             <button
               type="button"
@@ -137,12 +124,16 @@ export function GameImmersiveOverlay({
               ✕ 종료
             </button>
           ) : null}
-          <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 flex-1 items-center" />
+          <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 max-w-full flex-1 items-center overflow-hidden" />
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <div id={GAME_IMMERSIVE_HEADER_RIGHT_ID} className="flex items-center gap-3" />
+        <div
+          id={GAME_IMMERSIVE_HEADER_CENTER_ID}
+          className="z-[1] flex shrink-0 items-center justify-center justify-self-center"
+        />
+        <div className="flex min-w-0 max-w-full items-center justify-end gap-2 justify-self-stretch overflow-hidden">
+          <div id={GAME_IMMERSIVE_HEADER_RIGHT_ID} className="flex min-w-0 items-center justify-end gap-3 overflow-hidden" />
           {!hideHeaderStats && (
-            <span className="text-[10px] opacity-80">
+            <span className="shrink-0 text-[10px] opacity-80">
               {myRank ? `#${myRank}` : "-"} · {bestScore > 0 ? `${bestScore}점` : "0점"}
             </span>
           )}
@@ -152,7 +143,7 @@ export function GameImmersiveOverlay({
               onClick={() => {
                 void enter();
               }}
-              className="rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
+              className="shrink-0 rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
             >
               ⛶ 전체화면
             </button>
@@ -161,14 +152,14 @@ export function GameImmersiveOverlay({
             <button
               type="button"
               onClick={onShowRanking}
-              className="rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
+              className="shrink-0 rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
             >
               📊
             </button>
           )}
         </div>
       </div>
-      {showPracticeTicker ? <PracticeModeTicker /> : null}
+      <GameTickerBoard includePractice={showPracticeTicker} />
       <div className="relative min-h-0 flex-1 overflow-hidden">{children}</div>
       </div>
     </ImmersiveFullscreenContext.Provider>,

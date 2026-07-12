@@ -457,11 +457,62 @@ body {
   }
 }
 
+.yanmar-game-ticker {
+  height: 1.5rem;
+  min-height: 1.5rem;
+  max-height: 1.5rem;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 40%),
+    linear-gradient(180deg, #1f1410 0%, #120c0a 100%);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(251, 191, 36, 0.12),
+    0 0.12rem 0.35rem rgba(0, 0, 0, 0.35);
+}
+
+.yanmar-game-ticker-track {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  height: 100%;
+  animation: yanmar-game-ticker-scroll 24s linear infinite;
+  will-change: transform;
+}
+
+.yanmar-game-ticker-item {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 2.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  color: #fde68a;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.42);
+}
+
+@keyframes yanmar-game-ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 .yanmar-control-deck {
   /* Panel height + clearance so perspective/shadow bottoms are not clipped. */
   --yanmar-travel-panel-h: 3.6rem;
   --yanmar-travel-panel-half: 1.8rem;
-  --yanmar-travel-baseline: 2.45rem;
+  --yanmar-travel-baseline: 4.55rem;
+  --yanmar-foot-pedal-baseline: 1.35rem;
   --yanmar-travel-stick-h: 2.45rem;
   bottom: 0;
   height: clamp(9.5rem, 34dvh, 15rem);
@@ -2685,7 +2736,7 @@ body {
   grid-row: 2;
 }
 
-.yanmar-function-menu-item-pedal {
+.yanmar-function-menu-item-blade {
   grid-column: 3;
   grid-row: 2 / span 2;
   align-self: stretch;
@@ -2887,17 +2938,31 @@ body {
   text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.58);
 }
 
-.yanmar-auto-menu {
+.yanmar-horn-auto-cluster {
   position: absolute;
+  z-index: 66;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  pointer-events: none;
+}
+
+.yanmar-horn-auto-cluster > * {
+  pointer-events: auto;
+}
+
+.yanmar-auto-menu {
+  position: relative;
   z-index: 65;
-  transform: translate(-50%, -50%);
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .yanmar-horn-standalone {
-  position: absolute;
+  position: relative;
   z-index: 66;
-  transform: translate(-50%, -50%);
   flex-shrink: 0;
+  box-sizing: border-box;
   border-color: rgba(253, 230, 138, 0.38);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 32%),
@@ -2959,6 +3024,7 @@ body {
 
 .yanmar-auto-menu-toggle {
   position: relative;
+  box-sizing: border-box;
   flex-shrink: 0;
   border-color: rgba(196, 181, 253, 0.38);
   background:
@@ -3257,24 +3323,41 @@ body {
   box-shadow: none;
 }
 
-.yanmar-function-menu-item-pedal .yanmar-pedal-button-half {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
+.yanmar-function-menu-item-blade .yanmar-blade-lever-embedded {
+  overflow: visible;
+  border: 1px solid rgba(203, 213, 225, 0.52);
+  border-radius: 0.78rem;
+  background:
+    radial-gradient(ellipse at 28% 12%, rgba(255, 255, 255, 0.22), transparent 34%),
+    repeating-linear-gradient(
+      125deg,
+      rgba(255, 255, 255, 0.025) 0 1px,
+      transparent 1px 4px
+    ),
+    linear-gradient(155deg, #64748b 0%, #334155 30%, #111827 68%, #020617 100%);
+  box-shadow:
+    inset 0.12rem 0.14rem 0.1rem rgba(255, 255, 255, 0.18),
+    inset -0.14rem -0.18rem 0.16rem rgba(0, 0, 0, 0.55),
+    0 0 0 0.08rem #050911,
+    0 0 0 0.13rem rgba(148, 163, 184, 0.36),
+    0 0.28rem 0.3rem rgba(0, 0, 0, 0.55);
 }
 
-.yanmar-function-menu-item-pedal .yanmar-pedal-button.is-top-active .yanmar-pedal-button-top,
-.yanmar-function-menu-item-pedal .yanmar-pedal-button.is-bottom-active .yanmar-pedal-button-bottom {
-  background: rgba(34, 211, 238, 0.12);
-  box-shadow: inset 0 0 0.5rem rgba(34, 211, 238, 0.28);
+.yanmar-function-menu-item-blade .yanmar-blade-lever-embedded::before {
+  content: "";
+  position: absolute;
+  inset: 0.18rem;
+  z-index: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.58rem;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0.5rem rgba(148, 163, 184, 0.08),
+    inset 0 -0.22rem 0.3rem rgba(0, 0, 0, 0.28);
 }
 
 .yanmar-breaker-pedal-button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.18rem;
+  display: block;
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -3289,40 +3372,200 @@ body {
   filter: grayscale(0.35);
 }
 
-.yanmar-breaker-pedal-button.is-active {
-  box-shadow: none;
+.yanmar-premium-foot-pedal {
+  filter: drop-shadow(0 0.28rem 0.2rem rgba(2, 6, 23, 0.62));
 }
 
-.yanmar-breaker-pedal-pad {
-  display: block;
-  width: 100%;
-  height: 96%;
-  background-image: url("/images/yanmar/2d/cockpit/attachment-pedal-front.png?v=4");
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
-  transform-origin: center;
-  backface-visibility: hidden;
-  filter: drop-shadow(0 0.18rem 0.16rem rgba(0, 0, 0, 0.78));
-  transform: perspective(6rem) rotateX(0deg);
+.yanmar-premium-foot-pedal-art {
+  --pedal-accent: 251, 191, 36;
+  position: absolute;
+  inset: 0;
+}
+
+.yanmar-premium-foot-pedal-art-cyan {
+  --pedal-accent: 34, 211, 238;
+}
+
+.yanmar-premium-foot-pedal-bay {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  border: 1px solid rgba(203, 213, 225, 0.5);
+  border-radius: 0.72rem 0.72rem 0.42rem 0.42rem;
+  background:
+    radial-gradient(ellipse at 28% 12%, rgba(255, 255, 255, 0.28), transparent 32%),
+    repeating-linear-gradient(
+      125deg,
+      rgba(255, 255, 255, 0.025) 0 1px,
+      transparent 1px 4px
+    ),
+    linear-gradient(145deg, #64748b 0%, #334155 30%, #111827 68%, #020617 100%);
+  box-shadow:
+    inset 0.12rem 0.14rem 0.1rem rgba(255, 255, 255, 0.2),
+    inset -0.14rem -0.18rem 0.16rem rgba(0, 0, 0, 0.58),
+    0 0 0 0.08rem #050911,
+    0 0 0 0.12rem rgba(var(--pedal-accent), 0.34);
+  transform: perspective(7rem) rotateX(10deg);
+  transform-origin: 50% 100%;
+}
+
+.yanmar-premium-foot-pedal-inset {
+  position: absolute;
+  inset: 0.16rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 0.52rem 0.52rem 0.28rem 0.28rem;
+  box-shadow:
+    inset 0 0 0.5rem rgba(148, 163, 184, 0.08),
+    inset 0 -0.22rem 0.3rem rgba(0, 0, 0, 0.32);
+}
+
+.yanmar-premium-foot-pedal-bay .yanmar-premium-lever-bolt {
+  width: 0.28rem;
+  height: 0.28rem;
+}
+
+.yanmar-premium-foot-pedal-hinge {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  bottom: 22%;
+  z-index: 3;
+  width: 0.22rem;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.28), transparent 35% 65%, rgba(0, 0, 0, 0.55)),
+    linear-gradient(180deg, #94a3b8 0%, #334155 42%, #0b1220 100%);
+  box-shadow:
+    inset 0 0 0 0.04rem rgba(255, 255, 255, 0.12),
+    0 0 0.18rem rgba(0, 0, 0, 0.55);
+}
+
+.yanmar-premium-foot-pedal-hinge::before,
+.yanmar-premium-foot-pedal-hinge::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.45), transparent 34%),
+    linear-gradient(145deg, #cbd5e1, #334155 55%, #020617);
+  box-shadow:
+    inset 0 0 0 0.05rem rgba(15, 23, 42, 0.85),
+    0 0.06rem 0.08rem rgba(0, 0, 0, 0.45);
+}
+
+.yanmar-premium-foot-pedal-hinge::before {
+  top: -0.08rem;
+}
+
+.yanmar-premium-foot-pedal-hinge::after {
+  bottom: -0.08rem;
+}
+
+.yanmar-premium-foot-pedal-rocker {
+  position: absolute;
+  inset: 0.28rem 0.26rem 0.3rem;
+  z-index: 2;
+  display: flex;
+  align-items: stretch;
+  gap: 0.12rem;
+  transform-origin: 50% 55%;
+  transform-style: preserve-3d;
+  transition: transform 120ms cubic-bezier(0.22, 0.8, 0.3, 1), filter 120ms ease;
+}
+
+/* 시소: 왼쪽 눌림 → 왼쪽 하강, 오른쪽 상승 */
+.yanmar-premium-foot-pedal-rocker.is-left-active {
+  transform: perspective(5.5rem) rotateY(-16deg);
+  filter: brightness(1.06);
+}
+
+/* 시소: 오른쪽 눌림 → 오른쪽 하강, 왼쪽 상승 */
+.yanmar-premium-foot-pedal-rocker.is-right-active {
+  transform: perspective(5.5rem) rotateY(16deg);
+  filter: brightness(1.06);
+}
+
+.yanmar-premium-foot-pedal-half {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.48);
+  border-radius: 0.42rem;
+  background:
+    radial-gradient(ellipse at 34% 18%, rgba(255, 255, 255, 0.22), transparent 34%),
+    linear-gradient(180deg, #475569 0%, #1e293b 48%, #020617 100%);
+  box-shadow:
+    inset 0 0.08rem 0.1rem rgba(255, 255, 255, 0.14),
+    inset 0 -0.14rem 0.18rem rgba(0, 0, 0, 0.62),
+    0 0.08rem 0.12rem rgba(0, 0, 0, 0.35);
   transition:
-    transform 110ms ease-out,
-    filter 110ms ease-out;
+    box-shadow 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease,
+    filter 120ms ease;
 }
 
-.yanmar-breaker-pedal-button.is-active .yanmar-breaker-pedal-pad {
-  filter:
-    brightness(1.12)
-    drop-shadow(0 0.18rem 0.16rem rgba(0, 0, 0, 0.78))
-    drop-shadow(0 0 0.3rem rgba(251, 191, 36, 0.48));
+.yanmar-premium-foot-pedal-half.is-left {
+  border-radius: 0.48rem 0.28rem 0.28rem 0.48rem;
 }
 
-.yanmar-breaker-pedal-button.is-top-active .yanmar-breaker-pedal-pad {
-  transform: perspective(6rem) rotateX(11deg) translateY(0.08rem) scale(0.98);
+.yanmar-premium-foot-pedal-half.is-right {
+  border-radius: 0.28rem 0.48rem 0.48rem 0.28rem;
 }
 
-.yanmar-breaker-pedal-button.is-bottom-active .yanmar-breaker-pedal-pad {
-  transform: perspective(6rem) rotateX(-11deg) translateY(-0.08rem) scale(0.98);
+.yanmar-premium-foot-pedal-tread {
+  position: absolute;
+  inset: 0.18rem 0.16rem;
+  border-radius: inherit;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 0.18rem,
+      rgba(226, 232, 240, 0.16) 0.18rem 0.24rem,
+      transparent 0.24rem 0.42rem
+    ),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.35), rgba(2, 6, 23, 0.72));
+  box-shadow: inset 0 0 0.35rem rgba(0, 0, 0, 0.55);
+}
+
+.yanmar-premium-foot-pedal-spine {
+  position: relative;
+  z-index: 2;
+  width: 0.14rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(203, 213, 225, 0.55), rgba(15, 23, 42, 0.9));
+  box-shadow: 0 0 0.18rem rgba(0, 0, 0, 0.45);
+}
+
+/* 눌린 쪽: 어두워지며 눌림 */
+.yanmar-premium-foot-pedal.is-left-active .yanmar-premium-foot-pedal-half.is-left,
+.yanmar-premium-foot-pedal.is-right-active .yanmar-premium-foot-pedal-half.is-right {
+  border-color: rgba(var(--pedal-accent), 0.85);
+  background:
+    radial-gradient(ellipse at 40% 22%, rgba(var(--pedal-accent), 0.38), transparent 42%),
+    linear-gradient(180deg, #3f4b5a 0%, #151c2a 48%, #020617 100%);
+  box-shadow:
+    inset 0 0.22rem 0.35rem rgba(0, 0, 0, 0.72),
+    inset 0 0 0.5rem rgba(var(--pedal-accent), 0.26),
+    0 0 0.45rem rgba(var(--pedal-accent), 0.3);
+  filter: brightness(0.92);
+}
+
+/* 들린 쪽: 밝아지며 떠오름 */
+.yanmar-premium-foot-pedal.is-left-active .yanmar-premium-foot-pedal-half.is-right,
+.yanmar-premium-foot-pedal.is-right-active .yanmar-premium-foot-pedal-half.is-left {
+  border-color: rgba(203, 213, 225, 0.62);
+  box-shadow:
+    inset 0 0.06rem 0.08rem rgba(255, 255, 255, 0.22),
+    inset 0 -0.08rem 0.12rem rgba(0, 0, 0, 0.35),
+    0 0.14rem 0.2rem rgba(0, 0, 0, 0.28);
+  filter: brightness(1.14);
 }
 
 .yanmar-breaker-pedal-caption {
@@ -3559,7 +3802,7 @@ body {
   border-radius: 50%;
   border: 1px solid rgba(203, 213, 225, 0.48);
   transform: translateX(-50%) translateZ(0.12rem) perspective(5rem) rotateX(10deg);
-  transform-origin: 50% 82%;
+  transform-origin: 50% 92%;
   background:
     radial-gradient(ellipse at 30% 18%, rgba(255, 255, 255, 0.38), transparent 27%),
     repeating-linear-gradient(
@@ -3621,7 +3864,9 @@ body {
 .yanmar-layout-portrait .yanmar-control-deck {
   --yanmar-travel-panel-h: 3.6rem;
   --yanmar-travel-panel-half: 1.8rem;
-  --yanmar-travel-baseline: 2.45rem;
+  /* Raised so dual L/R foot pedals sit under the travel levers. */
+  --yanmar-travel-baseline: 4.55rem;
+  --yanmar-foot-pedal-baseline: 1.35rem;
   --yanmar-travel-stick-h: 2.45rem;
   bottom: 0;
   height: clamp(16rem, 40dvh, 20rem);
@@ -3679,6 +3924,41 @@ body {
   width: 3.3rem;
   height: 4.8rem;
   overflow: visible;
+}
+
+.yanmar-blade-lever-visual-embedded {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.yanmar-blade-lever-embedded {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.yanmar-blade-lever-embedded.is-disabled {
+  opacity: 0.45;
+}
+
+.yanmar-blade-lever-visual-embedded .yanmar-visual-lever-travel {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%) scale(0.68);
+  overflow: visible;
+  z-index: 1;
+}
+
+.yanmar-blade-lever-visual-embedded .yanmar-blade-lever-label {
+  top: auto;
+  bottom: 0.18rem;
+  z-index: 2;
+  box-shadow: 0 0 0 0.05rem rgba(148, 163, 184, 0.28);
 }
 
 .yanmar-blade-lever-visual.is-disabled {
@@ -4728,7 +5008,7 @@ html.pwa-mode body {
   height: 1.18rem;
   width: 1.18rem;
   transform: translateX(-50%) translateZ(0.12rem) perspective(5rem) rotateX(10deg);
-  transform-origin: 50% 82%;
+  transform-origin: 50% 92%;
   overflow: visible;
   border: 1px solid rgba(203, 213, 225, 0.48);
   border-radius: 50%;

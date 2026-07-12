@@ -8,7 +8,12 @@ const SNAPSHOT_VERSION = 2;
 /** 비로그인·세션 대기 중에도 같은 브라우저에서 자세를 유지한다. */
 export const AUTO_POSE_LOCAL_OWNER = "local";
 
-export type AutoPoseSlots = [SavedArmPose | null, SavedArmPose | null];
+export type AutoPoseSlots = [
+  SavedArmPose | null,
+  SavedArmPose | null,
+  SavedArmPose | null,
+  SavedArmPose | null,
+];
 
 interface AutoPoseSnapshotV2 {
   version: typeof SNAPSHOT_VERSION;
@@ -45,7 +50,16 @@ function isValidPose(value: unknown): value is SavedArmPose {
 }
 
 function emptySlots(): AutoPoseSlots {
-  return [null, null];
+  return [null, null, null, null];
+}
+
+function cloneSlots(slots: AutoPoseSlots): AutoPoseSlots {
+  return [
+    slots[0] ? { ...slots[0] } : null,
+    slots[1] ? { ...slots[1] } : null,
+    slots[2] ? { ...slots[2] } : null,
+    slots[3] ? { ...slots[3] } : null,
+  ];
 }
 
 function normalizeSlots(value: unknown): AutoPoseSlots {
@@ -58,7 +72,7 @@ function normalizeSlots(value: unknown): AutoPoseSlots {
 }
 
 function hasAnySlot(slots: AutoPoseSlots): boolean {
-  return slots[0] != null || slots[1] != null;
+  return slots.some((slot) => slot != null);
 }
 
 function isValidSnapshotV2(value: unknown): value is AutoPoseSnapshotV2 {
@@ -90,7 +104,7 @@ function migrateLegacySlots(ownerId: string): AutoPoseSlots | null {
       window.localStorage.removeItem(legacyStorageKey(ownerId));
       return null;
     }
-    const slots: AutoPoseSlots = [{ ...parsed.pose }, null];
+    const slots: AutoPoseSlots = [{ ...parsed.pose }, null, null, null];
     saveSavedArmPoseSlots(ownerId, slots, parsed.savedAtMs);
     window.localStorage.removeItem(legacyStorageKey(ownerId));
     return slots;
@@ -151,10 +165,7 @@ export function saveSavedArmPoseSlots(
     const payload: AutoPoseSnapshotV2 = {
       version: SNAPSHOT_VERSION,
       savedAtMs: nowMs,
-      slots: [
-        slots[0] ? { ...slots[0] } : null,
-        slots[1] ? { ...slots[1] } : null,
-      ],
+      slots: cloneSlots(slots),
     };
     window.localStorage.setItem(storageKey(ownerId), JSON.stringify(payload));
   } catch {

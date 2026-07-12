@@ -237,11 +237,10 @@ function PremiumTrack({
 }
 
 function RollBar() {
+  // Keep only the rear canopy pillars; front pair removed for an open forward view.
   const bars = [
     { x: -0.56, y: 0, z: -0.5 },
     { x: -0.56, y: 0, z: 0.5 },
-    { x: 0.56, y: 0, z: -0.5 },
-    { x: 0.56, y: 0, z: 0.5 },
   ];
 
   return (
@@ -474,27 +473,31 @@ export function PremiumExcavatorBody({
           <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
         </RoundedBox>
         {[-1, 1].map((side) => (
-          <mesh key={`body-highlight-${side}`} position={[-0.2, 0.28, side * 0.91]}>
-            <boxGeometry args={[1.12, 0.045, 0.035]} />
+          <mesh key={`body-highlight-${side}`} position={[-0.2, 0.3, side * 0.91]}>
+            <boxGeometry args={[1.12, 0.038, 0.035]} />
             <meshStandardMaterial color={COLOR.paintHighlight} {...MATERIAL.painted} />
           </mesh>
         ))}
         {[-1, 1].map((side) => (
-          <group key={`body-decals-${side}`} position={[0, 0, side * 0.925]}>
+          <group key={`body-decals-${side}`} position={[0, 0, side * 0.945]}>
             {yanmarLogo ? (
               <mesh
-                position={[yanmarLogoX, 0.11, 0]}
+                position={[yanmarLogoX, 0.12, 0]}
                 rotation={[0, side < 0 ? Math.PI : 0, 0]}
-                renderOrder={12}
+                renderOrder={20}
               >
                 <planeGeometry args={[yanmarLogoWidth, yanmarLogoHeight]} />
                 <meshBasicMaterial
                   map={yanmarLogo}
                   transparent
-                  alphaTest={0.25}
+                  alphaTest={0.12}
                   toneMapped={false}
                   depthWrite={false}
+                  depthTest
                   side={THREE.DoubleSide}
+                  polygonOffset
+                  polygonOffsetFactor={-4}
+                  polygonOffsetUnits={-4}
                 />
               </mesh>
             ) : null}
