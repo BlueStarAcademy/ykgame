@@ -12,7 +12,7 @@ export const COCKPIT_LAYOUT = {
   left: { cx: 0.095, cy: 0.76, radius: 0.085, travel: 0.05 },
   right: { cx: 0.905, cy: 0.76, radius: 0.085, travel: 0.05 },
   safetyLever: { cx: 0.245, cy: 0.77, radius: 0.038, travel: 0.055 },
-  travelLeft: { cx: 0.468, cy: 0.75, radius: 0.043, travel: 0.062 },
+  travelLeft: { cx: 0.473, cy: 0.75, radius: 0.043, travel: 0.062 },
   travelRight: { cx: 0.532, cy: 0.75, radius: 0.043, travel: 0.062 },
   travelBoth: { cx: 0.5, cy: 0.75, radius: 0.052, travel: 0.062 },
   hydraulicSpeed: { cx: 0.665, cy: 0.77, radius: 0.038, travel: 0.032 },

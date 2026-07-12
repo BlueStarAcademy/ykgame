@@ -132,7 +132,7 @@ const PORTRAIT_COCKPIT_LAYOUT: CockpitLayout = {
   left: { ...COCKPIT_LAYOUT.left, cx: 0.1, cy: 0.965 },
   right: { ...COCKPIT_LAYOUT.right, cx: 0.9, cy: 0.965 },
   safetyLever: { ...COCKPIT_LAYOUT.safetyLever, cx: 0.1, cy: 0.385 },
-  travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cx: 0.448, cy: 0.79 },
+  travelLeft: { ...COCKPIT_LAYOUT.travelLeft, cx: 0.453, cy: 0.79 },
   travelRight: { ...COCKPIT_LAYOUT.travelRight, cx: 0.548, cy: 0.79 },
   travelBoth: { ...COCKPIT_LAYOUT.travelBoth, cx: 0.5, cy: 0.79 },
   rightPedal: { ...COCKPIT_LAYOUT.rightPedal, cx: 0.1, cy: 0.165 },
@@ -275,14 +275,16 @@ function VisualLever({
       : v >= 0
         ? v * -22
         : v * -48;
-  const travelStickTiltX = -12 - pushDepth * 12 + pullDepth * 94;
-  const travelHeadTiltX = 10 - pushDepth * 4 - pullDepth * 84;
+  // Keep the stick root inside the lever lane when pulled/pushed.
+  const travelPivotThrowRem = 0.22;
+  const travelStickTiltX = -12 - pushDepth * 8 + pullDepth * 42;
+  const travelHeadTiltX = 10 - pushDepth * 4 - pullDepth * 36;
   const motionClass = v > 0.16 ? "is-pushed" : v < -0.16 ? "is-pulled" : "is-neutral";
   const stickTransform = isTravel
     ? `translate3d(-50%, 0, 0.22rem) rotateX(${travelStickTiltX}deg)`
     : `translate3d(-50%, ${stickDrop}rem, 0) rotateX(${bendX}deg)`;
   const pivotTransform = isTravel
-    ? `translate3d(-50%, calc(-50% + ${v * -0.72}rem), -0.12rem) rotateX(12deg)`
+    ? `translate3d(-50%, calc(-50% + ${v * -travelPivotThrowRem}rem), -0.12rem) rotateX(12deg)`
     : undefined;
   return (
     <div
@@ -1623,7 +1625,7 @@ function AttachmentPedalControl({
         top: isPortrait
           ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
           : `${pedal.cy * 100}%`,
-        width: isPortrait ? "2.75rem" : "2.6rem",
+        width: isPortrait ? "3.05rem" : "2.9rem",
         height: isPortrait ? "4.45rem" : "4.1rem",
         transform: "translate(-50%, -50%)",
       }}
@@ -1640,7 +1642,7 @@ function AttachmentPedalControl({
       />
       <button
         type="button"
-        className="absolute inset-x-[7%] top-[5%] h-[43%] rounded-t-[0.55rem]"
+        className="absolute inset-x-[15%] top-[5%] h-[43%] rounded-t-[0.55rem]"
         aria-label="발판 위쪽: 집게 닫기 또는 브레이커 작동"
         aria-pressed={direction > 0}
         onPointerDown={(event) => press(event, 1)}
@@ -1650,7 +1652,7 @@ function AttachmentPedalControl({
       />
       <button
         type="button"
-        className="absolute inset-x-[7%] bottom-[5%] h-[43%] rounded-b-[0.55rem]"
+        className="absolute inset-x-[15%] bottom-[5%] h-[43%] rounded-b-[0.55rem]"
         aria-label="발판 아래쪽: 집게 열기 또는 브레이커 작동"
         aria-pressed={direction < 0}
         onPointerDown={(event) => press(event, -1)}

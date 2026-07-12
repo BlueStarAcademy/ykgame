@@ -1,0 +1,247 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 22rem;
+  max-height: min(85dvh, 34rem);
+  overflow: hidden;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.28);
+  font-family: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  animation: promoIn 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.frame {
+  padding: 0.85rem 0.85rem 0.55rem;
+}
+
+.visual {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(180deg, #e8edf2 0%, #d5dde6 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.overlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.28) 0%,
+    rgba(15, 23, 42, 0.42) 50%,
+    rgba(15, 23, 42, 0.28) 100%
+  );
+}
+
+.caption {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.label {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sum {
+  margin: 0.15rem 0 0;
+  font-size: 2.35rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.num {
+  display: inline-block;
+}
+
+.plus {
+  display: inline-block;
+  margin: 0 0.25rem;
+  font-size: 1.75rem;
+  color: #fde68a;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.25rem 1rem 0.85rem;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 0.75rem 0.85rem;
+}
+
+.badge {
+  display: flex;
+  height: 1.75rem;
+  width: 1.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: linear-gradient(145deg, #ef5350 0%, #c62828 100%);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+.rowTitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #111827;
+}
+
+.rowDesc {
+  margin: 0.15rem 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: #6b7280;
+}
+
+.rowDesc span {
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.footer {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0.5rem;
+  border-top: 1px solid #f3f4f6;
+  background: #fff;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.04);
+}
+
+.btnMute,
+.btnClose {
+  flex: 1 1 0;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btnMute {
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #4b5563;
+}
+
+.btnMute:hover {
+  background: #f3f4f6;
+}
+
+.btnClose {
+  border: none;
+  background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(198, 40, 40, 0.28);
+}
+
+.btnClose:hover {
+  box-shadow: 0 8px 22px rgba(198, 40, 40, 0.38);
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .panel {
+    max-height: min(94dvh, 22rem);
+  }
+
+  .visual {
+    aspect-ratio: 21 / 9;
+  }
+
+  .sum {
+    font-size: 1.85rem;
+  }
+
+  .caption {
+    padding: 0.75rem;
+  }
+}
+
+@keyframes promoIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

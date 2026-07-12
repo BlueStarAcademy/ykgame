@@ -16,6 +16,7 @@ import {
   GAME_IMMERSIVE_HEADER_LEFT_ID,
   GAME_IMMERSIVE_HEADER_RIGHT_ID,
 } from "@/components/games/GameImmersiveOverlay";
+import { LandingPromoPopup } from "@/components/landing/LandingPromoPopup";
 import { StarAmount } from "@/components/StarAmount";
 import type { GameResult } from "@/games/shared/types";
 import { getMissionConfig } from "@/games/registry";
@@ -60,6 +61,15 @@ import { ControlsGuidePanel } from "./ControlsGuidePanel";
 import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
 import { QuestPanel } from "./QuestPanel";
 import { ShopPanel } from "./ShopPanel";
+import { ActiveShopBuffIcons } from "./ActiveShopBuffIcons";
+import {
+  activateShopBuff,
+  loadActiveShopBuffs,
+  resolveShopBuffOwner,
+  saveActiveShopBuffs,
+  type ActiveShopBuff,
+} from "./shopBuffPersistence";
+import { SHOP_ITEM_BY_ID, type ShopItemId } from "./shopCatalog";
 import { MissionHudPanel } from "./MissionHudPanel";
 import {
   applyQuestProgress,
@@ -671,6 +681,9 @@ export function ExcavatorGameWrapper({
   const [showTutorialMenu, setShowTutorialMenu] = useState(false);
   const [showQuestPanel, setShowQuestPanel] = useState(false);
   const [showShopPanel, setShowShopPanel] = useState(false);
+  const [activeShopBuffs, setActiveShopBuffs] = useState<ActiveShopBuff[]>([]);
+  const [purchasingShopItemId, setPurchasingShopItemId] =
+    useState<ShopItemId | null>(null);
   const [questState, setQuestState] = useState<YanmarQuestState | null>(null);
   const [questClaimingId, setQuestClaimingId] = useState<string | null>(null);
   const questStateRef = useRef<YanmarQuestState | null>(null);
@@ -1336,6 +1349,96 @@ export function ExcavatorGameWrapper({
     setQuestState(loaded);
     questTrackRef.current.ready = false;
   }, [session?.user?.id, session?.user?.totalXp, sessionStatus]);
+
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    setActiveShopBuffs(loadActiveShopBuffs(session?.user?.id));
+  }, [session?.user?.id, sessionStatus]);
+
+  const persistActiveShopBuffs = useCallback(
+    (next: ActiveShopBuff[]) => {
+      const ownerId = resolveShopBuffOwner(
+        session?.user?.id ?? gameSessionUserIdRef.current,
+      );
+      const pruned = next.filter((buff) => buff.expiresAt > Date.now());
+      saveActiveShopBuffs(ownerId, pruned);
+      setActiveShopBuffs(pruned);
+    },
+    [session?.user?.id],
+  );
+
+  const handleShopPurchase = useCallback(
+    async (itemId: ShopItemId) => {
+      const item = SHOP_ITEM_BY_ID[itemId];
+      if (!item || purchasingShopItemId) return;
+
+      const previewMode = modeRef.current !== "game";
+      if (previewMode) {
+        if (previewStars < item.priceStars) return;
+        setPreviewStars((value) => Math.max(0, value - item.priceStars));
+        setActiveShopBuffs((current) => {
+          const next = activateShopBuff(current, itemId, item.durationMs);
+          saveActiveShopBuffs(
+            resolveShopBuffOwner(
+              session?.user?.id ?? gameSessionUserIdRef.current,
+            ),
+            next,
+          );
+          return next;
+        });
+        return;
+      }
+
+      setPurchasingShopItemId(itemId);
+      try {
+        const res = await fetch("/api/shop/yanmar/purchase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId }),
+        });
+        const data = (await res.json().catch(() => null)) as {
+          currency?: number;
+          durationMs?: number;
+          expiresAt?: number;
+        } | null;
+        if (!res.ok || !data) return;
+        if (typeof data.currency === "number") {
+          syncSessionBalances(data);
+        }
+        const expiresAt =
+          typeof data.expiresAt === "number"
+            ? data.expiresAt
+            : Date.now() +
+              (typeof data.durationMs === "number"
+                ? data.durationMs
+                : item.durationMs);
+        setActiveShopBuffs((current) => {
+          const next = activateShopBuff(
+            current,
+            itemId,
+            Math.max(0, expiresAt - Date.now()),
+          );
+          saveActiveShopBuffs(
+            resolveShopBuffOwner(
+              session?.user?.id ?? gameSessionUserIdRef.current,
+            ),
+            next,
+          );
+          return next;
+        });
+      } catch {
+        /* keep current buffs / currency */
+      } finally {
+        setPurchasingShopItemId(null);
+      }
+    },
+    [
+      previewStars,
+      purchasingShopItemId,
+      session?.user?.id,
+      syncSessionBalances,
+    ],
+  );
 
   useEffect(() => {
     if (
@@ -3168,6 +3271,7 @@ export function ExcavatorGameWrapper({
           : "mx-auto w-full max-w-lg"
       } yanmar-layout-portrait`}
     >
+      <LandingPromoPopup surface="ingame" />
       <div
         className={`relative overflow-hidden bg-slate-300 ${
           immersive
@@ -3315,6 +3419,11 @@ export function ExcavatorGameWrapper({
                   open={showShopPanel}
                   onClose={() => setShowShopPanel(false)}
                   stars={mode === "game" ? currency : previewStars}
+                  activeItemIds={activeShopBuffs.map((buff) => buff.id)}
+                  purchasingId={purchasingShopItemId}
+                  onPurchase={(itemId) => {
+                    void handleShopPurchase(itemId);
+                  }}
                 />
               </>
             ) : null}
@@ -3616,7 +3725,12 @@ export function ExcavatorGameWrapper({
         )}
 
         {mode !== "intro" && (mode !== "gameReady" || showMinimap) && (
-          <div className="absolute right-1.5 top-1.5 z-30 flex w-[88px] flex-col items-stretch gap-1.5">
+          <div className="absolute right-1.5 top-1.5 z-30 flex items-start gap-1">
+            <ActiveShopBuffIcons
+              buffs={activeShopBuffs}
+              onChange={persistActiveShopBuffs}
+            />
+            <div className="flex w-[88px] flex-col items-stretch gap-1.5">
             <div className="relative flex w-full flex-col overflow-hidden rounded-xl border border-white/15 bg-black/60 shadow-lg backdrop-blur-sm">
               {mode !== "gameReady" ? (
                 <button
@@ -3659,6 +3773,7 @@ export function ExcavatorGameWrapper({
                 }}
               />
             ) : null}
+            </div>
           </div>
         )}
 

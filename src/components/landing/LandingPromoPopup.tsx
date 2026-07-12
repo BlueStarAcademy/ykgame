@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
+import { createPortal } from "react-dom";
+import styles from "./LandingPromoPopup.module.css";
 
-const STORAGE_KEY = "ykgame:landing:promo-dismissed-date";
+export type PromoPopupSurface = "landing" | "ingame";
+
+const STORAGE_KEYS: Record<PromoPopupSurface, string> = {
+  landing: "ykgame:landing:promo-dismissed-date",
+  ingame: "ykgame:yanmar:promo-dismissed-date",
+};
 
 function todayKey() {
   const d = new Date();
@@ -13,127 +19,136 @@ function todayKey() {
   return `${y}-${m}-${day}`;
 }
 
-function wasDismissedToday() {
+function wasDismissedToday(surface: PromoPopupSurface) {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === todayKey();
+    return window.localStorage.getItem(STORAGE_KEYS[surface]) === todayKey();
   } catch {
     return false;
   }
 }
 
-function dismissForToday() {
+function dismissForToday(surface: PromoPopupSurface) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, todayKey());
+    window.localStorage.setItem(STORAGE_KEYS[surface], todayKey());
   } catch {
     /* ignore quota / private mode */
   }
 }
 
-export function LandingPromoPopup() {
+interface LandingPromoPopupProps {
+  /** 랜딩·인게임은 각각 따로 '오늘 다시 보지않기'를 기억합니다. */
+  surface?: PromoPopupSurface;
+}
+
+export function LandingPromoPopup({ surface = "landing" }: LandingPromoPopupProps) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (!wasDismissedToday()) {
+    setMounted(true);
+    if (!wasDismissedToday(surface)) {
       setOpen(true);
     }
-  }, []);
+  }, [surface]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
 
   function handleClose() {
     setOpen(false);
   }
 
   function handleHideToday() {
-    dismissForToday();
+    dismissForToday(surface);
     setOpen(false);
   }
 
-  if (!open) return null;
+  if (!mounted || !open) return null;
 
-  return (
-    <AppModalOverlay
-      open={open}
-      onClose={handleClose}
-      panelClassName="!flex !max-h-[min(92dvh,36rem)] !flex-col !overflow-hidden max-w-[22rem] landscape:!max-h-[min(94dvh,22rem)]"
-    >
-      <div className="landing-promo flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="landing-promo-body min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
-          <div className="landing-promo-frame">
-            <div className="landing-promo-visual relative overflow-hidden rounded-xl">
+  return createPortal(
+    <div className={styles.backdrop} onClick={handleClose}>
+      <div
+        className={styles.panel}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="YK건기 마일리지 이벤트"
+      >
+        <div className={styles.body}>
+          <div className={styles.frame}>
+            <div className={styles.visual}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/landing/promo-mileage.png"
                 alt="얀마 굴착기 마일리지 이벤트"
-                className="landing-promo-img block h-full w-full object-cover object-center"
+                className={styles.img}
                 width={800}
-                height={450}
+                height={500}
               />
-              <div className="landing-promo-overlay" aria-hidden />
-              <div className="landing-promo-caption absolute inset-x-0 bottom-0 z-[1] px-4 pb-4 pt-10 text-center text-white">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">
-                  YK Event · 2026 3시즌
-                </p>
-                <p className="mt-1.5 text-[12px] font-medium tracking-wide text-white/90">
-                  마일리지
-                </p>
-                <p className="landing-promo-sum mt-0.5 text-[2.35rem] font-black leading-none tracking-tight">
-                  <span className="landing-promo-num">5만</span>
-                  <span className="landing-promo-plus mx-1 text-[1.75rem] text-amber-200">+</span>
-                  <span className="landing-promo-num">5만</span>
+              <div className={styles.overlay} aria-hidden />
+              <div className={styles.caption}>
+                <p className={styles.eyebrow}>YK Event · 2026 3시즌</p>
+                <p className={styles.label}>마일리지</p>
+                <p className={styles.sum}>
+                  <span className={styles.num}>5만</span>
+                  <span className={styles.plus}>+</span>
+                  <span className={styles.num}>5만</span>
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="space-y-2.5 px-4 pb-3 pt-1">
-            <div className="landing-promo-row">
-              <span className="landing-promo-badge" aria-hidden>
+          <div className={styles.rows}>
+            <div className={styles.row}>
+              <span className={styles.badge} aria-hidden>
                 01
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold leading-snug text-gray-900">
-                  얀마 게임 100만점 돌파
-                </p>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-gray-500">
-                  YK건기 마일리지{" "}
-                  <span className="font-bold text-red-600">5만 포인트</span> 선착순 5명 지급
+                <p className={styles.rowTitle}>얀마 게임 100만점 돌파</p>
+                <p className={styles.rowDesc}>
+                  YK건기 마일리지 <span>5만 포인트</span> 선착순 5명 지급
                 </p>
               </div>
             </div>
 
-            <div className="landing-promo-row">
-              <span className="landing-promo-badge" aria-hidden>
+            <div className={styles.row}>
+              <span className={styles.badge} aria-hidden>
                 02
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold leading-snug text-gray-900">
-                  2026-3시즌 랭킹 1위
-                </p>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-gray-500">
-                  2026년 7월~9월 ·{" "}
-                  <span className="font-bold text-red-600">5만 포인트</span> 추가 지급
+                <p className={styles.rowTitle}>2026-3시즌 랭킹 1위</p>
+                <p className={styles.rowDesc}>
+                  2026년 7월~9월 · <span>5만 포인트</span> 추가 지급
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="landing-promo-footer flex shrink-0 gap-2 border-t border-gray-100 bg-white px-4 py-3">
-          <button
-            type="button"
-            onClick={handleHideToday}
-            className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-[12px] font-semibold text-gray-600 transition hover:bg-gray-100"
-          >
+        <div className={styles.footer}>
+          <button type="button" onClick={handleHideToday} className={styles.btnMute}>
             오늘 다시 보지않기
           </button>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="landing-promo-close flex-1 rounded-xl px-3 py-2.5 text-[12px] font-bold text-white transition"
-          >
+          <button type="button" onClick={handleClose} className={styles.btnClose}>
             닫기
           </button>
         </div>
       </div>
-    </AppModalOverlay>
+    </div>,
+    document.body,
   );
 }

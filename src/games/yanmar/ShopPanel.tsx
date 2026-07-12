@@ -2,15 +2,38 @@
 
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
-import { SHOP_ITEMS, type ShopItem } from "./shopCatalog";
+import {
+  SHOP_ITEMS,
+  type ShopItem,
+  type ShopItemId,
+} from "./shopCatalog";
 
 interface ShopPanelProps {
   open: boolean;
   onClose: () => void;
   stars?: number;
+  activeItemIds?: ReadonlySet<ShopItemId> | readonly ShopItemId[];
+  purchasingId?: ShopItemId | null;
+  onPurchase?: (itemId: ShopItemId) => void | Promise<void>;
 }
 
-function ShopProductCard({ item }: { item: ShopItem }) {
+function ShopProductCard({
+  item,
+  stars,
+  active,
+  purchasing,
+  onPurchase,
+}: {
+  item: ShopItem;
+  stars?: number;
+  active: boolean;
+  purchasing: boolean;
+  onPurchase?: (itemId: ShopItemId) => void | Promise<void>;
+}) {
+  const canAfford =
+    typeof stars !== "number" || stars >= item.priceStars;
+  const disabled = purchasing || !canAfford || !onPurchase;
+
   return (
     <article className="yanmar-shop-card">
       <div className="yanmar-shop-card-media">
@@ -21,24 +44,48 @@ function ShopProductCard({ item }: { item: ShopItem }) {
           draggable={false}
         />
         <h3 className="yanmar-shop-card-title">{item.name}</h3>
+        {active ? (
+          <span className="yanmar-shop-card-active-badge">적용중</span>
+        ) : null}
       </div>
       <div className="yanmar-shop-card-effect">
         <p className="yanmar-shop-card-effect-main">{item.effect}</p>
         <p className="yanmar-shop-card-effect-time">{item.durationLabel}</p>
       </div>
-      <button type="button" className="yanmar-shop-card-buy">
+      <button
+        type="button"
+        className="yanmar-shop-card-buy"
+        disabled={disabled}
+        onClick={() => {
+          void onPurchase?.(item.id);
+        }}
+      >
         <StarAmount
           value={item.priceStars}
           size={12}
           valueClassName="yanmar-shop-card-star-value"
         />
-        <span className="yanmar-shop-card-buy-label">구매</span>
+        <span className="yanmar-shop-card-buy-label">
+          {purchasing ? "구매중" : active ? "연장" : "구매"}
+        </span>
       </button>
     </article>
   );
 }
 
-export function ShopPanel({ open, onClose, stars }: ShopPanelProps) {
+export function ShopPanel({
+  open,
+  onClose,
+  stars,
+  activeItemIds,
+  purchasingId = null,
+  onPurchase,
+}: ShopPanelProps) {
+  const activeSet =
+    activeItemIds instanceof Set
+      ? activeItemIds
+      : new Set(activeItemIds ?? []);
+
   return (
     <AppModalOverlay
       open={open}
@@ -79,7 +126,14 @@ export function ShopPanel({ open, onClose, stars }: ShopPanelProps) {
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 [-webkit-overflow-scrolling:touch]">
           <div className="yanmar-shop-grid">
             {SHOP_ITEMS.map((item) => (
-              <ShopProductCard key={item.id} item={item} />
+              <ShopProductCard
+                key={item.id}
+                item={item}
+                stars={stars}
+                active={activeSet.has(item.id)}
+                purchasing={purchasingId === item.id}
+                onPurchase={onPurchase}
+              />
             ))}
           </div>
         </div>

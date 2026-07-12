@@ -13,16 +13,36 @@ const GROUND_PAINT_MATERIAL = {
   depthTest: true,
   depthWrite: false,
   polygonOffset: true,
-  polygonOffsetFactor: 1,
-  polygonOffsetUnits: 1,
+  polygonOffsetFactor: -2,
+  polygonOffsetUnits: -2,
   side: THREE.DoubleSide,
   toneMapped: false,
 } as const;
 
-const GROUND_PAINT_LIFT = 0.012;
+const GROUND_PAINT_LIFT = 0.055;
 
-function zonePaintY(terrain: TerrainData, x: number, z: number) {
-  return sampleHeight(terrain, x, z) + GROUND_PAINT_LIFT;
+function zoneRingPaintY(
+  terrain: TerrainData,
+  x: number,
+  z: number,
+  radius: number,
+) {
+  const samples = 12;
+  const heights: number[] = [];
+  const ringR = Math.max(1.2, radius * 0.92);
+  for (let i = 0; i < samples; i += 1) {
+    const angle = (i / samples) * Math.PI * 2;
+    heights.push(
+      sampleHeight(
+        terrain,
+        x + Math.cos(angle) * ringR,
+        z + Math.sin(angle) * ringR,
+      ),
+    );
+  }
+  heights.sort((a, b) => a - b);
+  const median = heights[Math.floor(heights.length / 2)] ?? heights[0] ?? 0;
+  return median + GROUND_PAINT_LIFT;
 }
 
 function PremiumBoulder({
@@ -119,8 +139,8 @@ function PremiumBoulder({
 }
 
 function StoneZonePaint({ zone, terrain }: { zone: HillZone; terrain: TerrainData }) {
-  const paintY = zonePaintY(terrain, zone.centerX, zone.centerZ);
   const radius = zone.radius * 0.55;
+  const paintY = zoneRingPaintY(terrain, zone.centerX, zone.centerZ, radius);
   const remaining = zone.boulders.filter(
     (rock) => rock.active && !rock.delivered && !rock.extracted,
   ).length;
@@ -145,7 +165,7 @@ function StoneZonePaint({ zone, terrain }: { zone: HillZone; terrain: TerrainDat
         <meshBasicMaterial color="#bae6fd" opacity={0.5} {...GROUND_PAINT_MATERIAL} />
       </mesh>
       <Text
-        position={[0, 0.004, -radius - 1.15]}
+        position={[0, 0.006, -radius - 1.15]}
         rotation={[-Math.PI / 2, 0, Math.PI]}
         fontSize={1.55}
         color="#e0f2fe"
@@ -158,8 +178,8 @@ function StoneZonePaint({ zone, terrain }: { zone: HillZone; terrain: TerrainDat
         material-depthWrite={false}
         material-transparent
         material-polygonOffset
-        material-polygonOffsetFactor={1}
-        material-polygonOffsetUnits={1}
+        material-polygonOffsetFactor={-2}
+        material-polygonOffsetUnits={-2}
         material-toneMapped={false}
       >
         {label}

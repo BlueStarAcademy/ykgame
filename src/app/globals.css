@@ -2399,6 +2399,137 @@ body {
   opacity: 0.92;
 }
 
+.yanmar-shop-card-buy:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.yanmar-shop-card-active-badge {
+  position: absolute;
+  right: 0.28rem;
+  top: 0.28rem;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  background: rgba(2, 6, 23, 0.72);
+  padding: 0.08rem 0.32rem;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #fde68a;
+}
+
+.yanmar-active-buff-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.12rem;
+  width: 0.9rem;
+  max-height: 5.5rem;
+  padding: 0;
+  margin: 0.15rem 0 0;
+  list-style: none;
+  pointer-events: auto;
+}
+
+.yanmar-active-buff-icon {
+  position: relative;
+  width: 0.82rem;
+  height: 0.82rem;
+  flex-shrink: 0;
+  overflow: visible;
+  border-radius: 0.18rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(2, 6, 23, 0.55);
+  box-shadow: 0 0.08rem 0.14rem rgba(0, 0, 0, 0.55);
+}
+
+.yanmar-active-buff-hit {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: inherit;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  opacity: 1;
+  transition: opacity 180ms ease-out;
+}
+
+.yanmar-active-buff-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.yanmar-active-buff-hit.is-fading {
+  opacity: 0.42;
+}
+
+.yanmar-active-buff-hit.is-blinking {
+  animation: yanmar-active-buff-blink 0.65s ease-in-out infinite;
+}
+
+.yanmar-active-buff-tip {
+  position: absolute;
+  right: calc(100% + 0.32rem);
+  top: 50%;
+  z-index: 45;
+  transform: translateY(-50%);
+  border: 1px solid rgba(253, 230, 138, 0.45);
+  border-radius: 0.42rem;
+  background: rgba(2, 6, 23, 0.92);
+  padding: 0.18rem 0.38rem;
+  color: #fde68a;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 0.12rem 0.28rem rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  animation: yanmar-active-buff-tip-fade 3s ease-out forwards;
+}
+
+.yanmar-active-buff-tip::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border: 0.28rem solid transparent;
+  border-left-color: rgba(2, 6, 23, 0.92);
+  transform: translateY(-50%);
+}
+
+@keyframes yanmar-active-buff-blink {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes yanmar-active-buff-tip-fade {
+  0% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 .yanmar-function-menu-toggle {
   position: absolute;
   left: 0;
@@ -3044,7 +3175,7 @@ body {
 
 .yanmar-breaker-pedal-pad {
   display: block;
-  width: 92%;
+  width: 100%;
   height: 96%;
   background-image: url("/images/yanmar/2d/cockpit/attachment-pedal-front.png?v=4");
   background-position: center;
@@ -3935,130 +4066,6 @@ html.pwa-mode body {
   overscroll-behavior: contain;
   border-top: 1px solid rgba(226, 232, 240, 0.8);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, #f8fafc 16px);
-}
-
-.landing-promo {
-  animation: landing-promo-in 0.38s cubic-bezier(0.22, 1, 0.36, 1);
-  font-family: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
-}
-
-.landing-promo-frame {
-  padding: 0.85rem 0.85rem 0.55rem;
-}
-
-.landing-promo-visual {
-  aspect-ratio: 16 / 10;
-  border: 1px solid rgba(226, 232, 240, 0.95);
-  background: linear-gradient(180deg, #e8edf2 0%, #d5dde6 100%);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
-    0 1px 3px rgba(15, 23, 42, 0.06);
-}
-
-.landing-promo-img {
-  animation: landing-promo-img-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.landing-promo-overlay {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.08) 0%, transparent 38%),
-    linear-gradient(180deg, transparent 35%, rgba(15, 23, 42, 0.72) 100%);
-}
-
-.landing-promo-caption {
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
-}
-
-.landing-promo-sum {
-  letter-spacing: -0.02em;
-}
-
-.landing-promo-num {
-  display: inline-block;
-  animation: landing-promo-pop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.landing-promo-plus + .landing-promo-num {
-  animation-delay: 0.08s;
-}
-
-.landing-promo-plus {
-  display: inline-block;
-  animation: landing-promo-pop 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.04s both;
-}
-
-.landing-promo-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  border-radius: 0.875rem;
-  border: 1px solid rgba(226, 232, 240, 0.95);
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  padding: 0.75rem 0.85rem;
-}
-
-.landing-promo-badge {
-  display: flex;
-  height: 1.75rem;
-  width: 1.75rem;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.5rem;
-  background: linear-gradient(145deg, #ef5350 0%, #c62828 100%);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: #fff;
-}
-
-.landing-promo-footer {
-  box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.04);
-}
-
-.landing-promo-close {
-  background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
-  box-shadow: 0 4px 14px rgba(198, 40, 40, 0.28);
-}
-
-.landing-promo-close:hover {
-  box-shadow: 0 8px 22px rgba(198, 40, 40, 0.38);
-}
-
-@keyframes landing-promo-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes landing-promo-img-in {
-  from {
-    opacity: 0;
-    transform: scale(1.06);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes landing-promo-pop {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.88);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 
 /* Game-mode main controls: premium four-way 3D D-pads */

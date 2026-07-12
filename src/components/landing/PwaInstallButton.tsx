@@ -116,7 +116,7 @@ export function PwaInstallButton() {
         <span className="landing-install-icon" aria-hidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/icons/icon-192.png"
+            src="/icons/icon-192.png?v=3"
             alt=""
             width={18}
             height={18}

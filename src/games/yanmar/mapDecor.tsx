@@ -209,6 +209,7 @@ function DigMoundCollars({
   const [zones, setZones] = useState(() => getActiveDigZones(terrainRef.current));
   const [occupiedIds, setOccupiedIds] = useState<string[]>([]);
   const signatureRef = useRef("");
+  const collarGroupRefs = useRef(new Map<string, THREE.Group>());
 
   useFrame(() => {
     const nextZones = getActiveDigZones(terrainRef.current);
@@ -228,6 +229,27 @@ function DigMoundCollars({
       setZones([...nextZones]);
       setOccupiedIds(nextOccupied);
     }
+
+    for (const zone of nextZones) {
+      const group = collarGroupRefs.current.get(zone.id);
+      if (!group) continue;
+      const samples = 12;
+      const heights: number[] = [];
+      const ringR = Math.max(1.2, zone.radius * 0.92);
+      for (let i = 0; i < samples; i += 1) {
+        const angle = (i / samples) * Math.PI * 2;
+        heights.push(
+          sampleHeight(
+            terrainRef.current,
+            zone.x + Math.cos(angle) * ringR,
+            zone.z + Math.sin(angle) * ringR,
+          ),
+        );
+      }
+      heights.sort((a, b) => a - b);
+      const median = heights[Math.floor(heights.length / 2)] ?? heights[0] ?? 0;
+      group.position.y = median + 0.055;
+    }
   });
 
   const occupied = useMemo(() => new Set(occupiedIds), [occupiedIds]);
@@ -235,10 +257,32 @@ function DigMoundCollars({
   return (
     <>
       {zones.map((zone) => {
-        const baseY = sampleHeight(terrainRef.current, zone.x, zone.z) + 0.04;
+        const samples = 12;
+        const heights: number[] = [];
+        const ringR = Math.max(1.2, zone.radius * 0.92);
+        for (let i = 0; i < samples; i += 1) {
+          const angle = (i / samples) * Math.PI * 2;
+          heights.push(
+            sampleHeight(
+              terrainRef.current,
+              zone.x + Math.cos(angle) * ringR,
+              zone.z + Math.sin(angle) * ringR,
+            ),
+          );
+        }
+        heights.sort((a, b) => a - b);
+        const median = heights[Math.floor(heights.length / 2)] ?? heights[0] ?? 0;
+        const baseY = median + 0.055;
         const inside = occupied.has(zone.id);
         return (
-          <group key={zone.id} position={[zone.x, baseY, zone.z]}>
+          <group
+            key={zone.id}
+            position={[zone.x, baseY, zone.z]}
+            ref={(node) => {
+              if (node) collarGroupRefs.current.set(zone.id, node);
+              else collarGroupRefs.current.delete(zone.id);
+            }}
+          >
             {/* Hide collar rings when inside — ZoneMarkers shows diggable dirt edge instead */}
             {!inside ? (
               <>
