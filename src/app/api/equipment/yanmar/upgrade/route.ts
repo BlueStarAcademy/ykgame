@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import {
   calculateYanmarEquipmentStats,
   getYanmarUpgradeCost,
+  getYanmarUpgradeFailBonusGain,
+  getYanmarUpgradeSuccessRate,
+  mergeYanmarEquipmentFailBonusesFromDb,
   mergeYanmarEquipmentLevelsFromDb,
   YANMAR_EQUIPMENT_CONFIG,
   type YanmarEquipmentPart,
@@ -42,11 +45,14 @@ export async function POST(request: Request) {
         },
       });
       const currentLevel = current?.level ?? 0;
+      const currentFailBonus = Number(current?.failBonus ?? 0);
       const config = YANMAR_EQUIPMENT_CONFIG[part];
       if (currentLevel >= config.maxLevel) throw new Error("MAX_LEVEL");
 
       const nextLevel = currentLevel + 1;
       const cost = getYanmarUpgradeCost(part, nextLevel);
+      const successRate = getYanmarUpgradeSuccessRate(nextLevel, currentFailBonus);
+      const success = Math.random() < successRate;
 
       const chargedUsers = await tx.$queryRaw<Array<{ currency: number }>>`
         UPDATE "User"
@@ -58,7 +64,14 @@ export async function POST(request: Request) {
       const chargedUser = chargedUsers[0];
       if (!chargedUser) throw new Error("NOT_ENOUGH_STARS");
 
-      const updated = await tx.userEquipmentUpgrade.upsert({
+      const nextFailBonus = success
+        ? 0
+        : Math.min(
+            1,
+            currentFailBonus + getYanmarUpgradeFailBonusGain(nextLevel),
+          );
+
+      await tx.userEquipmentUpgrade.upsert({
         where: {
           userId_gameId_part: {
             userId: session.user.id,
@@ -70,21 +83,29 @@ export async function POST(request: Request) {
           userId: session.user.id,
           gameId: "yanmar",
           part,
-          level: nextLevel,
+          level: success ? nextLevel : currentLevel,
+          failBonus: nextFailBonus,
         },
-        update: { level: nextLevel },
+        update: {
+          level: success ? nextLevel : currentLevel,
+          failBonus: nextFailBonus,
+        },
       });
 
       const rows = await tx.userEquipmentUpgrade.findMany({
         where: { userId: session.user.id, gameId: "yanmar" },
-        select: { part: true, level: true },
+        select: { part: true, level: true, failBonus: true },
       });
       const levels = mergeYanmarEquipmentLevelsFromDb(rows);
+      const failBonuses = mergeYanmarEquipmentFailBonusesFromDb(rows);
 
       return {
-        upgraded: updated,
+        success,
+        successRate,
+        failBonus: nextFailBonus,
         currency: chargedUser.currency,
         levels,
+        failBonuses,
         stats: calculateYanmarEquipmentStats(levels),
       };
     });

@@ -114,6 +114,7 @@ import {
 } from "./dumpTruckState";
 import { expandTerrainForLevel, type TerrainData } from "./terrain";
 import {
+  DEFAULT_YANMAR_EQUIPMENT_FAIL_BONUSES,
   DEFAULT_YANMAR_EQUIPMENT_LEVELS,
   YANMAR_EQUIPMENT_RESET_REFUND_RATE,
   YANMAR_EQUIPMENT_CONFIG,
@@ -126,7 +127,10 @@ import {
   getLoadUnits,
   getYanmarPartResetRefundStars,
   getYanmarUpgradeCost,
+  getYanmarUpgradeFailBonusGain,
+  getYanmarUpgradeSuccessRate,
   rollYanmarHillXp,
+  type YanmarEquipmentFailBonuses,
   type YanmarEquipmentLevels,
   type YanmarEquipmentPart,
   type YanmarEquipmentStats,
@@ -371,15 +375,27 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
   const sepClass = panel.critical ? "text-yellow-200/80" : "text-white/35";
 
   return createPortal(
-    <div className="pointer-events-none fixed left-1/2 top-[4.25rem] z-[340] w-[min(22rem,92vw)] -translate-x-1/2">
-      <div
+    <div
+      className={`pointer-events-none fixed left-1/2 z-[340] w-[min(22rem,92vw)] -translate-x-1/2 ${
+        panel.critical ? "top-[5.1rem]" : "top-[4.25rem]"
+      }`}
+    >      <div
         key={panel.pulseKey}
-        className={`yanmar-score-panel rounded-xl border px-3.5 py-2 font-black shadow-xl backdrop-blur-md ${
+        className={`yanmar-score-panel relative rounded-xl border px-3.5 py-2 font-black shadow-xl backdrop-blur-md ${
           panel.critical
-            ? "border-yellow-200/70 bg-black/80 text-yellow-300"
+            ? "yanmar-score-panel-critical border-yellow-200/80 bg-black/85 text-yellow-300 shadow-[0_0_28px_rgba(250,204,21,0.35)]"
             : "border-white/25 bg-black/78 text-slate-200"
         }`}
       >
+        {panel.critical ? (
+          <div
+            key={`crit-${panel.pulseKey}`}
+            className="yanmar-score-critical-label pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-[118%]"
+            aria-hidden
+          >
+            CRITICAL
+          </div>
+        ) : null}
         {showScore || showXp || showStars ? (
           <div
             className={`yanmar-score-panel-value flex items-center justify-center gap-2.5 whitespace-nowrap tabular-nums ${
@@ -623,6 +639,8 @@ export function ExcavatorGameWrapper({
   const [equipmentLevels, setEquipmentLevels] = useState<YanmarEquipmentLevels>(
     DEFAULT_YANMAR_EQUIPMENT_LEVELS,
   );
+  const [equipmentFailBonuses, setEquipmentFailBonuses] =
+    useState<YanmarEquipmentFailBonuses>(DEFAULT_YANMAR_EQUIPMENT_FAIL_BONUSES);
   const [equipmentStats, setEquipmentStats] =
     useState<YanmarEquipmentStats>(defaultEquipmentStats);
   const [currency, setCurrency] = useState(() => session?.user?.currency ?? 0);
@@ -1394,6 +1412,7 @@ export function ExcavatorGameWrapper({
       if (!res.ok) return;
       const data = await res.json();
       if (data.levels) setEquipmentLevels(data.levels);
+      if (data.failBonuses) setEquipmentFailBonuses(data.failBonuses);
       if (data.stats) {
         equipmentStatsRef.current = data.stats;
         setEquipmentStats(data.stats);
@@ -2878,51 +2897,70 @@ export function ExcavatorGameWrapper({
   );
 
   const handleEquipmentUpgrade = useCallback(
-    (part: YanmarEquipmentPart) => {
+    async (part: YanmarEquipmentPart): Promise<boolean | null> => {
       const previewMode = modeRef.current !== "game";
       const practiceMode = modeRef.current === "practice";
       if (previewMode) {
-        setEquipmentLevels((current) => {
-          const maxLevel = YANMAR_EQUIPMENT_CONFIG[part].maxLevel;
-          const next = {
-            ...current,
-            [part]: Math.min(maxLevel, current[part] + 1),
-          };
-          const nextStats = calculateYanmarEquipmentStats(next);
-          equipmentStatsRef.current = nextStats;
-          setEquipmentStats(nextStats);
-          return next;
-        });
-        if (!practiceMode) {
-          setPreviewStars((value) =>
-            Math.max(0, value - getYanmarUpgradeCost(part, equipmentLevels[part] + 1)),
-          );
+        const currentLevel = equipmentLevels[part];
+        const maxLevel = YANMAR_EQUIPMENT_CONFIG[part].maxLevel;
+        if (currentLevel >= maxLevel) return null;
+
+        const nextLevel = currentLevel + 1;
+        const cost = getYanmarUpgradeCost(part, nextLevel);
+        const pity = equipmentFailBonuses[part] ?? 0;
+        const successRate = getYanmarUpgradeSuccessRate(nextLevel, pity);
+        const success = Math.random() < successRate;
+
+        setEquipmentFailBonuses((current) => ({
+          ...current,
+          [part]: success
+            ? 0
+            : Math.min(1, (current[part] ?? 0) + getYanmarUpgradeFailBonusGain(nextLevel)),
+        }));
+
+        if (success) {
+          setEquipmentLevels((current) => {
+            const next = {
+              ...current,
+              [part]: Math.min(maxLevel, current[part] + 1),
+            };
+            const nextStats = calculateYanmarEquipmentStats(next);
+            equipmentStatsRef.current = nextStats;
+            setEquipmentStats(nextStats);
+            return next;
+          });
         }
-        return;
+
+        if (!practiceMode) {
+          setPreviewStars((value) => Math.max(0, value - cost));
+        }
+        return success;
       }
 
       setUpgradingPart(part);
-      void (async () => {
-        try {
-          const res = await fetch("/api/equipment/yanmar/upgrade", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ part }),
-          });
-          const data = await res.json();
-          if (!res.ok) return;
-          if (data.levels) setEquipmentLevels(data.levels);
-          if (data.stats) {
-            equipmentStatsRef.current = data.stats;
-            setEquipmentStats(data.stats);
-          }
-          syncSessionBalances(data);
-        } finally {
-          setUpgradingPart(null);
+      try {
+        const res = await fetch("/api/equipment/yanmar/upgrade", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ part }),
+        });
+        const data = await res.json();
+        if (!res.ok) return null;
+        if (data.levels) setEquipmentLevels(data.levels);
+        if (data.failBonuses) setEquipmentFailBonuses(data.failBonuses);
+        if (data.stats) {
+          equipmentStatsRef.current = data.stats;
+          setEquipmentStats(data.stats);
         }
-      })();
+        syncSessionBalances(data);
+        return Boolean(data.success);
+      } catch {
+        return null;
+      } finally {
+        setUpgradingPart(null);
+      }
     },
-    [equipmentLevels, syncSessionBalances],
+    [equipmentFailBonuses, equipmentLevels, syncSessionBalances],
   );
 
   const handleEquipmentReset = useCallback((part: YanmarEquipmentPart) => {
@@ -2942,6 +2980,10 @@ export function ExcavatorGameWrapper({
         setEquipmentStats(nextStats);
         return next;
       });
+      setEquipmentFailBonuses((current) => ({
+        ...current,
+        [part]: 0,
+      }));
       if (!practiceMode) {
         const refundStars = getYanmarPartResetRefundStars(part, partLevel);
         if (refundStars > 0) {
@@ -2971,6 +3013,7 @@ export function ExcavatorGameWrapper({
         const data = await res.json();
         if (!res.ok) return;
         if (data.levels) setEquipmentLevels(data.levels);
+        if (data.failBonuses) setEquipmentFailBonuses(data.failBonuses);
         if (data.stats) {
           equipmentStatsRef.current = data.stats;
           setEquipmentStats(data.stats);
@@ -3152,6 +3195,7 @@ export function ExcavatorGameWrapper({
           open={showEquipmentUpgrade}
           mode={mode}
           levels={equipmentLevels}
+          failBonuses={equipmentFailBonuses}
           currency={currency}
           previewStars={previewStars}
           upgradingPart={upgradingPart}
@@ -3270,7 +3314,7 @@ export function ExcavatorGameWrapper({
                 <ShopPanel
                   open={showShopPanel}
                   onClose={() => setShowShopPanel(false)}
-                  stars={previewStars}
+                  stars={mode === "game" ? currency : previewStars}
                 />
               </>
             ) : null}

@@ -36,6 +36,7 @@ enum EquipmentPart {
   HAUL_TRUCK_SPEED
   GRAPPLE_ADHESION
   HILL_ROCK_PICK
+  HILL_SAFE_LOAD
 }
 
 model User {
@@ -146,6 +147,8 @@ model UserEquipmentUpgrade {
   gameId    String        @default("yanmar")
   part      EquipmentPart
   level     Int           @default(0)
+  /** Accumulated success-rate bonus after failed attempts (0~1). */
+  failBonus Float         @default(0)
   updatedAt DateTime      @updatedAt
   createdAt DateTime      @default(now())
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)

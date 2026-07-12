@@ -1,6 +1,7 @@
 "use client";
 
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
+import { StarAmount } from "@/components/StarAmount";
 import { SHOP_ITEMS, type ShopItem } from "./shopCatalog";
 
 interface ShopPanelProps {
@@ -26,15 +27,11 @@ function ShopProductCard({ item }: { item: ShopItem }) {
         <p className="yanmar-shop-card-effect-time">{item.durationLabel}</p>
       </div>
       <button type="button" className="yanmar-shop-card-buy">
-        <img
-          src="/images/star-currency.svg"
-          alt=""
-          width={12}
-          height={12}
-          className="yanmar-shop-card-star"
-          draggable={false}
+        <StarAmount
+          value={item.priceStars}
+          size={12}
+          valueClassName="yanmar-shop-card-star-value"
         />
-        <span>{item.priceStars}</span>
         <span className="yanmar-shop-card-buy-label">구매</span>
       </button>
     </article>
@@ -61,15 +58,12 @@ export function ShopPanel({ open, onClose, stars }: ShopPanelProps) {
           </div>
           <div className="flex items-center gap-2">
             {typeof stars === "number" ? (
-              <span className="inline-flex items-center gap-1 rounded-lg border border-amber-200/20 bg-black/35 px-2 py-1 text-[11px] font-black tabular-nums text-amber-100">
-                <img
-                  src="/images/star-currency.svg"
-                  alt=""
-                  width={12}
-                  height={12}
-                  draggable={false}
+              <span className="inline-flex items-center rounded-lg border border-amber-200/20 bg-black/35 px-2 py-1 text-amber-100">
+                <StarAmount
+                  value={stars}
+                  size={12}
+                  valueClassName="text-[11px] font-black tabular-nums text-amber-100"
                 />
-                {stars.toLocaleString()}
               </span>
             ) : null}
             <button

@@ -42,7 +42,7 @@ export const YANMAR_UPGRADE_VISUALS = {
   ],
   haulTruckUpgrades: [
     { part: "HAUL_TRUCK_SPEED" as const, label: "돌트럭속도" },
-    { part: "HILL_ROCK_PICK" as const, label: "돌 고르기" },
+    { part: "HILL_SAFE_LOAD" as const, label: "안전적재" },
   ],
 } as const;
 
@@ -69,6 +69,6 @@ export function isTruckUpgradePart(part: YanmarEquipmentPart): part is UpgradeTr
     part === "TRUCK_CAPACITY" ||
     part === "TRUCK_SPEED" ||
     part === "HAUL_TRUCK_SPEED" ||
-    part === "HILL_ROCK_PICK"
+    part === "HILL_SAFE_LOAD"
   );
 }

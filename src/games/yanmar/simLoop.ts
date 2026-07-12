@@ -1129,20 +1129,35 @@ export function tickExcavatorSim(params: SimTickParams) {
         const rock = terrain.hillZone?.boulders.find(
           (item) => item.id === sim.carriedBoulderId,
         );
-        if (rock) {
-          destroyCarriedRock(rock);
-          tryClearHillZone(terrain);
+        const safeLoad = Math.random() < stats.hillSafeLoadChance;
+        if (rock && safeLoad) {
+          placeCarriedRockOnGround(rock, grappleClamp, terrain);
+          sim.carriedBoulderId = null;
+          runtime.digDust.active = true;
+          runtime.digDust.x = grappleClamp.x;
+          runtime.digDust.y = grappleClamp.y;
+          runtime.digDust.z = grappleClamp.z;
+          const failTick = grip.liftResultTick;
+          resetGrappleGrip(grip);
+          grip.liftResult = "fail";
+          grip.liftResultTick = failTick;
+          onAttachmentWarning("돌이 깨지지 않아 다시 적재할 수 있습니다.");
+        } else {
+          if (rock) {
+            destroyCarriedRock(rock);
+            tryClearHillZone(terrain);
+          }
+          sim.carriedBoulderId = null;
+          runtime.digDust.active = true;
+          runtime.digDust.x = grappleClamp.x;
+          runtime.digDust.y = grappleClamp.y;
+          runtime.digDust.z = grappleClamp.z;
+          const failTick = grip.liftResultTick;
+          resetGrappleGrip(grip);
+          grip.liftResult = "fail";
+          grip.liftResultTick = failTick;
+          onAttachmentWarning("낙하하여 돌이 쓸수없게 되었습니다.");
         }
-        sim.carriedBoulderId = null;
-        runtime.digDust.active = true;
-        runtime.digDust.x = grappleClamp.x;
-        runtime.digDust.y = grappleClamp.y;
-        runtime.digDust.z = grappleClamp.z;
-        const failTick = grip.liftResultTick;
-        resetGrappleGrip(grip);
-        grip.liftResult = "fail";
-        grip.liftResultTick = failTick;
-        onAttachmentWarning("낙하하여 돌이 쓸수없게 되었습니다.");
       }
     }
   }

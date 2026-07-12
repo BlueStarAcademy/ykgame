@@ -5,12 +5,16 @@ import { StarAmount } from "@/components/StarAmount";
 import {
   YANMAR_EQUIPMENT_CONFIG,
   YANMAR_EQUIPMENT_RESET_REFUND_RATE,
+  formatYanmarSuccessRate,
   getYanmarUpgradeCost,
+  getYanmarUpgradeFailBonusGain,
   getYanmarUpgradePartStatLabel,
   getYanmarUpgradePartStatText,
   getYanmarUpgradePartStatValue,
   getYanmarUpgradePartGainText,
+  getYanmarUpgradeSuccessRate,
   getYanmarPartResetRefundStars,
+  type YanmarEquipmentFailBonuses,
   type YanmarEquipmentLevels,
   type YanmarEquipmentPart,
 } from "./equipment";
@@ -27,12 +31,13 @@ interface EquipmentUpgradePanelProps {
   open: boolean;
   mode: GameMode;
   levels: YanmarEquipmentLevels;
+  failBonuses: YanmarEquipmentFailBonuses;
   currency: number;
   previewStars: number;
   upgradingPart: YanmarEquipmentPart | null;
   resettingEquipment: boolean;
   onClose: () => void;
-  onUpgrade: (part: YanmarEquipmentPart) => void;
+  onUpgrade: (part: YanmarEquipmentPart) => void | Promise<boolean | null>;
   onResetEquipment: (part: YanmarEquipmentPart) => void;
 }
 
@@ -49,11 +54,19 @@ type UpgradeSession = {
   part: YanmarEquipmentPart;
   toLevel: number;
   barDone: boolean;
+  /** null = request error / cancelled, true/false = rolled result */
+  attemptResult: boolean | null | undefined;
 };
 
 type UpgradeSuccess = {
   part: YanmarEquipmentPart;
   level: number;
+};
+
+type UpgradeFail = {
+  part: YanmarEquipmentPart;
+  toLevel: number;
+  bonusGain: number;
 };
 
 function hotspotButtonClass(isSelected: boolean, partLevel: number, maxed: boolean) {
@@ -210,10 +223,44 @@ function UpgradeSuccessToast({
   );
 }
 
+function UpgradeFailToast({
+  part,
+  toLevel,
+  bonusGain,
+  toastKey,
+}: {
+  part: YanmarEquipmentPart;
+  toLevel: number;
+  bonusGain: number;
+  toastKey: number;
+}) {
+  const label = YANMAR_EQUIPMENT_CONFIG[part].label;
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[90] flex items-center justify-center px-6">
+      <div
+        key={toastKey}
+        className="yanmar-upgrade-success-toast max-w-[min(20rem,92%)] rounded-2xl border-2 border-slate-400/70 bg-gradient-to-br from-slate-900/95 to-slate-800/95 px-5 py-4 text-center shadow-2xl backdrop-blur-sm"
+      >
+        <p className="text-base font-black leading-snug text-slate-100 sm:text-lg">
+          강화 실패{" "}
+          <span className="text-white">({label} +{toLevel})</span>
+        </p>
+        {bonusGain > 0 ? (
+          <p className="mt-1 text-[11px] font-bold text-sky-200">
+            다음 시도 성공률 +{formatYanmarSuccessRate(bonusGain)}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function EquipmentUpgradePanel({
   open,
   mode,
   levels,
+  failBonuses,
   currency,
   previewStars,
   upgradingPart,
@@ -230,10 +277,12 @@ export function EquipmentUpgradePanel({
     useState<YanmarEquipmentPart | null>(null);
   const [bumpPart, setBumpPart] = useState<YanmarEquipmentPart | null>(null);
   const [upgradeSuccess, setUpgradeSuccess] = useState<UpgradeSuccess | null>(null);
+  const [upgradeFail, setUpgradeFail] = useState<UpgradeFail | null>(null);
   const [successToastKey, setSuccessToastKey] = useState(0);
   const barTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const failTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const upgradeSessionRef = useRef<UpgradeSession | null>(null);
   const levelsRef = useRef(levels);
 
@@ -262,24 +311,40 @@ export function EquipmentUpgradePanel({
       clearTimeout(successTimerRef.current);
       successTimerRef.current = null;
     }
+    if (failTimerRef.current) {
+      clearTimeout(failTimerRef.current);
+      failTimerRef.current = null;
+    }
   }, []);
 
   const tryShowUpgradeSuccess = useCallback(() => {
     const session = upgradeSessionRef.current;
     if (!session?.barDone) return;
+    if (session.attemptResult === undefined) return;
 
-    const currentLevel = levelsRef.current[session.part];
-    if (currentLevel >= session.toLevel) {
+    if (session.attemptResult === true) {
+      setUpgradeFail(null);
       setUpgradeSuccess({ part: session.part, level: session.toLevel });
       setSuccessToastKey((key) => key + 1);
       upgradeSessionRef.current = null;
       return;
     }
 
-    if (upgradingPart === null && activeUpgradeBarPart === null) {
+    if (session.attemptResult === false) {
+      setUpgradeSuccess(null);
+      setUpgradeFail({
+        part: session.part,
+        toLevel: session.toLevel,
+        bonusGain: getYanmarUpgradeFailBonusGain(session.toLevel),
+      });
+      setSuccessToastKey((key) => key + 1);
       upgradeSessionRef.current = null;
+      return;
     }
-  }, [upgradingPart, activeUpgradeBarPart]);
+
+    // request error — no toast
+    upgradeSessionRef.current = null;
+  }, []);
 
   useEffect(() => {
     return () => clearUpgradeTimers();
@@ -308,6 +373,22 @@ export function EquipmentUpgradePanel({
       }
     };
   }, [upgradeSuccess, successToastKey]);
+
+  useEffect(() => {
+    if (!upgradeFail) return;
+
+    failTimerRef.current = setTimeout(() => {
+      setUpgradeFail(null);
+      failTimerRef.current = null;
+    }, UPGRADE_SUCCESS_TOAST_MS);
+
+    return () => {
+      if (failTimerRef.current) {
+        clearTimeout(failTimerRef.current);
+        failTimerRef.current = null;
+      }
+    };
+  }, [upgradeFail, successToastKey]);
 
   const getDisplayLevel = useCallback(
     (part: YanmarEquipmentPart) => {
@@ -353,9 +434,16 @@ export function EquipmentUpgradePanel({
     setUpgradeBarKey((key) => key + 1);
     setActiveUpgradeBarPart(part);
     setBumpPart(part);
-    upgradeSessionRef.current = { part, toLevel, barDone: false };
+    upgradeSessionRef.current = { part, toLevel, barDone: false, attemptResult: undefined };
 
-    onUpgrade(part);
+    const result = onUpgrade(part);
+    void Promise.resolve(result).then((attemptResult) => {
+      if (upgradeSessionRef.current?.part === part) {
+        upgradeSessionRef.current.attemptResult =
+          typeof attemptResult === "boolean" ? attemptResult : null;
+      }
+      tryShowUpgradeSuccess();
+    });
 
     barTimerRef.current = setTimeout(() => {
       if (upgradeSessionRef.current) {
@@ -396,6 +484,12 @@ export function EquipmentUpgradePanel({
   const refundRateLabel = `${Math.round(YANMAR_EQUIPMENT_RESET_REFUND_RATE * 100)}%`;
   const attachmentPartLevel = getDisplayLevel(activeAttachment.part);
   const attachmentPartConfig = YANMAR_EQUIPMENT_CONFIG[activeAttachment.part];
+  const failBonus = failBonuses[selected] ?? 0;
+  const actualLevel = levels[selected];
+  const baseSuccessRate =
+    actualLevel >= config.maxLevel
+      ? 1
+      : getYanmarUpgradeSuccessRate(actualLevel + 1, 0);
 
   return (
     <div className="absolute inset-0 z-[80] flex flex-col bg-black/65 backdrop-blur-sm">
@@ -406,9 +500,17 @@ export function EquipmentUpgradePanel({
           toastKey={successToastKey}
         />
       ) : null}
+      {upgradeFail ? (
+        <UpgradeFailToast
+          part={upgradeFail.part}
+          toLevel={upgradeFail.toLevel}
+          bonusGain={upgradeFail.bonusGain}
+          toastKey={successToastKey}
+        />
+      ) : null}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl">
-        <div className="flex shrink-0 items-center justify-between bg-gradient-to-br from-slate-800 to-slate-950 px-4 py-3 text-white">
-          <div>
+        <div className="flex shrink-0 items-center justify-between gap-2 bg-gradient-to-br from-slate-800 to-slate-950 px-4 py-3 text-white">
+          <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-amber-200">
               Yanmar Parts
             </p>
@@ -422,7 +524,7 @@ export function EquipmentUpgradePanel({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-white/15 px-2.5 py-1 text-xs font-bold hover:bg-white/25"
+            className="shrink-0 rounded-lg bg-white/15 px-2.5 py-1 text-xs font-bold hover:bg-white/25"
           >
             닫기
           </button>
@@ -568,16 +670,22 @@ export function EquipmentUpgradePanel({
               </span>
             </p>
             <UpgradeStatCompare part={selected} level={level} maxed={maxed} />
-            {levels[selected] > 0 && !practiceMode ? (
-              <p className="mt-3 text-center text-[10px] font-bold text-slate-500">
-                초기화시 {refundRateLabel} 환급
+            {!maxed ? (
+              <div className="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-center text-[11px]">
+                <p className="font-black text-sky-900">
+                  성공률 {formatYanmarSuccessRate(baseSuccessRate)}
+                  {failBonus > 0
+                    ? `(+${formatYanmarSuccessRate(failBonus)})`
+                    : ""}
+                </p>
+              </div>
+            ) : null}
+            {!practiceMode ? (
+              <p className="mt-3 text-center text-[10px] font-semibold text-slate-500">
+                초기화 시 사용한 스타의 {refundRateLabel}가 환급됩니다.
               </p>
             ) : null}
-            <div
-              className={`grid gap-2 ${
-                levels[selected] > 0 ? "mt-1.5 grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : "mt-3 grid-cols-1"
-              }`}
-            >
+            <div className={`${practiceMode ? "mt-3" : "mt-2"} grid grid-cols-2 gap-2`}>
               <button
                 type="button"
                 onClick={handleUpgradeClick}
@@ -598,32 +706,32 @@ export function EquipmentUpgradePanel({
                   </>
                 )}
               </button>
-              {levels[selected] > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => onResetEquipment(selected)}
-                  disabled={resetDisabled}
-                  className="inline-flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-300 bg-slate-900 px-2 py-1.5 text-xs font-black text-white disabled:bg-gray-200 disabled:text-gray-400"
-                >
-                  {resettingEquipment ? (
-                    "초기화중"
-                  ) : practiceMode ? (
-                    "초기화"
-                  ) : (
-                    <>
-                      <span>초기화</span>
-                      <span className="inline-flex items-center gap-1">
-                        <StarAmount
-                          value={resetRefundStars}
-                          size={12}
-                          valueClassName="text-amber-200"
-                        />
-                        <span className="text-[10px] font-bold text-amber-100/90">환급</span>
-                      </span>
-                    </>
-                  )}
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onClick={() => onResetEquipment(selected)}
+                disabled={resetDisabled}
+                className="inline-flex min-w-0 flex-col items-center justify-center rounded-lg bg-red-600 px-3 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:bg-gray-300"
+                aria-label={`${config.label} 강화 초기화`}
+              >
+                {resettingEquipment ? (
+                  "초기화중"
+                ) : practiceMode ? (
+                  "초기화"
+                ) : levels[selected] > 0 ? (
+                  <>
+                    <span>초기화</span>
+                    <span className="mt-0.5 inline-flex items-center">
+                      <StarAmount
+                        value={resetRefundStars}
+                        size={12}
+                        valueClassName="text-[11px] font-bold text-white"
+                      />
+                    </span>
+                  </>
+                ) : (
+                  "초기화"
+                )}
+              </button>
             </div>
             {activeUpgradeBarPart === selected ? (
               <UpgradeProgressBar barKey={upgradeBarKey} />

@@ -72,7 +72,26 @@ function isStalePrismaClient(client: PrismaClient): boolean {
     rewardEvent?: unknown;
     userMail?: unknown;
   };
-  return delegates.userMail == null || delegates.rewardEvent == null;
+  if (delegates.userMail == null || delegates.rewardEvent == null) {
+    return true;
+  }
+
+  // Detect schema drift after prisma generate without a full process restart.
+  const runtime = client as PrismaClient & {
+    _runtimeDataModel?: {
+      models?: Record<string, { fields?: Array<{ name: string }> }>;
+    };
+  };
+  const equipmentFields =
+    runtime._runtimeDataModel?.models?.UserEquipmentUpgrade?.fields;
+  if (
+    Array.isArray(equipmentFields) &&
+    !equipmentFields.some((field) => field.name === "failBonus")
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function getPrismaClient(): PrismaClient {

@@ -5,6 +5,7 @@ import {
   YANMAR_EQUIPMENT_CONFIG,
   calculateYanmarEquipmentStats,
   getYanmarPartResetRefundStars,
+  mergeYanmarEquipmentFailBonusesFromDb,
   mergeYanmarEquipmentLevelsFromDb,
   type YanmarEquipmentPart,
 } from "@/games/yanmar/equipment";
@@ -30,10 +31,11 @@ export async function POST(req: Request) {
     const result = await prisma.$transaction(async (tx) => {
       const rows = await tx.userEquipmentUpgrade.findMany({
         where: { userId: session.user.id, gameId: "yanmar" },
-        select: { part: true, level: true },
+        select: { part: true, level: true, failBonus: true },
       });
 
       const levels = mergeYanmarEquipmentLevelsFromDb(rows);
+      const failBonuses = mergeYanmarEquipmentFailBonusesFromDb(rows);
       const partLevel = levels[part];
       const refundStars = getYanmarPartResetRefundStars(part, partLevel);
 
@@ -47,6 +49,7 @@ export async function POST(req: Request) {
           refundedStars: 0,
           currency: user.currency,
           levels,
+          failBonuses: { ...failBonuses, [part]: 0 },
           stats: calculateYanmarEquipmentStats(levels),
         };
       }
@@ -56,6 +59,7 @@ export async function POST(req: Request) {
       });
 
       const nextLevels = { ...levels, [part]: 0 };
+      const nextFailBonuses = { ...failBonuses, [part]: 0 };
 
       const updatedUser =
         refundStars > 0
@@ -74,6 +78,7 @@ export async function POST(req: Request) {
         refundedStars: refundStars,
         currency: updatedUser.currency,
         levels: nextLevels,
+        failBonuses: nextFailBonuses,
         stats: calculateYanmarEquipmentStats(nextLevels),
       };
     });

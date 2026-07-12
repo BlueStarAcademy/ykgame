@@ -51,13 +51,83 @@ body {
   }
 }
 
+@keyframes yanmar-score-panel-critical-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.88);
+  }
+  55% {
+    opacity: 1;
+    transform: translate3d(0, -2px, 0) scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes yanmar-score-critical-label-pop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.55) rotate(-8deg);
+    letter-spacing: 0.08em;
+  }
+  35% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1.18) rotate(0deg);
+    letter-spacing: 0.22em;
+  }
+  55% {
+    transform: translateX(-50%) translateY(0) scale(0.96) rotate(0deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1) rotate(0deg);
+    letter-spacing: 0.18em;
+  }
+}
+
+@keyframes yanmar-score-critical-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.55));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.95));
+  }
+}
+
 .yanmar-score-panel {
   animation: yanmar-score-panel-enter 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
 }
 
+.yanmar-score-panel-critical {
+  animation: yanmar-score-panel-critical-enter 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 .yanmar-score-panel-value {
   animation: yanmar-score-panel-value-bump 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.yanmar-score-panel-critical .yanmar-score-panel-value {
+  animation: yanmar-score-panel-value-bump 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.yanmar-score-critical-label {
+  font-size: clamp(0.72rem, 2.6vw, 0.92rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  color: #facc15;
+  text-shadow:
+    0 0 8px rgba(250, 204, 21, 0.85),
+    0 0 18px rgba(245, 158, 11, 0.55),
+    0 1px 0 rgba(0, 0, 0, 0.65);
+  animation:
+    yanmar-score-critical-label-pop 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    yanmar-score-critical-glow 1.1s ease-in-out 0.45s infinite;
+  will-change: transform, opacity, filter;
 }
 
 .yanmar-score-panel-star {
@@ -2317,10 +2387,11 @@ body {
   transform: scale(0.97);
 }
 
-.yanmar-shop-card-star {
-  width: 0.75rem;
-  height: 0.75rem;
-  flex-shrink: 0;
+.yanmar-shop-card-star-value {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .yanmar-shop-card-buy-label {
@@ -3864,6 +3935,130 @@ html.pwa-mode body {
   overscroll-behavior: contain;
   border-top: 1px solid rgba(226, 232, 240, 0.8);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, #f8fafc 16px);
+}
+
+.landing-promo {
+  animation: landing-promo-in 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  font-family: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+}
+
+.landing-promo-frame {
+  padding: 0.85rem 0.85rem 0.55rem;
+}
+
+.landing-promo-visual {
+  aspect-ratio: 16 / 10;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(180deg, #e8edf2 0%, #d5dde6 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.landing-promo-img {
+  animation: landing-promo-img-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.landing-promo-overlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.08) 0%, transparent 38%),
+    linear-gradient(180deg, transparent 35%, rgba(15, 23, 42, 0.72) 100%);
+}
+
+.landing-promo-caption {
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+}
+
+.landing-promo-sum {
+  letter-spacing: -0.02em;
+}
+
+.landing-promo-num {
+  display: inline-block;
+  animation: landing-promo-pop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.landing-promo-plus + .landing-promo-num {
+  animation-delay: 0.08s;
+}
+
+.landing-promo-plus {
+  display: inline-block;
+  animation: landing-promo-pop 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.04s both;
+}
+
+.landing-promo-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 0.75rem 0.85rem;
+}
+
+.landing-promo-badge {
+  display: flex;
+  height: 1.75rem;
+  width: 1.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: linear-gradient(145deg, #ef5350 0%, #c62828 100%);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+.landing-promo-footer {
+  box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.04);
+}
+
+.landing-promo-close {
+  background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
+  box-shadow: 0 4px 14px rgba(198, 40, 40, 0.28);
+}
+
+.landing-promo-close:hover {
+  box-shadow: 0 8px 22px rgba(198, 40, 40, 0.38);
+}
+
+@keyframes landing-promo-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes landing-promo-img-in {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes landing-promo-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Game-mode main controls: premium four-way 3D D-pads */

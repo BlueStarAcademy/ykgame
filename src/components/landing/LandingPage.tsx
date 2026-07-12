@@ -2,6 +2,7 @@ import Link from "next/link";
 import { GAMES } from "@/lib/games";
 import { COMPANY, EXPERIENCE_STEPS } from "@/lib/landing-content";
 import { LandingEquipmentCard } from "./LandingEquipmentCard";
+import { LandingPromoPopup } from "./LandingPromoPopup";
 import { PwaExperienceButton } from "./PwaExperienceButton";
 import { PwaInstallButton } from "./PwaInstallButton";
 import { WebExperienceSection } from "./WebExperienceSection";
@@ -14,6 +15,7 @@ interface LandingPageProps {
 export function LandingPage({ rideHref, gameHref }: LandingPageProps) {
   return (
     <main className="landing-page relative flex h-[100dvh] flex-col overflow-hidden text-gray-900">
+      <LandingPromoPopup />
       <div className="landing-bg pointer-events-none absolute inset-0" aria-hidden />
       <div className="landing-grid pointer-events-none absolute inset-0 opacity-40" aria-hidden />
 
