@@ -454,6 +454,16 @@ export const DUMP_TRUCK = {
   dumpMinHeightAboveDeck: -0.4,
 } as const;
 
+/**
+ * 돌트럭 주차 — 돌지역 중심(22,112)에서 남동쪽으로 약간 떨어진 하역장.
+ * rotation +π/2 → 모델 전방(로컬 +X)이 월드 −Z(남쪽), 퇴장로·진입로와 일치.
+ */
+export const HAUL_TRUCK = {
+  groupX: 42,
+  groupZ: 100,
+  rotation: Math.PI / 2,
+} as const;
+
 /** 트럭 고체 껍데기 — 칸 내부 공동은 비움 (하역 공간) */
 export const DUMP_TRUCK_SOLID = {
   centerLocalX: -0.12,
@@ -902,8 +912,8 @@ function createHillZone(
     centerX,
     centerZ,
     radius: 25,
-    dropX: centerX + 13,
-    dropZ: centerZ + 6,
+    dropX: HAUL_TRUCK.groupX,
+    dropZ: HAUL_TRUCK.groupZ,
     active: true,
     boulders: createHillBoulders(cycleId, centerX, centerZ, boulderCount),
     haulTruck: haulTruck
@@ -1110,6 +1120,16 @@ export function updateSpecialZones(
 
   const truck = terrain.hillZone?.haulTruck;
   if (!truck || truck.phase === "ready") return;
+  advanceHaulTruckState(truck, dt, haulTruckCooldownSec);
+}
+
+/** 한 틱만큼 돌트럭 상태 머신 진행 (phase 경계에서 멈춤). */
+export function advanceHaulTruckState(
+  truck: HaulTruckState,
+  dt: number,
+  haulTruckCooldownSec = HAUL_TRUCK_COOLDOWN_SEC,
+) {
+  if (truck.phase === "ready" || dt <= 0) return;
   truck.phaseElapsed += dt;
   if (truck.phase === "engineStart" && truck.phaseElapsed >= HAUL_TRUCK_ENGINE_START_SEC) {
     truck.phase = "departing";
@@ -1132,6 +1152,36 @@ export function updateSpecialZones(
       truck.cooldownRemaining = 0;
       truck.loadCount = 0;
     }
+  }
+}
+
+/**
+ * 앱/탭이 멈춰 있던 시간을 돌트럭 상태 머신에 반영한다.
+ * 각 phase 경계까지만 진행해 큰 elapsed도 다음 phase로 정확히 넘긴다.
+ */
+export function fastForwardHaulTruckState(
+  truck: HaulTruckState,
+  elapsedSec: number,
+  haulTruckCooldownSec = HAUL_TRUCK_COOLDOWN_SEC,
+) {
+  let remaining = Math.max(0, elapsedSec);
+
+  while (remaining > 0 && truck.phase !== "ready") {
+    let untilTransition: number;
+
+    if (truck.phase === "engineStart") {
+      untilTransition = Math.max(0, HAUL_TRUCK_ENGINE_START_SEC - truck.phaseElapsed);
+    } else if (truck.phase === "departing") {
+      untilTransition = Math.max(0, HAUL_TRUCK_DEPART_SEC - truck.phaseElapsed);
+    } else if (truck.phase === "cooldown") {
+      untilTransition = Math.max(0, truck.cooldownRemaining - HAUL_TRUCK_ARRIVE_SEC);
+    } else {
+      untilTransition = Math.max(0, HAUL_TRUCK_ARRIVE_SEC - truck.phaseElapsed);
+    }
+
+    const step = Math.min(remaining, Math.max(untilTransition, 0.000_001));
+    advanceHaulTruckState(truck, step, haulTruckCooldownSec);
+    remaining -= step;
   }
 }
 

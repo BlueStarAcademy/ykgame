@@ -11,6 +11,8 @@ import {
   createTerrain,
   flattenStoneZoneHeights,
   updateDigZoneRespawns,
+  fastForwardHaulTruckState,
+  HAUL_TRUCK_COOLDOWN_SEC,
   type DigZone,
   type CrashZone,
   type HillZone,
@@ -19,7 +21,7 @@ import {
 import type { MapTier } from "./mapTier";
 
 const STORAGE_PREFIX = "ykgame:yanmar:game-session:v1";
-const SNAPSHOT_VERSION = 2;
+const SNAPSHOT_VERSION = 3;
 
 function normalizeHillZone(zone: HillZone): HillZone {
   return {
@@ -61,12 +63,13 @@ function normalizeHillZone(zone: HillZone): HillZone {
 }
 
 export interface YanmarGameSessionSnapshot {
-  version: typeof SNAPSHOT_VERSION;
+  version: 2 | 3;
   seasonKey: string;
   savedAtMs: number;
   sim: ExcavatorSimState;
   dumpTruck: DumpTruckRuntimeState;
   dumpTruckCooldownSec: number;
+  haulTruckCooldownSec?: number;
   digZones: DigZone[];
   crashZone: CrashZone | null;
   hillZone: HillZone | null;
@@ -149,12 +152,14 @@ function isValidSnapshot(value: unknown): value is YanmarGameSessionSnapshot {
   if (!value || typeof value !== "object") return false;
   const snapshot = value as Partial<YanmarGameSessionSnapshot>;
   return (
-    snapshot.version === SNAPSHOT_VERSION &&
+    (snapshot.version === 2 || snapshot.version === SNAPSHOT_VERSION) &&
     typeof snapshot.seasonKey === "string" &&
     isFiniteNumber(snapshot.savedAtMs) &&
     isValidSim(snapshot.sim) &&
     isValidDumpTruck(snapshot.dumpTruck) &&
     isFiniteNumber(snapshot.dumpTruckCooldownSec) &&
+    (snapshot.haulTruckCooldownSec === undefined ||
+      isFiniteNumber(snapshot.haulTruckCooldownSec)) &&
     Array.isArray(snapshot.digZones) &&
     snapshot.digZones.every(isValidDigZone) &&
     (snapshot.mapTier === 1 || snapshot.mapTier === 2 || snapshot.mapTier === 3) &&
@@ -222,6 +227,7 @@ export function saveYanmarGameSession(
       sim: { ...snapshot.sim },
       dumpTruck: { ...snapshot.dumpTruck },
       dumpTruckCooldownSec: snapshot.dumpTruckCooldownSec,
+      haulTruckCooldownSec: snapshot.haulTruckCooldownSec,
       digZones: cloneDigZones(snapshot.digZones),
       crashZone: snapshot.crashZone
         ? {
@@ -267,16 +273,30 @@ export function loadYanmarGameSession(
 
     const dumpTruck = createDumpTruckState();
     Object.assign(dumpTruck, parsed.dumpTruck);
+    const elapsedSec = Math.max(0, nowMs - parsed.savedAtMs) / 1000;
     fastForwardDumpTruckState(
       dumpTruck,
-      Math.max(0, nowMs - parsed.savedAtMs) / 1000,
+      elapsedSec,
       parsed.dumpTruckCooldownSec,
     );
 
+    const haulTruckCooldownSec =
+      parsed.haulTruckCooldownSec ?? HAUL_TRUCK_COOLDOWN_SEC;
+    const hillZone = parsed.hillZone ? normalizeHillZone(parsed.hillZone) : null;
+    if (hillZone?.haulTruck) {
+      fastForwardHaulTruckState(
+        hillZone.haulTruck,
+        elapsedSec,
+        haulTruckCooldownSec,
+      );
+    }
+
     return {
       ...parsed,
+      version: SNAPSHOT_VERSION,
       sim: { ...parsed.sim },
       dumpTruck,
+      haulTruckCooldownSec,
       digZones: cloneDigZones(parsed.digZones),
       crashZone: parsed.crashZone
         ? {
@@ -284,7 +304,7 @@ export function loadYanmarGameSession(
             tiles: parsed.crashZone.tiles.map((tile) => ({ ...tile })),
           }
         : null,
-      hillZone: parsed.hillZone ? normalizeHillZone(parsed.hillZone) : null,
+      hillZone,
       heights: [...parsed.heights],
       baseHeights: [...parsed.baseHeights],
     };

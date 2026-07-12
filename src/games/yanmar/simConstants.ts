@@ -1,5 +1,7 @@
 export const MIN_BUCKET_GROUND_CLEARANCE = 0.05;
 export const MIN_BUCKET_DIG_ZONE_CLEARANCE = -2.15;
+/** 집게는 지면 아래로 파고들지 않는다. */
+export const MIN_GRAPPLE_GROUND_CLEARANCE = 0.02;
 /** 브레이커가 아스팔트/지면 위에 올려진 상태로 유지할 최소 여유. */
 export const MIN_BREAKER_SURFACE_CLEARANCE = 0.02;
 /** 팁이 이 높이 이하면 지면/아스팔트에 닿은 것으로 본다. */

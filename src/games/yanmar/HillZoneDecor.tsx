@@ -284,11 +284,11 @@ export function HillZoneDecor({
             </mesh>
           </>
         ) : null}
-        <HaulTruckModel state={zone.haulTruck} rockCount={zone.haulTruck.loadCount} />
+        <HaulTruckModel state={zone.haulTruck} />
         {showQuarry ? (
           <Text
-            position={[0, 0.1, -7.4]}
-            rotation={[-Math.PI / 2, 0, Math.PI]}
+            position={[0, 0.1, 7.4]}
+            rotation={[-Math.PI / 2, 0, 0]}
             fontSize={1.15}
             color="#f8fafc"
             outlineWidth={0.05}

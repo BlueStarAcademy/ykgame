@@ -798,6 +798,7 @@ export function ExcavatorGameWrapper({
         sim: { ...simRef.current },
         dumpTruck: { ...truckState },
         dumpTruckCooldownSec: cooldownSec,
+        haulTruckCooldownSec: equipmentStatsRef.current.haulTruckCooldownSec,
         digZones: terrain.digZones,
         crashZone: terrain.crashZone,
         hillZone: terrain.hillZone,
@@ -1030,8 +1031,17 @@ export function ExcavatorGameWrapper({
         auxiliaryRef.current,
       );
     };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        saveBeforeLeaving();
+      }
+    };
     window.addEventListener("pagehide", saveBeforeLeaving);
-    return () => window.removeEventListener("pagehide", saveBeforeLeaving);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", saveBeforeLeaving);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [persistDumpTruckCooldown, persistGameSession, session?.user?.id]);
 
   const syncMergedInput = useCallback(() => {
@@ -3351,6 +3361,7 @@ export function ExcavatorGameWrapper({
                     }`}
                     onClick={() => {
                       setShowShopPanel(false);
+                      setShowEquipmentUpgrade(false);
                       setShowQuestPanel((open) => !open);
                     }}
                     aria-expanded={showQuestPanel}
@@ -3385,6 +3396,7 @@ export function ExcavatorGameWrapper({
                     }`}
                     onClick={() => {
                       setShowQuestPanel(false);
+                      setShowEquipmentUpgrade(false);
                       setShowShopPanel((open) => !open);
                     }}
                     aria-expanded={showShopPanel}
@@ -3397,6 +3409,29 @@ export function ExcavatorGameWrapper({
                       draggable={false}
                     />
                     <span className="yanmar-shop-button-label">상점</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
+                      showEquipmentUpgrade ? " is-open" : ""
+                    }`}
+                    onClick={() => {
+                      setShowQuestPanel(false);
+                      setShowShopPanel(false);
+                      setShowEquipmentUpgrade((open) => !open);
+                    }}
+                    aria-expanded={showEquipmentUpgrade}
+                    aria-label={
+                      showEquipmentUpgrade ? "장비강화 닫기" : "장비강화 열기"
+                    }
+                  >
+                    <img
+                      className="yanmar-upgrade-hud-button-icon"
+                      src="/images/yanmar/2d/cockpit/upgrade-anvil-premium.png?v=2"
+                      alt=""
+                      draggable={false}
+                    />
+                    <span className="yanmar-upgrade-hud-button-label">강화</span>
                   </button>
                 </div>
                 <QuestPanel
@@ -3428,13 +3463,36 @@ export function ExcavatorGameWrapper({
               </>
             ) : null}
             {questsDisabled ? (
-              <button
-                type="button"
-                onClick={() => setShowTutorialMenu(true)}
-                className="w-[7.3125rem] rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
-              >
-                튜토리얼
-              </button>
+              <div className="pointer-events-auto flex items-start gap-1.5">
+                <button
+                  type="button"
+                  className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
+                    showEquipmentUpgrade ? " is-open" : ""
+                  }`}
+                  onClick={() => {
+                    setShowEquipmentUpgrade((open) => !open);
+                  }}
+                  aria-expanded={showEquipmentUpgrade}
+                  aria-label={
+                    showEquipmentUpgrade ? "장비강화 닫기" : "장비강화 열기"
+                  }
+                >
+                  <img
+                    className="yanmar-upgrade-hud-button-icon"
+                    src="/images/yanmar/2d/cockpit/upgrade-anvil-premium.png?v=2"
+                    alt=""
+                    draggable={false}
+                  />
+                  <span className="yanmar-upgrade-hud-button-label">강화</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowTutorialMenu(true)}
+                  className="h-[2.75rem] rounded-lg border border-white/20 bg-black/70 px-2.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
+                >
+                  튜토리얼
+                </button>
+              </div>
             ) : null}
             {showDigPoseGraph ? (
               <div className="yanmar-dig-pose-panel w-[7.3125rem] rounded-sm border border-white/10 bg-black/55 px-2 py-1.5 text-white shadow-xl backdrop-blur-sm">
@@ -3897,6 +3955,7 @@ export function ExcavatorGameWrapper({
               onSimTick={handleSimTick}
               cameraMode={cameraMode}
               lookOffsetRef={lookOffsetRef}
+              endedRef={endedRef}
             />
           </div>
         )}
@@ -3948,7 +4007,6 @@ export function ExcavatorGameWrapper({
             allowed={allowed}
             tutorialStep={tutorialStep}
             showTouchZones={showTouchZones}
-            onOpenEquipmentUpgrade={() => setShowEquipmentUpgrade(true)}
             onHorn={handleHornQuest}
           />
         )}

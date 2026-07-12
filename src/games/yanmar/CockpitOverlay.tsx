@@ -52,7 +52,6 @@ interface CockpitOverlayProps {
   unlockAllAttachments?: boolean;
   onAttachmentChange: (attachment: AttachmentType) => void;
   onAttachmentWarning?: (message: string) => void;
-  onOpenEquipmentUpgrade?: () => void;
   onHorn?: () => void;
 }
 
@@ -85,39 +84,9 @@ function getAuxMenuButtonSize(isPortrait: boolean) {
 /** 좌·우 보조 메뉴 토글 공통 높이 (기능 / 자동) */
 const AUX_MENU_TOGGLE_CY = 0.495;
 
-function getHornTouchZoneStyle(
-  layout: JoystickLayout,
-  isPortrait: boolean,
-  useDPad: boolean,
-) {
-  const gap = isPortrait ? "0.28rem" : "0.2rem";
-  const autoToggleHalf = isPortrait ? "1.425rem" : "1.375rem";
-  const buttonSize = getAuxMenuButtonSize(isPortrait);
-
-  // D-pad 모드: 기능/자동 버튼과 같은 가로 중심·폭으로, 바로 아래에 배치
-  if (useDPad) {
-    return {
-      left: `${layout.cx * 100}%`,
-      top: `calc(${AUX_MENU_TOGGLE_CY * 100}% + ${autoToggleHalf} + ${gap})`,
-      bottom: "auto" as const,
-      width: buttonSize,
-      height: "1.55rem",
-      transform: "translateX(-50%)",
-    };
-  }
-
-  const { centerYOffset, heightHalfPct, width } = getJoystickZoneMetrics(isPortrait);
-  const joystickCenterTop = (layout.cy - centerYOffset) * 100;
-
-  return {
-    left: `${layout.cx * 100}%`,
-    top: `calc(${AUX_MENU_TOGGLE_CY * 100}% + ${autoToggleHalf} + ${gap})`,
-    bottom: `calc(${100 - joystickCenterTop}% + ${heightHalfPct}% + ${gap})`,
-    width,
-    height: "auto" as const,
-    transform: "translateX(-50%)",
-  };
-}
+/** 조이스틱 탭=경적 / 드래그=조작 판정 */
+const JOYSTICK_TAP_MAX_MS = 320;
+const JOYSTICK_DRAG_START_PX = 12;
 
 /** `as const` layout literals widened so portrait offsets type-check. */
 type WidenNumbers<T> = T extends number
@@ -660,8 +629,21 @@ function MainDPadVisual({
           strokeOpacity="0.82"
           strokeWidth="1.5"
         />
-        <circle cx="50" cy="50" r="4.2" fill={accent} opacity="0.9" />
-        <circle cx="48.7" cy="48.7" r="1.3" fill="#fff" opacity="0.65" />
+        {side === "right" ? (
+          <image
+            href="/images/yanmar/2d/cockpit/horn-compact-fit.png?v=4"
+            x="37.5"
+            y="37.5"
+            width="25"
+            height="25"
+            preserveAspectRatio="xMidYMid meet"
+          />
+        ) : (
+          <>
+            <circle cx="50" cy="50" r="4.2" fill={accent} opacity="0.9" />
+            <circle cx="48.7" cy="48.7" r="1.3" fill="#fff" opacity="0.65" />
+          </>
+        )}
       </svg>
     </div>
   );
@@ -825,6 +807,8 @@ interface GameJoystickProps {
   isPortrait: boolean;
   useDPad: boolean;
   onChange: (x: number, y: number) => void;
+  /** 짧게 탭하면 경적 (드래그 시에는 조이스틱만 동작) */
+  onHornTap?: () => void;
   /** 드래그 중인 pointerId — 같은 손가락의 버튼 오입력만 걸러낼 때 사용 */
   onControlPointerDrag?: (pointerId: number, active: boolean) => void;
 }
@@ -838,15 +822,22 @@ function GameJoystick({
   isPortrait,
   useDPad,
   onChange,
+  onHornTap,
   onControlPointerDrag,
 }: GameJoystickProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
   const activePointerIdRef = useRef<number | null>(null);
+  const dragActiveRef = useRef(false);
+  const tapOriginRef = useRef<{ x: number; y: number; at: number } | null>(null);
+
   const releaseStick = useCallback(() => {
     const pid = activePointerIdRef.current;
+    const wasDragging = dragActiveRef.current;
     activePointerIdRef.current = null;
-    if (pid != null) onControlPointerDrag?.(pid, false);
-    onChange(0, 0);
+    dragActiveRef.current = false;
+    tapOriginRef.current = null;
+    if (pid != null && wasDragging) onControlPointerDrag?.(pid, false);
+    if (wasDragging) onChange(0, 0);
   }, [onChange, onControlPointerDrag]);
   const pointer = usePointerRelease(releaseStick);
   const joystickZone = getJoystickZoneMetrics(isPortrait);
@@ -876,25 +867,59 @@ function GameJoystick({
     [enabled.x, enabled.y, onChange, useDPad],
   );
 
+  const beginDrag = useCallback(
+    (pointerId: number, clientX: number, clientY: number) => {
+      if (dragActiveRef.current) return;
+      dragActiveRef.current = true;
+      onControlPointerDrag?.(pointerId, true);
+      updateFromEvent(clientX, clientY);
+    },
+    [onControlPointerDrag, updateFromEvent],
+  );
+
   const handleStart = (e: React.PointerEvent) => {
-    if (!enabled.x && !enabled.y) return;
+    if (!enabled.x && !enabled.y && !onHornTap) return;
     e.preventDefault();
     activePointerIdRef.current = e.pointerId;
-    onControlPointerDrag?.(e.pointerId, true);
+    dragActiveRef.current = false;
+    tapOriginRef.current = { x: e.clientX, y: e.clientY, at: performance.now() };
     pointer.begin(e.pointerId, zoneRef.current);
-    updateFromEvent(e.clientX, e.clientY);
   };
 
   const handleMove = (e: React.PointerEvent) => {
-    if (!pointer.dragging.current || pointer.pointerIdRef.current !== e.pointerId) return;
-    updateFromEvent(e.clientX, e.clientY);
+    if (!pointer.dragging.current || pointer.pointerIdRef.current !== e.pointerId) {
+      return;
+    }
+    if (!enabled.x && !enabled.y) return;
+
+    const origin = tapOriginRef.current;
+    if (!dragActiveRef.current && origin) {
+      const dist = Math.hypot(e.clientX - origin.x, e.clientY - origin.y);
+      if (dist < JOYSTICK_DRAG_START_PX) return;
+      beginDrag(e.pointerId, e.clientX, e.clientY);
+      return;
+    }
+    if (dragActiveRef.current) {
+      updateFromEvent(e.clientX, e.clientY);
+    }
   };
 
   const handleEnd = (e: React.PointerEvent) => {
+    if (pointer.pointerIdRef.current !== e.pointerId) return;
+
+    const origin = tapOriginRef.current;
+    const wasDragging = dragActiveRef.current;
+    if (!wasDragging && origin && onHornTap) {
+      const elapsed = performance.now() - origin.at;
+      const dist = Math.hypot(e.clientX - origin.x, e.clientY - origin.y);
+      if (elapsed <= JOYSTICK_TAP_MAX_MS && dist < JOYSTICK_DRAG_START_PX) {
+        onHornTap();
+      }
+    }
     pointer.finish(e.pointerId);
   };
 
-  const isDisabled = !enabled.x && !enabled.y;
+  const isDisabled = !enabled.x && !enabled.y && !onHornTap;
 
   return (
     <>
@@ -920,7 +945,15 @@ function GameJoystick({
         onLostPointerCapture={() => {
           pointer.finish();
         }}
-        aria-label={side === "left" ? "좌 조이스틱" : "우 조이스틱"}
+        aria-label={
+          side === "left"
+            ? onHornTap
+              ? "좌 조이스틱, 짧게 탭하면 경적"
+              : "좌 조이스틱"
+            : onHornTap
+              ? "우 조이스틱, 짧게 탭하면 경적"
+              : "우 조이스틱"
+        }
       >
         {showTouchZone && (
           <div
@@ -940,104 +973,6 @@ function GameJoystick({
       </div>
 
     </>
-  );
-}
-
-function HornTouchZone({
-  layout,
-  isPortrait,
-  useDPad,
-  showTouchZone,
-  shouldIgnorePointer,
-  onHorn,
-}: {
-  layout: JoystickLayout;
-  isPortrait: boolean;
-  useDPad: boolean;
-  showTouchZone: boolean;
-  shouldIgnorePointer?: (pointerId: number) => boolean;
-  onHorn: () => void;
-}) {
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (shouldIgnorePointer?.(e.pointerId)) return;
-    e.preventDefault();
-    onHorn();
-  };
-  const buttonWidth = getAuxMenuButtonSize(isPortrait);
-
-  return (
-    <div
-      className="yanmar-horn-touch-zone absolute touch-none"
-      style={getHornTouchZoneStyle(layout, isPortrait, useDPad)}
-      onPointerDown={handlePointerDown}
-      role="button"
-      tabIndex={-1}
-      aria-label="경적"
-    >
-      <span
-        className="yanmar-horn-button-visual pointer-events-none"
-        style={{ width: buttonWidth, height: "1.4rem" }}
-        aria-hidden
-      >
-        <span
-          className="yanmar-horn-button-image"
-          style={{
-            backgroundImage:
-              'url("/images/yanmar/2d/cockpit/horn-compact-fit.png?v=3")',
-          }}
-        />
-      </span>
-      {showTouchZone ? (
-        <span className="pointer-events-none absolute inset-0 border border-yellow-200/70 bg-yellow-200/10" />
-      ) : null}
-    </div>
-  );
-}
-
-function EquipmentUpgradeTouchZone({
-  layout,
-  isPortrait,
-  useDPad,
-  showTouchZone,
-  shouldIgnorePointer,
-  onOpen,
-}: {
-  layout: JoystickLayout;
-  isPortrait: boolean;
-  useDPad: boolean;
-  showTouchZone: boolean;
-  shouldIgnorePointer?: (pointerId: number) => boolean;
-  onOpen: () => void;
-}) {
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (shouldIgnorePointer?.(e.pointerId)) return;
-    e.preventDefault();
-    onOpen();
-  };
-  const buttonWidth = getAuxMenuButtonSize(isPortrait);
-
-  return (
-    <div
-      className="yanmar-upgrade-touch-zone absolute touch-none"
-      style={getHornTouchZoneStyle(layout, isPortrait, useDPad)}
-      onPointerDown={handlePointerDown}
-      role="button"
-      tabIndex={-1}
-      aria-label="장비강화"
-    >
-      <span
-        className="yanmar-upgrade-button-visual pointer-events-none"
-        style={{ width: buttonWidth, height: "1.4rem" }}
-        aria-hidden
-      >
-        <span className="yanmar-upgrade-button-sheen" />
-        <span className="yanmar-upgrade-button-icon" />
-        <span className="yanmar-upgrade-button-label">강화</span>
-      </span>
-      {showTouchZone ? (
-        <span className="pointer-events-none absolute inset-0 border border-amber-200/70 bg-amber-200/10" />
-      ) : null}
-    </div>
   );
 }
 
@@ -2264,7 +2199,6 @@ export function CockpitOverlay({
   unlockAllAttachments = false,
   onAttachmentChange,
   onAttachmentWarning,
-  onOpenEquipmentUpgrade,
   onHorn,
 }: CockpitOverlayProps) {
   const highlightLeft =
@@ -2283,7 +2217,6 @@ export function CockpitOverlay({
   const sideTravelActiveRef = useRef({ left: false, right: false });
   /** 조작 드래그 중인 pointerId — 같은 손가락의 버튼 오입력만 차단 */
   const controlDragPointersRef = useRef(new Set<number>());
-  const suppressButtonPointersRef = useRef(new Map<number, number>());
   const travelEnabled = allowed.travel && !auxiliary.safetyLocked;
   const pedalAttachmentEquipped =
     attachmentType === "breaker" || attachmentType === "grapple";
@@ -2296,14 +2229,6 @@ export function CockpitOverlay({
       return;
     }
     controlDragPointersRef.current.delete(pointerId);
-    // 손을 뗀 위치의 고스트 탭만 잠깐 무시 (다른 손가락 클릭은 허용)
-    suppressButtonPointersRef.current.set(pointerId, performance.now() + 320);
-  }, []);
-
-  const shouldIgnoreButtonPointer = useCallback((pointerId: number) => {
-    if (controlDragPointersRef.current.has(pointerId)) return true;
-    const until = suppressButtonPointersRef.current.get(pointerId);
-    return until != null && performance.now() < until;
   }, []);
 
   const syncSideTravelLock = useCallback(() => {
@@ -2501,6 +2426,10 @@ export function CockpitOverlay({
             isPortrait={isPortrait}
             useDPad={useDPad}
             onControlPointerDrag={setControlPointerDrag}
+            onHornTap={() => {
+              playHorn();
+              onHorn?.();
+            }}
             onChange={(x, y) =>
               onInputChange((current) => ({ ...current, left: { x, y } }))
             }
@@ -2517,31 +2446,14 @@ export function CockpitOverlay({
             isPortrait={isPortrait}
             useDPad={useDPad}
             onControlPointerDrag={setControlPointerDrag}
+            onHornTap={() => {
+              playHorn();
+              onHorn?.();
+            }}
             onChange={(x, y) =>
               onInputChange((current) => ({ ...current, right: { x, y } }))
             }
           />
-          <HornTouchZone
-            layout={layout.right}
-            isPortrait={isPortrait}
-            useDPad={useDPad}
-            showTouchZone={showTouchZones}
-            shouldIgnorePointer={shouldIgnoreButtonPointer}
-            onHorn={() => {
-              playHorn();
-              onHorn?.();
-            }}
-          />
-          {onOpenEquipmentUpgrade && mode !== "ride" && mode !== "gameReady" ? (
-            <EquipmentUpgradeTouchZone
-              layout={layout.left}
-              isPortrait={isPortrait}
-              useDPad={useDPad}
-              showTouchZone={showTouchZones}
-              shouldIgnorePointer={shouldIgnoreButtonPointer}
-              onOpen={onOpenEquipmentUpgrade}
-            />
-          ) : null}
         </div>
       </div>
     </>

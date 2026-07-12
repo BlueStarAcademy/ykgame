@@ -34,7 +34,6 @@ import {
   damageCrashTile,
   getCrashTileAt,
   isInsideHillZoneCore,
-  isInHillZone,
   isInDumpTruckBed,
   markHillRockExtracted,
   tryClearHillZone,
@@ -47,6 +46,7 @@ import {
   sampleHeight,
   updateDigZoneRespawns,
   updateSpecialZones,
+  fastForwardHaulTruckState,
   worldToDumpTruckLocal,
   dumpTruckLocalToWorld,
   hillBoulderVisualScale,
@@ -93,6 +93,7 @@ import {
   type DumpTruckPose,
   type DumpTruckRuntimeState,
   updateDumpTruckState,
+  fastForwardDumpTruckState,
 } from "./dumpTruckState";
 import type { DiggingScoreState } from "./scoring";
 import type { GameMode } from "./tutorial";
@@ -109,6 +110,7 @@ import {
   MIN_BREAKER_SURFACE_CLEARANCE,
   MIN_BUCKET_DIG_ZONE_CLEARANCE,
   MIN_BUCKET_GROUND_CLEARANCE,
+  MIN_GRAPPLE_GROUND_CLEARANCE,
 } from "./simConstants";
 import {
   computeComAlignFactor,
@@ -157,6 +159,8 @@ export interface SimLoopRuntime {
   attachmentActionCooldown: number;
   warningCooldown: number;
   grappleGrip: GrappleGripRuntime;
+  /** 트럭·특수구역 쿨타임용 벽시계 (탭 백그라운드 복귀 시 경과 반영). */
+  lastSystemsWallMs: number;
 }
 
 export function createSimLoopRuntime(): SimLoopRuntime {
@@ -182,6 +186,7 @@ export function createSimLoopRuntime(): SimLoopRuntime {
     attachmentActionCooldown: 0,
     warningCooldown: 0,
     grappleGrip: createGrappleGripRuntime(),
+    lastSystemsWallMs: 0,
   };
 }
 
@@ -208,6 +213,8 @@ export interface SimTickParams {
   onHillRockDelivered: (rockId: string) => void;
   onAttachmentWarning: (message: string) => void;
   onSimTick: () => void;
+  /** true면 덤프 트럭·특수구역 시간 진행을 멈춘다 (결과 화면 등). */
+  endedRef?: { current: boolean };
 }
 
 function clampControl(value: number, min = -1, max = 1) {
@@ -345,13 +352,42 @@ function destroyCarriedRock(rock: HillBoulder) {
   rock.extracted = true;
 }
 
-function bucketClearance(sim: ExcavatorSimState, terrain: TerrainData, boomSwing: number) {
+function bucketClearance(
+  sim: ExcavatorSimState,
+  terrain: TerrainData,
+  boomSwing: number,
+  grappleOpen = 1,
+) {
+  if (sim.attachmentType === "grapple") {
+    const samples = [
+      getGrappleClampWorld(sim, boomSwing),
+      ...getGrappleJawSampleWorlds(sim, boomSwing, grappleOpen),
+    ];
+    let tip = samples[0]!;
+    let groundH = sampleHeight(terrain, tip.x, tip.z);
+    let clearance = tip.y - groundH;
+    for (let i = 1; i < samples.length; i++) {
+      const sample = samples[i]!;
+      const h = sampleHeight(terrain, sample.x, sample.z);
+      const c = sample.y - h;
+      if (c < clearance) {
+        tip = sample;
+        groundH = h;
+        clearance = c;
+      }
+    }
+    return {
+      tip,
+      groundH,
+      depthBelow: groundH - tip.y,
+      clearance,
+    };
+  }
+
   const tip =
     sim.attachmentType === "breaker"
       ? getBreakerTipWorld(sim, boomSwing)
-      : sim.attachmentType === "grapple"
-        ? getGrappleClampWorld(sim, boomSwing)
-        : getBucketBodyContactWorld(sim, boomSwing);
+      : getBucketBodyContactWorld(sim, boomSwing);
   const groundH =
     sim.attachmentType === "breaker"
       ? sampleBreakerContactHeight(terrain, tip.x, tip.z, BREAKER_TIP_PROBE_RADIUS)
@@ -577,17 +613,46 @@ export function tickExcavatorSim(params: SimTickParams) {
     onHillRockDelivered,
     onAttachmentWarning,
     onSimTick,
+    endedRef,
   } = params;
 
-  updateDumpTruckState(truckState, dt, stats.truckCooldownSec);
-  updateSpecialZones(
-    terrain,
-    dt,
-    Date.now(),
-    stats.crashRespawnSec,
-    stats.haulTruckCooldownSec,
-    stats.hillBoulderCount,
-  );
+  const systemsFrozen = endedRef?.current === true;
+  if (!systemsFrozen) {
+    const nowMs = Date.now();
+    const prevWallMs = runtime.lastSystemsWallMs || nowMs;
+    runtime.lastSystemsWallMs = nowMs;
+    // 프레임 dt는 0.05초로 캡되어 백그라운드 복귀 시 쿨타임이 거의 안 줄어든다.
+    // 트럭·특수구역은 벽시계 경과로 따라잡는다.
+    const wallDt = Math.min(Math.max(0, (nowMs - prevWallMs) / 1000), 24 * 3600);
+
+    if (wallDt > 0.08) {
+      fastForwardDumpTruckState(truckState, wallDt, stats.truckCooldownSec);
+      const haulTruck = terrain.hillZone?.haulTruck;
+      if (haulTruck) {
+        fastForwardHaulTruckState(haulTruck, wallDt, stats.haulTruckCooldownSec);
+      }
+      updateSpecialZones(
+        terrain,
+        0,
+        nowMs,
+        stats.crashRespawnSec,
+        stats.haulTruckCooldownSec,
+        stats.hillBoulderCount,
+      );
+    } else {
+      updateDumpTruckState(truckState, wallDt, stats.truckCooldownSec);
+      updateSpecialZones(
+        terrain,
+        wallDt,
+        nowMs,
+        stats.crashRespawnSec,
+        stats.haulTruckCooldownSec,
+        stats.hillBoulderCount,
+      );
+    }
+  } else {
+    runtime.lastSystemsWallMs = Date.now();
+  }
   runtime.attachmentActionCooldown = Math.max(0, runtime.attachmentActionCooldown - dt);
   runtime.warningCooldown = Math.max(0, runtime.warningCooldown - dt);
   const truckPose = getDumpTruckPose(truckState);
@@ -612,7 +677,8 @@ export function tickExcavatorSim(params: SimTickParams) {
   const speedProfile = isRide ? RIDE_CONTROL_SPEED : CONTROL_SPEED;
   const travelSpeedScale = isRide ? 1 : stats.travelSpeedMultiplier;
   const boomSwing = auxiliary?.boomSwing ?? DEFAULT_BOOM_SWING;
-  const beforeControlBucket = bucketClearance(sim, terrain, boomSwing);
+  const grappleOpen = auxiliary?.grappleOpen ?? 1;
+  const beforeControlBucket = bucketClearance(sim, terrain, boomSwing, grappleOpen);
   const bucketTipInDigZone = isInDigZone(
     beforeControlBucket.tip.x,
     beforeControlBucket.tip.z,
@@ -795,7 +861,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     constrainExcavatorToMap(sim, terrain);
   }
 
-  let bucketContact = bucketClearance(sim, terrain, boomSwing);
+  let bucketContact = bucketClearance(sim, terrain, boomSwing, grappleOpen);
   let { clearance } = bucketContact;
   const bucketContactInDigZone = isInDigZone(
     bucketContact.tip.x,
@@ -812,16 +878,14 @@ export function tickExcavatorSim(params: SimTickParams) {
         )
       : null;
   const breakerOnAsphalt = !!breakerContact?.tile?.active;
-  const clampInHill =
-    sim.attachmentType === "grapple" &&
-    isInHillZone(terrain, bucketContact.tip.x, bucketContact.tip.z);
-  const minBucketClearance = breakerOnAsphalt
-    ? MIN_BREAKER_SURFACE_CLEARANCE
-    : clampInHill
-      ? -0.5
-      : bucketContactInDigZone
-        ? MIN_BUCKET_DIG_ZONE_CLEARANCE
-        : MIN_BUCKET_GROUND_CLEARANCE;
+  const minBucketClearance =
+    sim.attachmentType === "grapple"
+      ? MIN_GRAPPLE_GROUND_CLEARANCE
+      : breakerOnAsphalt
+        ? MIN_BREAKER_SURFACE_CLEARANCE
+        : bucketContactInDigZone
+          ? MIN_BUCKET_DIG_ZONE_CLEARANCE
+          : MIN_BUCKET_GROUND_CLEARANCE;
   const wasAlreadyBelowGround =
     beforeControlBucket.clearance < minBucketClearance - 0.02;
   const worsenedGroundPenetration =
@@ -847,7 +911,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     if (vel.boom > 0) vel.boom = 0;
     if (vel.arm > 0) vel.arm = 0;
     if (vel.bucket > 0) vel.bucket = 0;
-    bucketContact = bucketClearance(sim, terrain, boomSwing);
+    bucketContact = bucketClearance(sim, terrain, boomSwing, grappleOpen);
     ({ clearance } = bucketContact);
   }
   if (isAutoArm) {
@@ -901,7 +965,9 @@ export function tickExcavatorSim(params: SimTickParams) {
   const bucketReachY = Math.max(scraper.y, bucketTip.y);
   const scraperGroundH = sampleHeight(terrain, scraper.x, scraper.z);
   const scraperDepthBelow = scraperGroundH - scraper.y;
-  updateDigZoneRespawns(terrain);
+  if (!systemsFrozen) {
+    updateDigZoneRespawns(terrain);
+  }
   const activeDigZones = getActiveDigZones(terrain);
   const scraperInDigZone = isInDigZone(scraper.x, scraper.z, terrain);
   const tipInDigZone = isInDigZone(bucketTip.x, bucketTip.z, terrain);
@@ -1560,7 +1626,8 @@ export function tickExcavatorSim(params: SimTickParams) {
   };
   if (
     sim.attachmentType === "bucket" &&
-    sim.bucketLoad > soilRetention + 0.002
+    sim.bucketLoad > soilRetention + 0.002 &&
+    !(inTruckDumpTarget && !truckCanAccept)
   ) {
     const excess = sim.bucketLoad - soilRetention;
     const spillRate = soilRetention < BUCKET_SOIL_HOLD_MIN ? 2.4 : 1.35;
@@ -1584,6 +1651,7 @@ export function tickExcavatorSim(params: SimTickParams) {
   }
 
   // 하역 자세(버킷 펴기)면 장소와 무관하게 흙이 쏟아짐 — 트럭 위만 점수 반영
+  // 단, 트럭이 보이지만 아직 하역 불가(복귀 중·만차)면 흙을 버리지 않는다.
   const bucketDumpOpen = sim.bucket > 1.35;
   if (
     sim.attachmentType === "bucket" &&
@@ -1603,26 +1671,30 @@ export function tickExcavatorSim(params: SimTickParams) {
     sim.bucketLoad > 0 &&
     bucketDumpOpen
   ) {
-    const spillRate = 1.65;
-    const remainingLoad = sim.bucketLoad;
-    const dumpAmount =
-      remainingLoad < 0.025
-        ? remainingLoad
-        : Math.min(remainingLoad, remainingLoad * spillRate * dt);
-    sim.bucketLoad = Math.max(0, sim.bucketLoad - dumpAmount);
-    fb.soilSpilling = dumpAmount > 0.001;
+    if (inTruckDumpTarget && !truckCanAccept) {
+      // 복귀 중/만차 트럭 위에 버킷을 펴도 적재를 소모하지 않음
+    } else {
+      const spillRate = 1.65;
+      const remainingLoad = sim.bucketLoad;
+      const dumpAmount =
+        remainingLoad < 0.025
+          ? remainingLoad
+          : Math.min(remainingLoad, remainingLoad * spillRate * dt);
+      sim.bucketLoad = Math.max(0, sim.bucketLoad - dumpAmount);
+      fb.soilSpilling = dumpAmount > 0.001;
 
-    if (inTruckDumpTarget && truckCanAccept) {
-      applyTruckDump(dumpAmount, dumpParams);
-    } else if (dumpAmount > 0.001) {
-      runtime.dumpSoilVisual.active = true;
-      runtime.dumpSoilVisual.intensity = Math.min(
-        1.2,
-        runtime.dumpSoilVisual.intensity + dumpAmount * 5.2,
-      );
-      runtime.dumpSoilVisual.spawnX = bucketMouthCenter.x;
-      runtime.dumpSoilVisual.spawnY = Math.max(bucketReachY - 0.15, scraper.y);
-      runtime.dumpSoilVisual.spawnZ = bucketMouthCenter.z;
+      if (inTruckDumpTarget && truckCanAccept) {
+        applyTruckDump(dumpAmount, dumpParams);
+      } else if (dumpAmount > 0.001) {
+        runtime.dumpSoilVisual.active = true;
+        runtime.dumpSoilVisual.intensity = Math.min(
+          1.2,
+          runtime.dumpSoilVisual.intensity + dumpAmount * 5.2,
+        );
+        runtime.dumpSoilVisual.spawnX = bucketMouthCenter.x;
+        runtime.dumpSoilVisual.spawnY = Math.max(bucketReachY - 0.15, scraper.y);
+        runtime.dumpSoilVisual.spawnZ = bucketMouthCenter.z;
+      }
     }
   }
 

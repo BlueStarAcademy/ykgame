@@ -10,18 +10,18 @@ export const GRAPPLE_TRAVEL_LOCK_CLEARANCE = 0.32;
 /** 밀착 확정 시점 대비 이만큼 더 들어야 적재 성공/실패 판정. */
 export const GRAPPLE_LIFT_JUDGE_CLEARANCE_DELTA = 0.45;
 /** The visible jaws can enclose a rock throughout this practical curl range. */
-export const GRAPPLE_BUCKET_ANGLE_MIN = 0.25;
-export const GRAPPLE_BUCKET_ANGLE_MAX = 2.55;
+export const GRAPPLE_BUCKET_ANGLE_MIN = 0.35;
+export const GRAPPLE_BUCKET_ANGLE_MAX = 2.4;
 /** 클램프 XZ 기준 돌 집기 반경 (시각·키네마틱 오차 흡수). */
-export const GRAPPLE_GRAB_XZ_RADIUS = 2.85;
+export const GRAPPLE_GRAB_XZ_RADIUS = 2.35;
 /** 붐이 바닥 근처일 때 집기용 클램프 지면 여유 상한. */
-export const GRAPPLE_GROUND_PICKUP_MAX_CLEARANCE = 1.85;
+export const GRAPPLE_GROUND_PICKUP_MAX_CLEARANCE = 1.55;
 const GRAPPLE_BUCKET_ANGLE_OPTIMAL =
   (GRAPPLE_BUCKET_ANGLE_MIN + GRAPPLE_BUCKET_ANGLE_MAX) / 2;
 const GRAPPLE_BUCKET_ANGLE_HALF =
   (GRAPPLE_BUCKET_ANGLE_MAX - GRAPPLE_BUCKET_ANGLE_MIN) / 2;
-/** 무게중심 정렬 허용 거리 — 넓을수록 comFactor가 쉽게 유지된다. */
-const MAX_COM_ALIGN_DIST = 1.75;
+/** 무게중심 정렬 허용 거리 — 좁을수록 중앙 정렬이 더 필요하다. */
+const MAX_COM_ALIGN_DIST = 1.3;
 
 export interface GrappleGripRuntime {
   adhesion01: number;
@@ -65,9 +65,9 @@ export function hillBoulderGripEnvelope(rock: HillBoulder): {
 } {
   const scale = hillBoulderVisualScale(rock.size);
   return {
-    horizontalRadius: GRAPPLE_GRAB_XZ_RADIUS + scale * 0.25,
-    verticalRadius: scale * 1.35 + 1.1,
-    grabRadius: GRAPPLE_GRAB_XZ_RADIUS + scale * 0.35,
+    horizontalRadius: GRAPPLE_GRAB_XZ_RADIUS + scale * 0.18,
+    verticalRadius: scale * 1.2 + 0.95,
+    grabRadius: GRAPPLE_GRAB_XZ_RADIUS + scale * 0.22,
   };
 }
 
@@ -90,10 +90,10 @@ export function isGrappleGroundPickupPose(
   const xz = Math.hypot(clamp.x - rock.x, clamp.z - rock.z);
   const clearance = clamp.y - clampGroundY;
   return (
-    xz <= envelope.horizontalRadius + 1.05 &&
-    clearance >= -0.45 &&
+    xz <= envelope.horizontalRadius + 0.55 &&
+    clearance >= -0.02 &&
     clearance <= GRAPPLE_GROUND_PICKUP_MAX_CLEARANCE &&
-    clamp.y <= clampGroundY + scale * 1.15 + 1.25
+    clamp.y <= clampGroundY + scale * 1.05 + 0.95
   );
 }
 
@@ -111,25 +111,24 @@ export function computeGrappleAdhesion(params: {
 }): { adhesion01: number; pressure01: number } {
   const { rock, contactElapsed, bucketAngle, comFactor, adhesionBonus = 0 } = params;
   const pressure01 = clamp01(contactElapsed / GRAPPLE_PRESSURE_MAX_SEC);
-  // 크기·둥근 정도·각도 패널티를 더 줄여 밀착 확보를 완화한다. (압력 최대 시간은 3초 유지)
-  const sizeFactor = 1 - clamp01(rock.size) * 0.38;
-  const roundFactor = 1 - clamp01(rock.roundness) * 0.3;
+  // 압력 최대(3초)는 유지하고, 자세·크기·무게중심 조건은 조금 더 까다롭게.
+  const sizeFactor = 1 - clamp01(rock.size) * 0.55;
+  const roundFactor = 1 - clamp01(rock.roundness) * 0.45;
   const angleFactor =
     1 -
     clamp01(
       Math.abs(bucketAngle - GRAPPLE_BUCKET_ANGLE_OPTIMAL) /
-        Math.max(0.55, GRAPPLE_BUCKET_ANGLE_HALF),
+        Math.max(0.42, GRAPPLE_BUCKET_ANGLE_HALF),
     );
 
   const raw =
-    Math.pow(pressure01 + 0.18, 0.65) *
-    (0.52 + 0.48 * sizeFactor) *
-    (0.52 + 0.48 * roundFactor) *
-    (0.55 + 0.45 * clamp01(comFactor)) *
-    (0.55 + 0.45 * angleFactor);
+    Math.pow(pressure01 + 0.06, 0.78) *
+    (0.38 + 0.62 * sizeFactor) *
+    (0.38 + 0.62 * roundFactor) *
+    (0.32 + 0.68 * clamp01(comFactor)) *
+    (0.32 + 0.68 * angleFactor);
 
-  // 바닥을 올려 짧은 조임으로도 판정권에 들어가게 한다.
-  const adhesion01 = Math.max(0.24, Math.min(1, raw + adhesionBonus));
+  const adhesion01 = Math.max(0.08, Math.min(1, raw + adhesionBonus));
 
   return { adhesion01, pressure01 };
 }

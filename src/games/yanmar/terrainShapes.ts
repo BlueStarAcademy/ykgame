@@ -1,5 +1,9 @@
 import { getDumpTruckLaneSegment } from "./dumpTruckLane";
 import {
+  getHaulTruckLaneSegment,
+  haulTruckOffsetToWorld,
+} from "./haulTruckLane";
+import {
   distanceToSiteSegment,
   getSiteRoadsForTier,
   SITE_LAYOUT,
@@ -103,7 +107,9 @@ export function applyTruckDeparturePad(
   h: number,
   truck: { groupX: number; groupZ: number; rotation: number },
 ) {
-  const { startX, startZ, endX, endZ } = getDumpTruckLaneSegment();
+  const dumpLane = getDumpTruckLaneSegment();
+  const haulLane = getHaulTruckLaneSegment();
+  const haulPark = haulTruckOffsetToWorld(0);
   // DUMP_TRUCK_GROUND_Y 와 동일 — terrain 순환 import 방지로 상수 유지
   const target = 0.71;
 
@@ -113,9 +119,35 @@ export function applyTruckDeparturePad(
     h = h + (target - h) * blend * 0.94;
   }
 
-  const laneDist = distanceToSegment(wx, wz, startX, startZ, endX, endZ);
+  const haulPadDist = Math.hypot(wx - haulPark.groupX, wz - haulPark.groupZ);
+  if (haulPadDist < 6.6) {
+    const blend = 1 - haulPadDist / 6.6;
+    h = h + (target - h) * blend * 0.94;
+  }
+
+  const laneDist = distanceToSegment(
+    wx,
+    wz,
+    dumpLane.startX,
+    dumpLane.startZ,
+    dumpLane.endX,
+    dumpLane.endZ,
+  );
   if (laneDist < 3) {
     const blend = 1 - laneDist / 3;
+    h = h + (target - h) * blend * 0.96;
+  }
+
+  const haulLaneDist = distanceToSegment(
+    wx,
+    wz,
+    haulLane.startX,
+    haulLane.startZ,
+    haulLane.endX,
+    haulLane.endZ,
+  );
+  if (haulLaneDist < 3.2) {
+    const blend = 1 - haulLaneDist / 3.2;
     h = h + (target - h) * blend * 0.96;
   }
 

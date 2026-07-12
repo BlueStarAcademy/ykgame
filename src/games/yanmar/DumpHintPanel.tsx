@@ -52,7 +52,7 @@ export function DumpHintPanel({
         (canDump || aligned),
       label:
         truckCooldownRemaining > 0
-          ? `다음 트럭 대기 ${Math.ceil(truckCooldownRemaining)}초`
+          ? `트럭 복귀 중 ${Math.ceil(truckCooldownRemaining)}초`
           : !truckCanAccept
             ? "트럭 만차 — 하역 구역을 벗어나면 출발"
             : canDump

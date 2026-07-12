@@ -7,13 +7,38 @@ import * as THREE from "three";
 import {
   HAUL_TRUCK_ARRIVE_SEC,
   HAUL_TRUCK_DEPART_SEC,
+  HAUL_TRUCK,
   type HaulTruckState,
 } from "./terrain";
+import {
+  getHaulTruckLaneDirection,
+  HAUL_TRUCK_LANE_END_OFFSET,
+} from "./haulTruckLane";
 import {
   createYkGeongiWhiteTextTexture,
   YANMAR_MACHINE_COLORS as COLORS,
   YANMAR_MACHINE_MATERIALS as MATERIALS,
 } from "./machineVisualTheme";
+
+const MAX_VISIBLE_BED_ROCKS = 5;
+
+/** 짐칸 바닥에 안정적으로 앉는 위치 (bed group local). */
+const BED_ROCK_SLOTS: ReadonlyArray<{
+  x: number;
+  y: number;
+  z: number;
+  rx: number;
+  ry: number;
+  rz: number;
+  scale: [number, number, number];
+  color: string;
+}> = [
+  { x: -0.35, y: 0.02, z: -0.55, rx: 0.35, ry: 0.8, rz: 0.2, scale: [0.95, 0.78, 0.88], color: "#6b7280" },
+  { x: 0.55, y: 0.06, z: 0.35, rx: 0.55, ry: 1.1, rz: -0.25, scale: [0.82, 0.7, 0.9], color: "#7c8798" },
+  { x: -0.95, y: 0.04, z: 0.45, rx: -0.4, ry: 0.45, rz: 0.55, scale: [0.78, 0.72, 0.74], color: "#64748b" },
+  { x: 0.15, y: 0.42, z: -0.05, rx: 0.7, ry: -0.35, rz: 0.3, scale: [0.88, 0.68, 0.8], color: "#8b95a5" },
+  { x: -0.55, y: 0.38, z: 0.15, rx: 0.25, ry: 1.4, rz: -0.5, scale: [0.72, 0.62, 0.76], color: "#5f6b7a" },
+];
 
 function PremiumWheel({ x, z }: { x: number; z: number }) {
   // radius 0.76 → 중심을 0.76에 두면 휠 바닥이 그룹 원점(지면)에 붙음
@@ -57,12 +82,110 @@ function PremiumWheel({ x, z }: { x: number; z: number }) {
   );
 }
 
+function HaulTruckBedRocks({ state }: { state: HaulTruckState }) {
+  const rocksRef = useRef<Array<THREE.Group | null>>([]);
+  const prevCountRef = useRef(0);
+  const dropAnimRef = useRef<{ index: number; t: number } | null>(null);
+
+  useFrame((_, delta) => {
+    const count = Math.min(
+      MAX_VISIBLE_BED_ROCKS,
+      Math.max(0, Math.floor(state.loadCount)),
+    );
+    const prev = prevCountRef.current;
+
+    if (count > prev) {
+      dropAnimRef.current = { index: count - 1, t: 0 };
+    } else if (count < prev) {
+      dropAnimRef.current = null;
+    }
+    prevCountRef.current = count;
+
+    const drop = dropAnimRef.current;
+    if (drop) {
+      drop.t = Math.min(1, drop.t + delta * 2.6);
+      if (drop.t >= 1) dropAnimRef.current = null;
+    }
+
+    for (let i = 0; i < MAX_VISIBLE_BED_ROCKS; i += 1) {
+      const group = rocksRef.current[i];
+      const slot = BED_ROCK_SLOTS[i];
+      if (!group || !slot) continue;
+
+      const visible = i < count && state.phase !== "cooldown";
+      group.visible = visible;
+      if (!visible) continue;
+
+      let y = slot.y;
+      let squash = 1;
+      if (drop && drop.index === i) {
+        const u = drop.t;
+        const fall = u < 0.72 ? (u / 0.72) ** 2 : 1;
+        const bounce =
+          u > 0.72 ? Math.sin(((u - 0.72) / 0.28) * Math.PI) * (1 - u) * 0.35 : 0;
+        y = slot.y + (1 - fall) * 1.35 + bounce;
+        squash = u > 0.72 ? 1 - Math.sin(((u - 0.72) / 0.28) * Math.PI) * 0.12 : 1;
+        group.rotation.set(
+          slot.rx + (1 - fall) * 1.2,
+          slot.ry + (1 - fall) * 0.8,
+          slot.rz,
+        );
+      } else {
+        group.rotation.set(slot.rx, slot.ry, slot.rz);
+      }
+
+      group.position.set(slot.x, y, slot.z);
+      group.scale.set(
+        slot.scale[0],
+        slot.scale[1] * squash,
+        slot.scale[2] * (2 - squash),
+      );
+    }
+  });
+
+  return (
+    <group position={[0, -0.28, 0]}>
+      {BED_ROCK_SLOTS.map((slot, index) => (
+        <group
+          key={index}
+          ref={(node) => {
+            rocksRef.current[index] = node;
+          }}
+          visible={false}
+          position={[slot.x, slot.y, slot.z]}
+          rotation={[slot.rx, slot.ry, slot.rz]}
+          scale={slot.scale}
+        >
+          <mesh castShadow>
+            <icosahedronGeometry args={[0.55, 1]} />
+            <meshStandardMaterial
+              color={slot.color}
+              roughness={0.72}
+              metalness={0.12}
+              flatShading
+            />
+          </mesh>
+          <mesh position={[0.12, 0.08, -0.1]} scale={[0.55, 0.48, 0.5]} castShadow>
+            <dodecahedronGeometry args={[0.42, 0]} />
+            <meshStandardMaterial
+              color={index % 2 ? "#566074" : "#748092"}
+              roughness={0.78}
+              metalness={0.08}
+              flatShading
+            />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
 export function HaulTruckModel({
   state,
-  rockCount,
 }: {
   state: HaulTruckState;
-  rockCount: number;
+  /** @deprecated loadCount는 state에서 매 프레임 읽는다 */
+  rockCount?: number;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const ykMark = useMemo(() => createYkGeongiWhiteTextTexture(), []);
@@ -76,23 +199,32 @@ export function HaulTruckModel({
       state.phaseElapsed /
         (state.phase === "arriving" ? HAUL_TRUCK_ARRIVE_SEC : HAUL_TRUCK_DEPART_SEC),
     );
+    const { dirX, dirZ } = getHaulTruckLaneDirection();
+    const ease = progress * progress * (3 - 2 * progress);
     if (state.phase === "engineStart") {
-      group.position.x = Math.sin(state.phaseElapsed * 34) * 0.025;
+      const shake = Math.sin(state.phaseElapsed * 34) * 0.025;
+      group.position.x = -dirZ * shake;
+      group.position.z = dirX * shake;
       group.visible = true;
     } else if (state.phase === "departing") {
-      group.position.x = progress * 34;
+      const travel = ease * HAUL_TRUCK_LANE_END_OFFSET;
+      group.position.x = travel * dirX;
+      group.position.z = travel * dirZ;
       group.visible = true;
     } else if (state.phase === "arriving") {
-      group.position.x = (1 - progress) * 34;
+      const travel = (1 - ease) * HAUL_TRUCK_LANE_END_OFFSET;
+      group.position.x = travel * dirX;
+      group.position.z = travel * dirZ;
       group.visible = true;
     } else {
       group.position.x = 0;
+      group.position.z = 0;
       group.visible = state.phase === "ready";
     }
   });
 
   return (
-    <group ref={groupRef} rotation={[0, -Math.PI / 2, 0]}>
+    <group ref={groupRef} rotation={[0, HAUL_TRUCK.rotation, 0]}>
       {/* High-clearance black chassis under the painted body. */}
       <RoundedBox args={[6.9, 0.42, 2.55]} radius={0.12} position={[-0.05, 1.1, 0]} castShadow>
         <meshStandardMaterial color={COLORS.frame} {...MATERIALS.frame} />
@@ -139,22 +271,7 @@ export function HaulTruckModel({
         <RoundedBox args={[0.2, 1.5, 3.35]} radius={0.05} position={[-2.12, 0.04, 0]} castShadow>
           <meshStandardMaterial color={COLORS.truckBed} {...MATERIALS.painted} />
         </RoundedBox>
-        {Array.from({ length: Math.min(12, rockCount) }, (_, index) => (
-          <mesh
-            key={index}
-            position={[
-              -1.55 + (index % 4) * 1.02,
-              0.45 + Math.floor(index / 4) * 0.56,
-              -0.9 + (index % 3) * 0.9,
-            ]}
-            rotation={[index * 0.31, index * 0.73, index * 0.19]}
-            scale={[0.42, 0.34, 0.39]}
-            castShadow
-          >
-            <icosahedronGeometry args={[0.72, 1]} />
-            <meshStandardMaterial color={index % 2 ? "#64748b" : "#7c8ca0"} roughness={0.66} metalness={0.18} />
-          </mesh>
-        ))}
+        <HaulTruckBedRocks state={state} />
       </group>
 
       {/* Sculpted cab, glass canopy and front service deck. */}

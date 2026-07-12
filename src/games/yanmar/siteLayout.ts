@@ -45,7 +45,7 @@ export const SITE_LAYOUT = {
     {
       id: "hill",
       from: [10, 34],
-      to: [22, 106],
+      to: [42, 100],
       width: 6.2,
       unlockTier: 3,
       surface: "gravel",

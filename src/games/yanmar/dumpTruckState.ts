@@ -117,6 +117,18 @@ export function isDumpTruckVisible(state: DumpTruckRuntimeState): boolean {
   return state.phase !== "cooldown";
 }
 
+/** 복귀 연출 중 시각적으로 이미 주차된 경우 ready로 스냅해 하역 가능하게 한다. */
+export function finalizeDumpTruckArrivalIfParked(state: DumpTruckRuntimeState) {
+  if (state.phase !== "arriving") return;
+  const t = Math.min(1, state.phaseElapsed / ARRIVE_DURATION);
+  if (t < ARRIVE_DRIVE_END) return;
+  state.phase = "ready";
+  state.phaseElapsed = 0;
+  state.offsetLocalX = 0;
+  state.rotationYOffset = 0;
+  state.fillUnits = 0;
+}
+
 export function getDumpTruckFillRatio(state: DumpTruckRuntimeState, capacityUnits: number) {
   if (capacityUnits <= 0) return 0;
   return Math.min(1, Math.max(0, state.fillUnits / capacityUnits));
@@ -276,4 +288,6 @@ export function fastForwardDumpTruckState(
     updateDumpTruckState(state, step, cooldownSec);
     remaining -= step;
   }
+
+  finalizeDumpTruckArrivalIfParked(state);
 }

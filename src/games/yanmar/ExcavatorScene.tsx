@@ -129,6 +129,7 @@ interface ExcavatorSceneProps {
   onSimTick: () => void;
   cameraMode: CameraMode;
   lookOffsetRef: React.MutableRefObject<CameraLookOffset>;
+  endedRef?: React.RefObject<boolean>;
 }
 
 function TerrainMesh({
@@ -2416,6 +2417,7 @@ function SimLoop({
   onHillRockDelivered,
   onAttachmentWarning,
   onSimTick,
+  endedRef,
 }: ExcavatorSceneProps) {
   const runtimeRef = useRef(createSimLoopRuntime());
   const dustRef = useRef<THREE.Group>(null);
@@ -2447,6 +2449,7 @@ function SimLoop({
       onHillRockDelivered,
       onAttachmentWarning,
       onSimTick,
+      endedRef,
     });
 
     const dust = runtimeRef.current.digDust;

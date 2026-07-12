@@ -1,5 +1,5 @@
 import { EXCAVATOR_COLLISION_RADIUS, DUMP_TRUCK_COLLIDER } from "./simConstants";
-import { DUMP_TRUCK, dumpTruckBedCenterWorld } from "./terrain";
+import { DUMP_TRUCK, dumpTruckBedCenterWorld, HAUL_TRUCK } from "./terrain";
 import type { ExcavatorSimState } from "./types";
 import type { HydraulicVelocity } from "./controls";
 
@@ -24,14 +24,14 @@ export type TruckAlignTarget = {
 };
 
 /**
- * HaulTruckModel: group at drop, rotation Y = -π/2.
- * Bed group local (-1.05, 0) → world offset (0, -1.05).
+ * HaulTruckModel: group at drop, rotation Y = HAUL_TRUCK.rotation (+π/2).
+ * Bed group local (-1.05, 0) → world offset (0, +1.05).
  * Chassis ~6.9 × 2.55 after rotation → halfZ≈3.45, halfX≈1.56.
  */
 export const HAUL_TRUCK_ALIGN = {
-  rotation: -Math.PI / 2,
+  rotation: HAUL_TRUCK.rotation,
   bedOffsetX: 0,
-  bedOffsetZ: -1.05,
+  bedOffsetZ: 1.05,
   collider: {
     centerOffsetX: 0,
     centerOffsetZ: -0.05,

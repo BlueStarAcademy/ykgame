@@ -11,17 +11,22 @@ import {
   createGravelTexture,
   createPaintedMetalTexture,
 } from "./proceduralTextures";
+import { getDumpTruckLaneSegment, DUMP_TRUCK_LANE_LENGTH } from "./dumpTruckLane";
+import {
+  getHaulTruckLaneSegment,
+  HAUL_TRUCK_LANE_LENGTH,
+} from "./haulTruckLane";
+import { getSiteRoadsForTier } from "./siteLayout";
 import {
   DUMP_TRUCK,
   DUMP_ZONE,
+  HAUL_TRUCK,
   getActiveDigZones,
   getMapWorldBounds,
   sampleHeight,
   type TerrainData,
 } from "./terrain";
 import type { ExcavatorSimState } from "./types";
-import { getDumpTruckLaneSegment, DUMP_TRUCK_LANE_LENGTH } from "./dumpTruckLane";
-import { getSiteRoadsForTier } from "./siteLayout";
 import {
   configureSiteTexture,
   PREMIUM_SITE_TEXTURES,
@@ -119,6 +124,84 @@ function TruckDepartureLane({
   );
 }
 
+function HaulTruckDepartureLane({
+  compactTexture,
+  gravelTexture,
+}: {
+  compactTexture: THREE.Texture;
+  gravelTexture: THREE.Texture;
+}) {
+  const { startX, startZ, endX, endZ, dirX, dirZ } = getHaulTruckLaneSegment();
+  const laneLength = HAUL_TRUCK_LANE_LENGTH;
+  const laneWidth = 4.8;
+  const cx = (startX + endX) / 2;
+  const cz = (startZ + endZ) / 2;
+  const angle = Math.atan2(endX - startX, endZ - startZ);
+  const dashCount = 10;
+
+  return (
+    <group>
+      <mesh position={[cx, 0.702, cz]} rotation={[0, angle, 0]} receiveShadow>
+        <boxGeometry args={[laneWidth, 0.05, laneLength]} />
+        <meshStandardMaterial map={compactTexture} color="#8f8678" roughness={0.96} metalness={0.02} />
+      </mesh>
+      <mesh position={[cx, 0.708, cz]} rotation={[0, angle, 0]} receiveShadow>
+        <boxGeometry args={[laneWidth + 0.55, 0.04, laneLength + 0.8]} />
+        <meshStandardMaterial
+          map={gravelTexture}
+          color="#6f6758"
+          roughness={0.98}
+          metalness={0.01}
+          transparent
+          opacity={0.38}
+        />
+      </mesh>
+      {Array.from({ length: dashCount }, (_, i) => {
+        const t = (i + 0.5) / dashCount;
+        const px = startX + dirX * laneLength * t;
+        const pz = startZ + dirZ * laneLength * t;
+        return (
+          <mesh key={`haul-dash-${i}`} position={[px, 0.716, pz]} rotation={[0, angle, 0]}>
+            <boxGeometry args={[0.14, 0.02, 1.3]} />
+            <meshStandardMaterial
+              color="#f5d565"
+              roughness={0.55}
+              emissive="#fbbf24"
+              emissiveIntensity={0.08}
+            />
+          </mesh>
+        );
+      })}
+      {[-1, 1].map((side) => (
+        <mesh
+          key={`haul-edge-${side}`}
+          position={[
+            cx + Math.cos(angle + Math.PI / 2) * side * (laneWidth / 2 + 0.08),
+            0.714,
+            cz + Math.sin(angle + Math.PI / 2) * side * (laneWidth / 2 + 0.08),
+          ]}
+          rotation={[0, angle, 0]}
+        >
+          <boxGeometry args={[0.08, 0.025, laneLength]} />
+          <meshStandardMaterial color="#e8edf2" roughness={0.42} />
+        </mesh>
+      ))}
+      <mesh
+        position={[HAUL_TRUCK.groupX, 0.698, HAUL_TRUCK.groupZ]}
+        rotation={[-Math.PI / 2, 0, HAUL_TRUCK.rotation]}
+        receiveShadow
+      >
+        <planeGeometry args={[7.6, 5.8]} />
+        <meshStandardMaterial map={gravelTexture} color="#a89a84" roughness={0.94} metalness={0.02} />
+      </mesh>
+      <mesh position={[endX, 0.704, endZ]} rotation={[-Math.PI / 2, 0, angle]}>
+        <ringGeometry args={[2.4, 3.6, 32, 1, 0, Math.PI]} />
+        <meshStandardMaterial map={compactTexture} color="#8f8270" roughness={0.95} />
+      </mesh>
+    </group>
+  );
+}
+
 export function MapSiteDecor({
   terrainRef,
   simRef,
@@ -175,6 +258,7 @@ export function MapSiteDecor({
         />
       ))}
       <TruckDepartureLane compactTexture={compactTexture} gravelTexture={gravelTexture} />
+      <HaulTruckDepartureLane compactTexture={compactTexture} gravelTexture={gravelTexture} />
       <mesh position={[DUMP_ZONE.x, 0.72, DUMP_ZONE.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[DUMP_ZONE.radius + 2.2, 48]} />
         <meshStandardMaterial
