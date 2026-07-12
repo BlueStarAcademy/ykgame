@@ -19,6 +19,7 @@ interface ImmersiveFullscreenControl {
   apiFullscreen: boolean;
   isStandalone: boolean;
   enter: () => Promise<void>;
+  leave: () => Promise<void>;
 }
 
 const ImmersiveFullscreenContext = createContext<ImmersiveFullscreenControl | null>(null);
@@ -48,6 +49,7 @@ interface GameImmersiveOverlayProps {
   myRank: number | null;
   bestScore: number;
   hideHeaderStats?: boolean;
+  hideExitButton?: boolean;
   hideRankingButton?: boolean;
   hideFullscreenButton?: boolean;
   showPracticeTicker?: boolean;
@@ -62,6 +64,7 @@ export function GameImmersiveOverlay({
   myRank,
   bestScore,
   hideHeaderStats = false,
+  hideExitButton = false,
   hideRankingButton = false,
   hideFullscreenButton = false,
   showPracticeTicker = false,
@@ -104,7 +107,7 @@ export function GameImmersiveOverlay({
 
   return createPortal(
     <ImmersiveFullscreenContext.Provider
-      value={{ canFullscreen, apiFullscreen, isStandalone, enter }}
+      value={{ canFullscreen, apiFullscreen, isStandalone, enter, leave }}
     >
       <div
         ref={containerRef}
@@ -122,16 +125,18 @@ export function GameImmersiveOverlay({
         style={{ backgroundColor: headerColor }}
       >
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              void leave();
-              onExit();
-            }}
-            className="shrink-0 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold"
-          >
-            ✕ 종료
-          </button>
+          {!hideExitButton ? (
+            <button
+              type="button"
+              onClick={() => {
+                void leave();
+                onExit();
+              }}
+              className="shrink-0 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold"
+            >
+              ✕ 종료
+            </button>
+          ) : null}
           <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 flex-1 items-center" />
         </div>
         <div className="flex shrink-0 items-center gap-2">

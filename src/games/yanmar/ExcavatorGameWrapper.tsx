@@ -192,6 +192,7 @@ interface ExcavatorGameWrapperProps {
   immersive?: boolean;
   initialPlayMode?: "practice" | "game" | "ride";
   onShowRanking?: () => void;
+  onRequestExit?: () => void;
   /** Season total before this session; HUD shows base + session score in game mode. */
   seasonScoreBase?: number;
 }
@@ -585,6 +586,7 @@ export function ExcavatorGameWrapper({
   immersive = false,
   initialPlayMode,
   onShowRanking,
+  onRequestExit,
   seasonScoreBase = 0,
 }: ExcavatorGameWrapperProps) {
   const config = getMissionConfig("yanmar");
@@ -878,8 +880,10 @@ export function ExcavatorGameWrapper({
       prev.grappleNeedsAlignment === fb.grappleNeedsAlignment &&
       prev.canDropRock === fb.canDropRock &&
       prev.showGripGauge === fb.showGripGauge &&
-      Math.abs(prev.gripAdhesion - fb.gripAdhesion) < 0.01 &&
-      Math.abs(prev.gripPressure - fb.gripPressure) < 0.01 &&
+      Math.round(prev.gripAdhesion * 100) ===
+        Math.round(Math.min(1, fb.gripAdhesion) * 100) &&
+      Math.round(prev.gripPressure * 100) ===
+        Math.round(Math.min(1, fb.gripPressure) * 100) &&
       prev.grappleLiftResult === fb.grappleLiftResult &&
       prev.grappleLiftResultTick === fb.grappleLiftResultTick &&
       prev.digging === fb.digging &&
@@ -3391,27 +3395,6 @@ export function ExcavatorGameWrapper({
                   </button>
                   <button
                     type="button"
-                    className={`yanmar-shop-button yanmar-aux-button touch-none active:scale-95${
-                      showShopPanel ? " is-open" : ""
-                    }`}
-                    onClick={() => {
-                      setShowQuestPanel(false);
-                      setShowEquipmentUpgrade(false);
-                      setShowShopPanel((open) => !open);
-                    }}
-                    aria-expanded={showShopPanel}
-                    aria-label={showShopPanel ? "상점 닫기" : "상점 열기"}
-                  >
-                    <img
-                      className="yanmar-shop-button-icon"
-                      src="/images/yanmar/2d/cockpit/shop-premium.png?v=4"
-                      alt=""
-                      draggable={false}
-                    />
-                    <span className="yanmar-shop-button-label">상점</span>
-                  </button>
-                  <button
-                    type="button"
                     className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
                       showEquipmentUpgrade ? " is-open" : ""
                     }`}
@@ -3432,6 +3415,27 @@ export function ExcavatorGameWrapper({
                       draggable={false}
                     />
                     <span className="yanmar-upgrade-hud-button-label">강화</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`yanmar-shop-button yanmar-aux-button touch-none active:scale-95${
+                      showShopPanel ? " is-open" : ""
+                    }`}
+                    onClick={() => {
+                      setShowQuestPanel(false);
+                      setShowEquipmentUpgrade(false);
+                      setShowShopPanel((open) => !open);
+                    }}
+                    aria-expanded={showShopPanel}
+                    aria-label={showShopPanel ? "상점 닫기" : "상점 열기"}
+                  >
+                    <img
+                      className="yanmar-shop-button-icon"
+                      src="/images/yanmar/2d/cockpit/shop-premium.png?v=4"
+                      alt=""
+                      draggable={false}
+                    />
+                    <span className="yanmar-shop-button-label">상점</span>
                   </button>
                 </div>
                 <QuestPanel
@@ -3691,7 +3695,7 @@ export function ExcavatorGameWrapper({
                   {leftTarget && mode === "game"
                     ? createPortal(
                         <div className="flex min-w-0 w-full max-w-full items-center text-white">
-                          <div className="flex min-w-0 w-full flex-col gap-0.5 rounded-lg border border-white/15 bg-black/25 px-2 py-1">
+                          <div className="flex h-8 min-w-0 w-full flex-col justify-center gap-0.5 rounded-lg border border-white/15 bg-black/25 px-2">
                             <div className="flex min-w-0 items-baseline gap-1">
                               <p className="min-w-0 truncate text-[10px] font-black leading-none">
                                 {nickname}
@@ -3726,7 +3730,7 @@ export function ExcavatorGameWrapper({
                     : null}
                   {rightTarget
                     ? createPortal(
-                        <span className="inline-flex shrink-0 items-center rounded-lg border border-white/15 bg-black/25 px-2.5 py-1">
+                        <span className="inline-flex h-8 shrink-0 items-center rounded-lg border border-white/15 bg-black/25 px-2.5">
                           <StarAmount
                             value={ownedStars}
                             size={16}
@@ -3908,6 +3912,7 @@ export function ExcavatorGameWrapper({
           onOpenControlsGuide={() => setShowControlsGuide(true)}
           onResetPosition={resetExcavatorPosition}
           onShowRanking={onShowRanking}
+          onSaveAndExit={onRequestExit}
         />
 
         {tutorialFlash && (

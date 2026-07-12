@@ -14,8 +14,11 @@ export const GRAPPLE_BUCKET_ANGLE_MIN = 0.35;
 export const GRAPPLE_BUCKET_ANGLE_MAX = 2.4;
 /** 클램프 XZ 기준 돌 집기 반경 (시각·키네마틱 오차 흡수). */
 export const GRAPPLE_GRAB_XZ_RADIUS = 2.35;
-/** 붐이 바닥 근처일 때 집기용 클램프 지면 여유 상한. */
-export const GRAPPLE_GROUND_PICKUP_MAX_CLEARANCE = 1.55;
+/**
+ * 집기용 클램프 지면 여유 기본 상한 (작은 돌 기준).
+ * 실제 판정은 {@link grapplePickupMaxClearance}로 돌 크기를 반영한다.
+ */
+export const GRAPPLE_GROUND_PICKUP_MAX_CLEARANCE = 0.82;
 const GRAPPLE_BUCKET_ANGLE_OPTIMAL =
   (GRAPPLE_BUCKET_ANGLE_MIN + GRAPPLE_BUCKET_ANGLE_MAX) / 2;
 const GRAPPLE_BUCKET_ANGLE_HALF =
@@ -66,7 +69,8 @@ export function hillBoulderGripEnvelope(rock: HillBoulder): {
   const scale = hillBoulderVisualScale(rock.size);
   return {
     horizontalRadius: GRAPPLE_GRAB_XZ_RADIUS + scale * 0.18,
-    verticalRadius: scale * 1.2 + 0.95,
+    /** 돌 본체 높이 근처만 — 공중 샘플이 잡히지 않게. */
+    verticalRadius: scale * 0.7 + 0.38,
     grabRadius: GRAPPLE_GRAB_XZ_RADIUS + scale * 0.22,
   };
 }
@@ -79,6 +83,25 @@ export function grappleBucketAngleReady(bucket: number): boolean {
   return bucket >= GRAPPLE_BUCKET_ANGLE_MIN && bucket <= GRAPPLE_BUCKET_ANGLE_MAX;
 }
 
+/** 클램프가 돌이 있는 지면 근처에 내려와 있는지. */
+export function grapplePickupMaxClearance(rock: HillBoulder): number {
+  const scale = hillBoulderVisualScale(rock.size);
+  // 돌 꼭대기보다 약간 위까지 — 공중(수 m) 집기는 막고 바닥 집기 자세는 허용.
+  return Math.max(GRAPPLE_GROUND_PICKUP_MAX_CLEARANCE, scale + 0.28);
+}
+
+export function isGrappleClampNearGround(
+  clampY: number,
+  groundY: number,
+  rock?: HillBoulder,
+): boolean {
+  const maxClearance = rock
+    ? grapplePickupMaxClearance(rock)
+    : GRAPPLE_GROUND_PICKUP_MAX_CLEARANCE;
+  const clearance = clampY - groundY;
+  return clearance >= -0.02 && clearance <= maxClearance;
+}
+
 /** 붐·클램프가 바닥 근처에서 돌 위로 내려온 집기 자세인지. */
 export function isGrappleGroundPickupPose(
   clamp: { x: number; y: number; z: number },
@@ -88,12 +111,10 @@ export function isGrappleGroundPickupPose(
   const scale = hillBoulderVisualScale(rock.size);
   const envelope = hillBoulderGripEnvelope(rock);
   const xz = Math.hypot(clamp.x - rock.x, clamp.z - rock.z);
-  const clearance = clamp.y - clampGroundY;
   return (
     xz <= envelope.horizontalRadius + 0.55 &&
-    clearance >= -0.02 &&
-    clearance <= GRAPPLE_GROUND_PICKUP_MAX_CLEARANCE &&
-    clamp.y <= clampGroundY + scale * 1.05 + 0.95
+    isGrappleClampNearGround(clamp.y, clampGroundY, rock) &&
+    clamp.y <= clampGroundY + scale * 1.05 + 0.35
   );
 }
 
@@ -110,7 +131,11 @@ export function computeGrappleAdhesion(params: {
   adhesionBonus?: number;
 }): { adhesion01: number; pressure01: number } {
   const { rock, contactElapsed, bucketAngle, comFactor, adhesionBonus = 0 } = params;
-  const pressure01 = clamp01(contactElapsed / GRAPPLE_PRESSURE_MAX_SEC);
+  // 3초 도달 시 정확히 1로 스냅 (부동소수로 0.99x에 멈추지 않게).
+  const pressure01 =
+    contactElapsed >= GRAPPLE_PRESSURE_MAX_SEC
+      ? 1
+      : clamp01(contactElapsed / GRAPPLE_PRESSURE_MAX_SEC);
   // 압력 최대(3초)는 유지하고, 자세·크기·무게중심 조건은 조금 더 까다롭게.
   const sizeFactor = 1 - clamp01(rock.size) * 0.55;
   const roundFactor = 1 - clamp01(rock.roundness) * 0.45;

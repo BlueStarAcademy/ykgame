@@ -83,10 +83,8 @@ function getAuxMenuButtonSize(isPortrait: boolean) {
 
 /** 좌·우 보조 메뉴 토글 공통 높이 (기능 / 자동) */
 const AUX_MENU_TOGGLE_CY = 0.495;
-
-/** 조이스틱 탭=경적 / 드래그=조작 판정 */
-const JOYSTICK_TAP_MAX_MS = 320;
-const JOYSTICK_DRAG_START_PX = 12;
+/** 경적 ↔ 자동 버튼 간격 */
+const HORN_AUTO_GAP = "0.42rem";
 
 /** `as const` layout literals widened so portrait offsets type-check. */
 type WidenNumbers<T> = T extends number
@@ -201,9 +199,6 @@ function VisualJoystick({
             <span className="yanmar-realstick-ring yanmar-realstick-ring-3" />
             <span className="yanmar-realstick-label">{side === "left" ? "L" : "R"}</span>
           </span>
-          {side === "right" ? (
-            <span className="yanmar-realstick-horn yanmar-realstick-horn-top" aria-hidden />
-          ) : null}
         </div>
       </div>
     </div>
@@ -629,21 +624,8 @@ function MainDPadVisual({
           strokeOpacity="0.82"
           strokeWidth="1.5"
         />
-        {side === "right" ? (
-          <image
-            href="/images/yanmar/2d/cockpit/horn-compact-fit.png?v=4"
-            x="37.5"
-            y="37.5"
-            width="25"
-            height="25"
-            preserveAspectRatio="xMidYMid meet"
-          />
-        ) : (
-          <>
-            <circle cx="50" cy="50" r="4.2" fill={accent} opacity="0.9" />
-            <circle cx="48.7" cy="48.7" r="1.3" fill="#fff" opacity="0.65" />
-          </>
-        )}
+        <circle cx="50" cy="50" r="4.2" fill={accent} opacity="0.9" />
+        <circle cx="48.7" cy="48.7" r="1.3" fill="#fff" opacity="0.65" />
       </svg>
     </div>
   );
@@ -807,8 +789,6 @@ interface GameJoystickProps {
   isPortrait: boolean;
   useDPad: boolean;
   onChange: (x: number, y: number) => void;
-  /** 짧게 탭하면 경적 (드래그 시에는 조이스틱만 동작) */
-  onHornTap?: () => void;
   /** 드래그 중인 pointerId — 같은 손가락의 버튼 오입력만 걸러낼 때 사용 */
   onControlPointerDrag?: (pointerId: number, active: boolean) => void;
 }
@@ -822,20 +802,17 @@ function GameJoystick({
   isPortrait,
   useDPad,
   onChange,
-  onHornTap,
   onControlPointerDrag,
 }: GameJoystickProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
   const activePointerIdRef = useRef<number | null>(null);
   const dragActiveRef = useRef(false);
-  const tapOriginRef = useRef<{ x: number; y: number; at: number } | null>(null);
 
   const releaseStick = useCallback(() => {
     const pid = activePointerIdRef.current;
     const wasDragging = dragActiveRef.current;
     activePointerIdRef.current = null;
     dragActiveRef.current = false;
-    tapOriginRef.current = null;
     if (pid != null && wasDragging) onControlPointerDrag?.(pid, false);
     if (wasDragging) onChange(0, 0);
   }, [onChange, onControlPointerDrag]);
@@ -867,23 +844,14 @@ function GameJoystick({
     [enabled.x, enabled.y, onChange, useDPad],
   );
 
-  const beginDrag = useCallback(
-    (pointerId: number, clientX: number, clientY: number) => {
-      if (dragActiveRef.current) return;
-      dragActiveRef.current = true;
-      onControlPointerDrag?.(pointerId, true);
-      updateFromEvent(clientX, clientY);
-    },
-    [onControlPointerDrag, updateFromEvent],
-  );
-
   const handleStart = (e: React.PointerEvent) => {
-    if (!enabled.x && !enabled.y && !onHornTap) return;
+    if (!enabled.x && !enabled.y) return;
     e.preventDefault();
     activePointerIdRef.current = e.pointerId;
-    dragActiveRef.current = false;
-    tapOriginRef.current = { x: e.clientX, y: e.clientY, at: performance.now() };
+    dragActiveRef.current = true;
+    onControlPointerDrag?.(e.pointerId, true);
     pointer.begin(e.pointerId, zoneRef.current);
+    updateFromEvent(e.clientX, e.clientY);
   };
 
   const handleMove = (e: React.PointerEvent) => {
@@ -891,35 +859,15 @@ function GameJoystick({
       return;
     }
     if (!enabled.x && !enabled.y) return;
-
-    const origin = tapOriginRef.current;
-    if (!dragActiveRef.current && origin) {
-      const dist = Math.hypot(e.clientX - origin.x, e.clientY - origin.y);
-      if (dist < JOYSTICK_DRAG_START_PX) return;
-      beginDrag(e.pointerId, e.clientX, e.clientY);
-      return;
-    }
-    if (dragActiveRef.current) {
-      updateFromEvent(e.clientX, e.clientY);
-    }
+    updateFromEvent(e.clientX, e.clientY);
   };
 
   const handleEnd = (e: React.PointerEvent) => {
     if (pointer.pointerIdRef.current !== e.pointerId) return;
-
-    const origin = tapOriginRef.current;
-    const wasDragging = dragActiveRef.current;
-    if (!wasDragging && origin && onHornTap) {
-      const elapsed = performance.now() - origin.at;
-      const dist = Math.hypot(e.clientX - origin.x, e.clientY - origin.y);
-      if (elapsed <= JOYSTICK_TAP_MAX_MS && dist < JOYSTICK_DRAG_START_PX) {
-        onHornTap();
-      }
-    }
     pointer.finish(e.pointerId);
   };
 
-  const isDisabled = !enabled.x && !enabled.y && !onHornTap;
+  const isDisabled = !enabled.x && !enabled.y;
 
   return (
     <>
@@ -945,15 +893,7 @@ function GameJoystick({
         onLostPointerCapture={() => {
           pointer.finish();
         }}
-        aria-label={
-          side === "left"
-            ? onHornTap
-              ? "좌 조이스틱, 짧게 탭하면 경적"
-              : "좌 조이스틱"
-            : onHornTap
-              ? "우 조이스틱, 짧게 탭하면 경적"
-              : "우 조이스틱"
-        }
+        aria-label={side === "left" ? "좌 조이스틱" : "우 조이스틱"}
       >
         {showTouchZone && (
           <div
@@ -2069,6 +2009,50 @@ interface AutoMenuProps {
   executePoseDisabled?: boolean;
 }
 
+function HornButton({
+  layout,
+  isPortrait,
+  showTouchZones,
+  onHorn,
+}: {
+  layout: CockpitLayout;
+  isPortrait: boolean;
+  showTouchZones: boolean;
+  onHorn: () => void;
+}) {
+  const buttonSize = getAuxMenuButtonSize(isPortrait);
+  const autoCx = layout.horn.cx;
+  const toggleCy = AUX_MENU_TOGGLE_CY;
+
+  return (
+    <button
+      type="button"
+      className={`yanmar-horn-standalone yanmar-aux-button touch-none active:scale-95${
+        isPortrait ? " yanmar-aux-button-portrait" : ""
+      }`}
+      style={{
+        left: `calc(${autoCx * 100}% - ${buttonSize} - ${HORN_AUTO_GAP})`,
+        top: `${toggleCy * 100}%`,
+        width: buttonSize,
+        height: buttonSize,
+      }}
+      onClick={onHorn}
+      aria-label="경적"
+    >
+      <img
+        className="yanmar-horn-standalone-icon"
+        src="/images/yanmar/2d/cockpit/horn-hud-premium.png?v=2"
+        alt=""
+        draggable={false}
+      />
+      <span className="yanmar-horn-standalone-label">경적</span>
+      {showTouchZones ? (
+        <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-amber-200/65 bg-transparent" />
+      ) : null}
+    </button>
+  );
+}
+
 function AutoMenu({
   expanded,
   onToggle,
@@ -2402,6 +2386,15 @@ export function CockpitOverlay({
             unlockAllAttachments={unlockAllAttachments}
             onAttachmentChange={onAttachmentChange}
           />
+          <HornButton
+            layout={layout}
+            isPortrait={isPortrait}
+            showTouchZones={showTouchZones}
+            onHorn={() => {
+              playHorn();
+              onHorn?.();
+            }}
+          />
           <AutoMenu
             expanded={autoMenuExpanded}
             onToggle={() => setAutoMenuExpanded((open) => !open)}
@@ -2426,10 +2419,6 @@ export function CockpitOverlay({
             isPortrait={isPortrait}
             useDPad={useDPad}
             onControlPointerDrag={setControlPointerDrag}
-            onHornTap={() => {
-              playHorn();
-              onHorn?.();
-            }}
             onChange={(x, y) =>
               onInputChange((current) => ({ ...current, left: { x, y } }))
             }
@@ -2446,10 +2435,6 @@ export function CockpitOverlay({
             isPortrait={isPortrait}
             useDPad={useDPad}
             onControlPointerDrag={setControlPointerDrag}
-            onHornTap={() => {
-              playHorn();
-              onHorn?.();
-            }}
             onChange={(x, y) =>
               onInputChange((current) => ({ ...current, right: { x, y } }))
             }

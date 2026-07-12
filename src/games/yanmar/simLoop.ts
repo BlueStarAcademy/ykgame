@@ -119,6 +119,7 @@ import {
   grappleBucketAngleReady,
   hillBoulderGripEnvelope,
   hillBoulderWrapRadius,
+  isGrappleClampNearGround,
   isGrappleGroundPickupPose,
   resetGrappleGrip,
   GRAPPLE_LIFT_JUDGE_CLEARANCE_DELTA,
@@ -250,8 +251,8 @@ function distancePointToSegment3(
 }
 
 /**
- * 집게가 돌 위에/옆에 오면 잡히도록 XZ 위주 + 넉넉한 높이 허용.
- * 붐을 바닥에 내리고 집게를 벌린 뒤 닫는 집기 모션도 포함한다.
+ * 집게가 바닥 근처에서 돌 위/옆에 오면 잡히도록 한다.
+ * 클램프가 공중에 떠 있으면 집기 가능·잡기를 모두 막는다.
  */
 function isGrappleWrappingRock(
   samples: ReadonlyArray<{ x: number; y: number; z: number }>,
@@ -261,9 +262,19 @@ function isGrappleWrappingRock(
 ): boolean {
   const envelope = hillBoulderGripEnvelope(rock);
   const ground = sampleHeight(terrain, rock.x, rock.z);
-  const rockY = ground + hillBoulderVisualScale(rock.size) * 0.55;
-  const yMin = ground - 0.75;
-  const yMax = rockY + envelope.verticalRadius + 0.35;
+  // 벌어진 집게 끝(가장 낮은 샘플) 기준으로 바닥 근접을 본다.
+  const lowestY =
+    samples.length > 0
+      ? Math.min(clamp.y, ...samples.map((p) => p.y))
+      : clamp.y;
+  if (!isGrappleClampNearGround(lowestY, ground, rock)) {
+    return false;
+  }
+
+  const scale = hillBoulderVisualScale(rock.size);
+  const rockY = ground + scale * 0.55;
+  const yMin = ground - 0.35;
+  const yMax = rockY + envelope.verticalRadius;
 
   // 바닥 근처에서 돌 위로 내려온 자세면 입구에 들어온 것으로 본다.
   if (isGrappleGroundPickupPose(clamp, rock, ground)) {
@@ -288,6 +299,8 @@ function isGrappleWrappingRock(
     for (let i = 0; i < points.length - 1; i += 1) {
       const a = points[i];
       const b = points[i + 1];
+      // 세그먼트 양 끝도 돌 높이 근처여야 공중 아크가 잡히지 않는다.
+      if (a.y > yMax + 0.2 && b.y > yMax + 0.2) continue;
       const seg = distancePointToSegment3(
         rock.x,
         rockY,

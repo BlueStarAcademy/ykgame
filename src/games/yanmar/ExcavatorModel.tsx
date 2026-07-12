@@ -409,11 +409,17 @@ export function PremiumDozerBlade() {
 export function PremiumExcavatorBody({
   velRef,
   yanmarLogo,
+  yanmarLogoWidth = 0.72,
+  yanmarLogoHeight = 0.087,
+  yanmarLogoX = 0,
   ykLogo,
   upperBodyRef,
 }: {
   velRef: React.MutableRefObject<HydraulicVelocity>;
   yanmarLogo?: THREE.Texture;
+  yanmarLogoWidth?: number;
+  yanmarLogoHeight?: number;
+  yanmarLogoX?: number;
   ykLogo?: THREE.Texture;
   upperBodyRef?: React.Ref<THREE.Group>;
 }) {
@@ -476,8 +482,12 @@ export function PremiumExcavatorBody({
         {[-1, 1].map((side) => (
           <group key={`body-decals-${side}`} position={[0, 0, side * 0.925]}>
             {yanmarLogo ? (
-              <mesh position={[0.43, 0.11, 0]} rotation={[0, side < 0 ? Math.PI : 0, 0]} renderOrder={12}>
-                <planeGeometry args={[0.72, 0.087]} />
+              <mesh
+                position={[yanmarLogoX, 0.11, 0]}
+                rotation={[0, side < 0 ? Math.PI : 0, 0]}
+                renderOrder={12}
+              >
+                <planeGeometry args={[yanmarLogoWidth, yanmarLogoHeight]} />
                 <meshBasicMaterial
                   map={yanmarLogo}
                   transparent

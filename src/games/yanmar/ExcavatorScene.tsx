@@ -639,6 +639,10 @@ function LinkPin({
 const YANMAR_LOGO_ASPECT = 512 / 62;
 const YK_LABEL_ASPECT = 512 / 160;
 const YANMAR_LOGO_WIDTH = 1.24;
+/** 운전석 옆 차체: Yanmar + ViO17-1 (차체 측면 중앙에 맞춤) */
+const YANMAR_CAB_MODEL_NAME = "ViO17-1";
+const YANMAR_CAB_BRAND_WIDTH = 0.78;
+const YANMAR_CAB_BRAND_X = 0;
 const REAR_BODY_PANEL_X = -1.715;
 const REAR_BODY_PANEL_Z = -0.36;
 const YANMAR_REAR_BODY_Z = -0.24;
@@ -765,6 +769,72 @@ function createYanmarRearLabelTexture() {
   texture.needsUpdate = true;
   configureDecalTexture(texture);
   return texture;
+}
+
+/** 운전석 옆 차체용: Yanmar 로고 우측에 모델명(ViO17-1)을 붙인 데칼. */
+function createYanmarCabSideBrandTexture(source: THREE.Texture): {
+  texture: THREE.Texture;
+  aspect: number;
+} | null {
+  if (typeof document === "undefined") return null;
+  const img = source.image as CanvasImageSource | undefined;
+  if (!img) return null;
+
+  const logoW =
+    "naturalWidth" in img && typeof img.naturalWidth === "number" && img.naturalWidth > 0
+      ? img.naturalWidth
+      : "width" in img && typeof img.width === "number"
+        ? img.width
+        : 512;
+  const logoH =
+    "naturalHeight" in img && typeof img.naturalHeight === "number" && img.naturalHeight > 0
+      ? img.naturalHeight
+      : "height" in img && typeof img.height === "number"
+        ? img.height
+        : 62;
+  if (logoW <= 0 || logoH <= 0) return null;
+
+  const scale = 2;
+  const gap = Math.round(logoH * 0.42);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  ctx.font = `900 ${Math.round(logoH * 0.72)}px Arial, "Helvetica Neue", sans-serif`;
+  const modelWidth = Math.ceil(ctx.measureText(YANMAR_CAB_MODEL_NAME).width);
+  const padX = Math.round(logoH * 0.12);
+  const padY = Math.round(logoH * 0.18);
+  canvas.width = (logoW + gap + modelWidth + padX * 2) * scale;
+  canvas.height = (logoH + padY * 2) * scale;
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
+
+  ctx.drawImage(img, padX, padY, logoW, logoH);
+
+  ctx.font = `900 ${Math.round(logoH * 0.72)}px Arial, "Helvetica Neue", sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 2;
+  ctx.shadowOffsetY = 1;
+  const modelX = padX + logoW + gap;
+  const modelY = padY + logoH * 0.52;
+  ctx.lineWidth = Math.max(2, logoH * 0.06);
+  ctx.strokeStyle = "rgba(15,23,42,0.88)";
+  ctx.strokeText(YANMAR_CAB_MODEL_NAME, modelX, modelY);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(YANMAR_CAB_MODEL_NAME, modelX, modelY);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  configureDecalTexture(texture);
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  return {
+    texture,
+    aspect: canvas.width / canvas.height,
+  };
 }
 
 function clampControl(value: number, min = -1, max = 1) {
@@ -1824,9 +1894,51 @@ function ExcavatorArm({
   const bladeRef = useRef<THREE.Group>(null);
   const yanmarLogo = useLoader(THREE.TextureLoader, "/images/yanmar/yanmar-logo-white.png");
   const [ykBoomLogo, setYkBoomLogo] = useState<THREE.Texture | null>(null);
+  const [yanmarCabBrand, setYanmarCabBrand] = useState<{
+    texture: THREE.Texture;
+    aspect: number;
+  } | null>(null);
 
   useLayoutEffect(() => {
     configureDecalTexture(yanmarLogo);
+    let cancelled = false;
+    let owned: THREE.Texture | null = null;
+
+    const build = () => {
+      if (cancelled) return;
+      const brand = createYanmarCabSideBrandTexture(yanmarLogo);
+      if (!brand) {
+        setYanmarCabBrand(null);
+        return;
+      }
+      owned?.dispose();
+      owned = brand.texture;
+      setYanmarCabBrand(brand);
+    };
+
+    const img = yanmarLogo.image as HTMLImageElement | ImageBitmap | undefined;
+    if (
+      img &&
+      "complete" in img &&
+      typeof img.complete === "boolean" &&
+      !img.complete &&
+      "addEventListener" in img
+    ) {
+      img.addEventListener("load", build);
+      return () => {
+        cancelled = true;
+        img.removeEventListener("load", build);
+        owned?.dispose();
+        setYanmarCabBrand(null);
+      };
+    }
+
+    build();
+    return () => {
+      cancelled = true;
+      owned?.dispose();
+      setYanmarCabBrand(null);
+    };
   }, [yanmarLogo]);
 
   useLayoutEffect(() => {
@@ -2079,7 +2191,16 @@ function ExcavatorArm({
         <group ref={machineBodyRef} visible={cameraMode !== 3}>
           <PremiumExcavatorBody
             velRef={velRef}
-            yanmarLogo={yanmarLogo}
+            yanmarLogo={yanmarCabBrand?.texture ?? yanmarLogo}
+            yanmarLogoWidth={
+              yanmarCabBrand ? YANMAR_CAB_BRAND_WIDTH : 0.72
+            }
+            yanmarLogoHeight={
+              yanmarCabBrand
+                ? logoHeightForWidth(YANMAR_CAB_BRAND_WIDTH, yanmarCabBrand.aspect)
+                : 0.087
+            }
+            yanmarLogoX={yanmarCabBrand ? YANMAR_CAB_BRAND_X : 0}
             ykLogo={ykBoomLogo ?? undefined}
             upperBodyRef={upperBodyYawRef}
           />
@@ -2332,19 +2453,19 @@ function GameCamera({
       }
 
       if (mode === 1) {
-        camX = s.posX - forwardX * 5.9 + sideX * 2.75;
-        camY = 3.85 + baseY;
-        camZ = s.posZ - forwardZ * 5.9 + sideZ * 2.75;
-        lookX = s.posX + forwardX * 2.9 - sideX * 0.45;
-        lookY = 1.55 + baseY;
-        lookZ = s.posZ + forwardZ * 2.9 - sideZ * 0.45;
-      } else {
         camX = s.posX - forwardX * 11.5 + sideX * 6.2;
         camY = 6.2 + baseY;
         camZ = s.posZ - forwardZ * 11.5 + sideZ * 6.2;
         lookX = s.posX + forwardX * 3.9 - sideX * 0.7;
         lookY = 1.55 + baseY;
         lookZ = s.posZ + forwardZ * 3.9 - sideZ * 0.7;
+      } else {
+        camX = s.posX - forwardX * 5.9 + sideX * 2.75;
+        camY = 3.85 + baseY;
+        camZ = s.posZ - forwardZ * 5.9 + sideZ * 2.75;
+        lookX = s.posX + forwardX * 2.9 - sideX * 0.45;
+        lookY = 1.55 + baseY;
+        lookZ = s.posZ + forwardZ * 2.9 - sideZ * 0.45;
       }
     }
 

@@ -397,6 +397,7 @@ export function GamePlayClient({
           myRank={myStats.rank}
           bestScore={myStats.bestScore}
           hideHeaderStats={gameId === "yanmar"}
+          hideExitButton={gameId === "yanmar"}
           hideRankingButton={gameId === "yanmar"}
           hideFullscreenButton={gameId === "yanmar"}
           showPracticeTicker={playMode === "practice"}
@@ -410,6 +411,7 @@ export function GamePlayClient({
             immersive
             initialPlayMode={playMode ?? undefined}
             onShowRanking={() => setShowRanking(true)}
+            onRequestExit={handleExitGame}
             seasonScoreBase={yanmarSeasonBaseScore}
           />
         </GameImmersiveOverlay>

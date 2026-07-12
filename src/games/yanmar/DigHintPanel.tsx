@@ -145,8 +145,14 @@ export function GrappleGripGauge({
   adhesion: number;
   pressure: number;
 }) {
-  const adhesionPct = Math.max(1, Math.min(100, Math.round(Math.min(1, adhesion) * 100)));
-  const pressurePct = Math.max(0, Math.min(100, Math.round(Math.min(1, pressure) * 100)));
+  const adhesionPct = Math.max(
+    1,
+    Math.min(100, Math.round(Math.min(1, adhesion) * 100)),
+  );
+  // 1.0 직전(≥99.5%)도 100%로 표기 — HUD 스로틀/부동소수로 99%에 고착되지 않게.
+  const pressure01 = Math.min(1, Math.max(0, pressure));
+  const pressurePct =
+    pressure01 >= 0.995 ? 100 : Math.round(pressure01 * 100);
 
   return (
     <div className="min-w-[11rem] rounded-xl border border-sky-200/40 bg-slate-900/80 px-3 py-2 shadow-lg backdrop-blur-sm">

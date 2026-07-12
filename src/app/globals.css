@@ -2893,6 +2893,70 @@ body {
   transform: translate(-50%, -50%);
 }
 
+.yanmar-horn-standalone {
+  position: absolute;
+  z-index: 66;
+  transform: translate(-50%, -50%);
+  flex-shrink: 0;
+  border-color: rgba(253, 230, 138, 0.38);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(146, 64, 14, 0.72), rgba(2, 6, 23, 0.92));
+}
+
+.yanmar-horn-standalone:active {
+  border-color: rgba(251, 191, 36, 0.62);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 32%),
+    linear-gradient(180deg, rgba(180, 83, 9, 0.78), rgba(15, 23, 42, 0.92));
+}
+
+.yanmar-horn-standalone-icon {
+  position: absolute;
+  left: 50%;
+  top: 0.18rem;
+  display: block;
+  width: 1.95rem;
+  height: 1.95rem;
+  transform: translateX(-50%);
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0.14rem 0.12rem rgba(0, 0, 0, 0.82))
+    drop-shadow(0 0 0.18rem rgba(251, 191, 36, 0.28));
+  transition:
+    transform 130ms ease,
+    filter 130ms ease;
+  pointer-events: none;
+}
+
+.yanmar-horn-standalone:active .yanmar-horn-standalone-icon {
+  transform: translateX(-50%) rotate(-6deg) scale(1.06);
+  filter:
+    drop-shadow(0 0.14rem 0.12rem rgba(0, 0, 0, 0.82))
+    drop-shadow(0 0 0.34rem rgba(251, 191, 36, 0.55));
+}
+
+.yanmar-horn-standalone-label {
+  position: absolute;
+  left: 50%;
+  bottom: 0.22rem;
+  transform: translateX(-50%);
+  font-size: 0.46rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.58);
+}
+
+.yanmar-layout-portrait .yanmar-horn-standalone-label {
+  bottom: 0.06rem;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.62);
+  padding: 0.08rem 0.22rem;
+  font-size: 0.46rem;
+}
+
 .yanmar-auto-menu-toggle {
   position: relative;
   flex-shrink: 0;
