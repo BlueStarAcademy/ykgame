@@ -28,18 +28,26 @@ import {
   getMapWorldBounds,
   addHaulTruckRock,
   beginHaulTruckDeparture,
+  canHaulTruckAcceptRock,
+  getHaulTruckFillRatio,
+  getHaulTruckReturnEtaSec,
   damageCrashTile,
   getCrashTileAt,
   isInsideHillZoneCore,
+  isInHillZone,
   markHillRockExtracted,
   tryClearHillZone,
   digZoneLabel,
   getDigZoneRespawnEtaSec,
+  getCrashZoneRespawnEtaSec,
+  getHillZoneRespawnEtaSec,
+  sampleBreakerContactHeight,
   sampleCrashContactHeight,
   sampleHeight,
   updateDigZoneRespawns,
   updateSpecialZones,
   worldToDumpTruckLocal,
+  dumpTruckLocalToWorld,
   hillBoulderVisualScale,
   type TerrainData,
   type HillBoulder,
@@ -47,6 +55,8 @@ import {
   DUMP_TRUCK,
 } from "./terrain";
 import {
+  constrainArmFromHaulTruck,
+  constrainExcavatorToTruckTarget,
   getDumpTruckAlignTarget,
   getHaulTruckAlignTarget,
   isAlignedForTruckDump,
@@ -56,10 +66,12 @@ import {
 import { checkAttachmentUse, getZoneAt } from "./attachmentZones";
 import {
   BUCKET_SOIL_HOLD_MIN,
+  getArmCollisionSamples,
   getBreakerGroundAngleDeg,
   getBreakerTipWorld,
   getBucketBodyContactWorld,
   getGrappleClampWorld,
+  getGrappleJawSampleWorlds,
   getBucketScraperContactWorld,
   getBucketSoilRetention,
   getBucketTipWorld,
@@ -90,10 +102,12 @@ import {
   DUMP_TRUCK_COLLIDER,
   EXCAVATOR_COLLISION_RADIUS,
   EXCAVATOR_MAP_WALL_MARGIN,
+  BREAKER_TIP_PROBE_RADIUS,
+  BREAKER_TOUCH_BAND,
+  BREAKER_TRAVEL_LOCK_CLEARANCE,
   MIN_BREAKER_SURFACE_CLEARANCE,
   MIN_BUCKET_DIG_ZONE_CLEARANCE,
   MIN_BUCKET_GROUND_CLEARANCE,
-  BREAKER_TRAVEL_LOCK_CLEARANCE,
 } from "./simConstants";
 import {
   computeComAlignFactor,
@@ -102,7 +116,9 @@ import {
   grappleBucketAngleReady,
   hillBoulderGripEnvelope,
   hillBoulderWrapRadius,
+  isGrappleGroundPickupPose,
   resetGrappleGrip,
+  GRAPPLE_LIFT_JUDGE_CLEARANCE_DELTA,
   GRAPPLE_TRAVEL_LOCK_CLEARANCE,
   type GrappleGripRuntime,
 } from "./grappleGrip";
@@ -197,45 +213,112 @@ function clampControl(value: number, min = -1, max = 1) {
   return Math.max(min, Math.min(max, value));
 }
 
+function distancePointToSegment3(
+  px: number,
+  py: number,
+  pz: number,
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+) {
+  const abx = bx - ax;
+  const aby = by - ay;
+  const abz = bz - az;
+  const apx = px - ax;
+  const apy = py - ay;
+  const apz = pz - az;
+  const abLenSq = abx * abx + aby * aby + abz * abz;
+  const t =
+    abLenSq <= 1e-8
+      ? 0
+      : Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / abLenSq));
+  const cx = ax + abx * t;
+  const cy = ay + aby * t;
+  const cz = az + abz * t;
+  return Math.hypot(px - cx, py - cy, pz - cz);
+}
+
+/**
+ * 집게가 돌 위에/옆에 오면 잡히도록 XZ 위주 + 넉넉한 높이 허용.
+ * 붐을 바닥에 내리고 집게를 벌린 뒤 닫는 집기 모션도 포함한다.
+ */
 function isGrappleWrappingRock(
-  point: { x: number; y: number; z: number },
+  samples: ReadonlyArray<{ x: number; y: number; z: number }>,
+  clamp: { x: number; y: number; z: number },
   rock: HillBoulder,
   terrain: TerrainData,
 ): boolean {
-  const visualScale = hillBoulderVisualScale(rock.size);
   const envelope = hillBoulderGripEnvelope(rock);
   const ground = sampleHeight(terrain, rock.x, rock.z);
-  const xz = Math.hypot(point.x - rock.x, point.z - rock.z);
-  if (xz > envelope.horizontalRadius) return false;
+  const rockY = ground + hillBoulderVisualScale(rock.size) * 0.55;
+  const yMin = ground - 0.75;
+  const yMax = rockY + envelope.verticalRadius + 0.35;
 
-  // Flat-ground friendly vertical window (old hill used a tall band, not a tight ellipsoid).
-  const rockCenterY = ground + visualScale * 0.55;
-  const yMin = ground - 0.05;
-  const yMax = rockCenterY + envelope.verticalRadius;
-  return point.y >= yMin && point.y <= yMax;
+  // 바닥 근처에서 돌 위로 내려온 자세면 입구에 들어온 것으로 본다.
+  if (isGrappleGroundPickupPose(clamp, rock, ground)) {
+    return true;
+  }
+
+  const points = samples.length > 0 ? samples : [clamp];
+  for (const point of points) {
+    const xz = Math.hypot(point.x - rock.x, point.z - rock.z);
+    if (xz <= envelope.horizontalRadius && point.y >= yMin && point.y <= yMax) {
+      return true;
+    }
+  }
+
+  // 차체 근처 폴백 — 클램프만으로도 돌 옆이면 집기
+  const clampXz = Math.hypot(clamp.x - rock.x, clamp.z - rock.z);
+  if (clampXz <= envelope.horizontalRadius && clamp.y >= yMin && clamp.y <= yMax) {
+    return true;
+  }
+
+  if (points.length >= 2) {
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const a = points[i];
+      const b = points[i + 1];
+      const seg = distancePointToSegment3(
+        rock.x,
+        rockY,
+        rock.z,
+        a.x,
+        a.y,
+        a.z,
+        b.x,
+        b.y,
+        b.z,
+      );
+      if (seg <= envelope.grabRadius) return true;
+    }
+  }
+  return false;
 }
 
 function findWrappableHillRock(
   hill: NonNullable<TerrainData["hillZone"]>,
+  jawSamples: ReadonlyArray<{ x: number; y: number; z: number }>,
   clamp: { x: number; y: number; z: number },
-  tip: { x: number; y: number; z: number },
   terrain: TerrainData,
 ): HillBoulder | null {
   const candidates = hill.boulders
     .filter((item) => item.active && !item.delivered && !item.extracted)
     .map((item) => ({
       item,
-      distance: Math.min(
-        Math.hypot(item.x - clamp.x, item.z - clamp.z),
-        Math.hypot(item.x - tip.x, item.z - tip.z),
-      ),
+      distance: Math.hypot(item.x - clamp.x, item.z - clamp.z),
     }))
     .sort((a, b) => a.distance - b.distance);
+
   for (const candidate of candidates) {
     if (
-      isGrappleWrappingRock(clamp, candidate.item, terrain) ||
-      isGrappleWrappingRock(tip, candidate.item, terrain)
+      candidate.distance >
+      hillBoulderGripEnvelope(candidate.item).horizontalRadius + 1.2
     ) {
+      break;
+    }
+    if (isGrappleWrappingRock(jawSamples, clamp, candidate.item, terrain)) {
       return candidate.item;
     }
   }
@@ -270,7 +353,8 @@ function bucketClearance(sim: ExcavatorSimState, terrain: TerrainData, boomSwing
         : getBucketBodyContactWorld(sim, boomSwing);
   const groundH =
     sim.attachmentType === "breaker"
-      ? sampleCrashContactHeight(terrain, tip.x, tip.z)
+      ? sampleBreakerContactHeight(terrain, tip.x, tip.z, BREAKER_TIP_PROBE_RADIUS)
+          .height
       : sampleHeight(terrain, tip.x, tip.z);
   return {
     tip,
@@ -388,14 +472,84 @@ function isExcavatorCollidingWithDumpTruck(x: number, z: number, pose?: DumpTruc
   return outsideX * outsideX + outsideZ * outsideZ <= EXCAVATOR_COLLISION_RADIUS ** 2;
 }
 
+/** 트럭 OBB + 굴착기 반경 원 겹침을 최단면으로 밀어낸다. */
+function resolveExcavatorDumpTruckOverlap(
+  x: number,
+  z: number,
+  pose: DumpTruckPose,
+): { x: number; z: number } | null {
+  if (!pose.present) return null;
+  const local = worldToDumpTruckLocal(x, z, pose.groupX, pose.groupZ);
+  const lx = local.x - DUMP_TRUCK_COLLIDER.centerOffsetX;
+  const lz = local.z - DUMP_TRUCK_COLLIDER.centerOffsetZ;
+  const hx = DUMP_TRUCK_COLLIDER.halfX;
+  const hz = DUMP_TRUCK_COLLIDER.halfZ;
+  const radius = EXCAVATOR_COLLISION_RADIUS;
+  const pad = 0.04;
+
+  const closestX = Math.max(-hx, Math.min(hx, lx));
+  const closestZ = Math.max(-hz, Math.min(hz, lz));
+  const dx = lx - closestX;
+  const dz = lz - closestZ;
+  const distSq = dx * dx + dz * dz;
+
+  if (distSq > radius * radius) return null;
+
+  let outLx: number;
+  let outLz: number;
+  if (distSq < 1e-8) {
+    const toPosX = hx - lx;
+    const toNegX = hx + lx;
+    const toPosZ = hz - lz;
+    const toNegZ = hz + lz;
+    const nearest = Math.min(toPosX, toNegX, toPosZ, toNegZ);
+    if (nearest === toPosX) {
+      outLx = hx + radius + pad;
+      outLz = lz;
+    } else if (nearest === toNegX) {
+      outLx = -hx - radius - pad;
+      outLz = lz;
+    } else if (nearest === toPosZ) {
+      outLx = lx;
+      outLz = hz + radius + pad;
+    } else {
+      outLx = lx;
+      outLz = -hz - radius - pad;
+    }
+  } else {
+    const dist = Math.sqrt(distSq);
+    const scale = (radius + pad) / dist;
+    outLx = closestX + dx * scale;
+    outLz = closestZ + dz * scale;
+  }
+
+  return dumpTruckLocalToWorld(
+    outLx + DUMP_TRUCK_COLLIDER.centerOffsetX,
+    outLz + DUMP_TRUCK_COLLIDER.centerOffsetZ,
+    pose.groupX,
+    pose.groupZ,
+  );
+}
+
 function constrainExcavatorToDumpTruck(
   sim: ExcavatorSimState,
   previous: { x: number; z: number },
   pose?: DumpTruckPose,
 ) {
-  if (!isExcavatorCollidingWithDumpTruck(sim.posX, sim.posZ, pose)) return false;
-  sim.posX = previous.x;
-  sim.posZ = previous.z;
+  if (!pose || !isExcavatorCollidingWithDumpTruck(sim.posX, sim.posZ, pose)) {
+    return false;
+  }
+  // 평소: 진입 직전 위치로 되돌림. 이미 겹친 상태(복귀 끼임 등)는 밀어낸다.
+  if (!isExcavatorCollidingWithDumpTruck(previous.x, previous.z, pose)) {
+    sim.posX = previous.x;
+    sim.posZ = previous.z;
+    return true;
+  }
+  const resolved = resolveExcavatorDumpTruckOverlap(sim.posX, sim.posZ, pose);
+  if (resolved) {
+    sim.posX = resolved.x;
+    sim.posZ = resolved.z;
+  }
   return true;
 }
 
@@ -504,8 +658,19 @@ export function tickExcavatorSim(params: SimTickParams) {
     x: sim.posX,
     z: sim.posZ,
   };
+  const hillZone = terrain.hillZone;
+  const haulTruckPresent =
+    !!hillZone && hillZone.haulTruck.phase === "ready";
+  const haulAlignForCollision = hillZone
+    ? getHaulTruckAlignTarget(hillZone.dropX, hillZone.dropZ, haulTruckPresent)
+    : null;
+  const haulArmCollisionActive =
+    haulTruckPresent &&
+    Math.hypot(sim.posX - (hillZone?.dropX ?? 0), sim.posZ - (hillZone?.dropZ ?? 0)) <=
+      10;
   const truckArmCollisionActive =
-    truckPose.present && isDumpTruckArmCollisionActive(sim, boomSwing, truckPose);
+    (truckPose.present && isDumpTruckArmCollisionActive(sim, boomSwing, truckPose)) ||
+    haulArmCollisionActive;
   const hydraulicSubsteps = truckArmCollisionActive ? 5 : 1;
   const subDt = dt / hydraulicSubsteps;
 
@@ -537,6 +702,18 @@ export function tickExcavatorSim(params: SimTickParams) {
       advanceAutoArmPose(sim, vel, autoPose);
     }
     constrainArmFromDumpTruck(sim, vel, boomSwing, subBefore, truckPose);
+    if (hillZone) {
+      constrainArmFromHaulTruck(
+        sim,
+        vel,
+        boomSwing,
+        subBefore,
+        hillZone.dropX,
+        hillZone.dropZ,
+        haulTruckPresent,
+        getArmCollisionSamples,
+      );
+    }
   }
   if (constrainExcavatorToMap(sim, terrain)) {
     vel.travel = 0;
@@ -607,6 +784,14 @@ export function tickExcavatorSim(params: SimTickParams) {
     vel.trackTurn = 0;
     vel.trackLeft = 0;
     vel.trackRight = 0;
+    constrainExcavatorToMap(sim, terrain);
+  }
+  if (constrainExcavatorToTruckTarget(sim, beforeTravel, haulAlignForCollision)) {
+    vel.travel = 0;
+    vel.trackTurn = 0;
+    vel.trackLeft = 0;
+    vel.trackRight = 0;
+    constrainExcavatorToMap(sim, terrain);
   }
 
   let bucketContact = bucketClearance(sim, terrain, boomSwing);
@@ -616,14 +801,26 @@ export function tickExcavatorSim(params: SimTickParams) {
     bucketContact.tip.z,
     terrain,
   );
-  const breakerOnAsphalt =
-    sim.attachmentType === "breaker" &&
-    !!getCrashTileAt(terrain, bucketContact.tip.x, bucketContact.tip.z)?.active;
+  const breakerContact =
+    sim.attachmentType === "breaker"
+      ? sampleBreakerContactHeight(
+          terrain,
+          bucketContact.tip.x,
+          bucketContact.tip.z,
+          BREAKER_TIP_PROBE_RADIUS,
+        )
+      : null;
+  const breakerOnAsphalt = !!breakerContact?.tile?.active;
+  const clampInHill =
+    sim.attachmentType === "grapple" &&
+    isInHillZone(terrain, bucketContact.tip.x, bucketContact.tip.z);
   const minBucketClearance = breakerOnAsphalt
     ? MIN_BREAKER_SURFACE_CLEARANCE
-    : bucketContactInDigZone
-      ? MIN_BUCKET_DIG_ZONE_CLEARANCE
-      : MIN_BUCKET_GROUND_CLEARANCE;
+    : clampInHill
+      ? -0.5
+      : bucketContactInDigZone
+        ? MIN_BUCKET_DIG_ZONE_CLEARANCE
+        : MIN_BUCKET_GROUND_CLEARANCE;
   const wasAlreadyBelowGround =
     beforeControlBucket.clearance < minBucketClearance - 0.02;
   const worsenedGroundPenetration =
@@ -649,20 +846,45 @@ export function tickExcavatorSim(params: SimTickParams) {
   const scraper = getBucketScraperContactWorld(sim, boomSwing);
   const bucketTip = getBucketTipWorld(sim, boomSwing);
   const grappleClamp = getGrappleClampWorld(sim, boomSwing);
+  if (sim.attachmentType === "grapple" && auxiliary) {
+    const pedal = auxiliary.attachmentPedal;
+    // 발판 유지 동안 개폐가 서서히 변하도록 (풀오픈 → 닫기 집기 모션)
+    const openRate = 0.675;
+    if (pedal > 0) {
+      auxiliary.grappleOpen = Math.max(0, auxiliary.grappleOpen - openRate * dt);
+    } else if (pedal < 0) {
+      auxiliary.grappleOpen = Math.min(1, auxiliary.grappleOpen + openRate * dt);
+    }
+  }
+  const grappleJawSamples =
+    sim.attachmentType === "grapple"
+      ? getGrappleJawSampleWorlds(sim, boomSwing, auxiliary?.grappleOpen ?? 1)
+      : [];
   const toolTip =
     sim.attachmentType === "breaker"
       ? getBreakerTipWorld(sim, boomSwing)
       : sim.attachmentType === "grapple"
         ? grappleClamp
         : bucketTip;
+  const breakerTipContact =
+    sim.attachmentType === "breaker"
+      ? sampleBreakerContactHeight(
+          terrain,
+          toolTip.x,
+          toolTip.z,
+          BREAKER_TIP_PROBE_RADIUS,
+        )
+      : null;
   const toolZoneRaw = getZoneAt(toolTip.x, toolTip.z, terrain);
   const toolZone =
-    sim.attachmentType === "grapple" && toolZoneRaw !== "hill"
-      ? getZoneAt(bucketTip.x, bucketTip.z, terrain) === "hill" ||
-        getZoneAt(sim.posX, sim.posZ, terrain) === "hill"
-        ? "hill"
-        : toolZoneRaw
-      : toolZoneRaw;
+    sim.attachmentType === "breaker" && breakerTipContact?.tile?.active
+      ? "crash"
+      : sim.attachmentType === "grapple" && toolZoneRaw !== "hill"
+        ? getZoneAt(bucketTip.x, bucketTip.z, terrain) === "hill" ||
+          getZoneAt(sim.posX, sim.posZ, terrain) === "hill"
+          ? "hill"
+          : toolZoneRaw
+        : toolZoneRaw;
   const bedDeckY = dumpTruckBedDeckWorldY();
   const minDumpHeight = bedDeckY + DUMP_TRUCK.dumpMinHeightAboveDeck;
   const truckBedCenter = dumpTruckBedCenterWorld(truckPose.groupX, truckPose.groupZ);
@@ -675,9 +897,12 @@ export function tickExcavatorSim(params: SimTickParams) {
   const tipInDigZone = isInDigZone(bucketTip.x, bucketTip.z, terrain);
   const toolGround =
     sim.attachmentType === "breaker"
-      ? sampleCrashContactHeight(terrain, toolTip.x, toolTip.z)
+      ? (breakerTipContact?.height ??
+        sampleCrashContactHeight(terrain, toolTip.x, toolTip.z))
       : sampleHeight(terrain, toolTip.x, toolTip.z);
-  const toolTouchesGround = toolTip.y - toolGround <= 0.12;
+  const toolTouchesGround =
+    toolTip.y - toolGround <=
+    (sim.attachmentType === "breaker" ? BREAKER_TOUCH_BAND : 0.12);
   const breakerGroundAngle =
     sim.attachmentType === "breaker"
       ? getBreakerGroundAngleDeg(sim, boomSwing)
@@ -700,7 +925,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     } else if (toolTouchesGround && !breakerAngleReady) {
       warnAttachment("브레이커를 수직에 가깝게 세우세요.");
     } else if (toolTouchesGround && runtime.attachmentActionCooldown <= 0) {
-      const tile = getCrashTileAt(terrain, toolTip.x, toolTip.z);
+      const tile = breakerTipContact?.tile ?? null;
       if (tile?.active) {
         const hitDamage = rollYanmarBreakerDamage(stats.breakerDamage, {
           bonusOnly: true,
@@ -731,7 +956,12 @@ export function tickExcavatorSim(params: SimTickParams) {
     sim.attachmentType === "grapple" &&
     hillForGrapple?.active &&
     !sim.carriedBoulderId
-      ? findWrappableHillRock(hillForGrapple, grappleClamp, bucketTip, terrain)
+      ? findWrappableHillRock(
+          hillForGrapple,
+          grappleJawSamples,
+          grappleClamp,
+          terrain,
+        )
       : null;
 
   if (sim.attachmentType === "grapple") {
@@ -740,18 +970,25 @@ export function tickExcavatorSim(params: SimTickParams) {
     const opening = grapplePedal < 0;
     // Rocks only exist in the stone zone — allow wrap contact even if the clamp
     // samples just outside the painted radius after terrain flatten.
-    const canGrab = permission.allowed || wrappableRock != null;
+    const canGrabHere = permission.allowed || wrappableRock != null;
 
-    if (grapplePedal !== 0 && !canGrab && toolTouchesGround) {
+    if (grapplePedal !== 0 && !canGrabHere && toolTouchesGround) {
       warnAttachment(permission.message);
     }
 
-    if (canGrab && runtime.attachmentActionCooldown <= 0) {
+    if (canGrabHere && runtime.attachmentActionCooldown <= 0) {
       if (hillForGrapple?.active && !sim.carriedBoulderId && closing) {
-        if (wrappableRock && !angleReady) {
+        const groundPickup =
+          !!wrappableRock &&
+          isGrappleGroundPickupPose(
+            grappleClamp,
+            wrappableRock,
+            sampleHeight(terrain, wrappableRock.x, wrappableRock.z),
+          );
+        if (wrappableRock && !angleReady && !groundPickup) {
           warnAttachment("버켓 각도를 집게와 맞춰주세요.");
           runtime.attachmentActionCooldown = 0.35;
-        } else if (wrappableRock && angleReady) {
+        } else if (wrappableRock && (angleReady || groundPickup)) {
           wrappableRock.active = false;
           sim.carriedBoulderId = wrappableRock.id;
           resetGrappleGrip(runtime.grappleGrip);
@@ -815,7 +1052,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       }
     }
 
-    // 운반 중 닫기 유지: 압력·밀착감 갱신 / 페달 떼면 확정
+    // 운반 중 닫기 유지: 압력·밀착감 갱신 / 페달 떼면 밀착 확정
     if (sim.carriedBoulderId && hillForGrapple) {
       const carried = hillForGrapple.boulders.find(
         (item) => item.id === sim.carriedBoulderId,
@@ -823,6 +1060,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       const g = runtime.grappleGrip;
       if (carried && closing && !g.liftChecked) {
         g.locked = false;
+        g.clearanceAtLock = null;
         g.contactElapsed += dt;
         if (
           Math.hypot(grappleClamp.x - carried.x, grappleClamp.z - carried.z) <=
@@ -845,6 +1083,7 @@ export function tickExcavatorSim(params: SimTickParams) {
         g.pressure01 = next.pressure01;
       } else if (carried && !closing && !opening && !g.locked && !g.liftChecked) {
         g.locked = true;
+        g.clearanceAtLock = grappleClamp.y - sampleHeight(terrain, grappleClamp.x, grappleClamp.z);
       }
     } else if (!sim.carriedBoulderId && !runtime.grappleGrip.liftResult) {
       if (runtime.grappleGrip.contactElapsed > 0 && !runtime.grappleGrip.liftChecked) {
@@ -853,17 +1092,22 @@ export function tickExcavatorSim(params: SimTickParams) {
     }
   }
 
-  // 밀착감 확정 + 팁이 충분히 들린 뒤 낙하 판정
+  // 밀착 확정 후, 붐을 들어 클램프가 충분히 올라갔을 때만 성공/실패 판정
   {
     const grip = runtime.grappleGrip;
     const carryGround = sampleHeight(terrain, grappleClamp.x, grappleClamp.z);
     const carryClearance = grappleClamp.y - carryGround;
+    const liftNeeded =
+      (grip.clearanceAtLock ?? 0) + GRAPPLE_LIFT_JUDGE_CLEARANCE_DELTA;
+    const liftedEnough =
+      carryClearance >= GRAPPLE_TRAVEL_LOCK_CLEARANCE &&
+      carryClearance >= liftNeeded;
     if (
       sim.attachmentType === "grapple" &&
       sim.carriedBoulderId &&
       grip.locked &&
       !grip.liftChecked &&
-      carryClearance >= GRAPPLE_TRAVEL_LOCK_CLEARANCE
+      liftedEnough
     ) {
       const success = Math.random() < grip.adhesion01;
       grip.liftChecked = true;
@@ -943,28 +1187,29 @@ export function tickExcavatorSim(params: SimTickParams) {
     sim.swing,
     dumpAlignTarget,
   );
-  const haulTruckPresent =
-    !!terrain.hillZone && terrain.hillZone.haulTruck.phase === "ready";
-  const haulAlignTarget = terrain.hillZone
-    ? getHaulTruckAlignTarget(
-        terrain.hillZone.dropX,
-        terrain.hillZone.dropZ,
-        haulTruckPresent,
-      )
-    : null;
+  const haulAlignTarget = haulAlignForCollision;
   const haulBodyTouching = haulAlignTarget
     ? isBodyTouchingTruck(sim.posX, sim.posZ, haulAlignTarget)
     : false;
-  const haulFacingBed = haulAlignTarget
-    ? isFacingTruckBedCenter(
-        sim.posX,
-        sim.posZ,
-        sim.heading,
-        sim.swing,
-        haulAlignTarget.bedCenterX,
-        haulAlignTarget.bedCenterZ,
-      )
-    : false;
+  // 방향만 맞으면 맵 전역에서 true가 되므로, 안내·정렬은 트럭 근처에서만 본다.
+  const HAUL_GUIDE_RADIUS = 8;
+  const haulNearForGuide =
+    !!haulAlignTarget &&
+    Math.hypot(
+      sim.posX - haulAlignTarget.groupX,
+      sim.posZ - haulAlignTarget.groupZ,
+    ) <= HAUL_GUIDE_RADIUS;
+  const haulFacingBed =
+    haulAlignTarget && haulNearForGuide
+      ? isFacingTruckBedCenter(
+          sim.posX,
+          sim.posZ,
+          sim.heading,
+          sim.swing,
+          haulAlignTarget.bedCenterX,
+          haulAlignTarget.bedCenterZ,
+        )
+      : false;
   const alignedForHaulTruck = isAlignedForTruckDump(
     sim.posX,
     sim.posZ,
@@ -997,7 +1242,12 @@ export function tickExcavatorSim(params: SimTickParams) {
     beginDumpTruckDeparture(truckState);
   }
   const haulTruckDropZone = terrain.hillZone;
-  if (haulTruckDropZone && !haulBodyTouching) {
+  if (
+    haulTruckDropZone &&
+    !alignedForHaulTruck &&
+    haulTruckDropZone.haulTruck.loadCount >=
+      Math.max(1, Math.floor(stats.haulTruckCapacity))
+  ) {
     beginHaulTruckDeparture(terrain, stats.haulTruckCapacity);
   }
   const bucketInWorkRange = scraperDepthBelow > -1.4 && scraperDepthBelow < 2.6;
@@ -1046,33 +1296,29 @@ export function tickExcavatorSim(params: SimTickParams) {
     soilRetention >= BUCKET_SOIL_HOLD_MIN &&
     (poseReadiness >= 0.5 || (isAutoArm && autoDigPoseScore >= 0.25));
 
-  const crashTileAtTip =
-    sim.attachmentType === "breaker"
-      ? getCrashTileAt(terrain, toolTip.x, toolTip.z)
-      : null;
+  const crashTileAtTip = breakerTipContact?.tile ?? null;
+  const breakerOverAsphalt =
+    sim.attachmentType === "breaker" && !!crashTileAtTip?.active;
   const breakerNeedsVertical =
-    sim.attachmentType === "breaker" &&
-    toolZone === "crash" &&
-    toolTouchesGround &&
-    !!crashTileAtTip?.active &&
-    !breakerAngleReady;
+    breakerOverAsphalt && toolTouchesGround && !breakerAngleReady;
   const canStrike =
-    sim.attachmentType === "breaker" &&
-    toolZone === "crash" &&
-    toolTouchesGround &&
-    breakerAngleReady &&
-    !!crashTileAtTip?.active;
+    breakerOverAsphalt && toolTouchesGround && breakerAngleReady;
 
   const canGrab =
     sim.attachmentType === "grapple" &&
-    angleReady &&
     !sim.carriedBoulderId &&
-    !!wrappableRock;
+    !!wrappableRock &&
+    (angleReady ||
+      isGrappleGroundPickupPose(
+        grappleClamp,
+        wrappableRock,
+        sampleHeight(terrain, wrappableRock.x, wrappableRock.z),
+      ));
   const grappleNeedsAlignment =
     sim.attachmentType === "grapple" &&
     !sim.carriedBoulderId &&
     !!wrappableRock &&
-    !angleReady;
+    !canGrab;
   const canDropRock =
     sim.attachmentType === "grapple" &&
     !!sim.carriedBoulderId &&
@@ -1130,10 +1376,23 @@ export function tickExcavatorSim(params: SimTickParams) {
   fb.soilSpilling = false;
   const truckCanAccept = canDumpTruckAcceptDump(truckState, stats.truckCapacityUnits);
   const truckFillRatio = getDumpTruckFillRatio(truckState, stats.truckCapacityUnits);
+  const haulCapacity = Math.max(1, Math.floor(stats.haulTruckCapacity));
+  const haulTruck = terrain.hillZone?.haulTruck ?? null;
   fb.truckPresent = isDumpTruckVisible(truckState);
+  fb.haulTruckPresent = haulTruckPresent;
+  fb.nearHaulTruck = haulNearForGuide;
+  fb.carryingRock = !!sim.carriedBoulderId;
   fb.truckCanAccept = truckCanAccept;
   fb.truckFillRatio = truckFillRatio;
   fb.truckCooldownRemaining = getDumpTruckReturnEtaSec(truckState, stats.truckCooldownSec);
+  fb.haulTruckCanAccept = canHaulTruckAcceptRock(haulTruck, haulCapacity);
+  fb.haulTruckFillRatio = getHaulTruckFillRatio(haulTruck, haulCapacity);
+  fb.haulTruckCooldownRemaining = getHaulTruckReturnEtaSec(
+    haulTruck,
+    stats.haulTruckCooldownSec,
+  );
+  fb.haulTruckLoadCount = haulTruck?.loadCount ?? 0;
+  fb.haulTruckCapacity = haulCapacity;
   fb.digCooldowns = terrain.dynamicDigZones
     ? terrain.digZones
         .map((zone, index) => ({
@@ -1143,6 +1402,8 @@ export function tickExcavatorSim(params: SimTickParams) {
         }))
         .filter((zone) => zone.etaSec > 0)
     : [];
+  fb.crashCooldownEtaSec = getCrashZoneRespawnEtaSec(terrain.crashZone);
+  fb.hillCooldownEtaSec = getHillZoneRespawnEtaSec(terrain.hillZone);
   fb.canDump = inTruckDumpTarget && sim.bucketLoad > 0.02 && truckCanAccept;
   fb.dumpBodyTouching =
     sim.attachmentType === "grapple" ? haulBodyTouching : dumpBodyTouching;
@@ -1217,8 +1478,8 @@ export function tickExcavatorSim(params: SimTickParams) {
             terrain,
             digX,
             digZ,
-            naturalDigPose ? 4.4 : 3.7,
-            scrape * dt * digRate * (naturalDigPose ? 1.35 : 1.08),
+            naturalDigPose ? 2.6 : 2.2,
+            scrape * dt * digRate * (naturalDigPose ? 0.72 : 0.58),
           )
         : 0;
     fb.digging = dug > 0.002 || (naturalLoadReady && activelyScraping);

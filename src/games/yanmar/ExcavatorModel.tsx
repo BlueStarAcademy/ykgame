@@ -326,7 +326,7 @@ export function PremiumDozerBlade() {
 
   return (
     <group position={[1.8, -0.08, 0]}>
-      <group scale={0.88}>
+      <group scale={[0.88, 0.8, 0.88]}>
         {/* 곡면 몰드보드: 흙과 눈을 말아 올리며 앞으로 미는 실제 블레이드 단면 */}
         <mesh position={[0, 0, -1.24]} castShadow receiveShadow>
           <extrudeGeometry
@@ -499,8 +499,8 @@ export function PremiumExcavatorBody({
       <OperatorStation />
       <RollBar />
       {rearMark ? (
-        <mesh position={[-1.445, 1.1, 0]} rotation={[0, -Math.PI / 2, 0]} renderOrder={19}>
-          <planeGeometry args={[1.02, 0.357]} />
+        <mesh position={[-1.445, 1.12, 0]} rotation={[0, -Math.PI / 2, 0]} renderOrder={19}>
+          <planeGeometry args={[1.06, 0.372]} />
           <meshBasicMaterial
             map={rearMark}
             transparent
@@ -607,14 +607,6 @@ export function PremiumExcavatorLink({
           ) : null}
         </group>
       ))}
-      <mesh position={[length * 0.58, height * 0.52, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <capsuleGeometry args={[0.035, length * 0.48, 5, 10]} />
-        <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
-      </mesh>
-      <mesh position={[length * 0.58, height * 0.62, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <capsuleGeometry args={[0.025, length * 0.44, 5, 10]} />
-        <meshStandardMaterial color={COLOR.frameLight} {...MATERIAL.frame} />
-      </mesh>
     </group>
   );
 }

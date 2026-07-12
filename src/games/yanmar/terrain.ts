@@ -32,12 +32,16 @@ export const CRASH_ASPHALT_BOX_CENTER_Y = 0.12;
 export const CRASH_ASPHALT_BOX_THICKNESS = 0.2;
 export const HAUL_TRUCK_COOLDOWN_SEC = 300;
 export const HAUL_TRUCK_CAPACITY = 5;
+/** 돌트럭 시동·출발·복귀 주차 시간 (흙트럭과 동일). */
+export const HAUL_TRUCK_ENGINE_START_SEC = 2.2;
+export const HAUL_TRUCK_DEPART_SEC = 5.8;
+export const HAUL_TRUCK_ARRIVE_SEC = 10;
 export const HILL_BOULDER_COUNT = 5;
 /** 돌 구역의 돌을 모두 반출한 뒤 구역 재생성까지 대기. */
 export const HILL_ZONE_RESPAWN_MS = 300 * 1000;
 /** 채취량은 유지하되 화면에 보이는 지형 침하는 완만하게 제한한다. */
-const DIG_TERRAIN_DEFORMATION_SCALE = 0.45;
-const DIG_TERRAIN_MAX_DEPTH = 0.7;
+const DIG_TERRAIN_DEFORMATION_SCALE = 0.16;
+const DIG_TERRAIN_MAX_DEPTH = 0.28;
 
 export interface DigZone {
   id: string;
@@ -444,7 +448,7 @@ export const DUMP_TRUCK_SOLID = {
   cavityMaxY: 2.82,
 } as const;
 
-function dumpTruckLocalToWorld(
+export function dumpTruckLocalToWorld(
   localX: number,
   localZ: number,
   groupX: number = DUMP_TRUCK.groupX,
@@ -585,6 +589,22 @@ export function digZoneLabel(zoneId: string, index = 0) {
 
 export function getDigZoneRespawnEtaSec(zone: DigZone, now = Date.now()) {
   if (zone.active || zone.respawnAt == null) return 0;
+  return Math.max(0, (zone.respawnAt - now) / 1000);
+}
+
+export function getCrashZoneRespawnEtaSec(
+  zone: CrashZone | null | undefined,
+  now = Date.now(),
+) {
+  if (!zone || zone.active || zone.respawnAt == null) return 0;
+  return Math.max(0, (zone.respawnAt - now) / 1000);
+}
+
+export function getHillZoneRespawnEtaSec(
+  zone: HillZone | null | undefined,
+  now = Date.now(),
+) {
+  if (!zone || zone.active || zone.respawnAt == null) return 0;
   return Math.max(0, (zone.respawnAt - now) / 1000);
 }
 
@@ -906,6 +926,38 @@ export function getCrashTileAt(
   return zone.tiles.find((tile) => tile.row === row && tile.col === col) ?? null;
 }
 
+/** 팁이 타일 경계·시각 오차로 살짝 벗어나도 가까운 활성 아스팔트를 찾는다. */
+export function getCrashTileNear(
+  terrain: TerrainData,
+  wx: number,
+  wz: number,
+  radius = 0.65,
+): CrashTile | null {
+  const direct = getCrashTileAt(terrain, wx, wz);
+  if (direct?.active) return direct;
+
+  const zone = terrain.crashZone;
+  if (!zone?.active || radius <= 0) return direct;
+
+  let best: CrashTile | null = direct?.active ? direct : null;
+  let bestDist = Number.POSITIVE_INFINITY;
+  const tileW = zone.width / 3;
+  const tileD = zone.depth / 3;
+  for (const tile of zone.tiles) {
+    if (!tile.active) continue;
+    const cx = zone.centerX - zone.width / 2 + tileW * (tile.col + 0.5);
+    const cz = zone.centerZ - zone.depth / 2 + tileD * (tile.row + 0.5);
+    const dx = Math.max(Math.abs(wx - cx) - tileW * 0.5, 0);
+    const dz = Math.max(Math.abs(wz - cz) - tileD * 0.5, 0);
+    const dist = Math.hypot(dx, dz);
+    if (dist <= radius && dist < bestDist) {
+      best = tile;
+      bestDist = dist;
+    }
+  }
+  return best ?? direct;
+}
+
 /** 활성 아스팔트 타일 상단 오프셋. HP가 줄수록 낮아져 브레이커가 박혀 들어가는 느낌을 준다. */
 export function getCrashAsphaltSurfaceOffset(tile: CrashTile | null | undefined): number {
   if (!tile?.active) return 0;
@@ -920,6 +972,20 @@ export function sampleCrashContactHeight(
   wz: number,
 ): number {
   return sampleHeight(terrain, wx, wz) + getCrashAsphaltSurfaceOffset(getCrashTileAt(terrain, wx, wz));
+}
+
+/** 팁 근처 활성 타일을 포함한 접촉 높이 (브레이커 판정용). */
+export function sampleBreakerContactHeight(
+  terrain: TerrainData,
+  wx: number,
+  wz: number,
+  probeRadius = 0.65,
+): { height: number; tile: CrashTile | null } {
+  const tile = getCrashTileNear(terrain, wx, wz, probeRadius);
+  return {
+    tile,
+    height: sampleHeight(terrain, wx, wz) + getCrashAsphaltSurfaceOffset(tile),
+  };
 }
 
 export function damageCrashTile(
@@ -1025,25 +1091,81 @@ export function updateSpecialZones(
   const truck = terrain.hillZone?.haulTruck;
   if (!truck || truck.phase === "ready") return;
   truck.phaseElapsed += dt;
-  if (truck.phase === "engineStart" && truck.phaseElapsed >= 2.2) {
+  if (truck.phase === "engineStart" && truck.phaseElapsed >= HAUL_TRUCK_ENGINE_START_SEC) {
     truck.phase = "departing";
     truck.phaseElapsed = 0;
-  } else if (truck.phase === "departing" && truck.phaseElapsed >= 5) {
+  } else if (truck.phase === "departing" && truck.phaseElapsed >= HAUL_TRUCK_DEPART_SEC) {
     truck.phase = "cooldown";
     truck.phaseElapsed = 0;
     truck.cooldownRemaining = haulTruckCooldownSec;
+    truck.loadCount = 0;
   } else if (truck.phase === "cooldown") {
     truck.cooldownRemaining = Math.max(0, truck.cooldownRemaining - dt);
-    if (truck.cooldownRemaining <= 8) {
+    if (truck.cooldownRemaining <= HAUL_TRUCK_ARRIVE_SEC) {
       truck.phase = "arriving";
-      truck.phaseElapsed = 0;
+      truck.phaseElapsed = HAUL_TRUCK_ARRIVE_SEC - truck.cooldownRemaining;
     }
-  } else if (truck.phase === "arriving" && truck.phaseElapsed >= 8) {
-    truck.phase = "ready";
-    truck.phaseElapsed = 0;
-    truck.cooldownRemaining = 0;
-    truck.loadCount = 0;
+  } else if (truck.phase === "arriving") {
+    if (truck.phaseElapsed >= HAUL_TRUCK_ARRIVE_SEC) {
+      truck.phase = "ready";
+      truck.phaseElapsed = 0;
+      truck.cooldownRemaining = 0;
+      truck.loadCount = 0;
+    }
   }
+}
+
+export function canHaulTruckAcceptRock(
+  truck: HaulTruckState | null | undefined,
+  capacity = HAUL_TRUCK_CAPACITY,
+) {
+  if (!truck || truck.phase !== "ready") return false;
+  return truck.loadCount < Math.max(1, Math.floor(capacity));
+}
+
+export function getHaulTruckFillRatio(
+  truck: HaulTruckState | null | undefined,
+  capacity = HAUL_TRUCK_CAPACITY,
+) {
+  const maxLoad = Math.max(1, Math.floor(capacity));
+  if (!truck || maxLoad <= 0) return 0;
+  return Math.min(1, Math.max(0, truck.loadCount / maxLoad));
+}
+
+export function isHaulTruckVisible(truck: HaulTruckState | null | undefined) {
+  return !!truck && truck.phase !== "cooldown";
+}
+
+export function shouldShowHaulTruckReturnTimer(
+  truck: HaulTruckState | null | undefined,
+) {
+  return (
+    !!truck &&
+    (truck.phase === "engineStart" ||
+      truck.phase === "departing" ||
+      truck.phase === "cooldown" ||
+      truck.phase === "arriving")
+  );
+}
+
+export function getHaulTruckReturnEtaSec(
+  truck: HaulTruckState | null | undefined,
+  cooldownSec = HAUL_TRUCK_COOLDOWN_SEC,
+) {
+  if (!truck) return 0;
+  if (truck.phase === "cooldown") return truck.cooldownRemaining;
+  if (truck.phase === "engineStart") {
+    const engineLeft = Math.max(0, HAUL_TRUCK_ENGINE_START_SEC - truck.phaseElapsed);
+    return engineLeft + HAUL_TRUCK_DEPART_SEC + cooldownSec + HAUL_TRUCK_ARRIVE_SEC;
+  }
+  if (truck.phase === "departing") {
+    const departLeft = Math.max(0, HAUL_TRUCK_DEPART_SEC - truck.phaseElapsed);
+    return departLeft + cooldownSec + HAUL_TRUCK_ARRIVE_SEC;
+  }
+  if (truck.phase === "arriving") {
+    return Math.max(0, HAUL_TRUCK_ARRIVE_SEC - truck.phaseElapsed);
+  }
+  return 0;
 }
 
 export function addHaulTruckRock(
@@ -1051,7 +1173,7 @@ export function addHaulTruckRock(
   capacity = HAUL_TRUCK_CAPACITY,
 ) {
   const truck = terrain.hillZone?.haulTruck;
-  if (!truck || truck.phase !== "ready") return false;
+  if (!canHaulTruckAcceptRock(truck, capacity) || !truck) return false;
   const maxLoad = Math.max(1, Math.floor(capacity));
   truck.loadCount = Math.min(maxLoad, truck.loadCount + 1);
   return true;

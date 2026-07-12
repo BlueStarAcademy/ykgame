@@ -1,11 +1,16 @@
 "use client";
 
-import { useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { RoundedBox, Text } from "@react-three/drei";
+import { RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
-import type { HaulTruckState } from "./terrain";
 import {
+  HAUL_TRUCK_ARRIVE_SEC,
+  HAUL_TRUCK_DEPART_SEC,
+  type HaulTruckState,
+} from "./terrain";
+import {
+  createYkGeongiWhiteTextTexture,
   YANMAR_MACHINE_COLORS as COLORS,
   YANMAR_MACHINE_MATERIALS as MATERIALS,
 } from "./machineVisualTheme";
@@ -59,10 +64,17 @@ export function HaulTruckModel({
   rockCount: number;
 }) {
   const groupRef = useRef<THREE.Group>(null);
+  const ykMark = useMemo(() => createYkGeongiWhiteTextTexture(), []);
+  useLayoutEffect(() => () => ykMark?.dispose(), [ykMark]);
+
   useFrame(() => {
     const group = groupRef.current;
     if (!group) return;
-    const progress = Math.min(1, state.phaseElapsed / (state.phase === "arriving" ? 8 : 5));
+    const progress = Math.min(
+      1,
+      state.phaseElapsed /
+        (state.phase === "arriving" ? HAUL_TRUCK_ARRIVE_SEC : HAUL_TRUCK_DEPART_SEC),
+    );
     if (state.phase === "engineStart") {
       group.position.x = Math.sin(state.phaseElapsed * 34) * 0.025;
       group.visible = true;
@@ -104,18 +116,23 @@ export function HaulTruckModel({
                 <meshStandardMaterial color={COLORS.paintHighlight} {...MATERIALS.painted} />
               </mesh>
             ))}
-            <Text
-              position={[0, 0.02, side * 0.115]}
-              rotation={[0, side > 0 ? 0 : Math.PI, 0]}
-              fontSize={0.42}
-              color="#fff7ed"
-              anchorX="center"
-              anchorY="middle"
-              outlineWidth={0.018}
-              outlineColor={COLORS.paintRedDark}
-            >
-              YK QUARRY
-            </Text>
+            {ykMark ? (
+              <mesh
+                position={[0, 0.02, side * 0.12]}
+                rotation={[0, side > 0 ? 0 : Math.PI, 0]}
+                renderOrder={18}
+              >
+                <planeGeometry args={[2.05, 0.64]} />
+                <meshBasicMaterial
+                  map={ykMark}
+                  transparent
+                  alphaTest={0.16}
+                  toneMapped={false}
+                  depthWrite={false}
+                  side={THREE.DoubleSide}
+                />
+              </mesh>
+            ) : null}
           </group>
         ))}
         <RoundedBox args={[0.2, 1.5, 3.35]} radius={0.05} position={[-2.12, 0.04, 0]} castShadow>

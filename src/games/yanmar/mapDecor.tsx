@@ -19,6 +19,7 @@ import {
   sampleHeight,
   type TerrainData,
 } from "./terrain";
+import type { ExcavatorSimState } from "./types";
 import { getDumpTruckLaneSegment, DUMP_TRUCK_LANE_LENGTH } from "./dumpTruckLane";
 import { getSiteRoadsForTier } from "./siteLayout";
 import {
@@ -120,8 +121,10 @@ function TruckDepartureLane({
 
 export function MapSiteDecor({
   terrainRef,
+  simRef,
 }: {
   terrainRef: React.MutableRefObject<TerrainData>;
+  simRef?: React.MutableRefObject<ExcavatorSimState>;
 }) {
   const gravelTexture = useMemo(() => createGravelTexture(), []);
   const compactTexture = useMemo(() => createCompactedDirtTexture(), []);
@@ -181,7 +184,7 @@ export function MapSiteDecor({
           metalness={0.03}
         />
       </mesh>
-      <DigMoundCollars terrainRef={terrainRef} />
+      <DigMoundCollars terrainRef={terrainRef} simRef={simRef} />
       <SiteBarrierRow
         texture={metalTexture}
         terrain={terrainRef.current}
@@ -198,42 +201,63 @@ export function MapSiteDecor({
 
 function DigMoundCollars({
   terrainRef,
+  simRef,
 }: {
   terrainRef: React.MutableRefObject<TerrainData>;
+  simRef?: React.MutableRefObject<ExcavatorSimState>;
 }) {
   const [zones, setZones] = useState(() => getActiveDigZones(terrainRef.current));
+  const [occupiedIds, setOccupiedIds] = useState<string[]>([]);
   const signatureRef = useRef("");
 
   useFrame(() => {
-    const signature = terrainRef.current.digZones
-      .map((zone) => `${zone.id}:${zone.x}:${zone.z}:${zone.active}`)
-      .join("|");
+    const nextZones = getActiveDigZones(terrainRef.current);
+    const sim = simRef?.current;
+    const nextOccupied = sim
+      ? nextZones
+          .filter((zone) => Math.hypot(zone.x - sim.posX, zone.z - sim.posZ) < zone.radius)
+          .map((zone) => zone.id)
+          .sort()
+      : [];
+    const signature =
+      terrainRef.current.digZones
+        .map((zone) => `${zone.id}:${zone.x}:${zone.z}:${zone.active}`)
+        .join("|") + `|occ:${nextOccupied.join(",")}`;
     if (signature !== signatureRef.current) {
       signatureRef.current = signature;
-      setZones([...getActiveDigZones(terrainRef.current)]);
+      setZones([...nextZones]);
+      setOccupiedIds(nextOccupied);
     }
   });
+
+  const occupied = useMemo(() => new Set(occupiedIds), [occupiedIds]);
 
   return (
     <>
       {zones.map((zone) => {
         const baseY = sampleHeight(terrainRef.current, zone.x, zone.z) + 0.04;
+        const inside = occupied.has(zone.id);
         return (
           <group key={zone.id} position={[zone.x, baseY, zone.z]}>
-            <mesh rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[zone.radius - 0.35, zone.radius + 0.15, 64]} />
-              <meshStandardMaterial
-                color="#9a7048"
-                roughness={0.96}
-                metalness={0}
-                transparent
-                opacity={0.42}
-              />
-            </mesh>
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-              <ringGeometry args={[zone.radius * 0.55, zone.radius * 0.62, 48]} />
-              <meshStandardMaterial color="#c49a62" roughness={0.9} transparent opacity={0.28} />
-            </mesh>
+            {/* Hide collar rings when inside — ZoneMarkers shows diggable dirt edge instead */}
+            {!inside ? (
+              <>
+                <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                  <ringGeometry args={[zone.radius - 0.35, zone.radius + 0.15, 64]} />
+                  <meshStandardMaterial
+                    color="#9a7048"
+                    roughness={0.96}
+                    metalness={0}
+                    transparent
+                    opacity={0.42}
+                  />
+                </mesh>
+                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+                  <ringGeometry args={[zone.radius * 0.55, zone.radius * 0.62, 48]} />
+                  <meshStandardMaterial color="#c49a62" roughness={0.9} transparent opacity={0.28} />
+                </mesh>
+              </>
+            ) : null}
             {[0, 1, 2].map((i) => {
               const angle = (i / 3) * Math.PI * 2 + 0.4;
               const rx = Math.cos(angle) * (zone.radius * 0.78);

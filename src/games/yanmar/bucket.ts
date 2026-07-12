@@ -59,17 +59,19 @@ function bucketPointWorld(sim: ExcavatorSimState, boomSwing: number, localX: num
   const armEndX = boomEndX + Math.sin(visualArmAngle) * ARM_LEN;
   const armEndY = boomEndY + Math.cos(visualArmAngle) * ARM_LEN;
   const bucketAngle = visualBucketAngle;
+  // 붐 평면 reach: 모델 +X. 씬의 Y=-90° 이후 월드 forward(heading)와 동일 축.
   const reach = armEndX + Math.sin(bucketAngle) * localX - Math.cos(bucketAngle) * localY;
   const height =
     BOOM_PIVOT_Y +
     armEndY +
     Math.cos(bucketAngle) * localX +
     Math.sin(bucketAngle) * localY;
+  const forward = BOOM_OFFSET + reach;
 
   return {
-    x: sim.posX + Math.sin(facing) * BOOM_OFFSET + Math.cos(facing) * reach,
+    x: sim.posX + Math.sin(facing) * forward,
     y: height + sim.posY,
-    z: sim.posZ + Math.cos(facing) * BOOM_OFFSET - Math.sin(facing) * reach,
+    z: sim.posZ + Math.cos(facing) * forward,
   };
 }
 
@@ -88,6 +90,32 @@ export function getGrappleClampWorld(
     YANMAR_MACHINE_RIG.grappleClampLocalX,
     YANMAR_MACHINE_RIG.grappleClampLocalY,
   );
+}
+
+/** Jaw cavity samples used to detect rocks between thumb and teeth. */
+export function getGrappleJawSampleWorlds(
+  sim: ExcavatorSimState,
+  boomSwing = 0,
+  openAmount = 1,
+): BucketTip[] {
+  const open = Math.max(0, Math.min(1, openAmount));
+  // 집게가 벌어질수록 엄지·입구 쪽 샘플을 넓혀 바닥 집기 자세를 잡기 쉽게 한다.
+  const openDrop = open * 0.42;
+  const openOut = open * 0.28;
+  const locals: ReadonlyArray<readonly [number, number]> = [
+    [YANMAR_MACHINE_RIG.grappleTeethLocalX, YANMAR_MACHINE_RIG.grappleTeethLocalY],
+    [YANMAR_MACHINE_RIG.grappleClampLocalX, YANMAR_MACHINE_RIG.grappleClampLocalY],
+    [YANMAR_MACHINE_RIG.grappleMouthLocalX, YANMAR_MACHINE_RIG.grappleMouthLocalY],
+    [-BUCKET_LEN, 0],
+    [-BUCKET_LEN * 0.82, -0.22],
+    [-0.72, -0.08],
+    [YANMAR_MACHINE_RIG.grappleTeethLocalX - openOut, YANMAR_MACHINE_RIG.grappleTeethLocalY - openDrop * 0.35],
+    [YANMAR_MACHINE_RIG.grappleClampLocalX, YANMAR_MACHINE_RIG.grappleClampLocalY - openDrop],
+    [YANMAR_MACHINE_RIG.grappleMouthLocalX + openOut * 0.4, YANMAR_MACHINE_RIG.grappleMouthLocalY + openDrop * 0.55],
+    [-1.12, -0.28 - openDrop * 0.5],
+    [-0.85, 0.12 + openDrop * 0.35],
+  ];
+  return locals.map(([lx, ly]) => bucketPointWorld(sim, boomSwing, lx, ly));
 }
 
 export const MIN_BREAKER_GROUND_ANGLE_DEG = 70;
@@ -150,9 +178,9 @@ function linkPointWorld(
   }
 
   return {
-    x: sim.posX + Math.sin(facing) * BOOM_OFFSET + Math.cos(facing) * reach,
+    x: sim.posX + Math.sin(facing) * (BOOM_OFFSET + reach),
     y: height + sim.posY,
-    z: sim.posZ + Math.cos(facing) * BOOM_OFFSET - Math.sin(facing) * reach,
+    z: sim.posZ + Math.cos(facing) * (BOOM_OFFSET + reach),
   };
 }
 
@@ -293,12 +321,28 @@ export interface DigFeedback {
   /** 주행 레버 입력 중 버킷/암이 낮아 이동 불가 */
   travelBlockedRaiseArm: boolean;
   truckPresent: boolean;
+  /** 돌(스톤) 구역 하울 트럭이 대기 중 */
+  haulTruckPresent: boolean;
+  /** 하울 트럭 근처 (안내 표시용) */
+  nearHaulTruck: boolean;
+  /** 집게로 바위를 들고 있음 */
+  carryingRock: boolean;
   truckCanAccept: boolean;
   truckFillRatio: number;
   truckCooldownRemaining: number;
+  /** 돌트럭이 추가 적재를 받을 수 있는지 */
+  haulTruckCanAccept: boolean;
+  haulTruckFillRatio: number;
+  haulTruckCooldownRemaining: number;
+  haulTruckLoadCount: number;
+  haulTruckCapacity: number;
   /** Active Dig zone remaining soil units (0 when not in a dig zone). */
   digZoneRemainingUnits: number;
   digCooldowns: { id: string; label: string; etaSec: number }[];
+  /** 아스팔트 구역 재생성까지 남은 초 (0이면 표시 안 함). */
+  crashCooldownEtaSec: number;
+  /** 돌(석재) 구역 재생성까지 남은 초 (0이면 표시 안 함). */
+  hillCooldownEtaSec: number;
 }
 
 export function createDigFeedback(): DigFeedback {
@@ -337,11 +381,21 @@ export function createDigFeedback(): DigFeedback {
     dumpFacingBed: false,
     raiseArmForDump: false,
     travelBlockedRaiseArm: false,
-    truckPresent: true,
+    truckPresent: false,
+    haulTruckPresent: false,
+    nearHaulTruck: false,
+    carryingRock: false,
     truckCanAccept: true,
     truckFillRatio: 0,
     truckCooldownRemaining: 0,
+    haulTruckCanAccept: true,
+    haulTruckFillRatio: 0,
+    haulTruckCooldownRemaining: 0,
+    haulTruckLoadCount: 0,
+    haulTruckCapacity: 5,
     digZoneRemainingUnits: 0,
     digCooldowns: [],
+    crashCooldownEtaSec: 0,
+    hillCooldownEtaSec: 0,
   };
 }

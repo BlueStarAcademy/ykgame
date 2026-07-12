@@ -148,7 +148,7 @@ export function ExcavatorMinimap({
         context.fill();
       }
 
-      if (terrain.crashZone) {
+      if (terrain.crashZone?.active) {
         const crash = worldToMinimap(
           terrain.crashZone.centerX,
           terrain.crashZone.centerZ,
@@ -160,9 +160,7 @@ export function ExcavatorMinimap({
           (terrain.crashZone.width / (bounds.maxX - bounds.minX)) * inner;
         const depth =
           (terrain.crashZone.depth / (bounds.maxZ - bounds.minZ)) * inner;
-        context.fillStyle = terrain.crashZone.active
-          ? "rgba(245,158,11,0.42)"
-          : "rgba(100,116,139,0.28)";
+        context.fillStyle = "rgba(245,158,11,0.42)";
         context.fillRect(
           crash.px - width / 2,
           crash.py - depth / 2,
@@ -178,7 +176,7 @@ export function ExcavatorMinimap({
         );
       }
 
-      if (terrain.hillZone) {
+      if (terrain.hillZone?.active) {
         const hill = worldToMinimap(
           terrain.hillZone.centerX,
           terrain.hillZone.centerZ,
@@ -188,13 +186,11 @@ export function ExcavatorMinimap({
         );
         const radius =
           (terrain.hillZone.radius / (bounds.maxX - bounds.minX)) * inner;
-        context.fillStyle = terrain.hillZone.active
-          ? "rgba(148,163,184,0.3)"
-          : "rgba(100,116,139,0.2)";
+        context.fillStyle = "rgba(148,163,184,0.3)";
         context.beginPath();
         context.arc(hill.px, hill.py, Math.max(radius, 5), 0, Math.PI * 2);
         context.fill();
-        context.strokeStyle = terrain.hillZone.active ? "#cbd5e1" : "#64748b";
+        context.strokeStyle = "#cbd5e1";
         context.stroke();
       }
 

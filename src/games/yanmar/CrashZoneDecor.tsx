@@ -2,12 +2,13 @@
 
 import { useLayoutEffect, useMemo } from "react";
 import { useLoader } from "@react-three/fiber";
-import { Billboard, Text } from "@react-three/drei";
+import { Billboard, Outlines, Text } from "@react-three/drei";
 import * as THREE from "three";
 import {
   CRASH_ASPHALT_BOX_CENTER_Y,
   CRASH_ASPHALT_BOX_THICKNESS,
   CRASH_ASPHALT_SURFACE_SINK,
+  getCrashZoneRespawnEtaSec,
   type CrashZone,
   type TerrainData,
   sampleHeight,
@@ -16,13 +17,18 @@ import {
   configureSiteTexture,
   PREMIUM_SITE_TEXTURES,
 } from "./siteTextures";
+import { formatDumpTruckReturnTime } from "./dumpTruckState";
 
 export function CrashZoneDecor({
   zone,
   terrain,
+  showZoneLabel = true,
+  highlightTiles = false,
 }: {
   zone: CrashZone;
   terrain: TerrainData;
+  showZoneLabel?: boolean;
+  highlightTiles?: boolean;
 }) {
   const loaded = useLoader(THREE.TextureLoader, [
     PREMIUM_SITE_TEXTURES.asphaltAlbedo,
@@ -48,6 +54,12 @@ export function CrashZoneDecor({
   const tileWidth = zone.width / 3;
   const tileDepth = zone.depth / 3;
   const ground = sampleHeight(terrain, zone.centerX, zone.centerZ);
+  const respawnEtaSec = getCrashZoneRespawnEtaSec(zone);
+  const zoneLabel = zone.active
+    ? "노면 파쇄 작업구역"
+    : respawnEtaSec > 0
+      ? `노면 파쇄 · 리젠 ${formatDumpTruckReturnTime(respawnEtaSec)}`
+      : "노면 파쇄 작업구역";
 
   return (
     <group>
@@ -99,6 +111,7 @@ export function CrashZoneDecor({
                     roughness={0.96}
                     color={damage > 0.65 ? "#3e4448" : "#555b60"}
                   />
+                  {highlightTiles ? <Outlines thickness={0.055} color="#fbbf24" /> : null}
                 </mesh>
                 {damage > 0.1
                   ? Array.from({ length: Math.ceil(damage * 6) }, (_, index) => {
@@ -164,16 +177,18 @@ export function CrashZoneDecor({
           </group>
         );
       })}
-      <Text
-        position={[zone.centerX, ground + 0.08, zone.centerZ - zone.depth / 2 - 2]}
-        rotation={[-Math.PI / 2, 0, Math.PI]}
-        fontSize={1.3}
-        color="#f8fafc"
-        outlineWidth={0.06}
-        outlineColor="#111827"
-      >
-        노면 파쇄 작업구역
-      </Text>
+      {showZoneLabel ? (
+        <Text
+          position={[zone.centerX, ground + 0.08, zone.centerZ - zone.depth / 2 - 2]}
+          rotation={[-Math.PI / 2, 0, Math.PI]}
+          fontSize={1.3}
+          color="#f8fafc"
+          outlineWidth={0.06}
+          outlineColor="#111827"
+        >
+          {zoneLabel}
+        </Text>
+      ) : null}
     </group>
   );
 }

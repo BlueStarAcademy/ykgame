@@ -4,8 +4,9 @@ import * as THREE from "three";
 import { Outlines, Text } from "@react-three/drei";
 import { HaulTruckModel } from "./HaulTruckModel";
 import type { HillBoulder, HillZone, TerrainData } from "./terrain";
-import { sampleHeight } from "./terrain";
+import { getHillZoneRespawnEtaSec, sampleHeight } from "./terrain";
 import { hillBoulderVisualScale } from "./terrain";
+import { formatDumpTruckReturnTime } from "./dumpTruckState";
 
 const GROUND_PAINT_MATERIAL = {
   transparent: true,
@@ -28,12 +29,12 @@ function PremiumBoulder({
   rock,
   index,
   terrain,
-  showOutline,
+  showHighlight,
 }: {
   rock: HillBoulder;
   index: number;
   terrain: TerrainData;
-  showOutline: boolean;
+  showHighlight: boolean;
 }) {
   const scale = hillBoulderVisualScale(rock.size);
   const detail = rock.roundness >= 0.5 ? 1 : 0;
@@ -41,23 +42,26 @@ function PremiumBoulder({
   const markerRadius = Math.max(0.48, scale * 1.15);
   return (
     <group>
-      {/* Ground ring marks harvestable stones even without grapple outlines. */}
-      <mesh
-        position={[rock.x, groundY + GROUND_PAINT_LIFT, rock.z]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        renderOrder={0}
-      >
-        <ringGeometry args={[markerRadius * 0.72, markerRadius, 28]} />
-        <meshBasicMaterial color="#38bdf8" opacity={0.72} {...GROUND_PAINT_MATERIAL} />
-      </mesh>
-      <mesh
-        position={[rock.x, groundY + GROUND_PAINT_LIFT + 0.002, rock.z]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        renderOrder={0}
-      >
-        <ringGeometry args={[markerRadius * 0.42, markerRadius * 0.58, 24]} />
-        <meshBasicMaterial color="#f59e0b" opacity={0.55} {...GROUND_PAINT_MATERIAL} />
-      </mesh>
+      {showHighlight ? (
+        <>
+          <mesh
+            position={[rock.x, groundY + GROUND_PAINT_LIFT, rock.z]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            renderOrder={0}
+          >
+            <ringGeometry args={[markerRadius * 0.72, markerRadius, 28]} />
+            <meshBasicMaterial color="#38bdf8" opacity={0.85} {...GROUND_PAINT_MATERIAL} />
+          </mesh>
+          <mesh
+            position={[rock.x, groundY + GROUND_PAINT_LIFT + 0.002, rock.z]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            renderOrder={0}
+          >
+            <ringGeometry args={[markerRadius * 0.42, markerRadius * 0.58, 24]} />
+            <meshBasicMaterial color="#f59e0b" opacity={0.7} {...GROUND_PAINT_MATERIAL} />
+          </mesh>
+        </>
+      ) : null}
       <group
         position={[rock.x, groundY + scale * 0.55, rock.z]}
         rotation={[(index % 3) * 0.14, index * 1.71, (index % 4) * 0.1]}
@@ -68,11 +72,11 @@ function PremiumBoulder({
           <meshStandardMaterial
             color={index % 3 ? "#718096" : "#64748b"}
             emissive="#082f49"
-            emissiveIntensity={0.12}
+            emissiveIntensity={showHighlight ? 0.22 : 0.12}
             roughness={0.58}
             metalness={0.2}
           />
-          {showOutline ? <Outlines thickness={0.075} color="#67e8f9" /> : null}
+          {showHighlight ? <Outlines thickness={0.08} color="#67e8f9" /> : null}
         </mesh>
         {/* Pale mineral face and metallic veins make each collectible distinct. */}
         <mesh position={[0.18, 0.47, 0.6]} scale={[0.58, 0.12, 0.38]}>
@@ -120,6 +124,12 @@ function StoneZonePaint({ zone, terrain }: { zone: HillZone; terrain: TerrainDat
   const remaining = zone.boulders.filter(
     (rock) => rock.active && !rock.delivered && !rock.extracted,
   ).length;
+  const respawnEtaSec = getHillZoneRespawnEtaSec(zone);
+  const label = zone.active
+    ? `석재 · ${remaining}`
+    : respawnEtaSec > 0
+      ? `석재 · 리젠 ${formatDumpTruckReturnTime(respawnEtaSec)}`
+      : "석재";
   return (
     <group position={[zone.centerX, paintY, zone.centerZ]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={0}>
@@ -152,7 +162,7 @@ function StoneZonePaint({ zone, terrain }: { zone: HillZone; terrain: TerrainDat
         material-polygonOffsetUnits={1}
         material-toneMapped={false}
       >
-        {`석재 · ${remaining}`}
+        {label}
       </Text>
     </group>
   );
@@ -161,18 +171,23 @@ function StoneZonePaint({ zone, terrain }: { zone: HillZone; terrain: TerrainDat
 export function HillZoneDecor({
   zone,
   terrain,
-  showGrappleOutlines = false,
+  showZonePaint = true,
+  highlightBoulders = false,
 }: {
   zone: HillZone;
   terrain: TerrainData;
-  showGrappleOutlines?: boolean;
+  showZonePaint?: boolean;
+  highlightBoulders?: boolean;
 }) {
   const topY = sampleHeight(terrain, zone.centerX, zone.centerZ);
   const dropY = sampleHeight(terrain, zone.dropX, zone.dropZ);
   const showQuarry = zone.active;
+  const showRespawnPaint = !zone.active && getHillZoneRespawnEtaSec(zone) > 0;
   return (
     <group>
-      {showQuarry ? <StoneZonePaint zone={zone} terrain={terrain} /> : null}
+      {(showQuarry || showRespawnPaint) && showZonePaint ? (
+        <StoneZonePaint zone={zone} terrain={terrain} />
+      ) : null}
 
       {/* Distant quarry face decor — outside the harvest ring so it is not mistaken for pickups. */}
       {showQuarry
@@ -230,7 +245,7 @@ export function HillZoneDecor({
                 rock={rock}
                 index={index}
                 terrain={terrain}
-                showOutline={showGrappleOutlines}
+                showHighlight={highlightBoulders}
               />
             ))
         : null}

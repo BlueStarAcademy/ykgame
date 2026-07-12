@@ -103,11 +103,12 @@ export function ExcavatorGrapple({
       0,
       Math.min(1, Number(openAmountRef.current?.userData.openAmount ?? 1)),
     );
-    // 유압 엄지의 개폐 속도는 기존 대비 절반으로 낮춘다.
-    const follow = 1 - Math.exp(-delta * 5);
+    // 유압 엄지 개폐 속도: 기존 대비 1/8 (직전에 비해 절반)
+    const follow = 1 - Math.exp(-delta * 0.625);
     currentOpenRef.current += (target - currentOpenRef.current) * follow;
     if (thumbRef.current) {
-      thumbRef.current.rotation.z = -currentOpenRef.current * 0.82;
+      // 발판 하단(열기) 최대 벌림 ≈ 92° (암과 겹침 최소화)
+      thumbRef.current.rotation.z = -currentOpenRef.current * (92 * Math.PI) / 180;
     }
   });
 

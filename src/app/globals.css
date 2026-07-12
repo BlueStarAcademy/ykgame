@@ -2114,6 +2114,200 @@ body {
   box-shadow: 0 0 0.35rem rgba(251, 191, 36, 0.35);
 }
 
+.yanmar-shop-button {
+  position: relative;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  border-color: rgba(253, 230, 138, 0.38);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(146, 64, 14, 0.72), rgba(2, 6, 23, 0.92));
+}
+
+.yanmar-shop-button.is-open {
+  border-color: rgba(251, 191, 36, 0.62);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 32%),
+    linear-gradient(180deg, rgba(180, 83, 9, 0.78), rgba(15, 23, 42, 0.92));
+}
+
+.yanmar-shop-button-icon {
+  position: absolute;
+  left: 50%;
+  top: 0.18rem;
+  display: block;
+  width: 1.95rem;
+  height: 1.95rem;
+  transform: translateX(-50%);
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0.14rem 0.12rem rgba(0, 0, 0, 0.82))
+    drop-shadow(0 0 0.18rem rgba(251, 191, 36, 0.28));
+  transition:
+    transform 130ms ease,
+    filter 130ms ease;
+  pointer-events: none;
+}
+
+.yanmar-shop-button.is-open .yanmar-shop-button-icon {
+  transform: translateX(-50%) rotate(6deg) scale(1.06);
+  filter:
+    drop-shadow(0 0.14rem 0.12rem rgba(0, 0, 0, 0.82))
+    drop-shadow(0 0 0.34rem rgba(251, 191, 36, 0.55));
+}
+
+.yanmar-shop-button-label {
+  position: absolute;
+  left: 50%;
+  bottom: 0.22rem;
+  transform: translateX(-50%);
+  font-size: 0.46rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.58);
+}
+
+.yanmar-shop-panel-badge {
+  display: block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 0.18rem;
+  border: 1px solid rgba(253, 230, 138, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 40%),
+    linear-gradient(160deg, rgba(217, 119, 6, 0.95), rgba(120, 53, 15, 0.95));
+  box-shadow: 0 0 0.35rem rgba(251, 191, 36, 0.35);
+}
+
+.yanmar-shop-empty-icon {
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0.2rem 0.18rem rgba(0, 0, 0, 0.7))
+    drop-shadow(0 0 0.35rem rgba(251, 191, 36, 0.22));
+  pointer-events: none;
+}
+
+.yanmar-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.yanmar-shop-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(253, 230, 138, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 28%),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(2, 6, 23, 0.96));
+  box-shadow: 0 0.18rem 0.45rem rgba(0, 0, 0, 0.35);
+}
+
+.yanmar-shop-card-media {
+  position: relative;
+  display: flex;
+  aspect-ratio: 1 / 1;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(251, 191, 36, 0.14), transparent 58%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.35), rgba(2, 6, 23, 0.72));
+}
+
+.yanmar-shop-card-image {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.16rem 0.18rem rgba(0, 0, 0, 0.55));
+  pointer-events: none;
+}
+
+.yanmar-shop-card-title {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 1.1rem 0.4rem 0.35rem;
+  background: linear-gradient(180deg, transparent, rgba(2, 6, 23, 0.92) 55%);
+  color: #fef3c7;
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+  text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.75);
+}
+
+.yanmar-shop-card-effect {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-height: 2.7rem;
+  margin: 0;
+  padding: 0.45rem 0.45rem 0.35rem;
+}
+
+.yanmar-shop-card-effect-main {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.3;
+  text-wrap: pretty;
+}
+
+.yanmar-shop-card-effect-time {
+  color: rgba(252, 211, 77, 0.78);
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.yanmar-shop-card-buy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  width: calc(100% - 0.7rem);
+  margin: 0 0.35rem 0.4rem;
+  padding: 0.42rem 0.5rem;
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  border-radius: 0.55rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 40%),
+    linear-gradient(180deg, rgba(245, 158, 11, 0.95), rgba(180, 83, 9, 0.95));
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 0.12rem 0.28rem rgba(0, 0, 0, 0.35);
+  transition:
+    transform 120ms ease,
+    filter 120ms ease;
+}
+
+.yanmar-shop-card-buy:active {
+  transform: scale(0.97);
+}
+
+.yanmar-shop-card-star {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
+}
+
+.yanmar-shop-card-buy-label {
+  margin-left: 0.08rem;
+  opacity: 0.92;
+}
+
 .yanmar-function-menu-toggle {
   position: absolute;
   left: 0;
@@ -3263,10 +3457,6 @@ body {
 .yanmar-layout-portrait .yanmar-dig-pose-panel {
   top: 9.9rem !important;
   right: 0.5rem !important;
-}
-
-.yanmar-layout-portrait .yanmar-mission-hud-panel {
-  max-width: 10.5rem;
 }
 
 .yanmar-layout-portrait .yanmar-zone-legend {

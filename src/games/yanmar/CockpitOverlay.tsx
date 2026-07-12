@@ -748,21 +748,70 @@ function playHorn() {
 function usePointerRelease(onRelease: () => void) {
   const pointerIdRef = useRef<number | null>(null);
   const dragging = useRef(false);
+  const captureElRef = useRef<HTMLElement | null>(null);
+  const onReleaseRef = useRef(onRelease);
+  onReleaseRef.current = onRelease;
 
-  const releaseCapture = useCallback((el: HTMLElement | null) => {
+  const finish = useCallback((pointerId?: number) => {
+    if (
+      pointerId != null &&
+      pointerIdRef.current != null &&
+      pointerIdRef.current !== pointerId
+    ) {
+      return;
+    }
+    if (!dragging.current) return;
+    const el = captureElRef.current;
     const pid = pointerIdRef.current;
-    if (el && pid !== null) {
+    dragging.current = false;
+    pointerIdRef.current = null;
+    captureElRef.current = null;
+    if (el && pid != null) {
       try {
         if (el.hasPointerCapture(pid)) el.releasePointerCapture(pid);
       } catch {
         /* already released */
       }
     }
-    pointerIdRef.current = null;
-    dragging.current = false;
+    onReleaseRef.current();
   }, []);
 
-  return { pointerIdRef, dragging, releaseCapture, onRelease };
+  const begin = useCallback((pointerId: number, el: HTMLElement | null) => {
+    dragging.current = true;
+    pointerIdRef.current = pointerId;
+    captureElRef.current = el;
+    try {
+      el?.setPointerCapture(pointerId);
+    } catch {
+      /* capture optional — window pointerup still ends the drag */
+    }
+  }, []);
+
+  useEffect(() => {
+    const onUp = (e: PointerEvent) => finish(e.pointerId);
+    const onBlur = () => finish();
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [finish]);
+
+  return { pointerIdRef, dragging, begin, finish, onRelease };
+}
+
+const TRAVEL_INPUT_DEADZONE = 0.2;
+
+function travelAxisFromClientY(zone: HTMLElement, clientY: number) {
+  const rect = zone.getBoundingClientRect();
+  const cy = rect.top + rect.height / 2;
+  const maxR = Math.max(rect.height / 2, 1);
+  const dy = Math.max(-maxR, Math.min(maxR, clientY - cy));
+  const raw = Math.max(-1, Math.min(1, -dy / maxR));
+  return Math.abs(raw) < TRAVEL_INPUT_DEADZONE ? 0 : raw;
 }
 
 interface GameJoystickProps {
@@ -774,6 +823,8 @@ interface GameJoystickProps {
   isPortrait: boolean;
   useDPad: boolean;
   onChange: (x: number, y: number) => void;
+  /** 드래그 중인 pointerId — 같은 손가락의 버튼 오입력만 걸러낼 때 사용 */
+  onControlPointerDrag?: (pointerId: number, active: boolean) => void;
 }
 
 function GameJoystick({
@@ -785,9 +836,17 @@ function GameJoystick({
   isPortrait,
   useDPad,
   onChange,
+  onControlPointerDrag,
 }: GameJoystickProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
-  const pointer = usePointerRelease(() => onChange(0, 0));
+  const activePointerIdRef = useRef<number | null>(null);
+  const releaseStick = useCallback(() => {
+    const pid = activePointerIdRef.current;
+    activePointerIdRef.current = null;
+    if (pid != null) onControlPointerDrag?.(pid, false);
+    onChange(0, 0);
+  }, [onChange, onControlPointerDrag]);
+  const pointer = usePointerRelease(releaseStick);
   const joystickZone = getJoystickZoneMetrics(isPortrait);
 
   const updateFromEvent = useCallback(
@@ -818,9 +877,9 @@ function GameJoystick({
   const handleStart = (e: React.PointerEvent) => {
     if (!enabled.x && !enabled.y) return;
     e.preventDefault();
-    pointer.dragging.current = true;
-    pointer.pointerIdRef.current = e.pointerId;
-    zoneRef.current?.setPointerCapture(e.pointerId);
+    activePointerIdRef.current = e.pointerId;
+    onControlPointerDrag?.(e.pointerId, true);
+    pointer.begin(e.pointerId, zoneRef.current);
     updateFromEvent(e.clientX, e.clientY);
   };
 
@@ -830,9 +889,7 @@ function GameJoystick({
   };
 
   const handleEnd = (e: React.PointerEvent) => {
-    if (pointer.pointerIdRef.current !== e.pointerId) return;
-    pointer.releaseCapture(zoneRef.current);
-    pointer.onRelease();
+    pointer.finish(e.pointerId);
   };
 
   const isDisabled = !enabled.x && !enabled.y;
@@ -841,7 +898,7 @@ function GameJoystick({
     <>
       <div
         ref={zoneRef}
-        className={`absolute z-50 touch-none rounded-2xl ${isDisabled ? "pointer-events-none" : ""}`}
+        className={`absolute z-[62] touch-none rounded-2xl ${isDisabled ? "pointer-events-none" : ""}`}
         style={{
           left: useDPad
             ? side === "left"
@@ -859,9 +916,7 @@ function GameJoystick({
         onPointerUp={handleEnd}
         onPointerCancel={handleEnd}
         onLostPointerCapture={() => {
-          pointer.dragging.current = false;
-          pointer.pointerIdRef.current = null;
-          onChange(0, 0);
+          pointer.finish();
         }}
         aria-label={side === "left" ? "좌 조이스틱" : "우 조이스틱"}
       >
@@ -891,15 +946,18 @@ function HornTouchZone({
   isPortrait,
   useDPad,
   showTouchZone,
+  shouldIgnorePointer,
   onHorn,
 }: {
   layout: JoystickLayout;
   isPortrait: boolean;
   useDPad: boolean;
   showTouchZone: boolean;
+  shouldIgnorePointer?: (pointerId: number) => boolean;
   onHorn: () => void;
 }) {
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (shouldIgnorePointer?.(e.pointerId)) return;
     e.preventDefault();
     onHorn();
   };
@@ -939,15 +997,18 @@ function EquipmentUpgradeTouchZone({
   isPortrait,
   useDPad,
   showTouchZone,
+  shouldIgnorePointer,
   onOpen,
 }: {
   layout: JoystickLayout;
   isPortrait: boolean;
   useDPad: boolean;
   showTouchZone: boolean;
+  shouldIgnorePointer?: (pointerId: number) => boolean;
   onOpen: () => void;
 }) {
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (shouldIgnorePointer?.(e.pointerId)) return;
     e.preventDefault();
     onOpen();
   };
@@ -987,6 +1048,7 @@ interface TravelLeverProps {
   isPortrait: boolean;
   onChange: (value: number) => void;
   onDragActiveChange?: (active: boolean) => void;
+  onControlPointerDrag?: (pointerId: number, active: boolean) => void;
 }
 
 function TravelLever({
@@ -998,25 +1060,29 @@ function TravelLever({
   isPortrait,
   onChange,
   onDragActiveChange,
+  onControlPointerDrag,
 }: TravelLeverProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
+  const activePointerIdRef = useRef<number | null>(null);
   const releaseTravel = useCallback(() => {
+    const pid = activePointerIdRef.current;
+    activePointerIdRef.current = null;
+    if (pid != null) onControlPointerDrag?.(pid, false);
     onChange(0);
     onDragActiveChange?.(false);
-  }, [onChange, onDragActiveChange]);
+  }, [onChange, onDragActiveChange, onControlPointerDrag]);
   const pointer = usePointerRelease(releaseTravel);
+
+  useEffect(() => {
+    if (enabled) return;
+    pointer.finish();
+  }, [enabled, pointer.finish]);
 
   const updateFromEvent = useCallback(
     (clientY: number) => {
       const zone = zoneRef.current;
       if (!zone) return;
-      const rect = zone.getBoundingClientRect();
-      const cy = rect.top + rect.height / 2;
-      const maxR = rect.height / 2;
-      let dy = clientY - cy;
-      dy = Math.max(-maxR, Math.min(maxR, dy));
-      const value = Math.max(-1, Math.min(1, -dy / maxR));
-      onChange(value);
+      onChange(travelAxisFromClientY(zone, clientY));
     },
     [onChange],
   );
@@ -1024,10 +1090,10 @@ function TravelLever({
   const handleStart = (e: React.PointerEvent) => {
     if (!enabled) return;
     e.preventDefault();
-    pointer.dragging.current = true;
-    pointer.pointerIdRef.current = e.pointerId;
+    activePointerIdRef.current = e.pointerId;
+    onControlPointerDrag?.(e.pointerId, true);
     onDragActiveChange?.(true);
-    zoneRef.current?.setPointerCapture(e.pointerId);
+    pointer.begin(e.pointerId, zoneRef.current);
     updateFromEvent(e.clientY);
   };
 
@@ -1037,9 +1103,7 @@ function TravelLever({
   };
 
   const handleEnd = (e: React.PointerEvent) => {
-    if (pointer.pointerIdRef.current !== e.pointerId) return;
-    pointer.releaseCapture(zoneRef.current);
-    pointer.onRelease();
+    pointer.finish(e.pointerId);
   };
 
   const hitboxCenterOffset = isPortrait
@@ -1049,9 +1113,11 @@ function TravelLever({
     : side === "left"
       ? "-2.4%"
       : "2.4%";
-  const hitboxWidth = isPortrait ? "11%" : "6.6%";
-  const hitboxTopOffset = isPortrait ? "-2%" : "0%";
-  const hitboxHeight = isPortrait ? "44%" : "68%";
+  const hitboxWidth = isPortrait ? "10%" : "6.6%";
+  // 스틱 행정에 맞춘 높이 — 덱 높이 %로 잡으면 하단이 과도하게 후진 구역이 됨
+  const hitboxHeight = isPortrait
+    ? "calc(var(--yanmar-travel-stick-h, 2.45rem) * 2.4)"
+    : "68%";
 
   return (
     <>
@@ -1062,7 +1128,7 @@ function TravelLever({
           left: `calc(${layout.cx * 100}% + ${hitboxCenterOffset})`,
           top: isPortrait
             ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
-            : `calc(${layout.cy * 100}% + ${hitboxTopOffset})`,
+            : `calc(${layout.cy * 100}%)`,
           width: hitboxWidth,
           height: hitboxHeight,
           transform: "translate(-50%, -50%)",
@@ -1072,9 +1138,7 @@ function TravelLever({
         onPointerUp={handleEnd}
         onPointerCancel={handleEnd}
         onLostPointerCapture={() => {
-          pointer.dragging.current = false;
-          pointer.pointerIdRef.current = null;
-          releaseTravel();
+          pointer.finish();
         }}
         aria-label="주행 레버"
       >
@@ -1110,6 +1174,7 @@ interface DualTravelCenterProps {
   isPortrait: boolean;
   onChange: (value: number) => void;
   onDragActiveChange?: (active: boolean) => void;
+  onControlPointerDrag?: (pointerId: number, active: boolean) => void;
 }
 
 function DualTravelCenter({
@@ -1120,24 +1185,29 @@ function DualTravelCenter({
   isPortrait,
   onChange,
   onDragActiveChange,
+  onControlPointerDrag,
 }: DualTravelCenterProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
+  const activePointerIdRef = useRef<number | null>(null);
   const releaseTravel = useCallback(() => {
+    const pid = activePointerIdRef.current;
+    activePointerIdRef.current = null;
+    if (pid != null) onControlPointerDrag?.(pid, false);
     onChange(0);
     onDragActiveChange?.(false);
-  }, [onChange, onDragActiveChange]);
+  }, [onChange, onDragActiveChange, onControlPointerDrag]);
   const pointer = usePointerRelease(releaseTravel);
+
+  useEffect(() => {
+    if (enabled) return;
+    pointer.finish();
+  }, [enabled, pointer.finish]);
 
   const updateFromEvent = useCallback(
     (clientY: number) => {
       const zone = zoneRef.current;
       if (!zone) return;
-      const rect = zone.getBoundingClientRect();
-      const cy = rect.top + rect.height / 2;
-      const maxR = rect.height / 2;
-      const dy = Math.max(-maxR, Math.min(maxR, clientY - cy));
-      const value = Math.max(-1, Math.min(1, -dy / maxR));
-      onChange(value);
+      onChange(travelAxisFromClientY(zone, clientY));
     },
     [onChange],
   );
@@ -1145,10 +1215,10 @@ function DualTravelCenter({
   const handleStart = (e: React.PointerEvent) => {
     if (!enabled) return;
     e.preventDefault();
-    pointer.dragging.current = true;
-    pointer.pointerIdRef.current = e.pointerId;
+    activePointerIdRef.current = e.pointerId;
+    onControlPointerDrag?.(e.pointerId, true);
     onDragActiveChange?.(true);
-    zoneRef.current?.setPointerCapture(e.pointerId);
+    pointer.begin(e.pointerId, zoneRef.current);
     updateFromEvent(e.clientY);
   };
 
@@ -1158,9 +1228,7 @@ function DualTravelCenter({
   };
 
   const handleEnd = (e: React.PointerEvent) => {
-    if (pointer.pointerIdRef.current !== e.pointerId) return;
-    pointer.releaseCapture(zoneRef.current);
-    pointer.onRelease();
+    pointer.finish(e.pointerId);
   };
 
   return (
@@ -1171,9 +1239,11 @@ function DualTravelCenter({
         left: `${layout.cx * 100}%`,
         top: isPortrait
           ? "calc(100% - var(--yanmar-travel-baseline, 2.45rem))"
-          : `calc(${layout.cy * 100}% + 0%)`,
-        width: isPortrait ? "12%" : "12.5%",
-        height: isPortrait ? "48%" : "68%",
+          : `calc(${layout.cy * 100}%)`,
+        width: isPortrait ? "10%" : "12.5%",
+        height: isPortrait
+          ? "calc(var(--yanmar-travel-stick-h, 2.45rem) * 2.4)"
+          : "68%",
         transform: "translate(-50%, -50%)",
       }}
       onPointerDown={handleStart}
@@ -1181,9 +1251,7 @@ function DualTravelCenter({
       onPointerUp={handleEnd}
       onPointerCancel={handleEnd}
       onLostPointerCapture={() => {
-        pointer.dragging.current = false;
-        pointer.pointerIdRef.current = null;
-        releaseTravel();
+        pointer.finish();
       }}
       aria-label="좌우 주행 레버 동시 조작"
     >
@@ -1406,9 +1474,7 @@ function BladeLever({
   const handleStart = (e: React.PointerEvent) => {
     if (!enabled) return;
     e.preventDefault();
-    pointer.dragging.current = true;
-    pointer.pointerIdRef.current = e.pointerId;
-    zoneRef.current?.setPointerCapture(e.pointerId);
+    pointer.begin(e.pointerId, zoneRef.current);
     updateFromEvent(e.clientY);
   };
 
@@ -1418,9 +1484,7 @@ function BladeLever({
   };
 
   const handleEnd = (e: React.PointerEvent) => {
-    if (pointer.pointerIdRef.current !== e.pointerId) return;
-    pointer.releaseCapture(zoneRef.current);
-    pointer.onRelease();
+    pointer.finish(e.pointerId);
   };
 
   return (
@@ -1465,9 +1529,7 @@ function BladeLever({
         onPointerUp={handleEnd}
         onPointerCancel={handleEnd}
         onLostPointerCapture={() => {
-          pointer.dragging.current = false;
-          pointer.pointerIdRef.current = null;
-          stopMotion();
+          pointer.finish();
         }}
         onContextMenu={(e) => e.preventDefault()}
         aria-label="블레이드 레버"
@@ -2217,11 +2279,30 @@ export function CockpitOverlay({
   /** 중앙 동시 레버와 좌·우 개별 레버는 서로 배타. 좌·우는 동시 조작 가능. */
   const [travelLock, setTravelLock] = useState<"sides" | "both" | null>(null);
   const sideTravelActiveRef = useRef({ left: false, right: false });
+  /** 조작 드래그 중인 pointerId — 같은 손가락의 버튼 오입력만 차단 */
+  const controlDragPointersRef = useRef(new Set<number>());
+  const suppressButtonPointersRef = useRef(new Map<number, number>());
   const travelEnabled = allowed.travel && !auxiliary.safetyLocked;
   const pedalAttachmentEquipped =
     attachmentType === "breaker" || attachmentType === "grapple";
   const attachmentPedalCanOperate =
     pedalAttachmentEquipped && !auxiliary.safetyLocked;
+
+  const setControlPointerDrag = useCallback((pointerId: number, active: boolean) => {
+    if (active) {
+      controlDragPointersRef.current.add(pointerId);
+      return;
+    }
+    controlDragPointersRef.current.delete(pointerId);
+    // 손을 뗀 위치의 고스트 탭만 잠깐 무시 (다른 손가락 클릭은 허용)
+    suppressButtonPointersRef.current.set(pointerId, performance.now() + 320);
+  }, []);
+
+  const shouldIgnoreButtonPointer = useCallback((pointerId: number) => {
+    if (controlDragPointersRef.current.has(pointerId)) return true;
+    const until = suppressButtonPointersRef.current.get(pointerId);
+    return until != null && performance.now() < until;
+  }, []);
 
   const syncSideTravelLock = useCallback(() => {
     const { left, right } = sideTravelActiveRef.current;
@@ -2232,8 +2313,14 @@ export function CockpitOverlay({
     if (!travelEnabled) {
       sideTravelActiveRef.current = { left: false, right: false };
       setTravelLock(null);
+      if (input.travel.left !== 0 || input.travel.right !== 0) {
+        onInputChange((current) => ({
+          ...current,
+          travel: { left: 0, right: 0 },
+        }));
+      }
     }
-  }, [travelEnabled]);
+  }, [travelEnabled, input.travel.left, input.travel.right, onInputChange]);
 
   useEffect(() => {
     if (attachmentPedalCanOperate) return;
@@ -2295,6 +2382,7 @@ export function CockpitOverlay({
               sideTravelActiveRef.current.left = active;
               syncSideTravelLock();
             }}
+            onControlPointerDrag={setControlPointerDrag}
             onChange={(left) =>
               onInputChange((current) => ({
                 ...current,
@@ -2313,6 +2401,7 @@ export function CockpitOverlay({
               sideTravelActiveRef.current.right = active;
               syncSideTravelLock();
             }}
+            onControlPointerDrag={setControlPointerDrag}
             onChange={(right) =>
               onInputChange((current) => ({
                 ...current,
@@ -2342,6 +2431,7 @@ export function CockpitOverlay({
                 return current === "both" ? null : current;
               })
             }
+            onControlPointerDrag={setControlPointerDrag}
             onChange={(value) =>
               onInputChange((current) => ({
                 ...current,
@@ -2369,12 +2459,6 @@ export function CockpitOverlay({
               onAuxiliaryChange((current) => ({
                 ...current,
                 attachmentPedal,
-                grappleOpen:
-                  attachmentType !== "grapple" || attachmentPedal === 0
-                    ? current.grappleOpen
-                    : attachmentPedal > 0
-                      ? 0
-                      : 1,
               }))
             }
           />
@@ -2414,6 +2498,7 @@ export function CockpitOverlay({
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
             useDPad={useDPad}
+            onControlPointerDrag={setControlPointerDrag}
             onChange={(x, y) =>
               onInputChange((current) => ({ ...current, left: { x, y } }))
             }
@@ -2429,6 +2514,7 @@ export function CockpitOverlay({
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
             useDPad={useDPad}
+            onControlPointerDrag={setControlPointerDrag}
             onChange={(x, y) =>
               onInputChange((current) => ({ ...current, right: { x, y } }))
             }
@@ -2438,6 +2524,7 @@ export function CockpitOverlay({
             isPortrait={isPortrait}
             useDPad={useDPad}
             showTouchZone={showTouchZones}
+            shouldIgnorePointer={shouldIgnoreButtonPointer}
             onHorn={() => {
               playHorn();
               onHorn?.();
@@ -2449,6 +2536,7 @@ export function CockpitOverlay({
               isPortrait={isPortrait}
               useDPad={useDPad}
               showTouchZone={showTouchZones}
+              shouldIgnorePointer={shouldIgnoreButtonPointer}
               onOpen={onOpenEquipmentUpgrade}
             />
           ) : null}

@@ -44,10 +44,10 @@ export const YANMAR_CRASH_REWARD_CONFIG = {
 export const YANMAR_HILL_REWARD_CONFIG = {
   baseScoreMin: 900,
   baseScoreMax: 1000,
-  minStarReward: 10,
-  maxStarReward: 15,
-  xpMin: 900,
-  xpMax: 1000,
+  minStarReward: 20,
+  maxStarReward: 30,
+  xpMin: 1800,
+  xpMax: 2000,
 } as const;
 
 export const YANMAR_TRUCK_UPGRADE_COSTS = [

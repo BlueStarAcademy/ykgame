@@ -7,9 +7,16 @@ interface AppModalOverlayProps {
   open: boolean;
   onClose?: () => void;
   children: React.ReactNode;
+  /** Extra classes on the dialog panel (width/height overrides). */
+  panelClassName?: string;
 }
 
-export function AppModalOverlay({ open, onClose, children }: AppModalOverlayProps) {
+export function AppModalOverlay({
+  open,
+  onClose,
+  children,
+  panelClassName = "",
+}: AppModalOverlayProps) {
   useEffect(() => {
     if (!open) return;
 
@@ -37,7 +44,7 @@ export function AppModalOverlay({ open, onClose, children }: AppModalOverlayProp
       onClick={onClose}
     >
       <div
-        className="my-auto max-h-[min(92dvh,40rem)] w-full max-w-sm overflow-y-auto overscroll-contain rounded-2xl [-webkit-overflow-scrolling:touch] [touch-action:pan-y] landscape:max-h-[min(94dvh,24rem)]"
+        className={`my-auto max-h-[min(92dvh,40rem)] w-full max-w-sm overflow-y-auto overscroll-contain rounded-2xl [-webkit-overflow-scrolling:touch] [touch-action:pan-y] landscape:max-h-[min(94dvh,24rem)] ${panelClassName}`.trim()}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
