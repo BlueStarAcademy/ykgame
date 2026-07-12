@@ -1,11 +1,9 @@
-import { GameCard } from "@/components/home/GameCard";
-import { HomeProfilePanel } from "@/components/home/HomeProfilePanel";
+import { GamePlayClient } from "@/components/games/GamePlayClient";
 import { AppShell } from "@/components/layout/AppShell";
-import { AVAILABLE_GAME_IDS, GAMES, getSeasonInfo } from "@/lib/games";
+import { getSeasonInfo } from "@/lib/games";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getUserGameStatsForGames } from "@/lib/rankings";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function HomePage() {
@@ -24,92 +22,29 @@ export default async function HomePage() {
   const season = getSeasonInfo();
 
   const statsByGame = await getUserGameStatsForGames(
-    AVAILABLE_GAME_IDS,
+    ["yanmar"],
     session.user.id,
     season.key,
   );
-
-  const progressByGame = new Map(
-    AVAILABLE_GAME_IDS.map((gameId) => {
-      const stats = statsByGame.get(gameId);
-      return [
-        gameId,
-        {
-          score: stats?.bestScore ?? 0,
-          stars: stats?.bestStars ?? 0,
-          playTime: stats?.playTime ?? 0,
-        },
-      ] as const;
-    }),
-  );
-  const rankByGame = new Map(
-    AVAILABLE_GAME_IDS.map((gameId) => [
-      gameId,
-      statsByGame.get(gameId)?.rank ?? null,
-    ]),
-  );
-
-  const rankedGames = AVAILABLE_GAME_IDS.map((gameId) => {
-    const game = GAMES.find((item) => item.id === gameId);
-    const stats = statsByGame.get(gameId);
-    if (!game || !stats || stats.rank == null) return null;
-    return { gameId, brandKo: game.brandKo, ...stats };
-  })
-    .filter((item): item is NonNullable<typeof item> => item != null)
-    .sort((a, b) => {
-      const rankDiff =
-        (a.rank ?? Number.POSITIVE_INFINITY) -
-        (b.rank ?? Number.POSITIVE_INFINITY);
-      if (rankDiff !== 0) return rankDiff;
-      return b.bestScore - a.bestScore;
-    });
-
-  const highlightStats = rankedGames[0] ?? null;
+  const yanmarStats = statsByGame.get("yanmar");
 
   return (
     <AppShell
       nickname={nickname}
       currency={currency}
       role={session.user.role}
-      showHomeFeatures
+      hideFooter
     >
-      <div className="shrink-0 space-y-2">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-500 transition hover:text-red-600"
-        >
-          <span aria-hidden>←</span>
-          이전 페이지로 돌아가기
-        </Link>
-
-        <HomeProfilePanel
-          nickname={nickname}
-          totalXp={totalXp}
-          rank={highlightStats?.rank ?? null}
-          seasonScore={highlightStats?.bestScore ?? 0}
-          highlightGameName={highlightStats?.brandKo ?? null}
-          seasonLabel={season.label}
-        />
-      </div>
-
-      <div className="mt-3 flex min-h-0 flex-1 flex-col">
-        <h2 className="mb-2.5 shrink-0 px-0.5 text-[13px] font-bold tracking-tight text-slate-700">
-          장비 선택
-        </h2>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="grid grid-cols-2 gap-3.5 pb-2">
-            {GAMES.map((game) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                progress={progressByGame.get(game.id)}
-                rank={rankByGame.get(game.id) ?? null}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
+      <GamePlayClient
+        gameId="yanmar"
+        lobbyProfile={{
+          totalXp,
+          seasonLabel: season.label,
+          rank: yanmarStats?.rank ?? null,
+          seasonScore: yanmarStats?.bestScore ?? 0,
+          highlightGameName: "얀마",
+        }}
+      />
     </AppShell>
   );
 }

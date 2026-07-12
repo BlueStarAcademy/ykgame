@@ -1733,9 +1733,9 @@ function PedalSwingControl({
       className={`yanmar-breaker-pedal-button yanmar-premium-foot-pedal yanmar-boom-swing-pedal select-none absolute z-40 ${
         pressedDirection !== 0 ? "is-active" : ""
       } ${
-        pressedDirection < 0
+        pressedDirection > 0
           ? "is-left-active"
-          : pressedDirection > 0
+          : pressedDirection < 0
             ? "is-right-active"
             : ""
       } ${isPortrait ? "yanmar-breaker-pedal-button-portrait" : ""}`}
@@ -1752,8 +1752,8 @@ function PedalSwingControl({
     >
       <PremiumFootPedalArt
         accent="cyan"
-        leftActive={pressedDirection < 0}
-        rightActive={pressedDirection > 0}
+        leftActive={pressedDirection > 0}
+        rightActive={pressedDirection < 0}
       />
       {showTouchZone && (
         <div className="pointer-events-none absolute inset-0 rounded-lg border border-cyan-200/65 bg-transparent">
@@ -1764,24 +1764,24 @@ function PedalSwingControl({
       <button
         type="button"
         className="absolute inset-y-[10%] left-[5%] w-[42%] rounded-l-[0.45rem]"
-        onPointerDown={(e) => press(e, -1)}
-        onPointerUp={release}
-        onPointerCancel={release}
-        onLostPointerCapture={handleLostCapture}
-        onContextMenu={(e) => e.preventDefault()}
-        aria-pressed={pressedDirection < 0}
-        aria-label="발판 왼쪽: 암 좌측 회전"
-      />
-      <button
-        type="button"
-        className="absolute inset-y-[10%] right-[5%] w-[42%] rounded-r-[0.45rem]"
         onPointerDown={(e) => press(e, 1)}
         onPointerUp={release}
         onPointerCancel={release}
         onLostPointerCapture={handleLostCapture}
         onContextMenu={(e) => e.preventDefault()}
         aria-pressed={pressedDirection > 0}
-        aria-label="발판 오른쪽: 암 우측 회전"
+        aria-label="발판 왼쪽: 암 우측 회전"
+      />
+      <button
+        type="button"
+        className="absolute inset-y-[10%] right-[5%] w-[42%] rounded-r-[0.45rem]"
+        onPointerDown={(e) => press(e, -1)}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onLostPointerCapture={handleLostCapture}
+        onContextMenu={(e) => e.preventDefault()}
+        aria-pressed={pressedDirection < 0}
+        aria-label="발판 오른쪽: 암 좌측 회전"
       />
     </div>
   );

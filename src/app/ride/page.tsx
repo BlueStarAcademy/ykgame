@@ -24,7 +24,6 @@ export default async function RideHomePage() {
       nickname={nickname}
       currency={currency}
       role={session.user.role}
-      showHomeFeatures
     >
       <div className="shrink-0 space-y-2">
         <Link

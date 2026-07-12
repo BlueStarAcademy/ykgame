@@ -10,9 +10,10 @@ interface HomeProfilePanelProps {
   totalXp: number;
   rank: number | null;
   seasonScore?: number;
-  /** Brand shown for the season highlight (best ranking game) */
+  /** @deprecated Kept for call-site compatibility; not shown in the panel */
   highlightGameName?: string | null;
-  seasonLabel: string;
+  /** @deprecated Kept for call-site compatibility; not shown in the panel */
+  seasonLabel?: string;
 }
 
 function formatSeasonScore(score: number) {
@@ -28,8 +29,6 @@ export function HomeProfilePanel({
   totalXp,
   rank,
   seasonScore = 0,
-  highlightGameName = null,
-  seasonLabel,
 }: HomeProfilePanelProps) {
   const progress = getPlayerLevelProgress(totalXp);
   const initial = nickname.trim().charAt(0) || "?";
@@ -48,81 +47,68 @@ export function HomeProfilePanel({
         aria-hidden
       />
 
-      <div className="relative flex items-center gap-3 px-3.5 py-3">
-        <div className="relative shrink-0">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 text-sm font-semibold tracking-wide text-[#f4efe6] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_16px_rgba(15,23,42,0.22)]">
-            {initial}
-          </div>
-          <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/70 bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold tracking-[0.04em] text-amber-100 shadow-sm">
-            Lv.{progress.level}
-          </span>
+      <div className="relative flex items-center gap-2.5 px-3 py-2.5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 text-sm font-semibold tracking-wide text-[#f4efe6] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_16px_rgba(15,23,42,0.22)]">
+          {initial}
         </div>
 
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[15px] font-bold leading-none tracking-tight text-slate-900">
-            {nickname}
-          </h2>
-          <div className="mt-1.5 flex min-w-0 items-center gap-2">
-            <div className="home-profile-xp-track h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-900/10">
+          <div className="flex min-w-0 items-baseline gap-1.5">
+            <span className="shrink-0 text-[11px] font-black tabular-nums leading-none text-[#b71c1c]">
+              Lv.{progress.level}
+            </span>
+            <h2 className="truncate text-[15px] font-bold leading-none tracking-tight text-slate-900">
+              {nickname}
+            </h2>
+          </div>
+          <div className="relative mt-1.5 min-w-0 w-full overflow-hidden">
+            <div className="home-profile-xp-track h-2.5 w-full overflow-hidden rounded-full bg-slate-900/10">
               <div
                 className="home-profile-xp-fill h-full rounded-full bg-gradient-to-r from-[#b71c1c] via-[#c62828] to-[#e8a45a]"
                 style={{
                   width: `${Math.max(0, Math.min(100, progress.progressPct))}%`,
                 }}
-                aria-label={formatXpProgress(progress)}
               />
             </div>
-            <p className="shrink-0 text-[10px] font-bold tabular-nums leading-none text-slate-600">
-              {progress.currentXp.toLocaleString()}/
-              {progress.requiredXp.toLocaleString()}
-              <span className="text-slate-400">({progress.progressPct}%)</span>
-            </p>
+            <span
+              className="pointer-events-none absolute inset-0 flex items-center justify-end px-1.5 text-[8px] font-black leading-none tabular-nums text-white"
+              style={{
+                textShadow:
+                  "0 0 2px rgba(0,0,0,0.95), 0 1px 1px rgba(0,0,0,0.85)",
+              }}
+              title={formatXpProgress(progress)}
+            >
+              <span className="truncate">
+                {progress.currentXp.toLocaleString()}/
+                {progress.requiredXp.toLocaleString()}
+                <span className="text-amber-100">
+                  ({progress.progressPct}%)
+                </span>
+              </span>
+            </span>
           </div>
         </div>
-      </div>
 
-      <div className="relative flex items-center justify-center gap-2.5 border-t border-slate-200/70 px-3 py-2.5 sm:gap-3">
-        <div className="text-center">
-          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
-            시즌
-          </p>
-          <p className="mt-0.5 whitespace-nowrap text-[11px] font-bold leading-none text-slate-900">
-            {seasonLabel}
-          </p>
-        </div>
-        <span className="h-6 w-px bg-slate-200/90" aria-hidden />
-        {highlightGameName ? (
-          <>
-            <div className="text-center">
-              <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                게임
-              </p>
-              <p className="mt-0.5 max-w-[4rem] truncate text-[12px] font-bold leading-none text-slate-900">
-                {highlightGameName}
-              </p>
-            </div>
-            <span className="h-6 w-px bg-slate-200/90" aria-hidden />
-          </>
-        ) : null}
-        <div className="text-center">
-          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
-            점수
-          </p>
-          <p className="mt-0.5 text-[12px] font-bold tabular-nums leading-none text-slate-900">
-            {formatSeasonScore(seasonScore)}
-            {seasonScore > 0 ? (
-              <span className="ml-0.5 text-[9px] font-semibold text-slate-400">점</span>
-            ) : null}
-          </p>
-        </div>
-        <span className="h-6 w-px bg-slate-200/90" aria-hidden />
-        <div className="text-center">
-          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
-            랭킹
-          </p>
-          <p className="mt-0.5 text-[12px] font-bold tabular-nums leading-none text-slate-900">
-            {formatRank(rank)}
-          </p>
+        <div className="flex shrink-0 items-stretch gap-0 border-l border-slate-200/90 pl-2.5">
+          <div className="px-1.5 text-center">
+            <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-slate-500">
+              점수
+            </p>
+            <p className="mt-0.5 text-[12px] font-bold tabular-nums leading-none text-slate-900">
+              {formatSeasonScore(seasonScore)}
+              {seasonScore > 0 ? (
+                <span className="ml-0.5 text-[8px] font-semibold text-slate-400">점</span>
+              ) : null}
+            </p>
+          </div>
+          <div className="border-l border-slate-200/90 px-1.5 text-center">
+            <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-slate-500">
+              랭킹
+            </p>
+            <p className="mt-0.5 text-[12px] font-bold tabular-nums leading-none text-slate-900">
+              {formatRank(rank)}
+            </p>
+          </div>
         </div>
       </div>
     </section>

@@ -5,16 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { GameCardSprite } from "@/components/home/GameCardSprite";
+import { HomeProfilePanel } from "@/components/home/HomeProfilePanel";
 import { PhaserGameWrapper } from "@/components/games/PhaserGameWrapper";
 import { GameImmersiveOverlay } from "@/components/games/GameImmersiveOverlay";
 import { RankingBoard, RankingBoardPanel } from "@/components/games/RankingBoard";
 import type { GameConfig, GameId } from "@/lib/games";
 import { getGameById, isGameAvailable } from "@/lib/games";
-import { BRAND_PROFILES } from "@/lib/landing-content";
 import { prepareInGameFullscreen } from "@/lib/fullscreen";
 import { enablePwaMode } from "@/lib/pwa-mode";
 import type { GameResult } from "@/games/shared/types";
-import { YANMAR_REWARD_CONFIG } from "@/games/yanmar/equipment";
 import { GameResultScreen } from "./GameResultScreen";
 
 /** 모드 버튼 클릭(사용자 제스처)에서 전체화면 + 세로 고정 후 인게임 진입 */
@@ -24,8 +23,17 @@ async function enterPlayingAfterGesture(start: () => void): Promise<void> {
   start();
 }
 
+export interface LobbyProfileProps {
+  totalXp: number;
+  seasonLabel: string;
+  rank: number | null;
+  seasonScore: number;
+  highlightGameName?: string | null;
+}
+
 interface GamePlayClientProps {
   gameId: GameId;
+  lobbyProfile?: LobbyProfileProps;
 }
 
 interface MyStats {
@@ -38,62 +46,73 @@ type GamePhase = "lobby" | "playing" | "result";
 type PlayMode = "practice" | "game" | "ride";
 type LobbyTab = "guide" | "rewards" | "ranking";
 
-const YANMAR_LOBBY_TITLE = "굴착 하역 챌린지";
+const YANMAR_LOBBY_TITLE = "얀마! 너 뭐해?";
 
 const YANMAR_STEPS = [
-  { icon: "🟠", title: "굴착", desc: "주황 구역에서 흙 적재" },
-  { icon: "🚛", title: "하역", desc: "덤프트럭에 토사 투하" },
-  { icon: "🎁", title: "보상", desc: "하역 시 랜덤으로 보상 획득" },
-  { icon: "🔨", title: "강화", desc: "스타로 굴착기·트럭 업그레이드" },
+  {
+    icon: "🎮",
+    title: "모드 선택",
+    desc: "연습은 조작만 익히고, 게임은 점수·보상·랭킹에 도전합니다",
+  },
+  {
+    icon: "🕹️",
+    title: "기본 조작",
+    desc: "좌·우 레버와 주행으로 조작하고, 기능 메뉴에서 부착물을 바꿉니다",
+  },
+  {
+    icon: "🟠",
+    title: "굴착 · 하역",
+    desc: "주황 구역에서 흙을 담아 덤프트럭에 하역합니다",
+  },
+  {
+    icon: "💥",
+    title: "브레이커",
+    desc: "브레이커로 아스팔트를 깨면 보상을 얻습니다",
+  },
+  {
+    icon: "🪨",
+    title: "집게 · 석재",
+    desc: "집게로 돌을 집어 운반 트럭에 하역합니다",
+  },
+  {
+    icon: "🎁",
+    title: "보상 · 강화",
+    desc: "스타·쿠폰을 모아 장비를 강화하고 시즌 랭킹에 도전합니다",
+  },
 ];
 
 const YANMAR_REWARDS = [
   {
     icon: "⭐",
     label: "스타",
-    desc: `${YANMAR_REWARD_CONFIG.minStarReward}~${YANMAR_REWARD_CONFIG.maxStarReward}개 랜덤`,
+    desc: "무제한",
   },
   { icon: "🎟️", label: "YK 부품 할인권", desc: "10 / 15 / 20%" },
   { icon: "🎟️", label: "장비 대여 할인권", desc: "10 / 20 / 30%" },
   {
     icon: "🎟️",
     label: "필터 세트 교환 쿠폰",
-    desc: `시즌 ${YANMAR_REWARD_CONFIG.filterSetCouponSeasonLimit}장`,
+    desc: "시즌 한정 교환권",
   },
-];
-
-const DEFAULT_REWARDS = [
-  { icon: "⭐", label: "스타", desc: "미션 완료 시 획득" },
-  { icon: "🎟️", label: "쿠폰", desc: "랜덤 할인 보상" },
-  { icon: "🏆", label: "랭킹", desc: "시즌 기록 경쟁" },
 ];
 
 function BrandGuideLobby({
   game,
   highlightNickname,
-  playable,
+  lobbyProfile,
+  showBack = false,
   onStartPractice,
   onStartGame,
 }: {
   game: GameConfig;
   highlightNickname: string;
-  playable: boolean;
+  lobbyProfile?: LobbyProfileProps;
+  showBack?: boolean;
   onStartPractice: () => void;
   onStartGame: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<LobbyTab>("guide");
-  const profile = BRAND_PROFILES[game.id];
-  const isYanmar = game.id === "yanmar";
-  const title = isYanmar ? YANMAR_LOBBY_TITLE : game.mission;
-  const steps = isYanmar
-    ? YANMAR_STEPS
-    : [
-        { icon: "🎯", title: "미션", desc: game.mission },
-        { icon: "🕹️", title: "조작", desc: profile.category },
-        { icon: "✨", title: "포인트", desc: profile.highlight },
-        { icon: "📖", title: "소개", desc: profile.description },
-      ];
-  const rewards = isYanmar ? YANMAR_REWARDS : DEFAULT_REWARDS;
+  const title = YANMAR_LOBBY_TITLE;
 
   const tabs: { id: LobbyTab; label: string }[] = [
     { id: "guide", label: "게임방법" },
@@ -109,6 +128,21 @@ function BrandGuideLobby({
           background: `linear-gradient(145deg, ${game.color} 0%, ${game.headerColor} 45%, #1a0a0a 100%)`,
         }}
       >
+        {showBack || lobbyProfile?.seasonLabel ? (
+          <div className="game-lobby-hero-top">
+            {showBack ? (
+              <Link href="/" className="game-lobby-hero-back" aria-label="뒤로가기">
+                <span aria-hidden>←</span>
+                <span>뒤로가기</span>
+              </Link>
+            ) : (
+              <span />
+            )}
+            {lobbyProfile?.seasonLabel ? (
+              <span className="game-lobby-hero-season">{lobbyProfile.seasonLabel}</span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="game-lobby-hero-inner">
           <div className="game-lobby-hero-copy">
             <p className="game-lobby-brand">{game.brandEn}</p>
@@ -118,8 +152,23 @@ function BrandGuideLobby({
             <GameCardSprite gameId={game.id} />
           </div>
         </div>
+      </div>
 
-        <div className="game-lobby-tabs" role="tablist" aria-label="로비 정보">
+      {lobbyProfile ? (
+        <div className="game-lobby-profile shrink-0 px-1 pt-1.5">
+          <HomeProfilePanel
+            nickname={highlightNickname || "PLAYER"}
+            totalXp={lobbyProfile.totalXp}
+            rank={lobbyProfile.rank}
+            seasonScore={lobbyProfile.seasonScore}
+            highlightGameName={lobbyProfile.highlightGameName ?? "얀마"}
+            seasonLabel={lobbyProfile.seasonLabel}
+          />
+        </div>
+      ) : null}
+
+      <div className="game-lobby-tabs-bar shrink-0 px-1 pt-1.5" role="tablist" aria-label="로비 정보">
+        <div className="game-lobby-tabs">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -140,7 +189,7 @@ function BrandGuideLobby({
           {activeTab === "guide" ? (
             <section className="game-lobby-section game-lobby-section-fill">
               <div className="game-lobby-guide-grid">
-                {steps.map((step) => (
+                {YANMAR_STEPS.map((step) => (
                   <div key={step.title} className="game-lobby-guide-card">
                     <p className="game-lobby-guide-card-title">
                       {step.icon} {step.title}
@@ -155,7 +204,7 @@ function BrandGuideLobby({
           {activeTab === "rewards" ? (
             <section className="game-lobby-section game-lobby-section-fill">
               <div className="game-lobby-reward-grid">
-                {rewards.map((reward) => (
+                {YANMAR_REWARDS.map((reward) => (
                   <div key={reward.label} className="game-lobby-reward-card">
                     <span className="game-lobby-reward-label">
                       <span aria-hidden>{reward.icon}</span>
@@ -182,36 +231,23 @@ function BrandGuideLobby({
       </div>
 
       <div className="game-lobby-footer">
-        {!playable ? (
-          <p className="game-lobby-mode-locked-note">
-            이 장비의 연습·게임 모드는 준비 중입니다
-          </p>
-        ) : null}
         <div className="game-lobby-mode-grid">
           <button
             type="button"
             onClick={onStartPractice}
-            disabled={!playable}
-            className={`game-lobby-mode game-lobby-mode-card game-lobby-mode-practice${
-              playable ? "" : " is-locked"
-            }`}
+            className="game-lobby-mode game-lobby-mode-card game-lobby-mode-practice"
           >
             <span className="game-lobby-mode-icon game-lobby-mode-icon-practice">🎓</span>
             <span className="game-lobby-mode-card-copy">
               <span className="game-lobby-mode-copy-title">연습모드</span>
-              <span className="game-lobby-mode-copy-desc">
-                {playable ? "점수/보상/랭킹 없음" : "준비 중"}
-              </span>
+              <span className="game-lobby-mode-copy-desc">점수/보상/랭킹 없음</span>
             </span>
           </button>
 
           <button
             type="button"
             onClick={onStartGame}
-            disabled={!playable}
-            className={`game-lobby-mode game-lobby-mode-card game-lobby-mode-game${
-              playable ? "" : " is-locked"
-            }`}
+            className="game-lobby-mode game-lobby-mode-card game-lobby-mode-game"
           >
             <span
               className="game-lobby-mode-icon"
@@ -223,9 +259,7 @@ function BrandGuideLobby({
             </span>
             <span className="game-lobby-mode-card-copy">
               <span className="game-lobby-mode-copy-title">게임모드</span>
-              <span className="game-lobby-mode-copy-desc">
-                {playable ? "점수 · 보상 도전" : "준비 중"}
-              </span>
+              <span className="game-lobby-mode-copy-desc">점수/보상/랭킹 도전</span>
             </span>
           </button>
         </div>
@@ -238,6 +272,7 @@ export function GamePlayClient({
   gameId,
   initialPlay,
   standalone = false,
+  lobbyProfile,
 }: GamePlayClientProps & {
   initialPlay?: "ride";
   standalone?: boolean;
@@ -258,8 +293,8 @@ export function GamePlayClient({
   /** DB에 반영된 시즌 점수. HUD에서는 아직 저장하지 않은 세션 점수만 더한다. */
   const [yanmarSeasonBaseScore, setYanmarSeasonBaseScore] = useState(0);
   const [myStats, setMyStats] = useState<MyStats>({
-    rank: null,
-    bestScore: 0,
+    rank: lobbyProfile?.rank ?? null,
+    bestScore: lobbyProfile?.seasonScore ?? 0,
     bestStars: 0,
   });
   const [showRanking, setShowRanking] = useState(false);
@@ -342,14 +377,17 @@ export function GamePlayClient({
     loadStats();
   };
 
-  const handleYanmarScoreSaved = useCallback((score: number) => {
-    setYanmarSeasonBaseScore((total) => total + score);
-    setYanmarScoreCommit((commit) => ({
-      id: (commit?.id ?? 0) + 1,
-      score,
-    }));
-    void loadStats();
-  }, [loadStats]);
+  const handleYanmarScoreSaved = useCallback(
+    (score: number) => {
+      setYanmarSeasonBaseScore((total) => total + score);
+      setYanmarScoreCommit((commit) => ({
+        id: (commit?.id ?? 0) + 1,
+        score,
+      }));
+      void loadStats();
+    },
+    [loadStats],
+  );
 
   const handleExitHome = () => {
     router.push(playMode === "ride" || initialPlay === "ride" ? "/ride" : "/home");
@@ -357,7 +395,17 @@ export function GamePlayClient({
 
   if (!game) return null;
 
-  const nickname = session?.user?.nickname ?? "";
+  const displayNickname = session?.user?.nickname ?? "";
+  const totalXp = session?.user?.totalXp ?? lobbyProfile?.totalXp ?? 0;
+
+  const resolvedLobbyProfile: LobbyProfileProps | undefined = lobbyProfile
+    ? {
+        ...lobbyProfile,
+        totalXp,
+        rank: myStats.rank,
+        seasonScore: myStats.bestScore,
+      }
+    : undefined;
 
   if (phase === "result" && result) {
     return (
@@ -373,15 +421,11 @@ export function GamePlayClient({
     <>
       {phase === "lobby" ? (
         <div className="game-lobby-page flex min-h-0 flex-1 flex-col overflow-hidden">
-          {!standalone ? (
-            <Link href="/home" className="game-page-back shrink-0">
-              <span aria-hidden>←</span> 홈으로
-            </Link>
-          ) : null}
           <BrandGuideLobby
             game={game}
-            highlightNickname={nickname}
-            playable={playable}
+            highlightNickname={displayNickname}
+            lobbyProfile={resolvedLobbyProfile}
+            showBack={!standalone}
             onStartPractice={handleStartPractice}
             onStartGame={handleStartGame}
           />
@@ -431,7 +475,7 @@ export function GamePlayClient({
         gameId={gameId}
         open={showRanking}
         onClose={() => setShowRanking(false)}
-        highlightNickname={nickname}
+        highlightNickname={displayNickname}
       />
     </>
   );

@@ -3716,15 +3716,15 @@ export function ExcavatorGameWrapper({
                         <div className="flex min-w-0 w-full max-w-full items-center overflow-hidden text-white">
                           <div className="flex h-8 min-w-0 w-full flex-col justify-center gap-0.5 rounded-lg border border-white/15 bg-black/25 px-2">
                             <div className="flex min-w-0 items-baseline gap-1">
+                              <span className="shrink-0 text-[9px] font-black text-amber-200">
+                                Lv.{xpProgress.level}
+                              </span>
                               <p
                                 className="min-w-0 truncate text-[10px] font-black leading-none"
                                 title={nickname}
                               >
                                 {nickname}
                               </p>
-                              <span className="shrink-0 text-[9px] font-black text-amber-200">
-                                Lv.{xpProgress.level}
-                              </span>
                             </div>
                             <div className="relative min-w-0 w-full overflow-hidden">
                               <XpProgressBar
