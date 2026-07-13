@@ -28,7 +28,6 @@ function TickerMarquee({
   const viewportRef = useRef<HTMLDivElement>(null);
   const itemRef = useRef<HTMLSpanElement>(null);
   const [index, setIndex] = useState(0);
-  const [x, setX] = useState(0);
 
   const safeMessages = messages.length > 0 ? messages : [FALLBACK_MESSAGE];
   const message = safeMessages[index % safeMessages.length] ?? FALLBACK_MESSAGE;
@@ -52,6 +51,13 @@ function TickerMarquee({
     speedRef.current = Math.max(1, scrollSpeedPx);
   }, [scrollSpeedPx]);
 
+  /** Apply position via DOM — avoid setState every frame (causes jank). */
+  const applyX = (x: number) => {
+    const item = itemRef.current;
+    if (!item) return;
+    item.style.transform = `translate3d(${x}px,0,0)`;
+  };
+
   const startMessageFromRight = () => {
     const viewport = viewportRef.current;
     const item = itemRef.current;
@@ -68,7 +74,7 @@ function TickerMarquee({
     phaseRef.current = "enter";
     lastTsRef.current = null;
     needsMeasureRef.current = false;
-    setX(posRef.current);
+    applyX(posRef.current);
     return true;
   };
 
@@ -107,7 +113,7 @@ function TickerMarquee({
       if (phaseRef.current === "enter") {
         if (posRef.current <= targetEnterRef.current) {
           posRef.current = targetEnterRef.current;
-          setX(posRef.current);
+          applyX(posRef.current);
           phaseRef.current = "pause";
           lastTsRef.current = null;
           pauseTimerRef.current = setTimeout(() => {
@@ -116,15 +122,15 @@ function TickerMarquee({
             lastTsRef.current = null;
           }, TICKER_LEFT_PAUSE_MS);
         } else {
-          setX(posRef.current);
+          applyX(posRef.current);
         }
       } else if (phaseRef.current === "exit") {
         if (posRef.current <= targetExitRef.current) {
           posRef.current = targetExitRef.current;
-          setX(posRef.current);
+          applyX(posRef.current);
           advanceToNext();
         } else {
-          setX(posRef.current);
+          applyX(posRef.current);
         }
       }
 
@@ -154,11 +160,7 @@ function TickerMarquee({
 
   return (
     <div ref={viewportRef} className="yanmar-game-ticker-viewport">
-      <span
-        ref={itemRef}
-        className="yanmar-game-ticker-item"
-        style={{ transform: `translateX(${x}px)` }}
-      >
+      <span ref={itemRef} className="yanmar-game-ticker-item">
         {message}
       </span>
     </div>

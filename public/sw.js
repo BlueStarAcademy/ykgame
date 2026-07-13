@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "ykgame-static-";
-const CACHE_NAME = `${CACHE_PREFIX}v2`;
+const CACHE_NAME = `${CACHE_PREFIX}v3`;
 const STATIC_ASSET_EXTENSION =
   /\.(?:avif|gif|ico|jpe?g|json|mp3|ogg|otf|png|svg|ttf|wav|webp|woff2?)$/i;
 

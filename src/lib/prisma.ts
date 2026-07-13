@@ -112,11 +112,15 @@ function getPrismaClient(): PrismaClient {
     return globalForPrisma.prisma;
   }
 
-  if (globalForPrisma.pgPool) {
-    void globalForPrisma.pgPool.end();
+  // End only the previous pool after the replacement is assigned, so concurrent
+  // requests never call end() on the pool they are about to use.
+  const previousPool = globalForPrisma.pgPool;
+  globalForPrisma.prisma = createPrismaClient(connectionString);
+
+  if (previousPool && previousPool !== globalForPrisma.pgPool) {
+    void previousPool.end().catch(() => undefined);
   }
 
-  globalForPrisma.prisma = createPrismaClient(connectionString);
   return globalForPrisma.prisma;
 }
 
