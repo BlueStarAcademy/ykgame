@@ -7,6 +7,8 @@ import {
   useImmersiveFullscreenControl,
 } from "@/components/games/GameImmersiveOverlay";
 import { CustomerInquiryModal } from "@/components/games/CustomerInquiryModal";
+import { MailboxModal } from "@/components/layout/MailboxModal";
+import { InventoryModal } from "@/components/layout/InventoryModal";
 import { HORN_OPTIONS, type HornId } from "./soundSettings";
 
 type SettingsTab = "display" | "sound" | "other";
@@ -105,6 +107,8 @@ export function YanmarGameSettingsMenu({
     null,
   );
   const [inquiryOpen, setInquiryOpen] = useState(false);
+  const [mailboxOpen, setMailboxOpen] = useState(false);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
   const [tab, setTab] = useState<SettingsTab>("display");
   const buttonRef = useRef<HTMLButtonElement>(null);
   const fullscreen = useImmersiveFullscreenControl();
@@ -265,6 +269,20 @@ export function YanmarGameSettingsMenu({
                 />
               ) : null}
               <ActionRow
+                label="우편함"
+                onClick={() => {
+                  onOpenChange(false);
+                  setMailboxOpen(true);
+                }}
+              />
+              <ActionRow
+                label="쿠폰함"
+                onClick={() => {
+                  onOpenChange(false);
+                  setInventoryOpen(true);
+                }}
+              />
+              <ActionRow
                 label="랭킹정보"
                 onClick={() => {
                   onOpenChange(false);
@@ -332,6 +350,8 @@ export function YanmarGameSettingsMenu({
       {trigger}
       {panel && overlayRoot ? createPortal(panel, overlayRoot) : null}
       <CustomerInquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} />
+      <MailboxModal open={mailboxOpen} onClose={() => setMailboxOpen(false)} />
+      <InventoryModal open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
     </>
   );
 

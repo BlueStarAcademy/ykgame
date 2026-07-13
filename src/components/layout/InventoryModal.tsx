@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 
-interface InventoryCoupon {
+export interface InventoryCoupon {
   id: string;
   type: "YK_PARTS_DISCOUNT" | "EQUIPMENT_RENTAL_DISCOUNT" | "FILTER_SET_EXCHANGE";
   discountPct: number;
@@ -123,9 +123,78 @@ function ExpiryBadge({
 interface InventoryModalProps {
   open: boolean;
   onClose: () => void;
+  onInventoryChange?: (coupons: InventoryCoupon[]) => void;
 }
 
-export function InventoryModal({ open, onClose }: InventoryModalProps) {
+const COUPON_SEEN_KEY = "ykgame:coupons:seen-ids:v1";
+
+function loadSeenCouponIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(COUPON_SEEN_KEY);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((id): id is string => typeof id === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSeenCouponIds(ids: Set<string>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(COUPON_SEEN_KEY, JSON.stringify([...ids]));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function isUsableCoupon(coupon: InventoryCoupon, now = Date.now()) {
+  return !coupon.usedAt && new Date(coupon.expiresAt).getTime() > now;
+}
+
+/** Unused, unexpired coupons the player has not opened yet. */
+export function useCouponBadge() {
+  const [notifyCount, setNotifyCount] = useState(0);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/inventory");
+      if (!res.ok) return;
+      const data = await res.json();
+      const coupons = (data.coupons ?? []) as InventoryCoupon[];
+      const seen = loadSeenCouponIds();
+      const count = coupons.filter(
+        (coupon) => isUsableCoupon(coupon) && !seen.has(coupon.id),
+      ).length;
+      setNotifyCount(count);
+    } catch {
+      setNotifyCount(0);
+    }
+  }, []);
+
+  const markSeen = useCallback((coupons: InventoryCoupon[]) => {
+    const seen = loadSeenCouponIds();
+    for (const coupon of coupons) {
+      if (isUsableCoupon(coupon)) seen.add(coupon.id);
+    }
+    saveSeenCouponIds(seen);
+    setNotifyCount(0);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  return { notifyCount, refresh, markSeen };
+}
+
+export function InventoryModal({
+  open,
+  onClose,
+  onInventoryChange,
+}: InventoryModalProps) {
   const [coupons, setCoupons] = useState<InventoryCoupon[]>([]);
   const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -139,8 +208,10 @@ export function InventoryModal({ open, onClose }: InventoryModalProps) {
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data) => {
         if (cancelled) return;
-        setCoupons(data.coupons ?? []);
-        setSelectedCouponId(data.coupons?.[0]?.id ?? null);
+        const next = (data.coupons ?? []) as InventoryCoupon[];
+        setCoupons(next);
+        setSelectedCouponId(next[0]?.id ?? null);
+        onInventoryChange?.(next);
       })
       .catch(() => {
         if (!cancelled) {
@@ -154,6 +225,8 @@ export function InventoryModal({ open, onClose }: InventoryModalProps) {
     return () => {
       cancelled = true;
     };
+    // Reload only when the modal opens; avoid refetch loops from callback identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   if (!open) return null;

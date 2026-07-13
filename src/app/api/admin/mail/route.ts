@@ -47,9 +47,9 @@ export async function POST(request: Request) {
     if (userId?.trim()) {
       const user = await prisma.user.findUnique({
         where: { id: userId.trim() },
-        select: { id: true, role: true },
+        select: { id: true },
       });
-      if (!user || user.role === "ADMIN") {
+      if (!user) {
         return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
       }
       recipientIds = [user.id];

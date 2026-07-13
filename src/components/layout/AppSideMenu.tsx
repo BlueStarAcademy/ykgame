@@ -7,7 +7,8 @@ interface AppSideMenuProps {
   open: boolean;
   onClose: () => void;
   nickname: string;
-  unclaimedMailCount: number;
+  mailNotifyCount: number;
+  couponNotifyCount: number;
   isAdmin?: boolean;
   onOpenMailbox: () => void;
   onOpenInventory: () => void;
@@ -65,7 +66,8 @@ export function AppSideMenu({
   open,
   onClose,
   nickname,
-  unclaimedMailCount,
+  mailNotifyCount,
+  couponNotifyCount,
   isAdmin,
   onOpenMailbox,
   onOpenInventory,
@@ -129,17 +131,18 @@ export function AppSideMenu({
           <MenuItem
             icon="📬"
             label="우편함"
-            badge={unclaimedMailCount}
+            badge={mailNotifyCount}
             onClick={() => handleMenuAction(onOpenMailbox)}
           />
           <MenuItem
             icon="🎟️"
             label="쿠폰함"
+            badge={couponNotifyCount}
             onClick={() => handleMenuAction(onOpenInventory)}
           />
           <MenuItem
             icon="📊"
-            label="랭킹보기"
+            label="랭킹정보"
             onClick={() => handleMenuAction(onOpenRanking)}
           />
           <MenuItem

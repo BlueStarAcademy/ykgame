@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 
@@ -80,8 +80,26 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
 
   useEffect(() => {
     if (!open || !selectedMailId) return;
-    void fetch(`/api/mail/${selectedMailId}/read`, { method: "PATCH" });
-  }, [open, selectedMailId]);
+    let cancelled = false;
+    void fetch(`/api/mail/${selectedMailId}/read`, { method: "PATCH" }).then(
+      (res) => {
+        if (!res.ok || cancelled) return;
+        setMails((prev) => {
+          const mail = prev.find((item) => item.id === selectedMailId);
+          if (!mail || mail.readAt) return prev;
+          return prev.map((item) =>
+            item.id === selectedMailId
+              ? { ...item, readAt: new Date().toISOString() }
+              : item,
+          );
+        });
+        onMailboxChange?.();
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selectedMailId, onMailboxChange]);
 
   if (!open) return null;
 
@@ -106,8 +124,8 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
 
   return (
     <AppModalOverlay open={open} onClose={onClose}>
-      <div className="overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between bg-sky-600 px-4 py-3 text-white">
+      <div className="flex h-[min(82dvh,36rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl landscape:h-[min(90dvh,22rem)]">
+        <div className="flex shrink-0 items-center justify-between bg-sky-600 px-4 py-3 text-white">
           <h2 className="text-base font-black">우편함</h2>
           <button
             type="button"
@@ -118,14 +136,18 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
           </button>
         </div>
 
-        <div className="space-y-3 p-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
           {loading ? (
-            <p className="py-8 text-center text-xs text-gray-400">우편함 불러오는 중...</p>
+            <p className="flex flex-1 items-center justify-center text-xs text-gray-400">
+              우편함 불러오는 중...
+            </p>
           ) : mails.length === 0 ? (
-            <p className="py-8 text-center text-xs text-gray-400">받은 우편이 없습니다.</p>
+            <p className="flex flex-1 items-center justify-center text-xs text-gray-400">
+              받은 우편이 없습니다.
+            </p>
           ) : (
             <>
-              <div className="max-h-40 space-y-2 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] [touch-action:pan-y] landscape:max-h-24">
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
                 {mails.map((mail) => {
                   const selected = mail.id === selectedMailId;
                   const unclaimed = !mail.claimedAt && hasAttachment(mail);
@@ -158,16 +180,20 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
               </div>
 
               {selectedMail ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-sm font-black text-slate-900">{selectedMail.title}</p>
+                <div className="flex max-h-[45%] min-h-[8.5rem] shrink-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3 landscape:max-h-[42%] landscape:min-h-[6.5rem]">
+                  <p className="shrink-0 truncate text-sm font-black text-slate-900">
+                    {selectedMail.title}
+                  </p>
                   {selectedMail.body ? (
-                    <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
-                      {selectedMail.body}
-                    </p>
+                    <div className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                      <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
+                        {selectedMail.body}
+                      </p>
+                    </div>
                   ) : null}
 
                   {hasAttachment(selectedMail) ? (
-                    <div className="mt-3 space-y-1 rounded-lg bg-white px-3 py-2 text-xs">
+                    <div className="mt-3 shrink-0 space-y-1 rounded-lg bg-white px-3 py-2 text-xs">
                       {selectedMail.currencyAmount > 0 ? (
                         <p className="font-bold text-amber-700">
                           ⭐ 스타 {selectedMail.currencyAmount.toLocaleString()}
@@ -189,12 +215,14 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
                       type="button"
                       disabled={claiming}
                       onClick={() => claimMail(selectedMail.id)}
-                      className="mt-3 w-full rounded-xl bg-sky-600 py-2.5 text-xs font-bold text-white hover:bg-sky-500 disabled:opacity-60"
+                      className="mt-3 w-full shrink-0 rounded-xl bg-sky-600 py-2.5 text-xs font-bold text-white hover:bg-sky-500 disabled:opacity-60"
                     >
                       {claiming ? "수령 중..." : "보상 수령"}
                     </button>
                   ) : selectedMail.claimedAt ? (
-                    <p className="mt-3 text-center text-[10px] font-bold text-slate-400">수령 완료</p>
+                    <p className="mt-3 shrink-0 text-center text-[10px] font-bold text-slate-400">
+                      수령 완료
+                    </p>
                   ) : null}
                 </div>
               ) : null}
@@ -207,22 +235,26 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
 }
 
 export function useMailboxBadge() {
-  const [unclaimedCount, setUnclaimedCount] = useState(0);
+  const [notifyCount, setNotifyCount] = useState(0);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const res = await fetch("/api/mail");
       if (!res.ok) return;
       const data = await res.json();
-      setUnclaimedCount(data.unclaimedCount ?? 0);
+      const mails = (data.mails ?? []) as UserMail[];
+      const count = mails.filter(
+        (mail) => !mail.readAt || (!mail.claimedAt && hasAttachment(mail)),
+      ).length;
+      setNotifyCount(count);
     } catch {
-      setUnclaimedCount(0);
+      setNotifyCount(0);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [refresh]);
 
-  return { unclaimedCount, refresh };
+  return { notifyCount, refresh };
 }

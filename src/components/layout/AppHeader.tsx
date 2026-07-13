@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { clientLogout } from "@/lib/client-logout";
 import { MailboxModal, useMailboxBadge } from "@/components/layout/MailboxModal";
-import { InventoryModal } from "@/components/layout/InventoryModal";
+import {
+  InventoryModal,
+  useCouponBadge,
+  type InventoryCoupon,
+} from "@/components/layout/InventoryModal";
 import { SettingsModal } from "@/components/layout/SettingsModal";
 import { RankingBoard } from "@/components/games/RankingBoard";
 import { AppSideMenu } from "@/components/layout/AppSideMenu";
@@ -15,12 +19,24 @@ interface AppHeaderProps {
   role?: "USER" | "ADMIN";
 }
 
-function HamburgerButton({ onClick, open }: { onClick: () => void; open: boolean }) {
+function formatBadgeCount(count: number) {
+  return count > 9 ? "9+" : String(count);
+}
+
+function HamburgerButton({
+  onClick,
+  open,
+  badgeCount,
+}: {
+  onClick: () => void;
+  open: boolean;
+  badgeCount: number;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white shadow-sm hover:bg-slate-50"
+      className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white shadow-sm hover:bg-slate-50"
       aria-label={open ? "메뉴 닫기" : "메뉴 열기"}
       aria-expanded={open}
     >
@@ -41,6 +57,11 @@ function HamburgerButton({ onClick, open }: { onClick: () => void; open: boolean
           }`}
         />
       </span>
+      {badgeCount > 0 ? (
+        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold leading-none text-white shadow-sm">
+          {formatBadgeCount(badgeCount)}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -50,7 +71,13 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
   const [liveCurrency, setLiveCurrency] = useState<number | null>(null);
   const seenSessionCurrencyRef = useRef<number | undefined>(undefined);
   const syncedServerCurrencyRef = useRef<number | null>(null);
-  const { unclaimedCount, refresh: refreshMailbox } = useMailboxBadge();
+  const { notifyCount: mailNotifyCount, refresh: refreshMailbox } =
+    useMailboxBadge();
+  const {
+    notifyCount: couponNotifyCount,
+    refresh: refreshCoupons,
+    markSeen: markCouponsSeen,
+  } = useCouponBadge();
   const [menuOpen, setMenuOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [mailboxOpen, setMailboxOpen] = useState(false);
@@ -58,6 +85,14 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
   const [rankingOpen, setRankingOpen] = useState(false);
 
   const sessionCurrency = session?.user?.currency;
+  const menuNotifyCount = mailNotifyCount + couponNotifyCount;
+
+  const handleInventoryChange = useCallback(
+    (coupons: InventoryCoupon[]) => {
+      markCouponsSeen(coupons);
+    },
+    [markCouponsSeen],
+  );
 
   // 페이지 SSR(DB) 값이 있으면 JWT보다 우선해 첫 페인트 오표시를 막는다.
   useEffect(() => {
@@ -117,6 +152,7 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
 
             <HamburgerButton
               open={menuOpen}
+              badgeCount={menuNotifyCount}
               onClick={() => setMenuOpen((prev) => !prev)}
             />
           </div>
@@ -127,7 +163,8 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         nickname={displayNickname}
-        unclaimedMailCount={unclaimedCount}
+        mailNotifyCount={mailNotifyCount}
+        couponNotifyCount={couponNotifyCount}
         isAdmin={displayRole === "ADMIN"}
         onOpenMailbox={() => setMailboxOpen(true)}
         onOpenInventory={() => setInventoryOpen(true)}
@@ -139,9 +176,16 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
       <MailboxModal
         open={mailboxOpen}
         onClose={() => setMailboxOpen(false)}
-        onMailboxChange={refreshMailbox}
+        onMailboxChange={() => {
+          void refreshMailbox();
+          void refreshCoupons();
+        }}
       />
-      <InventoryModal open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
+      <InventoryModal
+        open={inventoryOpen}
+        onClose={() => setInventoryOpen(false)}
+        onInventoryChange={handleInventoryChange}
+      />
       <RankingBoard
         gameId="yanmar"
         open={rankingOpen}

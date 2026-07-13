@@ -5,6 +5,30 @@ import { prisma } from "@/lib/prisma";
 const TITLE_MAX = 80;
 const BODY_MAX = 2000;
 
+export async function GET() {
+  try {
+    const session = await requireAuth();
+    const inquiries = await prisma.customerInquiry.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        status: true,
+        adminNote: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return NextResponse.json({ inquiries });
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await requireAuth();
@@ -28,7 +52,11 @@ export async function POST(request: Request) {
       select: {
         id: true,
         title: true,
+        body: true,
+        status: true,
+        adminNote: true,
         createdAt: true,
+        updatedAt: true,
       },
     });
 
