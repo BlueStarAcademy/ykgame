@@ -6,6 +6,10 @@ import {
   GAME_IMMERSIVE_HEADER_RIGHT_ID,
   useImmersiveFullscreenControl,
 } from "@/components/games/GameImmersiveOverlay";
+import { CustomerInquiryModal } from "@/components/games/CustomerInquiryModal";
+import { HORN_OPTIONS, type HornId } from "./soundSettings";
+
+type SettingsTab = "display" | "sound" | "other";
 
 function ToggleRow({
   label,
@@ -28,6 +32,27 @@ function ToggleRow({
   );
 }
 
+function ActionRow({
+  label,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10 disabled:text-white/35"
+    >
+      {label}
+    </button>
+  );
+}
+
 interface YanmarGameSettingsMenuProps {
   immersive: boolean;
   show: boolean;
@@ -40,11 +65,20 @@ interface YanmarGameSettingsMenuProps {
   showTouchZones: boolean;
   onToggleTouchZones: () => void;
   touchZonesAvailable: boolean;
-  onOpenControlsGuide: () => void;
+  showMissionQuest: boolean;
+  onToggleMissionQuest: () => void;
+  hornId: HornId;
+  onHornIdChange: (hornId: HornId) => void;
   onResetPosition: () => void;
   onShowRanking?: () => void;
   onSaveAndExit?: () => void;
 }
+
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: "display", label: "화면" },
+  { id: "sound", label: "소리" },
+  { id: "other", label: "기타" },
+];
 
 export function YanmarGameSettingsMenu({
   immersive,
@@ -58,7 +92,10 @@ export function YanmarGameSettingsMenu({
   showTouchZones,
   onToggleTouchZones,
   touchZonesAvailable,
-  onOpenControlsGuide,
+  showMissionQuest,
+  onToggleMissionQuest,
+  hornId,
+  onHornIdChange,
   onResetPosition,
   onShowRanking,
   onSaveAndExit,
@@ -67,6 +104,8 @@ export function YanmarGameSettingsMenu({
   const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(
     null,
   );
+  const [inquiryOpen, setInquiryOpen] = useState(false);
+  const [tab, setTab] = useState<SettingsTab>("display");
   const buttonRef = useRef<HTMLButtonElement>(null);
   const fullscreen = useImmersiveFullscreenControl();
 
@@ -122,6 +161,10 @@ export function YanmarGameSettingsMenu({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) setTab("display");
+  }, [open]);
+
   if (!show) return null;
 
   const panel = open ? (
@@ -133,66 +176,115 @@ export function YanmarGameSettingsMenu({
         onClick={() => onOpenChange(false)}
       />
       <div
-        className="fixed z-[410] w-44 overflow-hidden rounded-xl border border-white/15 bg-black/90 py-1 shadow-2xl backdrop-blur-md"
+        className="fixed z-[410] flex w-52 flex-col overflow-hidden rounded-xl border border-white/15 bg-black/90 shadow-2xl backdrop-blur-md"
         style={
           panelPos
             ? { top: panelPos.top, right: panelPos.right }
             : { top: 48, right: 12 }
         }
       >
-        <ToggleRow label="미니맵" on={showMinimap} onToggle={onToggleMinimap} />
-        <ToggleRow label="적재자세" on={showDigPose} onToggle={onToggleDigPose} />
-        {touchZonesAvailable ? (
-          <ToggleRow label="터치범위" on={showTouchZones} onToggle={onToggleTouchZones} />
-        ) : null}
-        <button
-          type="button"
-          onClick={() => {
-            onOpenChange(false);
-            onOpenControlsGuide();
-          }}
-          className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10"
-        >
-          기능정보
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            onOpenChange(false);
-            onResetPosition();
-          }}
-          className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10"
-        >
-          초기위치
-        </button>
-        {fullscreen?.canFullscreen &&
-        !fullscreen.apiFullscreen &&
-        !fullscreen.isStandalone ? (
-          <button
-            type="button"
-            onClick={() => {
-              onOpenChange(false);
-              void fullscreen.enter();
-            }}
-            className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10"
-          >
-            전체화면
-          </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => {
-            onOpenChange(false);
-            onShowRanking?.();
-          }}
-          disabled={!onShowRanking}
-          className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10 disabled:text-white/35"
-        >
-          랭킹보드
-        </button>
+        <div className="flex border-b border-white/10 px-1 pt-1">
+          {TABS.map((item) => {
+            const active = tab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                className={`flex-1 rounded-t-md px-1 py-1.5 text-[10px] font-bold tracking-wide transition-colors ${
+                  active
+                    ? "bg-white/12 text-white"
+                    : "text-white/45 hover:text-white/75"
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="min-h-[9.5rem] px-1 py-1">
+          {tab === "display" ? (
+            <>
+              <ToggleRow label="미니맵" on={showMinimap} onToggle={onToggleMinimap} />
+              <ToggleRow
+                label="적재자세"
+                on={showDigPose}
+                onToggle={onToggleDigPose}
+              />
+              {touchZonesAvailable ? (
+                <ToggleRow
+                  label="터치범위"
+                  on={showTouchZones}
+                  onToggle={onToggleTouchZones}
+                />
+              ) : null}
+              <ToggleRow
+                label="미션퀘스트"
+                on={showMissionQuest}
+                onToggle={onToggleMissionQuest}
+              />
+            </>
+          ) : null}
+
+          {tab === "sound" ? (
+            <label className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-white">
+              <span>경적 소리</span>
+              <select
+                value={hornId}
+                onChange={(e) => onHornIdChange(Number(e.target.value) as HornId)}
+                className="max-w-[5.5rem] rounded-md border border-white/15 bg-black/70 px-1.5 py-1 text-[10px] font-semibold text-white outline-none focus:border-sky-400/60"
+              >
+                {HORN_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          {tab === "other" ? (
+            <>
+              <ActionRow
+                label="초기위치(끼임시 탈출)"
+                onClick={() => {
+                  onOpenChange(false);
+                  onResetPosition();
+                }}
+              />
+              {fullscreen?.canFullscreen &&
+              !fullscreen.apiFullscreen &&
+              !fullscreen.isStandalone ? (
+                <ActionRow
+                  label="전체화면"
+                  onClick={() => {
+                    onOpenChange(false);
+                    void fullscreen.enter();
+                  }}
+                />
+              ) : null}
+              <ActionRow
+                label="랭킹정보"
+                onClick={() => {
+                  onOpenChange(false);
+                  onShowRanking?.();
+                }}
+                disabled={!onShowRanking}
+              />
+              <ActionRow
+                label="고객문의"
+                onClick={() => {
+                  onOpenChange(false);
+                  setInquiryOpen(true);
+                }}
+              />
+            </>
+          ) : null}
+        </div>
+
         {onSaveAndExit ? (
-          <>
-            <div className="mx-2 my-1 border-t border-white/10" />
+          <div className="border-t border-white/10 px-1 py-1">
             <button
               type="button"
               onClick={() => {
@@ -204,7 +296,7 @@ export function YanmarGameSettingsMenu({
             >
               게임 저장 후 종료
             </button>
-          </>
+          </div>
         ) : null}
       </div>
     </>
@@ -239,6 +331,7 @@ export function YanmarGameSettingsMenu({
     <>
       {trigger}
       {panel && overlayRoot ? createPortal(panel, overlayRoot) : null}
+      <CustomerInquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} />
     </>
   );
 

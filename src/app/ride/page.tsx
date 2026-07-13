@@ -1,3 +1,4 @@
+import { AccountSanctionedView } from "@/components/auth/AccountSanctionedView";
 import { GameCard } from "@/components/home/GameCard";
 import { AppShell } from "@/components/layout/AppShell";
 import { GAMES } from "@/lib/games";
@@ -13,11 +14,27 @@ export default async function RideHomePage() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { currency: true, nickname: true },
+    select: {
+      currency: true,
+      nickname: true,
+      isActive: true,
+      sanctionReason: true,
+    },
   });
 
   const nickname = user?.nickname ?? session.user.nickname ?? "";
   const currency = user?.currency ?? 0;
+
+  if (user && !user.isActive) {
+    return (
+      <AppShell nickname={nickname} currency={currency} role={session.user.role}>
+        <AccountSanctionedView
+          nickname={nickname}
+          reason={user.sanctionReason?.trim() || "운영 정책에 따른 이용 제한"}
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell

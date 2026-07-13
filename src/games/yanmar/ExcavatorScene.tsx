@@ -2013,7 +2013,8 @@ function ExcavatorArm({
     const look = lookOffsetRef.current;
     const freeLooking =
       Math.abs(look.yaw) > FREE_LOOK_BODY_VISIBLE_EPS ||
-      Math.abs(look.pitch) > FREE_LOOK_BODY_VISIBLE_EPS;
+      Math.abs(look.pitch) > FREE_LOOK_BODY_VISIBLE_EPS ||
+      Math.abs(look.distance - 1) > FREE_LOOK_BODY_VISIBLE_EPS;
     // 카메라3(운전석)는 기본으로 차체를 숨기지만, 자유시점으로 둘러볼 때는 표시한다.
     const showBody = cameraMode !== 3 || freeLooking;
     // 월드 붐 피벗 = posY + boomPivotY 와 맞춘다 (bucket.ts 접촉점과 동일).
@@ -2529,15 +2530,20 @@ function GameCamera({
       (Math.abs(travel.left) > FREE_LOOK_TRAVEL_THRESHOLD ||
         Math.abs(travel.right) > FREE_LOOK_TRAVEL_THRESHOLD);
 
-    if (wantsTravel && (look.yaw !== 0 || look.pitch !== 0)) {
+    if (
+      wantsTravel &&
+      (look.yaw !== 0 || look.pitch !== 0 || look.distance !== 1)
+    ) {
       const k = 1 - Math.exp(-FREE_LOOK_RESET_RATE * Math.max(delta, 0));
       look.yaw += (0 - look.yaw) * k;
       look.pitch += (0 - look.pitch) * k;
+      look.distance += (1 - look.distance) * k;
       if (Math.abs(look.yaw) < 0.0005) look.yaw = 0;
       if (Math.abs(look.pitch) < 0.0005) look.pitch = 0;
+      if (Math.abs(look.distance - 1) < 0.001) look.distance = 1;
     }
 
-    if (look.yaw !== 0 || look.pitch !== 0) {
+    if (look.yaw !== 0 || look.pitch !== 0 || look.distance !== 1) {
       const { offset, right, up } = orbitScratch.current;
       offset.set(camX - lookX, camY - lookY, camZ - lookZ);
       offset.applyAxisAngle(up, look.yaw);
@@ -2548,6 +2554,11 @@ function GameCamera({
         right.normalize();
       }
       offset.applyAxisAngle(right, look.pitch);
+      const distance =
+        Number.isFinite(look.distance) && look.distance > 0
+          ? look.distance
+          : 1;
+      offset.multiplyScalar(distance);
       camera.position.set(lookX + offset.x, lookY + offset.y, lookZ + offset.z);
     } else {
       camera.position.set(camX, camY, camZ);

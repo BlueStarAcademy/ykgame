@@ -11,6 +11,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       target = "active",
+      userId,
       title,
       body: mailBody,
       currencyAmount = 0,
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
       couponDiscountPct,
     } = body as {
       target?: MailTarget;
+      userId?: string;
       title?: string;
       body?: string;
       currencyAmount?: number;
@@ -40,30 +42,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No mail content" }, { status: 400 });
     }
 
-    const users = await prisma.user.findMany({
-      where: {
-        role: "USER",
-        ...(target === "active" ? { isActive: true } : {}),
-      },
-      select: { id: true },
-    });
+    let recipientIds: string[] = [];
 
-    if (users.length === 0) {
+    if (userId?.trim()) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId.trim() },
+        select: { id: true, role: true },
+      });
+      if (!user || user.role === "ADMIN") {
+        return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
+      }
+      recipientIds = [user.id];
+    } else {
+      const users = await prisma.user.findMany({
+        where: {
+          role: "USER",
+          ...(target === "active" ? { isActive: true } : {}),
+        },
+        select: { id: true },
+      });
+      recipientIds = users.map((user) => user.id);
+    }
+
+    if (recipientIds.length === 0) {
       return NextResponse.json({ error: "No recipients" }, { status: 400 });
     }
 
+    const mailData = {
+      title: title.trim(),
+      body: mailBody?.trim() || null,
+      currencyAmount: safeCurrency,
+      couponType: hasCoupon ? couponType! : null,
+      couponDiscountPct: hasCoupon
+        ? isExchangeCoupon
+          ? 0
+          : Math.min(100, Math.floor(couponDiscountPct!))
+        : null,
+    };
+
     const result = await prisma.userMail.createMany({
-      data: users.map((user) => ({
-        userId: user.id,
-        title: title.trim(),
-        body: mailBody?.trim() || null,
-        currencyAmount: safeCurrency,
-        couponType: hasCoupon ? couponType : null,
-        couponDiscountPct: hasCoupon
-          ? isExchangeCoupon
-            ? 0
-            : Math.min(100, Math.floor(couponDiscountPct!))
-          : null,
+      data: recipientIds.map((id) => ({
+        userId: id,
+        ...mailData,
       })),
     });
 

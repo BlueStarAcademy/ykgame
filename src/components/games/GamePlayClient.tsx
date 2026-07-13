@@ -390,7 +390,16 @@ export function GamePlayClient({
   );
 
   const handleExitHome = () => {
-    router.push(playMode === "ride" || initialPlay === "ride" ? "/ride" : "/home");
+    if (playMode === "ride" || initialPlay === "ride") {
+      router.push("/ride");
+      return;
+    }
+    // 게임체험은 이미 /home 로비이므로 동일 경로 push 대신 로비 상태로 복귀
+    setResult(null);
+    setPlayMode(null);
+    setPhase("lobby");
+    setYanmarExitSignal(0);
+    void loadStats();
   };
 
   if (!game) return null;

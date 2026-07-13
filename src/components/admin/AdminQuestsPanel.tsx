@@ -150,6 +150,14 @@ function QuestSectionCard({ section }: { section: QuestSection }) {
 }
 
 export function AdminQuestsPanel() {
+  return (
+    <AdminShell title="퀘스트 정보" subtitle="일일·미션 퀘스트 규칙과 보상을 확인합니다.">
+      <AdminQuestsPanelContent />
+    </AdminShell>
+  );
+}
+
+export function AdminQuestsPanelContent() {
   const [report, setReport] = useState<QuestReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<QuestTabId>("rules");
@@ -168,60 +176,59 @@ export function AdminQuestsPanel() {
     return report.sections.filter((section) => tab.sectionTitles.includes(section.title));
   }, [activeTab, report]);
 
+  if (loading) {
+    return <p className="py-10 text-center text-sm text-slate-400">불러오는 중...</p>;
+  }
+  if (!report) {
+    return <p className="py-10 text-center text-sm text-slate-400">퀘스트 정보가 없습니다.</p>;
+  }
+
   return (
-    <AdminShell title="퀘스트 정보" subtitle="일일·미션 퀘스트 규칙과 보상을 확인합니다.">
-      {loading ? (
-        <p className="py-10 text-center text-sm text-slate-400">불러오는 중...</p>
-      ) : !report ? (
-        <p className="py-10 text-center text-sm text-slate-400">퀘스트 정보가 없습니다.</p>
-      ) : (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-cyan-200 bg-gradient-to-br from-cyan-50 to-white p-4 shadow-sm">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-600">
-              Yanmar
-            </p>
-            <h2 className="mt-1 text-lg font-black text-slate-900">{report.title}</h2>
-          </div>
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-cyan-200 bg-gradient-to-br from-cyan-50 to-white p-4 shadow-sm">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-600">
+          Yanmar
+        </p>
+        <h2 className="mt-1 text-lg font-black text-slate-900">{report.title}</h2>
+      </div>
 
-          <div
-            className="grid grid-cols-3 gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-1.5"
-            role="tablist"
-            aria-label="퀘스트 정보 분류"
-          >
-            {QUEST_TABS.map((tab) => {
-              const selected = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`rounded-xl px-2 py-2.5 text-[11px] font-bold transition ${
-                    selected
-                      ? "bg-white text-cyan-700 shadow-sm ring-1 ring-cyan-200"
-                      : "text-slate-500 hover:bg-white/70 hover:text-slate-700"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
+      <div
+        className="grid grid-cols-3 gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-1.5"
+        role="tablist"
+        aria-label="퀘스트 정보 분류"
+      >
+        {QUEST_TABS.map((tab) => {
+          const selected = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setActiveTab(tab.id)}
+              className={`rounded-xl px-2 py-2.5 text-[11px] font-bold transition ${
+                selected
+                  ? "bg-white text-cyan-700 shadow-sm ring-1 ring-cyan-200"
+                  : "text-slate-500 hover:bg-white/70 hover:text-slate-700"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-          <div className="space-y-4" role="tabpanel">
-            {activeSections.length > 0 ? (
-              activeSections.map((section) => (
-                <QuestSectionCard key={section.title} section={section} />
-              ))
-            ) : (
-              <p className="py-8 text-center text-sm text-slate-400">
-                이 분류에 표시할 항목이 없습니다.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-    </AdminShell>
+      <div className="space-y-4" role="tabpanel">
+        {activeSections.length > 0 ? (
+          activeSections.map((section) => (
+            <QuestSectionCard key={section.title} section={section} />
+          ))
+        ) : (
+          <p className="py-8 text-center text-sm text-slate-400">
+            이 분류에 표시할 항목이 없습니다.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

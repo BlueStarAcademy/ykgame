@@ -24,6 +24,13 @@ enum CouponType {
   FILTER_SET_EXCHANGE
 }
 
+enum InquiryStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
 enum EquipmentPart {
   ARM
   BOOM
@@ -50,6 +57,9 @@ model User {
   /** Lifetime dump XP — never reset by season */
   totalXp              Int                    @default(0)
   isActive             Boolean                @default(true)
+  /** Set when isActive is false — shown to the player on blocked entry */
+  sanctionReason       String?
+  sanctionedAt         DateTime?
   createdAt            DateTime               @default(now())
   gameScores           GameScore[]
   seasonStats          UserSeasonStats[]
@@ -58,6 +68,7 @@ model User {
   coupons              UserCoupon[]
   equipmentUpgrades    UserEquipmentUpgrade[]
   mails                UserMail[]
+  inquiries            CustomerInquiry[]
 }
 
 model GameScore {
@@ -172,6 +183,23 @@ model UserMail {
 
   @@index([userId, createdAt])
   @@index([userId, claimedAt])
+}
+
+/** 인게임 고객문의 */
+model CustomerInquiry {
+  id        String         @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  status    InquiryStatus  @default(OPEN)
+  adminNote String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
 }
 
 /** 관리자 전광판 공지 — sortOrder 오름차순으로 순환 표시 */

@@ -20,6 +20,8 @@ export async function GET(
         role: true,
         currency: true,
         isActive: true,
+        sanctionReason: true,
+        sanctionedAt: true,
         createdAt: true,
         _count: {
           select: {
@@ -77,7 +79,12 @@ export async function PATCH(
     await requireAdmin();
     const { userId } = await params;
     const body = await request.json();
-    const { nickname, role, isActive } = body;
+    const { nickname, role, isActive, sanctionReason } = body as {
+      nickname?: string;
+      role?: "USER" | "ADMIN";
+      isActive?: boolean;
+      sanctionReason?: string | null;
+    };
 
     const existing = await prisma.user.findUnique({
       where: { id: userId },
@@ -91,12 +98,31 @@ export async function PATCH(
       return NextResponse.json({ error: "Cannot deactivate admin" }, { status: 400 });
     }
 
+    if (isActive === false) {
+      const reason = typeof sanctionReason === "string" ? sanctionReason.trim() : "";
+      if (!reason) {
+        return NextResponse.json({ error: "Missing sanction reason" }, { status: 400 });
+      }
+    }
+
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
         ...(nickname !== undefined ? { nickname } : {}),
         ...(role !== undefined ? { role } : {}),
-        ...(isActive !== undefined ? { isActive } : {}),
+        ...(isActive !== undefined
+          ? isActive
+            ? {
+                isActive: true,
+                sanctionReason: null,
+                sanctionedAt: null,
+              }
+            : {
+                isActive: false,
+                sanctionReason: (sanctionReason as string).trim(),
+                sanctionedAt: new Date(),
+              }
+          : {}),
       },
       select: {
         id: true,
@@ -104,6 +130,8 @@ export async function PATCH(
         nickname: true,
         role: true,
         isActive: true,
+        sanctionReason: true,
+        sanctionedAt: true,
       },
     });
 

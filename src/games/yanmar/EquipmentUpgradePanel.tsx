@@ -26,6 +26,10 @@ import {
   getUpgradeAttachmentTab,
   type UpgradeAttachmentTab,
 } from "./upgradeVisualConfig";
+import {
+  getAttachmentRequiredLevel,
+  isUpgradeAttachmentTabUnlocked,
+} from "@/lib/playerUnlocks";
 
 interface EquipmentUpgradePanelProps {
   open: boolean;
@@ -36,6 +40,8 @@ interface EquipmentUpgradePanelProps {
   previewStars: number;
   upgradingPart: YanmarEquipmentPart | null;
   resettingEquipment: boolean;
+  playerLevel: number;
+  unlockAllAttachments?: boolean;
   onClose: () => void;
   onUpgrade: (part: YanmarEquipmentPart) => void | Promise<boolean | null>;
   onResetEquipment: (part: YanmarEquipmentPart) => void;
@@ -265,6 +271,8 @@ export function EquipmentUpgradePanel({
   previewStars,
   upgradingPart,
   resettingEquipment,
+  playerLevel,
+  unlockAllAttachments = false,
   onClose,
   onUpgrade,
   onResetEquipment,
@@ -399,6 +407,20 @@ export function EquipmentUpgradePanel({
   }, [levels, failBonuses, upgradingPart, activeUpgradeBarPart, tryShowUpgradeSuccess]);
 
   useEffect(() => {
+    if (!open) return;
+    if (
+      isUpgradeAttachmentTabUnlocked(attachmentTab, playerLevel, {
+        unlockAll: unlockAllAttachments,
+      })
+    ) {
+      return;
+    }
+    const bucket = getUpgradeAttachmentTab("bucket");
+    setAttachmentTab("bucket");
+    setSelected(bucket.part);
+  }, [open, attachmentTab, playerLevel, unlockAllAttachments]);
+
+  useEffect(() => {
     if (!upgradeSuccess) return;
 
     successTimerRef.current = setTimeout(() => {
@@ -430,11 +452,21 @@ export function EquipmentUpgradePanel({
     };
   }, [upgradeFail, successToastKey]);
 
-  const handleAttachmentTabChange = useCallback((tab: UpgradeAttachmentTab) => {
-    const next = getUpgradeAttachmentTab(tab);
-    setAttachmentTab(tab);
-    setSelected(next.part);
-  }, []);
+  const handleAttachmentTabChange = useCallback(
+    (tab: UpgradeAttachmentTab) => {
+      if (
+        !isUpgradeAttachmentTabUnlocked(tab, playerLevel, {
+          unlockAll: unlockAllAttachments,
+        })
+      ) {
+        return;
+      }
+      const next = getUpgradeAttachmentTab(tab);
+      setAttachmentTab(tab);
+      setSelected(next.part);
+    },
+    [playerLevel, unlockAllAttachments],
+  );
 
   const handleUpgradeClick = useCallback(() => {
     const part = selected;
@@ -566,19 +598,38 @@ export function EquipmentUpgradePanel({
             <div className="absolute left-2 top-2 z-30 flex gap-1">
               {YANMAR_UPGRADE_ATTACHMENT_TABS.map((tab) => {
                 const active = attachmentTab === tab.id;
+                const unlocked = isUpgradeAttachmentTabUnlocked(
+                  tab.id,
+                  playerLevel,
+                  { unlockAll: unlockAllAttachments },
+                );
+                const requiredLevel =
+                  tab.id === "bucket" ? 1 : getAttachmentRequiredLevel(tab.id);
                 return (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => handleAttachmentTabChange(tab.id)}
+                    disabled={!unlocked}
                     aria-pressed={active}
+                    aria-disabled={!unlocked}
+                    title={
+                      unlocked
+                        ? undefined
+                        : `유저 레벨 ${requiredLevel}에 개방됩니다`
+                    }
                     className={`rounded-md border px-2 py-1 text-[10px] font-black shadow-md transition ${
-                      active
-                        ? "border-amber-300 bg-red-600 text-white"
-                        : "border-white/70 bg-slate-950/70 text-white/90 hover:border-amber-200 hover:bg-slate-900/80"
+                      !unlocked
+                        ? "cursor-not-allowed border-white/20 bg-slate-950/45 text-white/35"
+                        : active
+                          ? "border-amber-300 bg-red-600 text-white"
+                          : "border-white/70 bg-slate-950/70 text-white/90 hover:border-amber-200 hover:bg-slate-900/80"
                     }`}
                   >
                     {tab.label}
+                    {!unlocked ? (
+                      <span className="ml-1 font-bold opacity-80">Lv.{requiredLevel}</span>
+                    ) : null}
                   </button>
                 );
               })}

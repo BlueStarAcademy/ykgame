@@ -147,6 +147,14 @@ function ProbabilitySectionCard({
 }
 
 export function AdminProbabilityPanel() {
+  return (
+    <AdminShell title="확률정보" subtitle="현재 적용 중인 게임 보상 확률을 확인합니다.">
+      <AdminProbabilityPanelContent />
+    </AdminShell>
+  );
+}
+
+export function AdminProbabilityPanelContent() {
   const [report, setReport] = useState<ProbabilityReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ProbabilityTabId>("rewards");
@@ -165,64 +173,63 @@ export function AdminProbabilityPanel() {
     return report.sections.filter((section) => tab.sectionTitles.includes(section.title));
   }, [activeTab, report]);
 
+  if (loading) {
+    return <p className="py-10 text-center text-sm text-slate-400">불러오는 중...</p>;
+  }
+  if (!report) {
+    return <p className="py-10 text-center text-sm text-slate-400">확률 정보가 없습니다.</p>;
+  }
+
   return (
-    <AdminShell title="확률정보" subtitle="현재 적용 중인 게임 보상 확률을 확인합니다.">
-      {loading ? (
-        <p className="py-10 text-center text-sm text-slate-400">불러오는 중...</p>
-      ) : !report ? (
-        <p className="py-10 text-center text-sm text-slate-400">확률 정보가 없습니다.</p>
-      ) : (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4 shadow-sm">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500">
-              Yanmar
-            </p>
-            <h2 className="mt-1 text-lg font-black text-slate-900">{report.title}</h2>
-          </div>
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4 shadow-sm">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500">
+          Yanmar
+        </p>
+        <h2 className="mt-1 text-lg font-black text-slate-900">{report.title}</h2>
+      </div>
 
-          <div
-            className="grid grid-cols-3 gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-1.5"
-            role="tablist"
-            aria-label="확률정보 분류"
-          >
-            {PROBABILITY_TABS.map((tab) => {
-              const selected = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`rounded-xl px-2 py-2.5 text-[11px] font-bold transition ${
-                    selected
-                      ? "bg-white text-violet-700 shadow-sm ring-1 ring-violet-200"
-                      : "text-slate-500 hover:bg-white/70 hover:text-slate-700"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
+      <div
+        className="grid grid-cols-3 gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-1.5"
+        role="tablist"
+        aria-label="확률정보 분류"
+      >
+        {PROBABILITY_TABS.map((tab) => {
+          const selected = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setActiveTab(tab.id)}
+              className={`rounded-xl px-2 py-2.5 text-[11px] font-bold transition ${
+                selected
+                  ? "bg-white text-violet-700 shadow-sm ring-1 ring-violet-200"
+                  : "text-slate-500 hover:bg-white/70 hover:text-slate-700"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-          <div className="space-y-4" role="tabpanel">
-            {activeSections.length > 0 ? (
-              activeSections.map((section) => (
-                <ProbabilitySectionCard
-                  key={section.title}
-                  section={section}
-                  compactTables={activeTab === "truck"}
-                />
-              ))
-            ) : (
-              <p className="py-8 text-center text-sm text-slate-400">
-                이 분류에 표시할 항목이 없습니다.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-    </AdminShell>
+      <div className="space-y-4" role="tabpanel">
+        {activeSections.length > 0 ? (
+          activeSections.map((section) => (
+            <ProbabilitySectionCard
+              key={section.title}
+              section={section}
+              compactTables={activeTab === "truck"}
+            />
+          ))
+        ) : (
+          <p className="py-8 text-center text-sm text-slate-400">
+            이 분류에 표시할 항목이 없습니다.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

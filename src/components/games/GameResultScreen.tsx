@@ -328,7 +328,7 @@ export function GameResultScreen({
           </button>
         ) : (
           <Link
-            href={`/games/${gameId}`}
+            href={isYanmar ? "/home" : `/games/${gameId}`}
             className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300"
           >
             재시도
@@ -346,7 +346,7 @@ export function GameResultScreen({
           </button>
         ) : (
           <Link
-            href="/home"
+            href={isRide ? "/ride" : "/home"}
             className="flex-1 rounded-lg py-3 text-center font-medium text-white hover:opacity-90"
             style={{ backgroundColor: game?.color }}
           >

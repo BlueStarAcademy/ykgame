@@ -58,8 +58,15 @@ import {
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
 import { DigPoseGraph, GrappleGripGauge } from "./DigHintPanel";
 import { DumpHintPanel } from "./DumpHintPanel";
-import { ControlsGuidePanel } from "./ControlsGuidePanel";
 import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
+import {
+  loadSoundSettings,
+  saveSoundSettings,
+  DEFAULT_SOUND_SETTINGS,
+  type HornId,
+  type SoundSettings,
+} from "./soundSettings";
+import { yanmarAudio } from "./yanmarAudio";
 import { QuestPanel } from "./QuestPanel";
 import { ShopPanel } from "./ShopPanel";
 import { ActiveShopBuffIcons } from "./ActiveShopBuffIcons";
@@ -287,6 +294,8 @@ const FREE_LOOK_SENSITIVITY = 0.0045;
 const FREE_LOOK_PITCH_MIN = -0.55;
 const FREE_LOOK_PITCH_MAX = 0.42;
 const FREE_LOOK_TRAVEL_THRESHOLD = 0.08;
+const FREE_LOOK_DISTANCE_MIN = 0.4;
+const FREE_LOOK_DISTANCE_MAX = 2.5;
 
 function appendRewardText(previous: string, next: string) {
   if (!next) return previous;
@@ -668,10 +677,12 @@ export function ExcavatorGameWrapper({
   const tutorialFlashTimersRef = useRef<number[]>([]);
   const tutorialUiPauseUntilRef = useRef(0);
   const tutorialCelebratedPhaseRef = useRef(-1);
-  const [showControlsGuide, setShowControlsGuide] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [soundSettings, setSoundSettings] =
+    useState<SoundSettings>(DEFAULT_SOUND_SETTINGS);
   const [showMinimap, setShowMinimap] = useState(true);
   const [showDigPoseGraph, setShowDigPoseGraph] = useState(true);
+  const [showMissionQuest, setShowMissionQuest] = useState(true);
   const [showTutorialMenu, setShowTutorialMenu] = useState(false);
   const [showQuestPanel, setShowQuestPanel] = useState(false);
   const [showShopPanel, setShowShopPanel] = useState(false);
@@ -700,7 +711,15 @@ export function ExcavatorGameWrapper({
   const [cameraMode, setCameraMode] = useState<CameraMode>(
     initialPlayMode === "ride" ? 3 : 1,
   );
-  const lookOffsetRef = useRef<CameraLookOffset>({ yaw: 0, pitch: 0 });
+  const lookOffsetRef = useRef<CameraLookOffset>({
+    yaw: 0,
+    pitch: 0,
+    distance: 1,
+  });
+  const freeLookPointersRef = useRef(
+    new Map<number, { x: number; y: number }>(),
+  );
+  const freeLookPinchRef = useRef<{ lastSpan: number } | null>(null);
   const freeLookDragRef = useRef<{
     pointerId: number | null;
     lastX: number;
@@ -1070,7 +1089,10 @@ export function ExcavatorGameWrapper({
   const clearFreeLook = useCallback(() => {
     lookOffsetRef.current.yaw = 0;
     lookOffsetRef.current.pitch = 0;
+    lookOffsetRef.current.distance = 1;
     freeLookDragRef.current.pointerId = null;
+    freeLookPointersRef.current.clear();
+    freeLookPinchRef.current = null;
   }, []);
 
   const isFreeLookTraveling = useCallback(() => {
@@ -1081,33 +1103,88 @@ export function ExcavatorGameWrapper({
     );
   }, []);
 
+  const syncFreeLookDragFromPointers = useCallback(() => {
+    const pointers = freeLookPointersRef.current;
+    if (pointers.size !== 1) {
+      freeLookDragRef.current.pointerId = null;
+      return;
+    }
+    const [pointerId, point] = pointers.entries().next().value!;
+    freeLookDragRef.current = {
+      pointerId,
+      lastX: point.x,
+      lastY: point.y,
+    };
+  }, []);
+
   const onFreeLookPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return;
       if (isFreeLookTraveling()) return;
-      freeLookDragRef.current = {
-        pointerId: event.pointerId,
-        lastX: event.clientX,
-        lastY: event.clientY,
-      };
+      const pointers = freeLookPointersRef.current;
+      pointers.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
       event.currentTarget.setPointerCapture(event.pointerId);
+
+      if (pointers.size >= 2) {
+        const [a, b] = pointers.values();
+        freeLookPinchRef.current = {
+          lastSpan: Math.hypot(a.x - b.x, a.y - b.y),
+        };
+        freeLookDragRef.current.pointerId = null;
+      } else {
+        freeLookPinchRef.current = null;
+        syncFreeLookDragFromPointers();
+      }
     },
-    [isFreeLookTraveling],
+    [isFreeLookTraveling, syncFreeLookDragFromPointers],
   );
 
   const onFreeLookPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      const drag = freeLookDragRef.current;
-      if (drag.pointerId !== event.pointerId) return;
+      const pointers = freeLookPointersRef.current;
+      if (!pointers.has(event.pointerId)) return;
+      pointers.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+
       if (isFreeLookTraveling()) {
         clearFreeLook();
         return;
       }
+
+      const look = lookOffsetRef.current;
+      if (pointers.size >= 2) {
+        const [a, b] = pointers.values();
+        const span = Math.hypot(a.x - b.x, a.y - b.y);
+        let pinch = freeLookPinchRef.current;
+        if (!pinch || pinch.lastSpan <= 1) {
+          freeLookPinchRef.current = { lastSpan: span };
+          return;
+        }
+        if (span > 1) {
+          // Pinch out → zoom in (closer). Pinch in → zoom out.
+          look.distance = Math.max(
+            FREE_LOOK_DISTANCE_MIN,
+            Math.min(
+              FREE_LOOK_DISTANCE_MAX,
+              look.distance * (pinch.lastSpan / span),
+            ),
+          );
+          pinch.lastSpan = span;
+        }
+        return;
+      }
+
+      const drag = freeLookDragRef.current;
+      if (drag.pointerId !== event.pointerId) return;
       const dx = event.clientX - drag.lastX;
       const dy = event.clientY - drag.lastY;
       drag.lastX = event.clientX;
       drag.lastY = event.clientY;
-      const look = lookOffsetRef.current;
       look.yaw -= dx * FREE_LOOK_SENSITIVITY;
       look.pitch = Math.max(
         FREE_LOOK_PITCH_MIN,
@@ -1122,13 +1199,24 @@ export function ExcavatorGameWrapper({
 
   const onFreeLookPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (freeLookDragRef.current.pointerId !== event.pointerId) return;
-      freeLookDragRef.current.pointerId = null;
+      const pointers = freeLookPointersRef.current;
+      if (!pointers.has(event.pointerId)) return;
+      pointers.delete(event.pointerId);
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId);
       }
+
+      if (pointers.size < 2) {
+        freeLookPinchRef.current = null;
+      } else {
+        const [a, b] = pointers.values();
+        freeLookPinchRef.current = {
+          lastSpan: Math.hypot(a.x - b.x, a.y - b.y),
+        };
+      }
+      syncFreeLookDragFromPointers();
     },
-    [],
+    [syncFreeLookDragFromPointers],
   );
 
   const modeRef = useRef<GameMode>(mode);
@@ -1502,6 +1590,44 @@ export function ExcavatorGameWrapper({
   const handleHornQuest = useCallback(() => {
     pushQuestProgress("horn", 1);
   }, [pushQuestProgress]);
+
+  const updateSoundSettings = useCallback(
+    (patch: Partial<SoundSettings> | ((prev: SoundSettings) => SoundSettings)) => {
+      setSoundSettings((prev) => {
+        const next = typeof patch === "function" ? patch(prev) : { ...prev, ...patch };
+        saveSoundSettings(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    setSoundSettings(loadSoundSettings());
+  }, []);
+
+  useEffect(() => {
+    yanmarAudio.setHornId(soundSettings.hornId);
+  }, [soundSettings]);
+
+  useEffect(() => {
+    const active = mode !== "intro";
+    yanmarAudio.setActive(active);
+    return () => {
+      yanmarAudio.setActive(false);
+    };
+  }, [mode]);
+
+  useEffect(() => {
+    if (!showSettingsMenu) return;
+    yanmarAudio.unlock();
+  }, [showSettingsMenu]);
+
+  useEffect(() => {
+    return () => {
+      yanmarAudio.dispose();
+    };
+  }, []);
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
@@ -3295,14 +3421,6 @@ export function ExcavatorGameWrapper({
         }`}
         style={gameFrameStyle}
       >
-        <ControlsGuidePanel
-          open={showControlsGuide}
-          onClose={() => setShowControlsGuide(false)}
-          digFeedback={digFeedback}
-          bucketLoad={hud.bucketLoad}
-          maxLoadUnits={equipmentStats.maxLoadUnits}
-          boom={hud.boom}
-        />
         <TutorialSelectModal
           open={showTutorialMenu}
           activeId={tutorialStep?.id ?? null}
@@ -3319,6 +3437,8 @@ export function ExcavatorGameWrapper({
           previewStars={previewStars}
           upgradingPart={upgradingPart}
           resettingEquipment={resettingEquipment}
+          playerLevel={getPlayerLevelProgress(totalXp).level}
+          unlockAllAttachments={practiceUnlocksAll}
           onClose={() => setShowEquipmentUpgrade(false)}
           onUpgrade={handleEquipmentUpgrade}
           onResetEquipment={handleEquipmentReset}
@@ -3509,7 +3629,7 @@ export function ExcavatorGameWrapper({
                 />
               </div>
             ) : null}
-            {!questsDisabled ? (
+            {!questsDisabled && showMissionQuest ? (
               <div className="pointer-events-auto w-[7.3125rem]">
                 <MissionHudPanel
                   questState={questState}
@@ -3948,7 +4068,15 @@ export function ExcavatorGameWrapper({
           showTouchZones={showTouchZones}
           onToggleTouchZones={() => setShowTouchZones((v) => !v)}
           touchZonesAvailable={mode !== "gameReady"}
-          onOpenControlsGuide={() => setShowControlsGuide(true)}
+          showMissionQuest={showMissionQuest}
+          onToggleMissionQuest={() => setShowMissionQuest((v) => !v)}
+          hornId={soundSettings.hornId}
+          onHornIdChange={(hornId: HornId) => {
+            yanmarAudio.unlock();
+            updateSoundSettings({ hornId });
+            yanmarAudio.setHornId(hornId);
+            yanmarAudio.playHorn(hornId);
+          }}
           onResetPosition={resetExcavatorPosition}
           onShowRanking={onShowRanking}
           onSaveAndExit={onRequestExit}
@@ -4051,6 +4179,7 @@ export function ExcavatorGameWrapper({
             allowed={allowed}
             tutorialStep={tutorialStep}
             showTouchZones={showTouchZones}
+            hornId={soundSettings.hornId}
             onHorn={handleHornQuest}
           />
         )}

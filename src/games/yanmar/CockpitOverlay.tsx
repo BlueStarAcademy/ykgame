@@ -21,7 +21,8 @@ import {
   getAttachmentRequiredLevel,
   isAttachmentUnlocked,
 } from "@/lib/playerUnlocks";
-
+import type { HornId } from "./soundSettings";
+import { yanmarAudio } from "./yanmarAudio";
 
 interface CockpitOverlayProps {
   mode: GameMode;
@@ -52,6 +53,7 @@ interface CockpitOverlayProps {
   unlockAllAttachments?: boolean;
   onAttachmentChange: (attachment: AttachmentType) => void;
   onAttachmentWarning?: (message: string) => void;
+  hornId?: HornId;
   onHorn?: () => void;
 }
 
@@ -697,44 +699,6 @@ function VisualControlDeck({
   );
 }
 
-function playHorn() {
-  const AudioContextCtor =
-    window.AudioContext ??
-    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextCtor) return;
-
-  const ctx = new AudioContextCtor();
-  const now = ctx.currentTime;
-  const master = ctx.createGain();
-  const filter = ctx.createBiquadFilter();
-  const gain = ctx.createGain();
-
-  filter.type = "bandpass";
-  filter.frequency.setValueAtTime(460, now);
-  filter.Q.setValueAtTime(1.2, now);
-  master.gain.setValueAtTime(0.9, now);
-  master.connect(filter);
-  filter.connect(gain);
-
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.2, now + 0.025);
-  gain.gain.setValueAtTime(0.2, now + 0.32);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.58);
-  gain.connect(ctx.destination);
-
-  [410, 515].forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    osc.type = i === 0 ? "triangle" : "sine";
-    osc.frequency.setValueAtTime(freq, now);
-    osc.frequency.linearRampToValueAtTime(freq * 0.985, now + 0.5);
-    osc.connect(master);
-    osc.start(now + i * 0.015);
-    osc.stop(now + 0.6);
-  });
-
-  window.setTimeout(() => void ctx.close(), 760);
-}
-
 function usePointerRelease(onRelease: () => void) {
   const pointerIdRef = useRef<number | null>(null);
   const dragging = useRef(false);
@@ -1291,14 +1255,16 @@ function BladeLever({
   const frameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number | null>(null);
   const [stick, setStick] = useState(0);
+  const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     valueRef.current = value;
   }, [value]);
 
-  const stopMotion = useCallback(() => {
+  const stopRate = useCallback(() => {
     stickRef.current = 0;
     setStick(0);
+    setDragging(false);
     lastFrameTimeRef.current = null;
     if (frameRef.current != null) {
       cancelAnimationFrame(frameRef.current);
@@ -1320,7 +1286,7 @@ function BladeLever({
       lastFrameTimeRef.current = time;
 
       const current = valueRef.current;
-      // rate > 0(밀기)=하강, rate < 0(당기기)=상승
+      // rate > 0(밀기)=하강, rate < 0(당기기)=상승. Full stroke ≈ 2s.
       let next = current + rate * BLADE_SPEED_PER_SECOND * deltaSeconds;
       next = Math.max(BLADE_RAISED, Math.min(BLADE_LOWERED, next));
 
@@ -1333,20 +1299,21 @@ function BladeLever({
         (rate > 0 && next >= BLADE_LOWERED - 1e-4) ||
         (rate < 0 && next <= BLADE_RAISED + 1e-4)
       ) {
-        stopMotion();
+        frameRef.current = null;
+        lastFrameTimeRef.current = null;
         return;
       }
 
       frameRef.current = requestAnimationFrame(animate);
     },
-    [onChange, stopMotion],
+    [onChange],
   );
 
-  useEffect(() => stopMotion, [stopMotion]);
+  useEffect(() => () => stopRate(), [stopRate]);
 
   useEffect(() => {
-    if (!enabled) stopMotion();
-  }, [enabled, stopMotion]);
+    if (!enabled) stopRate();
+  }, [enabled, stopRate]);
 
   const updateFromEvent = useCallback(
     (clientY: number) => {
@@ -1356,7 +1323,7 @@ function BladeLever({
       const cy = rect.top + rect.height / 2;
       const maxR = Math.max(rect.height / 2, 1);
       const dy = Math.max(-maxR, Math.min(maxR, clientY - cy));
-      // 위(+)=하강, 아래(-)=상승. 중앙 근처는 중립.
+      // 위(+)=하강, 아래(-)=상승. 중앙 근처는 중립(정지).
       let nextStick = Math.max(-1, Math.min(1, -dy / maxR));
       if (Math.abs(nextStick) < 0.18) nextStick = 0;
       stickRef.current = nextStick;
@@ -1369,11 +1336,23 @@ function BladeLever({
     [animate],
   );
 
-  const pointer = usePointerRelease(stopMotion);
+  const onRelease = useCallback(() => {
+    stickRef.current = 0;
+    setStick(0);
+    setDragging(false);
+    lastFrameTimeRef.current = null;
+    if (frameRef.current != null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+  }, []);
+
+  const pointer = usePointerRelease(onRelease);
 
   const handleStart = (e: React.PointerEvent) => {
     if (!enabled) return;
     e.preventDefault();
+    setDragging(true);
     pointer.begin(e.pointerId, zoneRef.current);
     updateFromEvent(e.clientY);
   };
@@ -1387,6 +1366,11 @@ function BladeLever({
     pointer.finish(e.pointerId);
   };
 
+  // Dragging: show command stick. Idle: hold visual at blade position (no spring-to-center).
+  const visualValue = dragging
+    ? stick
+    : Math.max(-1, Math.min(1, value * 2 - 1));
+
   if (embedded) {
     return (
       <div
@@ -1399,7 +1383,7 @@ function BladeLever({
           <VisualLever
             cx={0.5}
             cy={0.5}
-            value={stick}
+            value={visualValue}
             color="dark"
             variant="travel"
           />
@@ -1449,7 +1433,7 @@ function BladeLever({
         <VisualLever
           cx={0.5}
           cy={0.5}
-          value={stick}
+          value={visualValue}
           color="dark"
           variant="travel"
         />
@@ -2285,6 +2269,7 @@ export function CockpitOverlay({
   unlockAllAttachments = false,
   onAttachmentChange,
   onAttachmentWarning,
+  hornId = 1,
   onHorn,
 }: CockpitOverlayProps) {
   const highlightLeft =
@@ -2493,7 +2478,7 @@ export function CockpitOverlay({
             isPortrait={isPortrait}
             showTouchZones={showTouchZones}
             onHorn={() => {
-              playHorn();
+              yanmarAudio.playHorn(hornId);
               onHorn?.();
             }}
             autoExpanded={autoMenuExpanded}

@@ -265,22 +265,32 @@ export function AdminNoticesPanel() {
                           {notice.active ? "표시중" : "숨김"}
                         </span>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
+                      <div className="mt-2 flex flex-nowrap items-center gap-1.5 overflow-x-auto">
                         <button
                           type="button"
                           disabled={saving || index === 0}
                           onClick={() => void moveNotice(notice.id, -1)}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 disabled:opacity-40"
+                          aria-label="위로"
+                          className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 disabled:opacity-40"
                         >
-                          ↑ 위로
+                          ↑
                         </button>
                         <button
                           type="button"
                           disabled={saving || index === notices.length - 1}
                           onClick={() => void moveNotice(notice.id, 1)}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 disabled:opacity-40"
+                          aria-label="아래로"
+                          className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 disabled:opacity-40"
                         >
-                          ↓ 아래로
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => void toggleActive(notice)}
+                          className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700"
+                        >
+                          {notice.active ? "숨기기" : "표시"}
                         </button>
                         <button
                           type="button"
@@ -289,23 +299,15 @@ export function AdminNoticesPanel() {
                             setEditingId(notice.id);
                             setEditMessage(notice.message);
                           }}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700"
+                          className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700"
                         >
                           수정
                         </button>
                         <button
                           type="button"
                           disabled={saving}
-                          onClick={() => void toggleActive(notice)}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700"
-                        >
-                          {notice.active ? "숨기기" : "표시"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={saving}
                           onClick={() => void removeNotice(notice.id)}
-                          className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700"
+                          className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700"
                         >
                           삭제
                         </button>

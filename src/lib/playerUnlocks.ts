@@ -25,6 +25,32 @@ export function isAttachmentUnlocked(
   return playerLevel >= getAttachmentRequiredLevel(type);
 }
 
+/** 장비 강화 모달 부착물 탭 (버켓은 항상 개방) */
+export function isUpgradeAttachmentTabUnlocked(
+  tab: AttachmentType,
+  playerLevel: number,
+  opts?: { unlockAll?: boolean },
+): boolean {
+  if (tab === "bucket") return true;
+  return isAttachmentUnlocked(tab, playerLevel, opts);
+}
+
+/** 브레이커/집게(돌트럭 포함) 강화 파츠 잠금 여부 */
+export function isYanmarEquipmentPartLocked(
+  part: string,
+  playerLevel: number,
+): boolean {
+  if (part === "CRASH_RESPAWN") return playerLevel < PLAYER_UNLOCKS.BREAKER;
+  if (
+    part === "GRAPPLE_ADHESION" ||
+    part === "HAUL_TRUCK_SPEED" ||
+    part === "HILL_SAFE_LOAD"
+  ) {
+    return playerLevel < PLAYER_UNLOCKS.GRAPPLE;
+  }
+  return false;
+}
+
 export function getCrossedUnlocks(previousLevel: number, nextLevel: number): PlayerUnlockKind[] {
   return (Object.keys(PLAYER_UNLOCKS) as PlayerUnlockKind[]).filter((kind) => {
     const required = PLAYER_UNLOCKS[kind];

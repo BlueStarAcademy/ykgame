@@ -1,3 +1,4 @@
+import { AccountSanctionedView } from "@/components/auth/AccountSanctionedView";
 import { GamePlayClient } from "@/components/games/GamePlayClient";
 import { AppShell } from "@/components/layout/AppShell";
 import { getSeasonInfo } from "@/lib/games";
@@ -13,14 +14,31 @@ export default async function HomePage() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { currency: true, nickname: true, totalXp: true },
+    select: {
+      currency: true,
+      nickname: true,
+      totalXp: true,
+      isActive: true,
+      sanctionReason: true,
+    },
   });
 
   const nickname = user?.nickname ?? session.user.nickname ?? "";
   const currency = user?.currency ?? 0;
   const totalXp = user?.totalXp ?? 0;
-  const season = getSeasonInfo();
 
+  if (user && !user.isActive) {
+    return (
+      <AppShell nickname={nickname} currency={currency} role={session.user.role} hideFooter>
+        <AccountSanctionedView
+          nickname={nickname}
+          reason={user.sanctionReason?.trim() || "운영 정책에 따른 이용 제한"}
+        />
+      </AppShell>
+    );
+  }
+
+  const season = getSeasonInfo();
   const statsByGame = await getUserGameStatsForGames(
     ["yanmar"],
     session.user.id,

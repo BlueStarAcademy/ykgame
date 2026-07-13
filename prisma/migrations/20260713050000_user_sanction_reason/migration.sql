@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "sanctionReason" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "sanctionedAt" TIMESTAMP(3);

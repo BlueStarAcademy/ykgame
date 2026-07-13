@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { isGameAvailable } from "@/lib/games";
 import { isValidGameId } from "@/games/registry";
 import { GamePlayClient } from "@/components/games/GamePlayClient";
+import { prisma } from "@/lib/prisma";
 
 export default async function GamePage({
   params,
@@ -14,6 +15,14 @@ export default async function GamePage({
   const session = await auth();
   if (!session?.user) redirect("/login");
   if (!session.user.nickname) redirect("/nickname");
+
+  const account = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { isActive: true },
+  });
+  if (account && !account.isActive) {
+    redirect("/home");
+  }
 
   const { gameId } = await params;
   const { play } = await searchParams;

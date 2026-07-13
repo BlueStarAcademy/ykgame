@@ -11,6 +11,8 @@ import {
   YANMAR_EQUIPMENT_CONFIG,
   type YanmarEquipmentPart,
 } from "@/games/yanmar/equipment";
+import { getPlayerLevelProgress } from "@/lib/playerLevel";
+import { isYanmarEquipmentPartLocked } from "@/lib/playerUnlocks";
 
 function isEquipmentPart(part: unknown): part is YanmarEquipmentPart {
   return (
@@ -28,6 +30,18 @@ export async function POST(request: Request) {
   const { part } = (await request.json()) as { part?: unknown };
   if (!isEquipmentPart(part)) {
     return NextResponse.json({ error: "Invalid part" }, { status: 400 });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { totalXp: true },
+  });
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const playerLevel = getPlayerLevelProgress(user.totalXp).level;
+  if (isYanmarEquipmentPartLocked(part, playerLevel)) {
+    return NextResponse.json({ error: "Attachment locked" }, { status: 403 });
   }
 
   try {

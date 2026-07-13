@@ -4,6 +4,8 @@ export type CameraMode = 1 | 2 | 3;
 export interface CameraLookOffset {
   yaw: number;
   pitch: number;
+  /** Orbit distance scale (1 = default). Pinch/zoom adjusts this. */
+  distance: number;
 }
 
 export type AttachmentType = "bucket" | "breaker" | "grapple";
