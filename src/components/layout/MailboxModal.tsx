@@ -62,8 +62,21 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
       const res = await fetch("/api/mail");
       if (!res.ok) throw new Error("failed");
       const data = await res.json();
-      setMails(data.mails ?? []);
-      setSelectedMailId((current) => current ?? data.mails?.[0]?.id ?? null);
+      const nextMails = (data.mails ?? []) as UserMail[];
+      const hadUnread = nextMails.some((mail) => !mail.readAt);
+
+      // Opening the mailbox counts as checking inbox — clear unread notify.
+      if (hadUnread) {
+        await fetch("/api/mail/read-all", { method: "POST" });
+      }
+
+      const readAt = new Date().toISOString();
+      setMails(
+        nextMails.map((mail) =>
+          mail.readAt ? mail : { ...mail, readAt },
+        ),
+      );
+      setSelectedMailId((current) => current ?? nextMails[0]?.id ?? null);
       onMailboxChange?.();
     } catch {
       setMails([]);
@@ -76,30 +89,9 @@ export function MailboxModal({ open, onClose, onMailboxChange }: MailboxModalPro
   useEffect(() => {
     if (!open) return;
     void loadMails();
+    // Reload only when the modal opens; avoid refetch loops from callback identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  useEffect(() => {
-    if (!open || !selectedMailId) return;
-    let cancelled = false;
-    void fetch(`/api/mail/${selectedMailId}/read`, { method: "PATCH" }).then(
-      (res) => {
-        if (!res.ok || cancelled) return;
-        setMails((prev) => {
-          const mail = prev.find((item) => item.id === selectedMailId);
-          if (!mail || mail.readAt) return prev;
-          return prev.map((item) =>
-            item.id === selectedMailId
-              ? { ...item, readAt: new Date().toISOString() }
-              : item,
-          );
-        });
-        onMailboxChange?.();
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [open, selectedMailId, onMailboxChange]);
 
   if (!open) return null;
 
@@ -243,9 +235,8 @@ export function useMailboxBadge() {
       if (!res.ok) return;
       const data = await res.json();
       const mails = (data.mails ?? []) as UserMail[];
-      const count = mails.filter(
-        (mail) => !mail.readAt || (!mail.claimedAt && hasAttachment(mail)),
-      ).length;
+      // Notify only for unchecked mail. Unclaimed rewards stay visible in the list.
+      const count = mails.filter((mail) => !mail.readAt).length;
       setNotifyCount(count);
     } catch {
       setNotifyCount(0);

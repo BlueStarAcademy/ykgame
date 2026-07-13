@@ -473,38 +473,29 @@ body {
     0 0.12rem 0.35rem rgba(0, 0, 0, 0.35);
 }
 
-.yanmar-game-ticker-track {
-  display: flex;
-  align-items: center;
-  width: max-content;
+.yanmar-game-ticker-viewport {
+  position: relative;
+  width: 100%;
   height: 100%;
-  animation: yanmar-game-ticker-scroll 24s linear infinite;
-  will-change: transform;
+  overflow: hidden;
 }
 
 .yanmar-game-ticker-item {
-  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
   display: inline-flex;
   align-items: center;
   height: 100%;
-  padding: 0 2.75rem;
+  padding: 0 0.75rem;
   white-space: nowrap;
-  overflow: hidden;
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.03em;
   color: #fde68a;
   text-shadow: 0 0 8px rgba(251, 191, 36, 0.42);
-}
-
-@keyframes yanmar-game-ticker-scroll {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
+  will-change: transform;
 }
 
 .yanmar-control-deck {

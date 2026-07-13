@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
-import { getTickerFeed } from "@/lib/ticker";
+import { getTickerFeed, getTickerSettings } from "@/lib/ticker";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const includePractice = searchParams.get("practice") === "1";
 
   try {
-    const items = await getTickerFeed({ includePractice });
+    const [items, settings] = await Promise.all([
+      getTickerFeed({ includePractice }),
+      getTickerSettings(),
+    ]);
     return NextResponse.json(
-      { items },
+      { items, scrollSpeedPx: settings.scrollSpeedPx },
       {
         headers: {
           "Cache-Control": "public, max-age=5, stale-while-revalidate=15",
@@ -17,6 +20,17 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     console.error("[ticker] feed failed:", error);
-    return NextResponse.json({ items: [] }, { status: 200 });
+    try {
+      const items = await getTickerFeed({ includePractice });
+      return NextResponse.json(
+        { items, scrollSpeedPx: 60 },
+        { status: 200 },
+      );
+    } catch {
+      return NextResponse.json(
+        { items: [], scrollSpeedPx: 60 },
+        { status: 200 },
+      );
+    }
   }
 }

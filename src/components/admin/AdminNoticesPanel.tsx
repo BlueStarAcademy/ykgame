@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AdminShell } from "./AdminShell";
+import {
+  TICKER_SCROLL_SPEED_DEFAULT,
+  TICKER_SCROLL_SPEED_MAX,
+  TICKER_SCROLL_SPEED_MIN,
+} from "@/lib/ticker-constants";
 
 type TickerNotice = {
   id: string;
@@ -20,6 +25,8 @@ export function AdminNoticesPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editMessage, setEditMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [scrollSpeedPx, setScrollSpeedPx] = useState(TICKER_SCROLL_SPEED_DEFAULT);
+  const [speedDraft, setSpeedDraft] = useState(TICKER_SCROLL_SPEED_DEFAULT);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -29,6 +36,12 @@ export function AdminNoticesPanel() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "불러오기 실패");
       setNotices(data.notices ?? []);
+      const speed =
+        typeof data.scrollSpeedPx === "number"
+          ? data.scrollSpeedPx
+          : TICKER_SCROLL_SPEED_DEFAULT;
+      setScrollSpeedPx(speed);
+      setSpeedDraft(speed);
     } catch (err) {
       setError(err instanceof Error ? err.message : "불러오기 실패");
     } finally {
@@ -59,6 +72,30 @@ export function AdminNoticesPanel() {
       setNotices((prev) => [...prev, data.notice]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "등록 실패");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveScrollSpeed() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/notices", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scrollSpeedPx: speedDraft }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "속도 저장 실패");
+      const speed =
+        typeof data.scrollSpeedPx === "number"
+          ? data.scrollSpeedPx
+          : speedDraft;
+      setScrollSpeedPx(speed);
+      setSpeedDraft(speed);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "속도 저장 실패");
     } finally {
       setSaving(false);
     }
@@ -152,12 +189,66 @@ export function AdminNoticesPanel() {
     }
   }
 
+  const speedDirty = speedDraft !== scrollSpeedPx;
+
   return (
     <AdminShell
       title="전광판 공지"
       subtitle="게임 상단 전광판에 표시할 공지를 작성·정렬합니다. 쿠폰 획득 알림과 함께 순환됩니다."
     >
       <div className="space-y-4">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-black text-slate-900">스크롤 속도</h2>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+            공지가 오른쪽에서 왼쪽으로 흐르다 왼쪽 끝에 도착하면 3초 정지한 뒤
+            다시 흘러갑니다. 속도 단위는 px/s입니다.
+          </p>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input
+              type="range"
+              min={TICKER_SCROLL_SPEED_MIN}
+              max={TICKER_SCROLL_SPEED_MAX}
+              step={5}
+              value={speedDraft}
+              onChange={(e) => setSpeedDraft(Number(e.target.value))}
+              className="min-w-0 flex-1 accent-slate-900"
+              aria-label="스크롤 속도"
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={TICKER_SCROLL_SPEED_MIN}
+                max={TICKER_SCROLL_SPEED_MAX}
+                value={speedDraft}
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  if (!Number.isFinite(next)) return;
+                  setSpeedDraft(
+                    Math.min(
+                      TICKER_SCROLL_SPEED_MAX,
+                      Math.max(TICKER_SCROLL_SPEED_MIN, Math.round(next)),
+                    ),
+                  );
+                }}
+                className="w-20 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm tabular-nums"
+              />
+              <span className="text-xs font-bold text-slate-500">px/s</span>
+              <button
+                type="button"
+                disabled={saving || !speedDirty}
+                onClick={() => void saveScrollSpeed()}
+                className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+              >
+                저장
+              </button>
+            </div>
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-400">
+            현재 적용: {scrollSpeedPx} px/s · 범위{" "}
+            {TICKER_SCROLL_SPEED_MIN}–{TICKER_SCROLL_SPEED_MAX}
+          </p>
+        </section>
+
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-sm font-black text-slate-900">새 공지 작성</h2>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">

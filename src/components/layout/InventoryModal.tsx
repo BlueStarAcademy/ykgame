@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 
 export interface InventoryCoupon {
@@ -126,25 +127,45 @@ interface InventoryModalProps {
   onInventoryChange?: (coupons: InventoryCoupon[]) => void;
 }
 
-const COUPON_SEEN_KEY = "ykgame:coupons:seen-ids:v1";
+const COUPON_SEEN_KEY_PREFIX = "ykgame:coupons:seen-ids:v1";
+const COUPON_SEEN_KEY_LEGACY = "ykgame:coupons:seen-ids:v1";
 
-function loadSeenCouponIds(): Set<string> {
+function couponSeenStorageKey(userId: string | undefined) {
+  return userId
+    ? `${COUPON_SEEN_KEY_PREFIX}:${userId}`
+    : COUPON_SEEN_KEY_LEGACY;
+}
+
+function loadSeenCouponIds(userId?: string): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
-    const raw = window.localStorage.getItem(COUPON_SEEN_KEY);
+    const key = couponSeenStorageKey(userId);
+    const raw =
+      window.localStorage.getItem(key) ??
+      // Migrate legacy unscoped key once per browser.
+      (userId ? window.localStorage.getItem(COUPON_SEEN_KEY_LEGACY) : null);
     if (!raw) return new Set();
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((id): id is string => typeof id === "string"));
+    const ids = new Set(
+      parsed.filter((id): id is string => typeof id === "string"),
+    );
+    if (userId && !window.localStorage.getItem(key) && ids.size > 0) {
+      saveSeenCouponIds(ids, userId);
+    }
+    return ids;
   } catch {
     return new Set();
   }
 }
 
-function saveSeenCouponIds(ids: Set<string>) {
+function saveSeenCouponIds(ids: Set<string>, userId?: string) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(COUPON_SEEN_KEY, JSON.stringify([...ids]));
+    window.localStorage.setItem(
+      couponSeenStorageKey(userId),
+      JSON.stringify([...ids]),
+    );
   } catch {
     // ignore quota / private mode
   }
@@ -154,8 +175,20 @@ function isUsableCoupon(coupon: InventoryCoupon, now = Date.now()) {
   return !coupon.usedAt && new Date(coupon.expiresAt).getTime() > now;
 }
 
+/** Persist “checked” coupon ids so reconnect does not re-notify. */
+function markCouponsSeen(coupons: InventoryCoupon[], userId?: string) {
+  const seen = loadSeenCouponIds(userId);
+  for (const coupon of coupons) {
+    if (isUsableCoupon(coupon)) seen.add(coupon.id);
+  }
+  saveSeenCouponIds(seen, userId);
+  return seen;
+}
+
 /** Unused, unexpired coupons the player has not opened yet. */
 export function useCouponBadge() {
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
   const [notifyCount, setNotifyCount] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -164,7 +197,7 @@ export function useCouponBadge() {
       if (!res.ok) return;
       const data = await res.json();
       const coupons = (data.coupons ?? []) as InventoryCoupon[];
-      const seen = loadSeenCouponIds();
+      const seen = loadSeenCouponIds(userId);
       const count = coupons.filter(
         (coupon) => isUsableCoupon(coupon) && !seen.has(coupon.id),
       ).length;
@@ -172,16 +205,15 @@ export function useCouponBadge() {
     } catch {
       setNotifyCount(0);
     }
-  }, []);
+  }, [userId]);
 
-  const markSeen = useCallback((coupons: InventoryCoupon[]) => {
-    const seen = loadSeenCouponIds();
-    for (const coupon of coupons) {
-      if (isUsableCoupon(coupon)) seen.add(coupon.id);
-    }
-    saveSeenCouponIds(seen);
-    setNotifyCount(0);
-  }, []);
+  const markSeen = useCallback(
+    (coupons: InventoryCoupon[]) => {
+      markCouponsSeen(coupons, userId);
+      setNotifyCount(0);
+    },
+    [userId],
+  );
 
   useEffect(() => {
     void refresh();
@@ -195,6 +227,8 @@ export function InventoryModal({
   onClose,
   onInventoryChange,
 }: InventoryModalProps) {
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
   const [coupons, setCoupons] = useState<InventoryCoupon[]>([]);
   const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -211,6 +245,8 @@ export function InventoryModal({
         const next = (data.coupons ?? []) as InventoryCoupon[];
         setCoupons(next);
         setSelectedCouponId(next[0]?.id ?? null);
+        // Always persist checked state here so in-game / header paths both stick.
+        markCouponsSeen(next, userId);
         onInventoryChange?.(next);
       })
       .catch(() => {
@@ -227,7 +263,7 @@ export function InventoryModal({
     };
     // Reload only when the modal opens; avoid refetch loops from callback identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, userId]);
 
   if (!open) return null;
 

@@ -214,6 +214,14 @@ model TickerNotice {
   @@index([active, sortOrder])
 }
 
+/** 전광판 전역 설정 (싱글톤 id=default) */
+model TickerSettings {
+  id            String   @id @default("default")
+  /** Scroll speed in pixels per second (20–200). */
+  scrollSpeedPx Int      @default(60)
+  updatedAt     DateTime @updatedAt
+}
+
 /** 쿠폰·스타 당첨 등 실시간 전광판 이벤트 (최근분만 유지) */
 model TickerWinEvent {
   id        String   @id @default(cuid())

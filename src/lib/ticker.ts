@@ -1,15 +1,34 @@
 import type { CouponType, Prisma } from "@/generated/prisma/client";
 import { couponTypeLabel, isExchangeCoupon } from "@/lib/coupon";
 import { prisma } from "@/lib/prisma";
+import {
+  clampTickerScrollSpeed,
+  TICKER_SCROLL_SPEED_DEFAULT,
+  TICKER_SCROLL_SPEED_MAX,
+  TICKER_SCROLL_SPEED_MIN,
+  TICKER_SETTINGS_ID,
+} from "@/lib/ticker-constants";
 
 export const TICKER_WIN_RETENTION_MS = 1000 * 60 * 60 * 6;
 export const TICKER_WIN_FEED_LIMIT = 12;
+export {
+  clampTickerScrollSpeed,
+  TICKER_LEFT_PAUSE_MS,
+  TICKER_SCROLL_SPEED_DEFAULT,
+  TICKER_SCROLL_SPEED_MAX,
+  TICKER_SCROLL_SPEED_MIN,
+  TICKER_SETTINGS_ID,
+} from "@/lib/ticker-constants";
 
 export type TickerFeedItem = {
   id: string;
   kind: "notice" | "coupon" | "practice";
   message: string;
   createdAt: string | null;
+};
+
+export type TickerSettings = {
+  scrollSpeedPx: number;
 };
 
 function displayName(nickname: string | null | undefined) {
@@ -51,6 +70,52 @@ export async function publishTickerWinEvents(
   await db.tickerWinEvent.deleteMany({
     where: { createdAt: { lt: cutoff } },
   });
+}
+
+export async function getTickerSettings(): Promise<TickerSettings> {
+  const delegate = (
+    prisma as typeof prisma & {
+      tickerSettings?: typeof prisma.tickerSettings;
+    }
+  ).tickerSettings;
+  if (!delegate) {
+    console.error(
+      "[ticker] prisma.tickerSettings missing — restarting client may be required",
+    );
+    return { scrollSpeedPx: TICKER_SCROLL_SPEED_DEFAULT };
+  }
+
+  const row = await delegate.upsert({
+    where: { id: TICKER_SETTINGS_ID },
+    create: {
+      id: TICKER_SETTINGS_ID,
+      scrollSpeedPx: TICKER_SCROLL_SPEED_DEFAULT,
+    },
+    update: {},
+    select: { scrollSpeedPx: true },
+  });
+  return {
+    scrollSpeedPx:
+      clampTickerScrollSpeed(row.scrollSpeedPx) ?? TICKER_SCROLL_SPEED_DEFAULT,
+  };
+}
+
+export async function upsertTickerScrollSpeed(
+  scrollSpeedPx: number,
+): Promise<TickerSettings> {
+  const speed = clampTickerScrollSpeed(scrollSpeedPx);
+  if (speed == null) {
+    throw new Error(
+      `scrollSpeedPx must be ${TICKER_SCROLL_SPEED_MIN}–${TICKER_SCROLL_SPEED_MAX}`,
+    );
+  }
+  const row = await prisma.tickerSettings.upsert({
+    where: { id: TICKER_SETTINGS_ID },
+    create: { id: TICKER_SETTINGS_ID, scrollSpeedPx: speed },
+    update: { scrollSpeedPx: speed },
+    select: { scrollSpeedPx: true },
+  });
+  return { scrollSpeedPx: row.scrollSpeedPx };
 }
 
 export async function getTickerFeed(options?: {

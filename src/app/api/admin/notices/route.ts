@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  clampTickerScrollSpeed,
+  getTickerSettings,
+  TICKER_SCROLL_SPEED_DEFAULT,
+  TICKER_SCROLL_SPEED_MAX,
+  TICKER_SCROLL_SPEED_MIN,
+  upsertTickerScrollSpeed,
+} from "@/lib/ticker";
 
 const MAX_MESSAGE_LENGTH = 160;
 
@@ -17,11 +25,27 @@ export async function GET() {
     const notices = await prisma.tickerNotice.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
-    return NextResponse.json({ notices });
+    let scrollSpeedPx = TICKER_SCROLL_SPEED_DEFAULT;
+    try {
+      const settings = await getTickerSettings();
+      scrollSpeedPx = settings.scrollSpeedPx;
+    } catch (settingsError) {
+      console.error("[admin/notices] settings load failed:", settingsError);
+    }
+    return NextResponse.json({
+      notices,
+      scrollSpeedPx,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unauthorized";
-    const status = message === "FORBIDDEN" ? 403 : 401;
-    return NextResponse.json({ error: message }, { status });
+    if (message === "FORBIDDEN") {
+      return NextResponse.json({ error: message }, { status: 403 });
+    }
+    if (message === "UNAUTHORIZED") {
+      return NextResponse.json({ error: message }, { status: 401 });
+    }
+    console.error("[admin/notices] GET failed:", error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -64,7 +88,23 @@ export async function PATCH(request: Request) {
     await requireAdmin();
     const body = (await request.json().catch(() => null)) as {
       orderedIds?: unknown;
+      scrollSpeedPx?: unknown;
     } | null;
+
+    if (body?.scrollSpeedPx !== undefined) {
+      const speed = clampTickerScrollSpeed(body.scrollSpeedPx);
+      if (speed == null) {
+        return NextResponse.json(
+          {
+            error: `스크롤 속도는 ${TICKER_SCROLL_SPEED_MIN}–${TICKER_SCROLL_SPEED_MAX} px/s 사이여야 합니다.`,
+          },
+          { status: 400 },
+        );
+      }
+      const settings = await upsertTickerScrollSpeed(speed);
+      return NextResponse.json({ scrollSpeedPx: settings.scrollSpeedPx });
+    }
+
     const orderedIds = Array.isArray(body?.orderedIds)
       ? body.orderedIds.filter((id): id is string => typeof id === "string")
       : null;

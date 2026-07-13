@@ -71,8 +71,15 @@ function isStalePrismaClient(client: PrismaClient): boolean {
   const delegates = client as PrismaClient & {
     rewardEvent?: unknown;
     userMail?: unknown;
+    tickerSettings?: unknown;
+    tickerNotice?: unknown;
   };
-  if (delegates.userMail == null || delegates.rewardEvent == null) {
+  if (
+    delegates.userMail == null ||
+    delegates.rewardEvent == null ||
+    delegates.tickerNotice == null ||
+    delegates.tickerSettings == null
+  ) {
     return true;
   }
 
