@@ -69,6 +69,10 @@ interface YanmarGameSettingsMenuProps {
   touchZonesAvailable: boolean;
   showMissionQuest: boolean;
   onToggleMissionQuest: () => void;
+  bgmEnabled: boolean;
+  onToggleBgm: () => void;
+  sfxEnabled: boolean;
+  onToggleSfx: () => void;
   hornId: HornId;
   onHornIdChange: (hornId: HornId) => void;
   onResetPosition: () => void;
@@ -96,6 +100,10 @@ export function YanmarGameSettingsMenu({
   touchZonesAvailable,
   showMissionQuest,
   onToggleMissionQuest,
+  bgmEnabled,
+  onToggleBgm,
+  sfxEnabled,
+  onToggleSfx,
   hornId,
   onHornIdChange,
   onResetPosition,
@@ -232,20 +240,24 @@ export function YanmarGameSettingsMenu({
           ) : null}
 
           {tab === "sound" ? (
-            <label className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-white">
-              <span>경적 소리</span>
-              <select
-                value={hornId}
-                onChange={(e) => onHornIdChange(Number(e.target.value) as HornId)}
-                className="max-w-[5.5rem] rounded-md border border-white/15 bg-black/70 px-1.5 py-1 text-[10px] font-semibold text-white outline-none focus:border-sky-400/60"
-              >
-                {HORN_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <>
+              <ToggleRow label="배경음" on={bgmEnabled} onToggle={onToggleBgm} />
+              <ToggleRow label="효과음" on={sfxEnabled} onToggle={onToggleSfx} />
+              <label className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-white">
+                <span>경적 소리</span>
+                <select
+                  value={hornId}
+                  onChange={(e) => onHornIdChange(Number(e.target.value) as HornId)}
+                  className="max-w-[5.5rem] rounded-md border border-white/15 bg-black/70 px-1.5 py-1 text-[10px] font-semibold text-white outline-none focus:border-sky-400/60"
+                >
+                  {HORN_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
           ) : null}
 
           {tab === "other" ? (

@@ -1,4 +1,4 @@
-const STORAGE_KEY = "ykgame:yanmar:sound-settings:v2";
+const STORAGE_KEY = "ykgame:yanmar:sound-settings:v3";
 
 export const HORN_OPTIONS = [
   { id: 1 as const, label: "경적1" },
@@ -11,52 +11,86 @@ export type HornId = (typeof HORN_OPTIONS)[number]["id"];
 
 export interface SoundSettings {
   hornId: HornId;
+  /** Reserved for future BGM; persisted so the toggle works when audio is added. */
+  bgmEnabled: boolean;
+  /** Currently gates breaker strike SFX (and future effect sounds). */
+  sfxEnabled: boolean;
 }
 
 export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
   hornId: 1,
+  bgmEnabled: true,
+  sfxEnabled: true,
 };
 
 function isHornId(value: unknown): value is HornId {
   return value === 1 || value === 2 || value === 3 || value === 4;
 }
 
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === "boolean";
+}
+
 function isValidSettings(value: unknown): value is SoundSettings {
   if (!value || typeof value !== "object") return false;
   const settings = value as Partial<SoundSettings>;
-  return isHornId(settings.hornId);
+  return (
+    isHornId(settings.hornId) &&
+    isBoolean(settings.bgmEnabled) &&
+    isBoolean(settings.sfxEnabled)
+  );
+}
+
+function migrateFromLegacy(raw: string | null): SoundSettings | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const legacy = parsed as Partial<SoundSettings> & { hornId?: unknown };
+    if (!isHornId(legacy.hornId)) return null;
+    return {
+      hornId: legacy.hornId,
+      bgmEnabled: isBoolean(legacy.bgmEnabled)
+        ? legacy.bgmEnabled
+        : DEFAULT_SOUND_SETTINGS.bgmEnabled,
+      sfxEnabled: isBoolean(legacy.sfxEnabled)
+        ? legacy.sfxEnabled
+        : DEFAULT_SOUND_SETTINGS.sfxEnabled,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function loadSoundSettings(): SoundSettings {
   if (typeof window === "undefined") return { ...DEFAULT_SOUND_SETTINGS };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      // Migrate hornId from v1 if present
-      const legacy = window.localStorage.getItem(
-        "ykgame:yanmar:sound-settings:v1",
-      );
-      if (legacy) {
-        const parsed: unknown = JSON.parse(legacy);
-        if (
-          parsed &&
-          typeof parsed === "object" &&
-          isHornId((parsed as { hornId?: unknown }).hornId)
-        ) {
-          const next = { hornId: (parsed as SoundSettings).hornId };
-          saveSoundSettings(next);
-          window.localStorage.removeItem("ykgame:yanmar:sound-settings:v1");
-          return next;
-        }
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (isValidSettings(parsed)) {
+        return {
+          hornId: parsed.hornId,
+          bgmEnabled: parsed.bgmEnabled,
+          sfxEnabled: parsed.sfxEnabled,
+        };
       }
-      return { ...DEFAULT_SOUND_SETTINGS };
-    }
-    const parsed: unknown = JSON.parse(raw);
-    if (!isValidSettings(parsed)) {
       window.localStorage.removeItem(STORAGE_KEY);
-      return { ...DEFAULT_SOUND_SETTINGS };
     }
-    return { hornId: parsed.hornId };
+
+    for (const key of [
+      "ykgame:yanmar:sound-settings:v2",
+      "ykgame:yanmar:sound-settings:v1",
+    ]) {
+      const migrated = migrateFromLegacy(window.localStorage.getItem(key));
+      if (migrated) {
+        saveSoundSettings(migrated);
+        window.localStorage.removeItem(key);
+        return migrated;
+      }
+    }
+
+    return { ...DEFAULT_SOUND_SETTINGS };
   } catch {
     return { ...DEFAULT_SOUND_SETTINGS };
   }

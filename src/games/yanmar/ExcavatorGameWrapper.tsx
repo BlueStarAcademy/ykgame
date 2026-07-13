@@ -1608,6 +1608,8 @@ export function ExcavatorGameWrapper({
 
   useEffect(() => {
     yanmarAudio.setHornId(soundSettings.hornId);
+    yanmarAudio.setBgmEnabled(soundSettings.bgmEnabled);
+    yanmarAudio.setSfxEnabled(soundSettings.sfxEnabled);
   }, [soundSettings]);
 
   useEffect(() => {
@@ -4070,6 +4072,24 @@ export function ExcavatorGameWrapper({
           touchZonesAvailable={mode !== "gameReady"}
           showMissionQuest={showMissionQuest}
           onToggleMissionQuest={() => setShowMissionQuest((v) => !v)}
+          bgmEnabled={soundSettings.bgmEnabled}
+          onToggleBgm={() => {
+            yanmarAudio.unlock();
+            updateSoundSettings((prev) => {
+              const bgmEnabled = !prev.bgmEnabled;
+              yanmarAudio.setBgmEnabled(bgmEnabled);
+              return { ...prev, bgmEnabled };
+            });
+          }}
+          sfxEnabled={soundSettings.sfxEnabled}
+          onToggleSfx={() => {
+            yanmarAudio.unlock();
+            updateSoundSettings((prev) => {
+              const sfxEnabled = !prev.sfxEnabled;
+              yanmarAudio.setSfxEnabled(sfxEnabled);
+              return { ...prev, sfxEnabled };
+            });
+          }}
           hornId={soundSettings.hornId}
           onHornIdChange={(hornId: HornId) => {
             yanmarAudio.unlock();

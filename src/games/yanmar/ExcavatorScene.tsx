@@ -18,6 +18,7 @@ import {
 } from "./ExcavatorModel";
 import { PremiumDumpTruckModel } from "./DumpTruckModel";
 import { YANMAR_MACHINE_RIG } from "./machineVisualTheme";
+import { yanmarAudio } from "./yanmarAudio";
 import {
   createTerrain,
   digZoneLabel,
@@ -2173,14 +2174,18 @@ function ExcavatorArm({
           getBreakerGroundAngleDeg(s, boomSwing) >= MIN_BREAKER_GROUND_ANGLE_DEG &&
           !!tile?.active;
         const hammering = (aux?.attachmentPedal ?? 0) !== 0 && onAsphalt;
+        yanmarAudio.setBreakerHammering(hammering);
         const t = performance.now();
         if (breakerChiselRef.current) {
           breakerChiselRef.current.position.x = hammering
             ? Math.sin(t * 0.17) * 0.026 + Math.sin(t * 0.33) * 0.008
             : 0;
         }
-      } else if (breakerChiselRef.current) {
-        breakerChiselRef.current.position.x = 0;
+      } else {
+        yanmarAudio.setBreakerHammering(false);
+        if (breakerChiselRef.current) {
+          breakerChiselRef.current.position.x = 0;
+        }
       }
     }
     if (grappleVisualRef.current) {
