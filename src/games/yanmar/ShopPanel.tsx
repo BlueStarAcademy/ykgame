@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
 import {
@@ -7,6 +8,11 @@ import {
   type ShopItem,
   type ShopItemId,
 } from "./shopCatalog";
+import {
+  GACHA_CONFIG,
+  type GachaBanner,
+} from "./gearCatalog";
+import { gachaBannerArtSrc, gachaBannerChromeClass } from "./gearArt";
 
 interface ShopPanelProps {
   open: boolean;
@@ -15,6 +21,8 @@ interface ShopPanelProps {
   activeItemIds?: ReadonlySet<ShopItemId> | readonly ShopItemId[];
   purchasingId?: ShopItemId | null;
   onPurchase?: (itemId: ShopItemId) => void | Promise<void>;
+  gachaBusy?: boolean;
+  onGacha?: (banner: "STANDARD" | "PREMIUM", count: 1 | 10) => void | Promise<void>;
 }
 
 function ShopProductCard({
@@ -73,6 +81,77 @@ function ShopProductCard({
   );
 }
 
+function GachaBannerSection({
+  banner,
+  title,
+  gradeLabels,
+  gachaBusy,
+  onGacha,
+}: {
+  banner: GachaBanner;
+  title: string;
+  gradeLabels: readonly string[];
+  gachaBusy?: boolean;
+  onGacha?: (banner: "STANDARD" | "PREMIUM", count: 1 | 10) => void | Promise<void>;
+}) {
+  const cfg = GACHA_CONFIG[banner];
+  const isPremium = banner === "PREMIUM";
+  return (
+    <section className={`yanmar-gacha-banner ${gachaBannerChromeClass(banner)}`}>
+      <div className="yanmar-gacha-banner-showcase">
+        <div className="yanmar-gacha-banner-art" aria-hidden>
+          <img
+            src={`${gachaBannerArtSrc(banner)}?v=1`}
+            alt=""
+            draggable={false}
+          />
+        </div>
+        <div className="yanmar-gacha-banner-copy">
+          <span className="yanmar-gacha-banner-kicker">
+            {isPremium ? "PREMIUM" : "STANDARD"}
+          </span>
+          <h3>{title}</h3>
+          <div className="yanmar-gacha-grade-row" aria-label="등장 등급">
+            {gradeLabels.map((label) => (
+              <span key={label} className="yanmar-gacha-grade-chip">
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="yanmar-gacha-actions">
+        <button
+          type="button"
+          disabled={gachaBusy || !onGacha}
+          className="yanmar-gacha-pull-btn yanmar-gacha-pull-btn--single"
+          onClick={() => void onGacha?.(banner, 1)}
+        >
+          <span className="yanmar-gacha-pull-label">1회 뽑기</span>
+          <StarAmount
+            value={cfg.cost1}
+            size={12}
+            valueClassName="yanmar-gacha-pull-star"
+          />
+        </button>
+        <button
+          type="button"
+          disabled={gachaBusy || !onGacha}
+          className="yanmar-gacha-pull-btn yanmar-gacha-pull-btn--multi"
+          onClick={() => void onGacha?.(banner, 10)}
+        >
+          <span className="yanmar-gacha-pull-label">10연 뽑기</span>
+          <StarAmount
+            value={cfg.cost10}
+            size={12}
+            valueClassName="yanmar-gacha-pull-star"
+          />
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function ShopPanel({
   open,
   onClose,
@@ -80,7 +159,10 @@ export function ShopPanel({
   activeItemIds,
   purchasingId = null,
   onPurchase,
+  gachaBusy,
+  onGacha,
 }: ShopPanelProps) {
+  const [tab, setTab] = useState<"gear" | "buff">("gear");
   const activeSet =
     activeItemIds instanceof Set
       ? activeItemIds
@@ -90,18 +172,13 @@ export function ShopPanel({
     <AppModalOverlay
       open={open}
       onClose={onClose}
-      panelClassName="max-w-[22.5rem] landscape:max-h-[min(94dvh,28rem)]"
+      panelClassName="max-w-[min(96vw,26rem)] landscape:max-h-[min(94dvh,32rem)]"
     >
       <div className="flex h-[min(84dvh,38rem)] w-full flex-col overflow-hidden rounded-2xl border border-amber-200/20 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl landscape:h-[min(92dvh,26rem)]">
         <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="yanmar-shop-panel-badge" aria-hidden />
-            <div>
-              <h2 className="text-sm font-black text-amber-100">상점</h2>
-              <p className="text-[10px] font-semibold text-white/45">
-                YK건기 아이템 샵
-              </p>
-            </div>
+            <h2 className="text-sm font-black text-amber-100">상점</h2>
           </div>
           <div className="flex items-center gap-2">
             {typeof stars === "number" ? (
@@ -123,19 +200,59 @@ export function ShopPanel({
           </div>
         </div>
 
+        <div className="flex shrink-0 gap-2 border-b border-white/10 px-3 py-2">
+          <button
+            type="button"
+            className={`rounded-lg px-3 py-1 text-[11px] font-bold ${
+              tab === "gear" ? "bg-amber-500/20 text-amber-100" : "text-white/60"
+            }`}
+            onClick={() => setTab("gear")}
+          >
+            장비
+          </button>
+          <button
+            type="button"
+            className={`rounded-lg px-3 py-1 text-[11px] font-bold ${
+              tab === "buff" ? "bg-amber-500/20 text-amber-100" : "text-white/60"
+            }`}
+            onClick={() => setTab("buff")}
+          >
+            버프
+          </button>
+        </div>
+
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 [-webkit-overflow-scrolling:touch]">
-          <div className="yanmar-shop-grid">
-            {SHOP_ITEMS.map((item) => (
-              <ShopProductCard
-                key={item.id}
-                item={item}
-                stars={stars}
-                active={activeSet.has(item.id)}
-                purchasing={purchasingId === item.id}
-                onPurchase={onPurchase}
+          {tab === "buff" ? (
+            <div className="yanmar-shop-grid">
+              {SHOP_ITEMS.map((item) => (
+                <ShopProductCard
+                  key={item.id}
+                  item={item}
+                  stars={stars}
+                  active={activeSet.has(item.id)}
+                  purchasing={purchasingId === item.id}
+                  onPurchase={onPurchase}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="yanmar-gacha-stack">
+              <GachaBannerSection
+                banner="STANDARD"
+                title="일반 뽑기"
+                gradeLabels={["일반", "강화", "정밀"]}
+                gachaBusy={gachaBusy}
+                onGacha={onGacha}
               />
-            ))}
-          </div>
+              <GachaBannerSection
+                banner="PREMIUM"
+                title="고급 뽑기"
+                gradeLabels={["강화", "정밀", "마스터"]}
+                gachaBusy={gachaBusy}
+                onGacha={onGacha}
+              />
+            </div>
+          )}
         </div>
       </div>
     </AppModalOverlay>

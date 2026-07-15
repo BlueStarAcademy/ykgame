@@ -84,6 +84,8 @@ import {
   type ScatterRock,
 } from "./terrainScatter";
 import { MapSiteDecor } from "./mapDecor";
+import { RepairTent } from "./RepairTent";
+import { REPAIR_TENT } from "./gearCatalog";
 import { CrashZoneDecor } from "./CrashZoneDecor";
 import { HillZoneDecor } from "./HillZoneDecor";
 import { hillBoulderVisualScale } from "./terrain";
@@ -127,6 +129,8 @@ interface ExcavatorSceneProps {
   onCrashTileDestroyed: (tileId: string) => void;
   onHillRockDelivered: (rockId: string) => void;
   onAttachmentWarning: (message: string) => void;
+  onDumpTruckFull?: () => void;
+  onHaulTruckFull?: () => void;
   onSimTick: () => void;
   cameraMode: CameraMode;
   lookOffsetRef: React.MutableRefObject<CameraLookOffset>;
@@ -2606,6 +2610,8 @@ function SimLoop({
   onCrashTileDestroyed,
   onHillRockDelivered,
   onAttachmentWarning,
+  onDumpTruckFull,
+  onHaulTruckFull,
   onSimTick,
   endedRef,
 }: ExcavatorSceneProps) {
@@ -2638,6 +2644,8 @@ function SimLoop({
       onCrashTileDestroyed,
       onHillRockDelivered,
       onAttachmentWarning,
+      onDumpTruckFull,
+      onHaulTruckFull,
       onSimTick,
       endedRef,
     });
@@ -4056,6 +4064,7 @@ function SceneContent(props: ExcavatorSceneProps) {
         terrainRef={props.terrainRef}
         simRef={props.simRef}
       />
+      <RepairTent x={REPAIR_TENT.x} z={REPAIR_TENT.z} radius={REPAIR_TENT.radius} />
       <TerrainRockScatter key={`rocks-${terrainRevision}`} terrainRef={props.terrainRef} />
       <ContactShadows
         position={[48, 0.12, 48]}

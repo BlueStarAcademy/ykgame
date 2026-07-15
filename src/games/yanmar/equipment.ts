@@ -168,7 +168,11 @@ export interface YanmarEquipmentStats {
   scoreChunkUnits: number;
   criticalChance: number;
   criticalMultiplier: number;
+  /** Maintenance / other global score penalty (default 1). */
+  scoreMult?: number;
   travelSpeedMultiplier: number;
+  /** 붐/암 속도 배율 (선회·버켓·블레이드·집게 제외) */
+  workSpeedMultiplier: number;
   /** Upgrade bonus added to each 6~10 base hit roll. */
   breakerDamage: number;
   crashRespawnSec: number;
@@ -179,6 +183,12 @@ export interface YanmarEquipmentStats {
   gripAdhesionBonus: number;
   /** 돌 적재 실패 시 돌이 깨지지 않을 확률. */
   hillSafeLoadChance: number;
+  /** 마스터옵션: 브레이커 3회마다 데미지 배수 (없으면 1) */
+  breakerEvery3HitMult?: number;
+  /** 블레이드 주옵션 효율 (기본 1) */
+  bladeEfficiency?: number;
+  /** 작업 반경/도달 (기본 1). 능력치 파생으로 확장 가능 */
+  reachMultiplier?: number;
 }
 
 export const DEFAULT_YANMAR_EQUIPMENT_LEVELS: YanmarEquipmentLevels = {
@@ -405,7 +415,10 @@ export function calculateYanmarChunkScore(
   critical: boolean,
   baseScore = rollYanmarBaseScorePerChunk(),
 ): number {
-  return Math.round(baseScore * (critical ? stats.criticalMultiplier : 1));
+  const scoreMult = stats.scoreMult ?? 1;
+  return Math.round(
+    baseScore * (critical ? stats.criticalMultiplier : 1) * scoreMult,
+  );
 }
 
 export function rollYanmarCrashBaseScore(): number {
@@ -418,7 +431,10 @@ export function calculateYanmarCrashScore(
   critical: boolean,
   baseScore = rollYanmarCrashBaseScore(),
 ): number {
-  return Math.round(baseScore * (critical ? stats.criticalMultiplier : 1));
+  const scoreMult = stats.scoreMult ?? 1;
+  return Math.round(
+    baseScore * (critical ? stats.criticalMultiplier : 1) * scoreMult,
+  );
 }
 
 export function rollYanmarHillBaseScore(): number {
@@ -431,7 +447,10 @@ export function calculateYanmarHillScore(
   critical: boolean,
   baseScore = rollYanmarHillBaseScore(),
 ): number {
-  return Math.round(baseScore * (critical ? stats.criticalMultiplier : 1));
+  const scoreMult = stats.scoreMult ?? 1;
+  return Math.round(
+    baseScore * (critical ? stats.criticalMultiplier : 1) * scoreMult,
+  );
 }
 
 export function rollYanmarHillXp(): number {
@@ -458,6 +477,7 @@ export function calculateYanmarEquipmentStats(
       sumUpgradeBonuses(YANMAR_UPGRADE_BONUSES.BOOM, safeLevels.BOOM),
     travelSpeedMultiplier:
       1 + sumUpgradeBonuses(YANMAR_UPGRADE_BONUSES.ENGINE, safeLevels.ENGINE),
+    workSpeedMultiplier: 1,
     breakerDamage: getYanmarBreakerDamageBonus(safeLevels.CRASH_RESPAWN),
     crashRespawnSec: 5 * 60,
     haulTruckCooldownSec: getYanmarHaulTruckCooldownSec(safeLevels.HAUL_TRUCK_SPEED),

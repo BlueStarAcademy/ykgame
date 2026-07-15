@@ -46,6 +46,49 @@ enum EquipmentPart {
   HILL_SAFE_LOAD
 }
 
+enum ChassisModelId {
+  SV08_1C
+  SV10
+  SV11
+  ViO12_2A
+  ViO17_1
+  ViO20_6
+  ViO23_6
+  ViO25_6A
+  ViO35_74
+  ViO35_7A_CJR
+  ViO55_6A
+  ViO80_7
+  SV100_7
+}
+
+enum GearSlot {
+  ARM
+  BOOM
+  BLADE
+  BUCKET
+  BREAKER
+  GRAPPLE
+}
+
+enum ItemGrade {
+  NORMAL
+  ENHANCED
+  PRECISION
+  MASTER
+}
+
+enum GachaBanner {
+  STANDARD
+  PREMIUM
+}
+
+enum RepairBuffKind {
+  NONE
+  SMALL
+  LARGE
+}
+
 model User {
   id                   String                 @id @default(cuid())
   loginId              String                 @unique
@@ -69,6 +112,14 @@ model User {
   equipmentUpgrades    UserEquipmentUpgrade[]
   mails                UserMail[]
   inquiries            CustomerInquiry[]
+  chassisLoadouts      UserChassisLoadout[]
+  gearItems            GearItem[]
+  repairStates         UserRepairState[]
+  gachaPullLogs        GachaPullLog[]
+  shopBuffs            UserShopBuff[]
+  enhanceCores         Int                    @default(0)
+  /** Yanmar gear inventory capacity (expandable to GEAR_INVENTORY_MAX). */
+  gearInventorySlots   Int                    @default(40)
 }
 
 model GameScore {
@@ -166,6 +217,109 @@ model UserEquipmentUpgrade {
 
   @@unique([userId, gameId, part])
   @@index([userId, gameId])
+}
+
+model UserChassisLoadout {
+  id               String         @id @default(cuid())
+  userId           String
+  gameId           String         @default("yanmar")
+  activeChassisId  ChassisModelId @default(ViO17_1)
+  /** JSON string array of ChassisModelId */
+  ownedChassisIds  Json           @default("[\"ViO17_1\"]")
+  migratedAt       DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId])
+  @@index([userId, gameId])
+}
+
+model GearItem {
+  id             String    @id @default(cuid())
+  userId         String
+  gameId         String    @default("yanmar")
+  slot           GearSlot
+  grade          ItemGrade
+  enhanceLevel   Int       @default(0)
+  failBonus      Float     @default(0)
+  mainOption     Json
+  subOptions     Json
+  masterOption   Json?
+  nameSnapshot   String
+  durability     Float
+  durabilityMax  Float
+  equippedSlot   GearSlot?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, gameId])
+  @@index([userId, gameId, equippedSlot])
+}
+
+model UserRepairState {
+  id                 String         @id @default(cuid())
+  userId             String
+  gameId             String         @default("yanmar")
+  buffKind           RepairBuffKind @default(NONE)
+  buffExpiresAt      DateTime?
+  /** @deprecated Use per-fluid freeAvailableAt fields */
+  freeRepairAvailableAt DateTime?
+  odometerMeters     Float          @default(0)
+  engineOilRemaining Float          @default(1)
+  engineOilCapacityMult Float       @default(1)
+  engineOilFreeAvailableAt DateTime?
+  engineOilFilterRemaining Float    @default(1)
+  engineOilFilterCapacityMult Float @default(1)
+  engineOilFilterFreeAvailableAt DateTime?
+  hydraulicOilFilledAt DateTime?
+  hydraulicOilCapacityMult Float    @default(1)
+  hydraulicOilFreeAvailableAt DateTime?
+  hydraulicFilterFilledAt DateTime?
+  hydraulicFilterCapacityMult Float @default(1)
+  hydraulicFilterFreeAvailableAt DateTime?
+  fuelFilterFilledAt DateTime?
+  fuelFilterCapacityMult Float      @default(1)
+  fuelFilterFreeAvailableAt DateTime?
+  gearOilFilledAt    DateTime?
+  gearOilCapacityMult Float         @default(1)
+  gearOilFreeAvailableAt DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId])
+  @@index([userId, gameId])
+}
+
+model GachaPullLog {
+  id        String      @id @default(cuid())
+  userId    String
+  gameId    String      @default("yanmar")
+  banner    GachaBanner
+  count     Int         @default(1)
+  results   Json
+  createdAt DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([gameId, createdAt])
+}
+
+/** Timed shop consumable buffs (server authority for reward APIs). */
+model UserShopBuff {
+  id        String   @id @default(cuid())
+  userId    String
+  gameId    String   @default("yanmar")
+  itemId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId, itemId])
+  @@index([userId, gameId, expiresAt])
 }
 
 model UserMail {

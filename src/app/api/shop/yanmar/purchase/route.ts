@@ -5,6 +5,7 @@ import {
   SHOP_ITEM_BY_ID,
   isShopItemId,
 } from "@/games/yanmar/shopCatalog";
+import { persistShopBuff } from "@/games/yanmar/shopBuffServer";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
     }
 
     const expiresAt = Date.now() + item.durationMs;
+    await persistShopBuff(session.user.id, item.id, expiresAt);
     return NextResponse.json({
       itemId: item.id,
       durationMs: item.durationMs,

@@ -1,29 +1,31 @@
 import {
-  YANMAR_EQUIPMENT_CONFIG,
+  GACHA_CONFIG,
+  WORK_GEAR_DROP_BASE_CHANCE,
+  WORK_GEAR_DROP_GRADES,
+  WORK_CORE_DROP,
+  GEAR_INVENTORY_BASE,
+  GEAR_INVENTORY_MAX,
+  GEAR_INVENTORY_EXPAND_STEP,
+  GRADE_COST_MULT,
+  DISMANTLE_CORE_GRADE_BASE,
+  DISMANTLE_CORE_ENHANCE_BONUS,
+} from "@/games/yanmar/gearCatalog";
+import {
   YANMAR_REWARD_CONFIG,
   YANMAR_CRASH_REWARD_CONFIG,
   YANMAR_HILL_REWARD_CONFIG,
-  YANMAR_EQUIPMENT_RESET_REFUND_RATE,
-  YANMAR_UNIFIED_UPGRADE_COSTS,
-  YANMAR_UPGRADE_ATTEMPT,
-  YANMAR_UPGRADE_BONUSES,
-  YANMAR_BASE_HILL_SAFE_LOAD_CHANCE,
-  formatYanmarUpgradeCostSequence,
-  formatYanmarBreakerDamage,
-  formatYanmarSuccessRate,
-  getYanmarGripAdhesionBonus,
-  getYanmarHaulTruckCooldownSec,
-  getYanmarHillSafeLoadChance,
-  getYanmarTruckCapacityUnits,
-  getYanmarTruckCooldownSec,
-  sumUpgradeBonuses,
-  type YanmarEquipmentPart,
 } from "@/games/yanmar/equipment";
 import {
   DUMP_TRUCK_ARRIVE_DURATION_SEC,
   DUMP_TRUCK_DEPART_DURATION_SEC,
   DUMP_TRUCK_ENGINE_START_DURATION_SEC,
 } from "@/games/yanmar/dumpTruckState";
+import {
+  getEnhanceCost,
+  getEnhanceCoreCost,
+  getEnhanceSuccessRate,
+  getDismantleEnhanceCores,
+} from "@/games/yanmar/gearGenerate";
 
 const PARTS_DISCOUNTS = [10, 15, 20] as const;
 const RENTAL_DISCOUNTS = [10, 20, 30] as const;
@@ -36,10 +38,6 @@ function pctFromFraction(value: number, digits = 5) {
   return `${(value * 100).toFixed(digits)}%`;
 }
 
-function pctPoint(value: number, digits = 1) {
-  return `${(value * 100).toFixed(digits)}%p`;
-}
-
 export function getGameProbabilityReport() {
   const couponDropChance = YANMAR_REWARD_CONFIG.couponDropChance;
   const couponTypeWeights = YANMAR_REWARD_CONFIG.couponTypeWeights;
@@ -49,6 +47,166 @@ export function getGameProbabilityReport() {
     couponTypeWeights.EQUIPMENT_RENTAL_DISCOUNT;
   const couponTypeShare = (weight: number) =>
     couponTypeWeightTotal > 0 ? weight / couponTypeWeightTotal : 0;
+
+  const enhanceRateRows = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => {
+    const cost = getEnhanceCost(level, "NORMAL");
+    const cores = getEnhanceCoreCost(level, "NORMAL");
+    const rate = getEnhanceSuccessRate(level, 0, "NORMAL");
+    return [
+      `+${level - 1} → +${level}`,
+      cost == null
+        ? "MAX"
+        : `${cost}★${cores > 0 ? ` · 코어 ${cores}` : ""} · ${pct(rate, 0)}`,
+    ];
+  });
+
+  const gradeCostRows = (
+    ["NORMAL", "ENHANCED", "PRECISION", "MASTER"] as const
+  ).map((grade) => [grade, `×${GRADE_COST_MULT[grade]}`]);
+
+  const dismantleRows = (
+    ["NORMAL", "ENHANCED", "PRECISION", "MASTER"] as const
+  ).map((grade) => [
+    grade,
+    `${getDismantleEnhanceCores(grade, 0)} ~ ${getDismantleEnhanceCores(grade, 10)}`,
+  ]);
+
+  const coreDropRows = (
+    Object.entries(WORK_CORE_DROP) as [
+      keyof typeof WORK_CORE_DROP,
+      (typeof WORK_CORE_DROP)[keyof typeof WORK_CORE_DROP],
+    ][]
+  ).map(([key, cfg]) => [
+    key,
+    `${pct(cfg.chance, 0)} · ${
+      cfg.min === cfg.max ? cfg.min : `${cfg.min}~${cfg.max}`
+    }개`,
+  ]);
+
+  const gearSections = [
+    {
+      title: "작업 중 장비 드롭",
+      items: [
+        {
+          label: "기본 획득 판정",
+          value: pct(WORK_GEAR_DROP_BASE_CHANCE),
+          detail:
+            "흙 하역 / 아스팔트 제거 / 돌 하역 / 트럭 만재 시 독립 판정 · 마스터 옵션 보유 시 상대 +10%",
+        },
+        {
+          label: "등급 확률 (성공 시)",
+          value: "조건부",
+          table: {
+            columns: ["등급", "확률"],
+            rows: WORK_GEAR_DROP_GRADES.map((g) => [
+              g.grade,
+              pct(g.weight / 100, 2),
+            ]),
+          },
+        },
+        {
+          label: "인벤토리 가득",
+          value: "우편 스타 전환",
+          detail: `플레이어 장비 칸(기본 ${GEAR_INVENTORY_BASE}·최대 ${GEAR_INVENTORY_MAX}·${GEAR_INVENTORY_EXPAND_STEP}칸 단위 확장) 초과 시 드롭 성공분만 등급별 스타로 우편 지급 (실패 판정은 메일 없음)`,
+        },
+      ],
+    },
+    {
+      title: "작업 중 강화코어 드롭",
+      items: [
+        {
+          label: "독립 판정",
+          value: "장비 드롭과 별도",
+          detail: "작업 완료 시 확률로 강화코어 지급",
+          table: {
+            columns: ["트리거", "확률·개수"],
+            rows: coreDropRows,
+          },
+        },
+      ],
+    },
+    {
+      title: "장비 가챠 — 일반뽑기",
+      items: [
+        {
+          label: "비용",
+          value: `1회 ${GACHA_CONFIG.STANDARD.cost1}★ · 10연 ${GACHA_CONFIG.STANDARD.cost10}★`,
+          detail: "일반~정밀 (마스터 미포함)",
+        },
+        {
+          label: "등급 가중치",
+          value: "상대",
+          table: {
+            columns: ["등급", "가중치"],
+            rows: GACHA_CONFIG.STANDARD.grades.map((g) => [
+              g.grade,
+              String(g.weight),
+            ]),
+          },
+        },
+      ],
+    },
+    {
+      title: "장비 가챠 — 고급뽑기",
+      items: [
+        {
+          label: "비용",
+          value: `1회 ${GACHA_CONFIG.PREMIUM.cost1}★ · 10연 ${GACHA_CONFIG.PREMIUM.cost10}★`,
+          detail: "강화~마스터 (일반 미포함)",
+        },
+        {
+          label: "등급 가중치",
+          value: "상대",
+          table: {
+            columns: ["등급", "가중치"],
+            rows: GACHA_CONFIG.PREMIUM.grades.map((g) => [
+              g.grade,
+              String(g.weight),
+            ]),
+          },
+        },
+      ],
+    },
+    {
+      title: "장비 강화",
+      items: [
+        {
+          label: "일반 기준 비용·성공률",
+          value: "단계별",
+          detail:
+            "스타 + 강화코어(+3부터) · 비용 등급배율 ×1/1.5/2.25/3.375 · 고등급일수록 성공률·실패가산 하향",
+          table: {
+            columns: ["단계", "일반 비용·성공률(보너스 0)"],
+            rows: enhanceRateRows,
+          },
+        },
+        {
+          label: "등급 비용 배율",
+          value: "⌈일반×배율⌉",
+          table: {
+            columns: ["등급", "배율"],
+            rows: gradeCostRows,
+          },
+        },
+        {
+          label: "분해 보상",
+          value: "강화코어만",
+          detail: `스타 환불 없음 · base(${Object.values(DISMANTLE_CORE_GRADE_BASE).join("/")}) + 강화보너스(0~${DISMANTLE_CORE_ENHANCE_BONUS[10]})`,
+          table: {
+            columns: ["등급", "코어(+0~+10)"],
+            rows: dismantleRows,
+          },
+        },
+        {
+          label: "마일스톤",
+          value: "+3 / +6 / +9 / +10",
+          detail:
+            "도달 시 부옵션 티어업 또는 신규 T1 추가(첫 옵션=+N%·이름접두어, 이후=+N, 능력치 종류 중복 없음)",
+        },
+      ],
+    },
+  ];
+
   const sharedDropRewardItems = [
     {
       label: "스타 보상",
@@ -99,48 +257,33 @@ export function getGameProbabilityReport() {
       detail: "dump / crash / hill 보상 API 공통 드롭 모델",
     },
   ];
-  const capacityConfig = YANMAR_EQUIPMENT_CONFIG.TRUCK_CAPACITY;
-  const speedConfig = YANMAR_EQUIPMENT_CONFIG.TRUCK_SPEED;
-  const maxTruckCapacity = getYanmarTruckCapacityUnits(capacityConfig.maxLevel);
-  const minTruckCooldown = getYanmarTruckCooldownSec(speedConfig.maxLevel);
-  const truckCapacityRows = Array.from(
-    { length: capacityConfig.maxLevel + 1 },
-    (_, level) => ({
-      level: `+${level}`,
-      value: `${getYanmarTruckCapacityUnits(level).toLocaleString()}`,
-    }),
-  );
-  const truckSpeedRows = Array.from(
-    { length: speedConfig.maxLevel + 1 },
-    (_, level) => ({
-      level: `+${level}`,
-      value: `${getYanmarTruckCooldownSec(level).toFixed(0)}초`,
-    }),
-  );
-  const truckCostRows = YANMAR_UNIFIED_UPGRADE_COSTS.map((cost, index) => ({
-    level: `+${index} → +${index + 1}`,
-    value: `${cost.toLocaleString()} 스타`,
-  }));
-  const upgradeRateRows = YANMAR_UPGRADE_ATTEMPT.map((attempt, index) => ({
-    level: `+${index} → +${index + 1}`,
-    value: `${formatYanmarSuccessRate(attempt.successRate)}${
-      attempt.failBonus > 0
-        ? ` · 실패 시 +${formatYanmarSuccessRate(attempt.failBonus)}`
-        : ""
-    }`,
-  }));
 
   return {
     yanmar: {
-      title: "얀마 굴착기 — 하역 보상",
+      title: "얀마 굴착기 — 하역·장비·가챠",
       sections: [
+        ...gearSections,
         {
           title: "기본 점수",
           items: [
-            { label: "점수 청크 단위", value: `${YANMAR_REWARD_CONFIG.scoreChunkUnits} 적재량` },
-            { label: "청크당 기본 점수", value: `${YANMAR_REWARD_CONFIG.baseScorePerChunkMin}~${YANMAR_REWARD_CONFIG.baseScorePerChunkMax}점 (랜덤)` },
-            { label: "기본 크리티컬 확률", value: pct(YANMAR_REWARD_CONFIG.baseCriticalChance) },
-            { label: "기본 크리티컬 배율", value: `×${YANMAR_REWARD_CONFIG.baseCriticalMultiplier}` },
+            {
+              label: "점수 청크 단위",
+              value: `${YANMAR_REWARD_CONFIG.scoreChunkUnits} 적재량`,
+            },
+            {
+              label: "청크당 기본 점수",
+              value: `${YANMAR_REWARD_CONFIG.baseScorePerChunkMin}~${YANMAR_REWARD_CONFIG.baseScorePerChunkMax}점 (랜덤)`,
+            },
+            {
+              label: "기본 크리티컬 확률",
+              value: pct(YANMAR_REWARD_CONFIG.baseCriticalChance),
+              detail: "차체 기술·장비(암) 주옵션으로 증가",
+            },
+            {
+              label: "기본 크리티컬 배율",
+              value: `×${YANMAR_REWARD_CONFIG.baseCriticalMultiplier}`,
+              detail: "붐 주옵션·부옵션으로 증가",
+            },
           ],
         },
         {
@@ -153,15 +296,7 @@ export function getGameProbabilityReport() {
             {
               label: "기본 점수",
               value: `${YANMAR_CRASH_REWARD_CONFIG.baseScoreMin}~${YANMAR_CRASH_REWARD_CONFIG.baseScoreMax}점 (랜덤)`,
-              detail: "암/붐 강화의 크리티컬 확률·배율 적용",
-            },
-            {
-              label: "기본 크리티컬 확률",
-              value: pct(YANMAR_REWARD_CONFIG.baseCriticalChance),
-            },
-            {
-              label: "기본 크리티컬 배율",
-              value: `×${YANMAR_REWARD_CONFIG.baseCriticalMultiplier}`,
+              detail: "장착 장비 크리티컬 확률·배율 적용",
             },
             {
               label: "스타 보상",
@@ -190,7 +325,7 @@ export function getGameProbabilityReport() {
             {
               label: "기본 점수",
               value: `${YANMAR_HILL_REWARD_CONFIG.baseScoreMin}~${YANMAR_HILL_REWARD_CONFIG.baseScoreMax}점 (랜덤)`,
-              detail: "암/붐 강화의 크리티컬 확률·배율 적용",
+              detail: "장착 장비 크리티컬 확률·배율 적용",
             },
             {
               label: "경험치",
@@ -208,8 +343,8 @@ export function getGameProbabilityReport() {
             },
             {
               label: "구역 규칙",
-              value: "돌 5개 · 트럭 적재 5개 · 리젠 300초",
-              detail: "안전적재 강화로 적재 실패 시 재적재 확률 증가 · 돌트럭속도 강화로 복귀 단축",
+              value: "돌 5개 · 트럭 적재 고정 용량 · 리젠 300초",
+              detail: "트럭/하역 강화는 제거됨 · 차체·장비 스탯으로만 성장",
             },
           ],
         },
@@ -222,105 +357,15 @@ export function getGameProbabilityReport() {
               detail: `만차 시 하역 불가 · 시동 ${DUMP_TRUCK_ENGINE_START_DURATION_SEC}초 · 출발 ${DUMP_TRUCK_DEPART_DURATION_SEC}초 · 복귀 ${DUMP_TRUCK_ARRIVE_DURATION_SEC}초`,
             },
             {
-              label: "기본 최대 하역량",
-              value: `${YANMAR_REWARD_CONFIG.baseTruckCapacityUnits.toLocaleString()}`,
-              detail: `강화 최대 +${sumUpgradeBonuses(YANMAR_UPGRADE_BONUSES.TRUCK_CAPACITY, capacityConfig.maxLevel)} → ${maxTruckCapacity.toLocaleString()}`,
+              label: "트럭 용량·쿨다운",
+              value: "고정 베이스",
+              detail: `용량 ${YANMAR_REWARD_CONFIG.baseTruckCapacityUnits.toLocaleString()} · 재도착 ${YANMAR_REWARD_CONFIG.baseTruckCooldownSec}초 (구 트럭 강화 제거)`,
             },
             {
-              label: "기본 재도착 대기",
-              value: `${YANMAR_REWARD_CONFIG.baseTruckCooldownSec}초`,
-              detail: `속도 강화 최소 ${minTruckCooldown.toFixed(0)}초 (초 단위 누적 단축)`,
+              label: "기본 최대 적재량(버켓)",
+              value: `${YANMAR_REWARD_CONFIG.baseMaxLoadUnits}`,
+              detail: "차체 힘 + 버켓 장비로 증가",
             },
-            {
-              label: "하역량 강화",
-              value: `+0 ~ +${capacityConfig.maxLevel}`,
-              table: {
-                columns: ["레벨", "하역량"],
-                rows: truckCapacityRows,
-              },
-            },
-            {
-              label: "속도 강화",
-              value: `+0 ~ +${speedConfig.maxLevel}`,
-              table: {
-                columns: ["레벨", "재도착"],
-                rows: truckSpeedRows,
-              },
-            },
-            {
-              label: "강화 비용",
-              value: "고정 비용표",
-              table: {
-                columns: ["단계", "비용"],
-                rows: truckCostRows,
-              },
-            },
-          ],
-        },
-        {
-          title: "장비강화 효과",
-          items: (Object.keys(YANMAR_EQUIPMENT_CONFIG) as YanmarEquipmentPart[]).map(
-            (part) => {
-              const config = YANMAR_EQUIPMENT_CONFIG[part];
-              const maxEffect =
-                part === "TRUCK_CAPACITY"
-                  ? `+${sumUpgradeBonuses(YANMAR_UPGRADE_BONUSES.TRUCK_CAPACITY, config.maxLevel)}`
-                  : part === "TRUCK_SPEED"
-                    ? `${getYanmarTruckCooldownSec(0).toFixed(0)}초 → ${getYanmarTruckCooldownSec(config.maxLevel).toFixed(0)}초`
-                    : part === "CRASH_RESPAWN"
-                      ? `${formatYanmarBreakerDamage(0)} → ${formatYanmarBreakerDamage(config.maxLevel)}`
-                      : part === "GRAPPLE_ADHESION"
-                        ? `+${Math.round(getYanmarGripAdhesionBonus(config.maxLevel) * 100)}%`
-                      : part === "HAUL_TRUCK_SPEED"
-                        ? `${getYanmarHaulTruckCooldownSec(0)}초 → ${Math.round(getYanmarHaulTruckCooldownSec(config.maxLevel))}초`
-                      : part === "HILL_SAFE_LOAD"
-                        ? `${Math.round(YANMAR_BASE_HILL_SAFE_LOAD_CHANCE * 100)}% → ${Math.round(getYanmarHillSafeLoadChance(config.maxLevel) * 100)}%`
-                    : part === "ARM"
-                      ? pctPoint(sumUpgradeBonuses(YANMAR_UPGRADE_BONUSES.ARM, config.maxLevel))
-                      : part === "BOOM"
-                        ? `+${(sumUpgradeBonuses(YANMAR_UPGRADE_BONUSES.BOOM, config.maxLevel) * 100).toFixed(0)}%`
-                        : part === "BUCKET"
-                          ? `+${sumUpgradeBonuses(YANMAR_UPGRADE_BONUSES.BUCKET, config.maxLevel)}`
-                          : `+${(sumUpgradeBonuses(YANMAR_UPGRADE_BONUSES.ENGINE, config.maxLevel) * 100).toFixed(0)}%`;
-              return {
-                label: `${config.label} (+${config.maxLevel} 최대)`,
-                value: config.description,
-                detail: `최대 누적 ${maxEffect} · 강화 비용 ${formatYanmarUpgradeCostSequence(part, config.maxLevel)} 스타`,
-              };
-            },
-          ),
-        },
-        {
-          title: "강화 성공·실패",
-          items: [
-            {
-              label: "공통 성공률",
-              value: "단계별 고정",
-              table: {
-                columns: ["단계", "성공률"],
-                rows: upgradeRateRows,
-              },
-            },
-            {
-              label: "실패 보너스",
-              value: "같은 단계 재도전 누적",
-              detail: "성공 또는 초기화 시 보너스 초기화 · 스타는 실패해도 소모",
-            },
-          ],
-        },
-        {
-          title: "강화 비용 공식",
-          items: [
-            {
-              label: "모든 부위",
-              value: "통일 비용표",
-              detail: YANMAR_UNIFIED_UPGRADE_COSTS.join(" / "),
-            },
-            {
-              label: "강화 초기화",
-              value: `사용 스타의 ${Math.round(YANMAR_EQUIPMENT_RESET_REFUND_RATE * 100)}% 환급`,
-            },
-            { label: "기본 최대 적재량", value: `${YANMAR_REWARD_CONFIG.baseMaxLoadUnits}` },
           ],
         },
       ],

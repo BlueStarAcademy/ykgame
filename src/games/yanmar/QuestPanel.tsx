@@ -65,6 +65,23 @@ function QuestRewardDisplay({ reward }: { reward: QuestReward }) {
       </span>,
     );
   }
+  if ((reward.enhanceCores ?? 0) > 0) {
+    parts.push(
+      <span
+        key="cores"
+        className="inline-flex items-center gap-0.5 tabular-nums"
+      >
+        <img
+          src="/images/yanmar/2d/enhance-core.png?v=3"
+          alt=""
+          width={12}
+          height={12}
+          draggable={false}
+        />
+        {reward.enhanceCores!.toLocaleString()}
+      </span>,
+    );
+  }
   if (parts.length === 0) {
     return <span>보상 없음</span>;
   }
@@ -331,18 +348,13 @@ export function QuestPanel({
                 </div>
               ) : (
                 <div className="rounded-xl border border-amber-200/20 bg-black/40 px-3 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-black text-white">
-                      미션 {currentMission.index + 1}
+                  <div className="flex items-center justify-end gap-2">
+                    <p className="text-[10px] font-semibold text-amber-200/85">
+                      <QuestRewardDisplay
+                        reward={MISSION_DIFFICULTY_REWARDS[currentMission.difficulty]}
+                      />
                     </p>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <p className="text-[10px] font-semibold text-amber-200/85">
-                        <QuestRewardDisplay
-                          reward={MISSION_DIFFICULTY_REWARDS[currentMission.difficulty]}
-                        />
-                      </p>
-                      <DifficultyStars count={currentMission.difficulty} />
-                    </div>
+                    <DifficultyStars count={currentMission.difficulty} />
                   </div>
 
                   <ul className="mt-3 space-y-2">

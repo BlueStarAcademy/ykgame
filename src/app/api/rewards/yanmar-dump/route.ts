@@ -16,11 +16,18 @@ import { getSeasonKey } from "@/lib/games";
 import { withHotApiObservability } from "@/lib/hot-api-observability";
 import { consumeDumpRateLimit } from "@/lib/redis-token-bucket";
 import {
-  mergeYanmarEquipmentLevelsFromDb,
   YANMAR_REWARD_CONFIG,
-  calculateYanmarEquipmentStats,
   calculateYanmarChunkScore,
 } from "@/games/yanmar/equipment";
+import { ensureYanmarGearMigration } from "@/games/yanmar/gearMigrate";
+import {
+  applyMasterScoreXpBonus,
+  applyWorkExpGainSub,
+  loadUserFinalStats,
+  serializeWorkGearDrop,
+  tryWorkEnhanceCoresDrop,
+  tryWorkGearDrop,
+} from "@/games/yanmar/gearService";
 import type { CouponType, Prisma } from "@/generated/prisma/client";
 
 type DumpStarEvent = {
@@ -117,12 +124,17 @@ export const POST = withHotApiObservability(
     );
   }
 
-  const rows = await prisma.userEquipmentUpgrade.findMany({
-    where: { userId: session.user.id, gameId: "yanmar" },
-    select: { part: true, level: true },
+  await prisma.$transaction(async (tx) => {
+    await ensureYanmarGearMigration(tx, session.user.id);
   });
-  const levels = mergeYanmarEquipmentLevelsFromDb(rows);
-  const stats = calculateYanmarEquipmentStats(levels);
+  const loaded = await loadUserFinalStats(prisma, session.user.id);
+  const { loadActiveShopBuffIds } = await import("@/games/yanmar/shopBuffServer");
+  const {
+    applyShopBuffsToStats,
+    applyRankerWillScore,
+  } = await import("@/games/yanmar/shopBuffEffects");
+  const buffIds = await loadActiveShopBuffIds(session.user.id);
+  const stats = applyShopBuffsToStats(loaded.stats, buffIds);
   const seasonKey = getSeasonKey();
 
   const issued = await countSeasonGameDropCouponsGrouped(prisma, seasonKey);
@@ -146,7 +158,9 @@ export const POST = withHotApiObservability(
 
   const plannedChunks = Array.from({ length: safeChunkCount }, () => {
     const critical = Math.random() < stats.criticalChance;
-    const score = calculateYanmarChunkScore(stats, critical);
+    let score = calculateYanmarChunkScore(stats, critical);
+    const boosted = applyMasterScoreXpBonus("soil", score, 0, stats.activeMasters);
+    score = applyRankerWillScore(boosted.score, buffIds);
     const { stars, coupon } = rollYanmarDropRewards({
       score,
       minStars: YANMAR_REWARD_CONFIG.minStarReward,
@@ -159,7 +173,15 @@ export const POST = withHotApiObservability(
   });
 
   /** 1 dump score chunk == scoreChunkUnits of soil == same amount of lifetime XP */
-  const xpGained = stats.scoreChunkUnits * safeChunkCount;
+  let xpGained = applyWorkExpGainSub(
+    stats.scoreChunkUnits * safeChunkCount,
+    stats.workExpGainBonus,
+    { workXpMult: stats.workXpMult },
+  );
+  const soilXpMaster = stats.activeMasters.soilDumpXpPct;
+  if (soilXpMaster) {
+    xpGained = Math.round(xpGained * (1 + soilXpMaster.value / 100));
+  }
 
   const result = await prisma.$transaction(async (tx) => {
     return runReplayableRewardEvent(
@@ -228,13 +250,31 @@ export const POST = withHotApiObservability(
       await tx.userRewardInventory.createMany({ data: starInventoryRows });
     }
 
+    const gearDrops = [];
+    let coresDropped = 0;
+    let enhanceCoresTotal: number | undefined;
+    for (let i = 0; i < safeChunkCount; i += 1) {
+      const drop = await tryWorkGearDrop(tx, session.user.id, "soilDump");
+      const payload = serializeWorkGearDrop(drop);
+      if (payload) gearDrops.push(payload);
+      const coreDrop = await tryWorkEnhanceCoresDrop(
+        tx,
+        session.user.id,
+        "soilDump",
+      );
+      if (coreDrop.dropped) {
+        coresDropped += coreDrop.amount;
+        enhanceCoresTotal = coreDrop.enhanceCores;
+      }
+    }
+
     const updated = await tx.user.update({
       where: { id: session.user.id },
       data: {
         ...(totalStars > 0 ? { currency: { increment: totalStars } } : {}),
         totalXp: { increment: xpGained },
       },
-      select: { currency: true, totalXp: true },
+      select: { currency: true, totalXp: true, enhanceCores: true },
     });
 
         return {
@@ -249,7 +289,10 @@ export const POST = withHotApiObservability(
           xpGained,
           currency: updated.currency,
           totalXp: updated.totalXp,
+          enhanceCores: enhanceCoresTotal ?? updated.enhanceCores,
+          coresDropped,
           stats,
+          gearDrops,
         } as unknown as Prisma.InputJsonValue;
       },
     );

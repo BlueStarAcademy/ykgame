@@ -26,6 +26,10 @@ export function dumpRateLimitEventKey(
   return redisKey(prefix, "rate:dump:event", userId, eventId);
 }
 
+export function shopBuffKey(prefix: string, userId: string): string {
+  return redisKey(prefix, "yanmar:shopbuff", userId);
+}
+
 export function rankingsTopKey(
   prefix: string,
   gameId: string,

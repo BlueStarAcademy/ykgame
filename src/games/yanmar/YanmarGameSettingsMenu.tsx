@@ -62,8 +62,6 @@ interface YanmarGameSettingsMenuProps {
   onOpenChange: (open: boolean) => void;
   showMinimap: boolean;
   onToggleMinimap: () => void;
-  showDigPose: boolean;
-  onToggleDigPose: () => void;
   showTouchZones: boolean;
   onToggleTouchZones: () => void;
   touchZonesAvailable: boolean;
@@ -93,8 +91,6 @@ export function YanmarGameSettingsMenu({
   onOpenChange,
   showMinimap,
   onToggleMinimap,
-  showDigPose,
-  onToggleDigPose,
   showTouchZones,
   onToggleTouchZones,
   touchZonesAvailable,
@@ -219,11 +215,6 @@ export function YanmarGameSettingsMenu({
           {tab === "display" ? (
             <>
               <ToggleRow label="미니맵" on={showMinimap} onToggle={onToggleMinimap} />
-              <ToggleRow
-                label="적재자세"
-                on={showDigPose}
-                onToggle={onToggleDigPose}
-              />
               {touchZonesAvailable ? (
                 <ToggleRow
                   label="터치범위"

@@ -19,6 +19,7 @@ export async function GET(
         nickname: true,
         role: true,
         currency: true,
+        enhanceCores: true,
         isActive: true,
         sanctionReason: true,
         sanctionedAt: true,
@@ -29,6 +30,7 @@ export async function GET(
             coupons: true,
             mails: true,
             rewardInventoryItems: true,
+            gearItems: true,
           },
         },
         gameScores: {
@@ -54,9 +56,28 @@ export async function GET(
             usedAt: true,
           },
         },
-        equipmentUpgrades: {
+        gearItems: {
           where: { gameId: "yanmar" },
-          select: { part: true, level: true },
+          orderBy: { updatedAt: "desc" },
+          take: 20,
+          select: {
+            id: true,
+            slot: true,
+            grade: true,
+            enhanceLevel: true,
+            nameSnapshot: true,
+            durability: true,
+            durabilityMax: true,
+            equippedSlot: true,
+          },
+        },
+        chassisLoadouts: {
+          where: { gameId: "yanmar" },
+          take: 1,
+          select: {
+            activeChassisId: true,
+            ownedChassisIds: true,
+          },
         },
       },
     });

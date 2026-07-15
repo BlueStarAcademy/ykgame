@@ -18,7 +18,7 @@ export const REPEAT_QUEST_DEFS: readonly RepeatQuestDef[] = [
     metric: "soilDump",
     target: 10000,
     minLevel: 1,
-    reward: { stars: 5, xp: 0 },
+    reward: { stars: 5, xp: 0, enhanceCores: 1 },
   },
   {
     id: "repeat-asphalt-10",
@@ -26,7 +26,7 @@ export const REPEAT_QUEST_DEFS: readonly RepeatQuestDef[] = [
     metric: "asphaltBreak",
     target: 10,
     minLevel: 10,
-    reward: { stars: 5, xp: 0 },
+    reward: { stars: 5, xp: 0, enhanceCores: 1 },
   },
   {
     id: "repeat-rock-dump-10",
@@ -34,7 +34,7 @@ export const REPEAT_QUEST_DEFS: readonly RepeatQuestDef[] = [
     metric: "rockDump",
     target: 10,
     minLevel: 15,
-    reward: { stars: 5, xp: 0 },
+    reward: { stars: 5, xp: 0, enhanceCores: 1 },
   },
   {
     id: "repeat-travel-10000",
@@ -42,7 +42,7 @@ export const REPEAT_QUEST_DEFS: readonly RepeatQuestDef[] = [
     metric: "travel",
     target: 10000,
     minLevel: 1,
-    reward: { stars: 5, xp: 0 },
+    reward: { stars: 5, xp: 0, enhanceCores: 1 },
   },
 ];
 
@@ -53,7 +53,7 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
     metric: "login",
     target: 1,
     minLevel: 1,
-    reward: { stars: 10, xp: 0 },
+    reward: { stars: 10, xp: 0, enhanceCores: 1 },
   },
   {
     id: "daily-horn",
@@ -61,7 +61,7 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
     metric: "horn",
     target: { min: 1, max: 5 },
     minLevel: 1,
-    reward: { stars: 10, xp: 0 },
+    reward: { stars: 10, xp: 0, enhanceCores: 1 },
   },
   {
     id: "daily-soil-load",
@@ -69,7 +69,7 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
     metric: "soilLoad",
     target: { min: 3000, max: 5000, step: 100 },
     minLevel: 1,
-    reward: { stars: 10, xp: 1000 },
+    reward: { stars: 10, xp: 1000, enhanceCores: 1 },
   },
   {
     id: "daily-truck-depart",
@@ -77,7 +77,7 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
     metric: "dumpTruckDepart",
     target: { min: 2, max: 5 },
     minLevel: 1,
-    reward: { stars: 10, xp: 1000 },
+    reward: { stars: 10, xp: 1000, enhanceCores: 2 },
   },
   {
     id: "daily-travel-3000",
@@ -85,7 +85,7 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
     metric: "travel",
     target: 3000,
     minLevel: 1,
-    reward: { stars: 10, xp: 1000 },
+    reward: { stars: 10, xp: 1000, enhanceCores: 1 },
   },
   {
     id: "daily-asphalt-9",
@@ -93,7 +93,7 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
     metric: "asphaltBreak",
     target: 9,
     minLevel: 10,
-    reward: { stars: 10, xp: 1500 },
+    reward: { stars: 10, xp: 1500, enhanceCores: 2 },
   },
   {
     id: "daily-rock-load-5",
@@ -101,17 +101,17 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
     metric: "rockLoad",
     target: 5,
     minLevel: 15,
-    reward: { stars: 10, xp: 2000 },
+    reward: { stars: 10, xp: 2000, enhanceCores: 2 },
   },
 ] as const;
 
-/** 난이도 1~5 보상 (경험치·스타·점수) */
+/** 난이도 1~5 보상 (경험치·스타·점수·강화코어) */
 export const MISSION_DIFFICULTY_REWARDS: Record<1 | 2 | 3 | 4 | 5, QuestReward> = {
-  1: { xp: 2000, stars: 10, score: 2000 },
-  2: { xp: 3000, stars: 15, score: 3000 },
-  3: { xp: 4000, stars: 20, score: 5000 },
-  4: { xp: 5000, stars: 25, score: 7500 },
-  5: { xp: 6000, stars: 30, score: 10000 },
+  1: { xp: 2000, stars: 10, score: 2000, enhanceCores: 2 },
+  2: { xp: 3000, stars: 15, score: 3000, enhanceCores: 3 },
+  3: { xp: 4000, stars: 20, score: 5000, enhanceCores: 5 },
+  4: { xp: 5000, stars: 25, score: 7500, enhanceCores: 6 },
+  5: { xp: 6000, stars: 30, score: 10000, enhanceCores: 8 },
 };
 
 export type MissionLevelBand = "under10" | "lv10" | "lv15";

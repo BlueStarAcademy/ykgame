@@ -158,6 +158,7 @@ export interface SimLoopRuntime {
   digDust: DigDustVisual;
   bladeSpray: BladeSprayVisual;
   attachmentActionCooldown: number;
+  breakerHitCount: number;
   warningCooldown: number;
   grappleGrip: GrappleGripRuntime;
   /** 트럭·특수구역 쿨타임용 벽시계 (탭 백그라운드 복귀 시 경과 반영). */
@@ -185,6 +186,7 @@ export function createSimLoopRuntime(): SimLoopRuntime {
       intensity: 0,
     },
     attachmentActionCooldown: 0,
+    breakerHitCount: 0,
     warningCooldown: 0,
     grappleGrip: createGrappleGripRuntime(),
     lastSystemsWallMs: 0,
@@ -213,6 +215,10 @@ export interface SimTickParams {
   onCrashTileDestroyed: (tileId: string) => void;
   onHillRockDelivered: (rockId: string) => void;
   onAttachmentWarning: (message: string) => void;
+  /** 덤프트럭 만재→출발 전환 시 1회 */
+  onDumpTruckFull?: () => void;
+  /** 돌트럭 만재→출발 전환 시 1회 */
+  onHaulTruckFull?: () => void;
   onSimTick: () => void;
   /** true면 덤프 트럭·특수구역 시간 진행을 멈춘다 (결과 화면 등). */
   endedRef?: { current: boolean };
@@ -625,6 +631,8 @@ export function tickExcavatorSim(params: SimTickParams) {
     onCrashTileDestroyed,
     onHillRockDelivered,
     onAttachmentWarning,
+    onDumpTruckFull,
+    onHaulTruckFull,
     onSimTick,
     endedRef,
   } = params;
@@ -680,7 +688,8 @@ export function tickExcavatorSim(params: SimTickParams) {
   const isAutoArm = autoPose.executing && autoPose.saved != null;
 
   const isRide = mode === "ride";
-  const hydraulicSpeedScale = isRide
+  // RPM(고속)연동: 전진·붐·암이 동일 배율. 버켓/선회는 고정.
+  const rpmScale = isRide
     ? auxiliary?.highSpeed
       ? 1.15
       : 1
@@ -688,7 +697,8 @@ export function tickExcavatorSim(params: SimTickParams) {
       ? 0.5
       : 0.25;
   const speedProfile = isRide ? RIDE_CONTROL_SPEED : CONTROL_SPEED;
-  const travelSpeedScale = isRide ? 1 : stats.travelSpeedMultiplier;
+  const travelSpeedScale = stats.travelSpeedMultiplier * rpmScale;
+  const workSpeedScale = (stats.workSpeedMultiplier ?? 1) * rpmScale;
   const boomSwing = auxiliary?.boomSwing ?? DEFAULT_BOOM_SWING;
   const grappleOpen = auxiliary?.grappleOpen ?? 1;
   const beforeControlBucket = bucketClearance(sim, terrain, boomSwing, grappleOpen);
@@ -774,7 +784,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       stepInput,
       subDt,
       vel,
-      hydraulicSpeedScale,
+      workSpeedScale,
       travelSpeedScale,
       speedProfile,
     );
@@ -1016,9 +1026,14 @@ export function tickExcavatorSim(params: SimTickParams) {
     } else if (toolTouchesGround && runtime.attachmentActionCooldown <= 0) {
       const tile = breakerTipContact?.tile ?? null;
       if (tile?.active) {
-        const hitDamage = rollYanmarBreakerDamage(stats.breakerDamage, {
+        runtime.breakerHitCount += 1;
+        let hitDamage = rollYanmarBreakerDamage(stats.breakerDamage, {
           bonusOnly: true,
         });
+        const every3 = stats.breakerEvery3HitMult ?? 1;
+        if (every3 > 1 && runtime.breakerHitCount % 3 === 0) {
+          hitDamage = Math.round(hitDamage * every3);
+        }
         const result = damageCrashTile(terrain, tile.id, hitDamage);
         // Hold-to-hammer: rapid ticks while the foot pedal stays down.
         runtime.attachmentActionCooldown = 0.11;
@@ -1328,7 +1343,9 @@ export function tickExcavatorSim(params: SimTickParams) {
   const bucketOpening = sim.bucket > 1.1;
   const bucketAboveBed = bucketReachY >= minDumpHeight;
   const bodyNearDigZone = activeDigZones.some(
-    (zone) => Math.hypot(sim.posX - zone.x, sim.posZ - zone.z) < zone.radius + 9,
+    (zone) =>
+      Math.hypot(sim.posX - zone.x, sim.posZ - zone.z) <
+      zone.radius + 9 * Math.max(1, stats.reachMultiplier ?? 1),
   );
   const inZone = scraperInDigZone || tipInDigZone || bodyNearDigZone;
   const bucketContactsInDump =
@@ -1343,7 +1360,10 @@ export function tickExcavatorSim(params: SimTickParams) {
   // 흙트럭·돌트럭 공통: 차체 밀착 + 정면이 짐칸 중심
   const inTruckDumpTarget = alignedForDumpTruck;
   if (!inDump && truckState.fillUnits >= stats.truckCapacityUnits - 0.5) {
-    beginDumpTruckDeparture(truckState);
+    if (truckState.phase === "ready") {
+      beginDumpTruckDeparture(truckState);
+      onDumpTruckFull?.();
+    }
   }
   const haulTruckDropZone = terrain.hillZone;
   if (
@@ -1352,10 +1372,16 @@ export function tickExcavatorSim(params: SimTickParams) {
     haulTruckDropZone.haulTruck.loadCount >=
       Math.max(1, Math.floor(stats.haulTruckCapacity))
   ) {
-    beginHaulTruckDeparture(terrain, stats.haulTruckCapacity);
+    if (haulTruckDropZone.haulTruck.phase === "ready") {
+      beginHaulTruckDeparture(terrain, stats.haulTruckCapacity);
+      onHaulTruckFull?.();
+    }
   }
-  const bucketInWorkRange = scraperDepthBelow > -1.4 && scraperDepthBelow < 2.6;
-  const tipOnGround = scraperDepthBelow > -1.2 && scraperDepthBelow < 2.6;
+  const reach = Math.max(1, stats.reachMultiplier ?? 1);
+  const bucketInWorkRange =
+    scraperDepthBelow > -1.4 * reach && scraperDepthBelow < 2.6 * reach;
+  const tipOnGround =
+    scraperDepthBelow > -1.2 * reach && scraperDepthBelow < 2.6 * reach;
   const curled = isBucketCurled(sim.boom, sim.bucket);
   const soilRetention = getBucketSoilRetention(sim.boom, sim.arm, sim.bucket);
   const bucketOpenReady = sim.bucket >= 0.35 && sim.bucket <= 1.85;
@@ -1471,6 +1497,7 @@ export function tickExcavatorSim(params: SimTickParams) {
   }
   fb.groundDepth = scraperDepthBelow;
   fb.digging = false;
+  fb.bladeWorking = false;
   fb.bucketOpenReady = bucketOpenReady;
   fb.insertedDeepEnough = insertedDeepEnough;
   fb.bucketCurlReady = bucketCurlReady;
@@ -1583,7 +1610,7 @@ export function tickExcavatorSim(params: SimTickParams) {
             terrain,
             digX,
             digZ,
-            naturalDigPose ? 2.6 : 2.2,
+            (naturalDigPose ? 2.6 : 2.2) * reach,
             scrape * dt * digRate * (naturalDigPose ? 0.72 : 0.58),
           )
         : 0;
@@ -1746,10 +1773,19 @@ export function tickExcavatorSim(params: SimTickParams) {
     forwardTravel > 0.35 &&
     bladeInSoilField;
   if (bladeScraping) {
+    const bladeEff = Math.max(0.5, stats.bladeEfficiency ?? 1);
+    digAt(
+      terrain,
+      bladeContact.x,
+      bladeContact.z,
+      2.1 * Math.max(1, stats.reachMultiplier ?? 1),
+      forwardTravel * dt * 0.85 * bladeEff,
+    );
+    fb.bladeWorking = true;
     runtime.bladeSpray.active = true;
     runtime.bladeSpray.intensity = Math.min(
       1.35,
-      runtime.bladeSpray.intensity + forwardTravel * dt * 1.8,
+      runtime.bladeSpray.intensity + forwardTravel * dt * 1.8 * bladeEff,
     );
     runtime.bladeSpray.x = bladeContact.x;
     runtime.bladeSpray.y = bladeGroundY + 0.06;

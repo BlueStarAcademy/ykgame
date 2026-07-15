@@ -300,6 +300,8 @@ export interface DigFeedback {
   grappleLiftResult: null | "success" | "fail";
   grappleLiftResultTick: number;
   digging: boolean;
+  /** 도저 블레이드로 흙밭을 긁는 중 */
+  bladeWorking: boolean;
   groundDepth: number;
   bucketOpenReady: boolean;
   insertedDeepEnough: boolean;
@@ -367,6 +369,7 @@ export function createDigFeedback(): DigFeedback {
     grappleLiftResult: null,
     grappleLiftResultTick: 0,
     digging: false,
+    bladeWorking: false,
     groundDepth: 0,
     bucketOpenReady: false,
     insertedDeepEnough: false,

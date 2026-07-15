@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { YANMAR_EQUIPMENT_CONFIG } from "@/games/yanmar/equipment";
 import {
   SANCTION_REASON_CUSTOM,
   SANCTION_REASON_PRESETS,
 } from "@/lib/sanctions";
 import { AdminShell } from "./AdminShell";
+import { GEAR_SLOT_LABEL, ITEM_GRADE_LABEL } from "@/games/yanmar/gearCatalog";
 
 interface UserDetail {
   id: string;
@@ -15,6 +15,7 @@ interface UserDetail {
   nickname: string | null;
   role: string;
   currency: number;
+  enhanceCores: number;
   isActive: boolean;
   sanctionReason: string | null;
   sanctionedAt: string | null;
@@ -24,6 +25,7 @@ interface UserDetail {
     coupons: number;
     mails: number;
     rewardInventoryItems: number;
+    gearItems: number;
   };
   gameScores: Array<{
     id: string;
@@ -40,9 +42,19 @@ interface UserDetail {
     expiresAt: string;
     usedAt: string | null;
   }>;
-  equipmentUpgrades: Array<{
-    part: string;
-    level: number;
+  gearItems: Array<{
+    id: string;
+    slot: string;
+    grade: string;
+    enhanceLevel: number;
+    nameSnapshot: string;
+    durability: number;
+    durabilityMax: number;
+    equippedSlot: string | null;
+  }>;
+  chassisLoadouts: Array<{
+    activeChassisId: string;
+    ownedChassisIds: unknown;
   }>;
 }
 
@@ -298,27 +310,60 @@ export function AdminUserDetail({ userId }: { userId: string }) {
                 {user._count.rewardInventoryItems}건
               </p>
             </div>
+            <div className="rounded-xl bg-slate-50 px-3 py-2">
+              <p className="text-slate-400">장비 / 코어</p>
+              <p className="mt-0.5 font-bold text-slate-800">
+                {user._count.gearItems}개 · 강화코어 {user.enhanceCores}
+              </p>
+            </div>
           </div>
         </section>
 
-        {user.equipmentUpgrades.length > 0 ? (
+        {user.chassisLoadouts[0] ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-black text-slate-900">장비강화</h2>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {user.equipmentUpgrades.map((upgrade) => {
-                const partLabel =
-                  upgrade.part in YANMAR_EQUIPMENT_CONFIG
-                    ? YANMAR_EQUIPMENT_CONFIG[
-                        upgrade.part as keyof typeof YANMAR_EQUIPMENT_CONFIG
-                      ].label
-                    : upgrade.part;
+            <h2 className="text-sm font-black text-slate-900">차체</h2>
+            <p className="mt-2 text-xs text-slate-600">
+              장착{" "}
+              <span className="font-bold text-slate-900">
+                {user.chassisLoadouts[0].activeChassisId}
+              </span>
+            </p>
+          </section>
+        ) : null}
+
+        {user.gearItems.length > 0 ? (
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-black text-slate-900">보유 장비</h2>
+            <div className="mt-3 space-y-2">
+              {user.gearItems.map((item) => {
+                const gradeLabel =
+                  item.grade in ITEM_GRADE_LABEL
+                    ? ITEM_GRADE_LABEL[item.grade as keyof typeof ITEM_GRADE_LABEL]
+                    : item.grade;
+                const slotLabel =
+                  item.slot in GEAR_SLOT_LABEL
+                    ? GEAR_SLOT_LABEL[item.slot as keyof typeof GEAR_SLOT_LABEL]
+                    : item.slot;
                 return (
-                  <span
-                    key={upgrade.part}
-                    className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700"
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-slate-100 px-3 py-2 text-xs"
                   >
-                    {partLabel} +{upgrade.level}
-                  </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-slate-800">
+                        {item.nameSnapshot}
+                        {item.enhanceLevel > 0 ? ` +${item.enhanceLevel}` : ""}
+                      </span>
+                      <span className="text-slate-500">
+                        {gradeLabel} · {slotLabel}
+                        {item.equippedSlot ? " · 장착" : ""}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-slate-400">
+                      내구 {Math.round(item.durability)}/
+                      {Math.round(item.durabilityMax)}
+                    </p>
+                  </div>
                 );
               })}
             </div>

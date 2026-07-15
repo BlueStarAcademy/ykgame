@@ -8,6 +8,7 @@ import {
 
 const MAX_STARS = 40;
 const MAX_XP = 6000;
+const MAX_CORES = 16;
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -19,12 +20,15 @@ export async function POST(request: Request) {
     eventId?: unknown;
     stars?: unknown;
     xp?: unknown;
+    enhanceCores?: unknown;
     label?: unknown;
   } | null;
 
   const eventId = parseRewardEventId(body?.eventId);
   const stars = typeof body?.stars === "number" ? Math.floor(body.stars) : NaN;
   const xp = typeof body?.xp === "number" ? Math.floor(body.xp) : NaN;
+  const enhanceCores =
+    typeof body?.enhanceCores === "number" ? Math.floor(body.enhanceCores) : 0;
   const label =
     typeof body?.label === "string" ? body.label.slice(0, 80) : "퀘스트 보상";
 
@@ -37,7 +41,14 @@ export async function POST(request: Request) {
   if (!Number.isFinite(xp) || xp < 0 || xp > MAX_XP) {
     return NextResponse.json({ error: "Invalid xp" }, { status: 400 });
   }
-  if (stars === 0 && xp === 0) {
+  if (
+    !Number.isFinite(enhanceCores) ||
+    enhanceCores < 0 ||
+    enhanceCores > MAX_CORES
+  ) {
+    return NextResponse.json({ error: "Invalid enhanceCores" }, { status: 400 });
+  }
+  if (stars === 0 && xp === 0 && enhanceCores === 0) {
     return NextResponse.json({ error: "Empty reward" }, { status: 400 });
   }
 
@@ -52,8 +63,11 @@ export async function POST(request: Request) {
             data: {
               ...(stars > 0 ? { currency: { increment: stars } } : {}),
               ...(xp > 0 ? { totalXp: { increment: xp } } : {}),
+              ...(enhanceCores > 0
+                ? { enhanceCores: { increment: enhanceCores } }
+                : {}),
             },
-            select: { currency: true, totalXp: true },
+            select: { currency: true, totalXp: true, enhanceCores: true },
           });
 
           await tx.userRewardInventory.create({
@@ -65,6 +79,7 @@ export async function POST(request: Request) {
               metadata: {
                 eventId,
                 xp,
+                enhanceCores,
                 label,
                 source: "quest",
               },
@@ -75,8 +90,10 @@ export async function POST(request: Request) {
             eventId,
             currency: user.currency,
             totalXp: user.totalXp,
+            enhanceCores: user.enhanceCores,
             stars,
             xp,
+            coresGranted: enhanceCores,
           };
         },
       );

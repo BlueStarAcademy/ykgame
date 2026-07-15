@@ -120,9 +120,9 @@ export function createAuxiliaryControls(): AuxiliaryControlState {
   };
 }
 
-/** 최대 각속도·주행속도 (게임 — 빠른 피드백) */
+/** 최대 각속도·주행속도 (게임 — 빠른 피드백). swing은 전 차체 공통·기존 대비 1/2. */
 export const CONTROL_SPEED = {
-  swing: 1.4,
+  swing: 0.7,
   travel: 5.5,
   trackTurn: 1.35,
   boom: 1.35,
@@ -130,9 +130,9 @@ export const CONTROL_SPEED = {
   bucket: 1.2,
 } as const;
 
-/** 탑승 체험 — 실제 미니 굴착기에 가까운 저속 프로필 */
+/** 탑승 체험 — 실제 미니 굴착기에 가까운 저속 프로필. swing도 1/2. */
 export const RIDE_CONTROL_SPEED = {
-  swing: 0.52,
+  swing: 0.26,
   travel: 2.1,
   trackTurn: 0.5,
   boom: 0.48,
@@ -240,6 +240,11 @@ export function mergeControlInputs(
   };
 }
 
+/**
+ * @param workSpeedScale RPM×민첩 — 붐/암에만 적용
+ * @param travelSpeedScale RPM×민첩 — 전진 주행에만 적용
+ * 선회·버켓 컬은 차체/RPM 배율 없이 고정
+ */
 export function applyControls(
   state: {
     swing: number;
@@ -253,7 +258,7 @@ export function applyControls(
   input: ExcavatorControlState,
   dt: number,
   vel: HydraulicVelocity,
-  hydraulicSpeedScale = 1,
+  workSpeedScale = 1,
   travelSpeedScale = 1,
   speedProfile: ControlSpeedProfile = CONTROL_SPEED,
 ) {
@@ -269,7 +274,7 @@ export function applyControls(
   // 좌 조이스틱 앞=암 뻗음(각도↑), 뒤=암 당김 — 위/아래 매핑 반전 반영
   vel.arm = approach(
     vel.arm,
-    left.y * speedProfile.arm * hydraulicSpeedScale,
+    left.y * speedProfile.arm * workSpeedScale,
     ACCEL.arm,
     DAMPING.arm,
     dt,
@@ -300,16 +305,16 @@ export function applyControls(
   // 우 조이스틱 앞=붐 하강(각도↑·버킷↓), 뒤=붐 상승 — 3D 암 골격과 일치
   vel.boom = approach(
     vel.boom,
-    right.y * speedProfile.boom * hydraulicSpeedScale,
+    right.y * speedProfile.boom * workSpeedScale,
     ACCEL.boom,
     DAMPING.boom,
     dt,
   );
+  // 버켓 컬/펴기: 전 차체 공통 고정 속도 (RPM·민첩 미적용)
   vel.bucket = approach(
     vel.bucket,
     right.x *
       speedProfile.bucket *
-      hydraulicSpeedScale *
       (right.x < 0 ? BUCKET_CURL_SPEED_SCALE : 1),
     ACCEL.bucket,
     DAMPING.bucket,

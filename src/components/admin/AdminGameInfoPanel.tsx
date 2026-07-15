@@ -7,7 +7,9 @@ import { AdminProbabilityPanelContent } from "./AdminProbabilityPanel";
 import { AdminQuestsPanelContent } from "./AdminQuestsPanel";
 import { AdminWorkshopsPanelContent } from "./AdminWorkshopsPanel";
 
-type GameInfoTabId = "probability" | "quests" | "workshops";
+import { AdminYanmarGearPanelContent } from "./AdminYanmarGearPanel";
+
+type GameInfoTabId = "probability" | "quests" | "workshops" | "gear";
 
 const GAME_INFO_TABS: {
   id: GameInfoTabId;
@@ -15,12 +17,18 @@ const GAME_INFO_TABS: {
   emoji: string;
 }[] = [
   { id: "probability", label: "확률정보", emoji: "🎲" },
-  { id: "quests", label: "퀘스트 정보", emoji: "📋" },
-  { id: "workshops", label: "작업장 정보", emoji: "🏗️" },
+  { id: "quests", label: "퀘스트", emoji: "📋" },
+  { id: "workshops", label: "작업장", emoji: "🏗️" },
+  { id: "gear", label: "장비·가챠", emoji: "⚙️" },
 ];
 
 function resolveInitialTab(value: string | null): GameInfoTabId {
-  if (value === "quests" || value === "workshops" || value === "probability") {
+  if (
+    value === "quests" ||
+    value === "workshops" ||
+    value === "probability" ||
+    value === "gear"
+  ) {
     return value;
   }
   return "probability";
@@ -34,11 +42,11 @@ export function AdminGameInfoPanel() {
   return (
     <AdminShell
       title="게임정보"
-      subtitle="확률·퀘스트·작업장 정보를 한곳에서 확인합니다."
+      subtitle="확률·퀘스트·작업장·장비/가챠 정보를 한곳에서 확인합니다."
     >
       <div className="space-y-4">
         <div
-          className="grid grid-cols-3 gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-1.5"
+          className="grid grid-cols-4 gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-1.5"
           role="tablist"
           aria-label="게임정보 분류"
         >
@@ -70,6 +78,7 @@ export function AdminGameInfoPanel() {
           {activeTab === "probability" ? <AdminProbabilityPanelContent /> : null}
           {activeTab === "quests" ? <AdminQuestsPanelContent /> : null}
           {activeTab === "workshops" ? <AdminWorkshopsPanelContent /> : null}
+          {activeTab === "gear" ? <AdminYanmarGearPanelContent /> : null}
         </div>
       </div>
     </AdminShell>

@@ -35,8 +35,6 @@ export function DigHintContent({
   bucketLoad,
   maxLoadUnits,
   boom,
-  arm,
-  bucket,
   compact = false,
 }: DigHintContentProps) {
   const steps = [
@@ -100,11 +98,6 @@ export function DigHintContent({
         ))}
       </ul>
       {compact ? null : <BoomLoadGauge bucketLoad={bucketLoad} maxLoadUnits={maxLoadUnits} />}
-      {compact || arm == null || bucket == null ? null : (
-        <div className="mt-1 border-t border-white/10">
-          <DigPoseGraph boom={boom} arm={arm} bucket={bucket} feedback={feedback} />
-        </div>
-      )}
     </div>
   );
 }
@@ -179,122 +172,6 @@ export function GrappleGripGauge({
         <span className="w-8 text-right text-[8px] tabular-nums text-white/70">
           {pressurePct}%
         </span>
-      </div>
-    </div>
-  );
-}
-
-function clamp(v: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, v));
-}
-
-function toPct(value: number, min: number, max: number) {
-  return clamp(((value - min) / (max - min)) * 100, 0, 100);
-}
-
-function graphColor(ok: boolean, near: boolean) {
-  if (ok) return "bg-emerald-400";
-  if (near) return "bg-amber-300";
-  return "bg-white/45";
-}
-
-function GraphRow({
-  label,
-  value,
-  min,
-  max,
-  optimalMin,
-  optimalMax,
-  ok,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  optimalMin: number;
-  optimalMax: number;
-  ok: boolean;
-}) {
-  const current = toPct(value, min, max);
-  const start = toPct(optimalMin, min, max);
-  const end = toPct(optimalMax, min, max);
-  const near =
-    value >= optimalMin - (max - min) * 0.12 &&
-    value <= optimalMax + (max - min) * 0.12;
-  const markerColor = graphColor(ok, near);
-
-  return (
-    <div className="grid grid-cols-[2rem_1fr] items-center gap-1">
-      <span className="text-[8px] font-bold text-white/70">{label}</span>
-      <div className="relative h-1.5 rounded-full bg-white/15">
-        <div
-          className="absolute top-0 h-full rounded-full bg-emerald-400/35"
-          style={{ left: `${start}%`, width: `${Math.max(4, end - start)}%` }}
-        />
-        <div
-          className={`absolute top-1/2 h-2.5 w-1 -translate-y-1/2 rounded-full ${markerColor}`}
-          style={{ left: `calc(${current}% - 2px)` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-export function DigPoseGraph({
-  boom,
-  arm,
-  bucket,
-  feedback,
-}: {
-  boom: number;
-  arm: number;
-  bucket: number;
-  feedback: DigFeedback;
-}) {
-  const scorePct = Math.round(feedback.digPoseScore * 100);
-
-  return (
-    <div className="pt-0.5">
-      <div className="mb-0.5 flex items-center justify-between">
-        <span className="text-[8px] font-bold text-orange-200">적재 자세</span>
-        <span
-          className={
-            feedback.optimalDigPose
-              ? "text-[8px] font-bold text-emerald-300"
-              : "text-[8px] font-bold text-white/55"
-          }
-        >
-          {feedback.optimalDigPose ? "최적" : `${scorePct}%`}
-        </span>
-      </div>
-      <div className="space-y-px">
-        <GraphRow
-          label="버켓"
-          value={bucket}
-          min={0.35}
-          max={3.6}
-          optimalMin={0.35}
-          optimalMax={1.1}
-          ok={feedback.bucketOpenReady && feedback.bucketCurlReady}
-        />
-        <GraphRow
-          label="붐"
-          value={boom}
-          min={0.06}
-          max={1.45}
-          optimalMin={0.65}
-          optimalMax={1.2}
-          ok={feedback.insertedDeepEnough}
-        />
-        <GraphRow
-          label="암"
-          value={arm}
-          min={-2.05}
-          max={0.55}
-          optimalMin={-1.75}
-          optimalMax={-0.55}
-          ok={feedback.armPulling}
-        />
       </div>
     </div>
   );

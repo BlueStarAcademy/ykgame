@@ -4,9 +4,7 @@ import { getSeasonKey } from "@/lib/games";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import { prisma } from "@/lib/prisma";
 import {
-  calculateYanmarEquipmentStats,
   calculateYanmarHillScore,
-  mergeYanmarEquipmentLevelsFromDb,
   rollYanmarHillXp,
   YANMAR_HILL_REWARD_CONFIG,
 } from "@/games/yanmar/equipment";
@@ -75,16 +73,37 @@ export async function POST(request: Request) {
           throw new RewardRateLimitError();
         }
 
-        const rows = await tx.userEquipmentUpgrade.findMany({
-          where: { userId: session.user.id, gameId: "yanmar" },
-          select: { part: true, level: true },
-        });
-        const stats = calculateYanmarEquipmentStats(
-          mergeYanmarEquipmentLevelsFromDb(rows),
-        );
+        const { ensureYanmarGearMigration } = await import("@/games/yanmar/gearMigrate");
+        await ensureYanmarGearMigration(tx, session.user.id);
+        const {
+          loadUserFinalStats,
+          tryWorkGearDrop,
+          tryWorkEnhanceCoresDrop,
+          applyMasterScoreXpBonus,
+          applyWorkExpGainSub,
+          serializeWorkGearDrop,
+        } = await import("@/games/yanmar/gearService");
+        const loaded = await loadUserFinalStats(tx, session.user.id);
+        const { loadActiveShopBuffIds } = await import("@/games/yanmar/shopBuffServer");
+        const {
+          applyShopBuffsToStats,
+          applyRankerWillScore,
+        } = await import("@/games/yanmar/shopBuffEffects");
+        const buffIds = await loadActiveShopBuffIds(session.user.id);
+        const stats = applyShopBuffsToStats(loaded.stats, buffIds);
         const critical = Math.random() < stats.criticalChance;
-        const score = calculateYanmarHillScore(stats, critical);
-        const xpGained = rollYanmarHillXp();
+        let score = calculateYanmarHillScore(stats, critical);
+        let xpGained = rollYanmarHillXp();
+        const boosted = applyMasterScoreXpBonus(
+          "hill",
+          score,
+          xpGained,
+          stats.activeMasters,
+        );
+        score = applyRankerWillScore(boosted.score, buffIds);
+        xpGained = applyWorkExpGainSub(boosted.xp, stats.workExpGainBonus, {
+          workXpMult: stats.workXpMult,
+        });
         const rolled = rollYanmarDropRewards({
           score,
           minStars: minStarReward,
@@ -100,6 +119,14 @@ export async function POST(request: Request) {
           coupon: rolled.coupon,
           metadata: { eventId, xpGained, score, critical },
         });
+        const gearDrop = serializeWorkGearDrop(
+          await tryWorkGearDrop(tx, session.user.id, "hillDump"),
+        );
+        const coreDrop = await tryWorkEnhanceCoresDrop(
+          tx,
+          session.user.id,
+          "hillDump",
+        );
         const totalStars = issued.stars.stars;
         const updated = await tx.user.update({
           where: { id: session.user.id },
@@ -107,7 +134,7 @@ export async function POST(request: Request) {
             totalXp: { increment: xpGained },
             ...(totalStars > 0 ? { currency: { increment: totalStars } } : {}),
           },
-          select: { currency: true, totalXp: true },
+          select: { currency: true, totalXp: true, enhanceCores: true },
         });
 
         return {
@@ -119,13 +146,16 @@ export async function POST(request: Request) {
                 expiresAt: issued.coupon.expiresAt.toISOString(),
               }
             : null,
-          score: issued.stars.score,
+          score,
           critical: issued.stars.critical,
           xpGained,
           totalStars,
           currency: updated.currency,
           totalXp: updated.totalXp,
           level: getPlayerLevelProgress(updated.totalXp).level,
+          gearDrop,
+          coresDropped: coreDrop.dropped ? coreDrop.amount : 0,
+          enhanceCores: coreDrop.enhanceCores ?? updated.enhanceCores,
         };
       },
     );

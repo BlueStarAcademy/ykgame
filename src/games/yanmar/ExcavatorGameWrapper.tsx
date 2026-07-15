@@ -48,7 +48,6 @@ import type {
   AutoPoseSlotIndex,
   AutoPoseState,
 } from "./types";
-import { EquipmentUpgradePanel } from "./EquipmentUpgradePanel";
 import {
   createHydraulicVelocity,
   createAutoPoseState,
@@ -56,7 +55,7 @@ import {
   type HydraulicVelocity,
 } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
-import { DigPoseGraph, GrappleGripGauge } from "./DigHintPanel";
+import { GrappleGripGauge } from "./DigHintPanel";
 import { DumpHintPanel } from "./DumpHintPanel";
 import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
 import {
@@ -69,6 +68,7 @@ import {
 import { yanmarAudio } from "./yanmarAudio";
 import { QuestPanel } from "./QuestPanel";
 import { ShopPanel } from "./ShopPanel";
+import { GachaResultModal } from "./GachaResultModal";
 import { ActiveShopBuffIcons } from "./ActiveShopBuffIcons";
 import {
   activateShopBuff,
@@ -77,7 +77,14 @@ import {
   saveActiveShopBuffs,
   type ActiveShopBuff,
 } from "./shopBuffPersistence";
-import { SHOP_ITEM_BY_ID, type ShopItemId } from "./shopCatalog";
+import {
+  activeShopBuffIds,
+  applyShopBuffsToStats,
+} from "./shopBuffEffects";
+import {
+  SHOP_ITEM_BY_ID,
+  type ShopItemId,
+} from "./shopCatalog";
 import { MissionHudPanel } from "./MissionHudPanel";
 import {
   applyQuestProgress,
@@ -132,27 +139,29 @@ import {
 } from "./dumpTruckState";
 import { expandTerrainForLevel, type TerrainData } from "./terrain";
 import {
-  DEFAULT_YANMAR_EQUIPMENT_FAIL_BONUSES,
-  DEFAULT_YANMAR_EQUIPMENT_LEVELS,
-  YANMAR_EQUIPMENT_RESET_REFUND_RATE,
-  YANMAR_EQUIPMENT_CONFIG,
   YANMAR_REWARD_CONFIG,
   YANMAR_CRASH_REWARD_CONFIG,
   YANMAR_HILL_REWARD_CONFIG,
   calculateYanmarCrashScore,
   calculateYanmarHillScore,
-  calculateYanmarEquipmentStats,
   getLoadUnits,
-  getYanmarPartResetRefundStars,
-  getYanmarUpgradeCost,
-  getYanmarUpgradeFailBonusGain,
-  getYanmarUpgradeSuccessRate,
   rollYanmarHillXp,
-  type YanmarEquipmentFailBonuses,
-  type YanmarEquipmentLevels,
-  type YanmarEquipmentPart,
   type YanmarEquipmentStats,
 } from "./equipment";
+import { defaultFinalStats } from "./gearStats";
+import { GearPanel, type GearPanelItem } from "./GearPanel";
+import { PlayerProfileModal } from "./PlayerProfileModal";
+import { RepairPanel } from "./RepairPanel";
+import {
+  computeMaintenanceSnapshot,
+  type MaintenanceFluidId,
+  type MaintenanceRepairKind,
+  type MaintenanceSnapshot,
+} from "./maintenance";
+import { isInRepairTentRange } from "./RepairTent";
+import type { ChassisModelId } from "./chassisCatalog";
+import { getChassisDef } from "./chassisCatalog";
+import { GEAR_INVENTORY_BASE, ITEM_GRADE_LABEL, type ItemGrade } from "./gearCatalog";
 import {
   createScoreState,
   getProgress,
@@ -180,7 +189,6 @@ import {
   getYanmarCouponImage,
   getYanmarCouponLabel,
 } from "./rewardVisualConfig";
-import { XpProgressBar } from "@/components/ui/XpProgressBar";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import {
   getCrossedUnlocks,
@@ -592,7 +600,7 @@ export function ExcavatorGameWrapper({
 }: ExcavatorGameWrapperProps) {
   const config = getMissionConfig("yanmar");
   const { data: session, status: sessionStatus, update } = useSession();
-  const defaultEquipmentStats = calculateYanmarEquipmentStats(DEFAULT_YANMAR_EQUIPMENT_LEVELS);
+  const defaultEquipmentStats = defaultFinalStats();
   const [mode, setMode] = useState<GameMode>("intro");
   const [tutorialIndex, setTutorialIndex] = useState(0);
   const [input, setInput] = useState<ExcavatorControlState>({
@@ -649,11 +657,6 @@ export function ExcavatorGameWrapper({
   });
   const [dumpScorePanel, setDumpScorePanel] = useState<DumpScorePanelState | null>(null);
   const [couponDiscovery, setCouponDiscovery] = useState<CouponDiscoveryState | null>(null);
-  const [equipmentLevels, setEquipmentLevels] = useState<YanmarEquipmentLevels>(
-    DEFAULT_YANMAR_EQUIPMENT_LEVELS,
-  );
-  const [equipmentFailBonuses, setEquipmentFailBonuses] =
-    useState<YanmarEquipmentFailBonuses>(DEFAULT_YANMAR_EQUIPMENT_FAIL_BONUSES);
   const [equipmentStats, setEquipmentStats] =
     useState<YanmarEquipmentStats>(defaultEquipmentStats);
   const [currency, setCurrency] = useState(() => session?.user?.currency ?? 0);
@@ -681,11 +684,40 @@ export function ExcavatorGameWrapper({
   const [soundSettings, setSoundSettings] =
     useState<SoundSettings>(DEFAULT_SOUND_SETTINGS);
   const [showMinimap, setShowMinimap] = useState(true);
-  const [showDigPoseGraph, setShowDigPoseGraph] = useState(true);
   const [showMissionQuest, setShowMissionQuest] = useState(true);
   const [showTutorialMenu, setShowTutorialMenu] = useState(false);
   const [showQuestPanel, setShowQuestPanel] = useState(false);
   const [showShopPanel, setShowShopPanel] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showRepairPanel, setShowRepairPanel] = useState(false);
+  const [gearItems, setGearItems] = useState<GearPanelItem[]>([]);
+  const [enhanceCores, setEnhanceCores] = useState(0);
+  const [gearInventorySlots, setGearInventorySlots] = useState(GEAR_INVENTORY_BASE);
+  const [gearExpandCost, setGearExpandCost] = useState<number | null>(100);
+  const [activeChassisId, setActiveChassisId] = useState<ChassisModelId | string>("ViO17_1");
+  const [ownedChassisIds, setOwnedChassisIds] = useState<string[]>(["ViO17_1"]);
+  const [gearBusy, setGearBusy] = useState(false);
+  const [gachaBusy, setGachaBusy] = useState(false);
+  const [lastGachaResults, setLastGachaResults] = useState<
+    { nameSnapshot: string; grade: string; slot?: string }[] | null
+  >(null);
+  const [lastGachaBanner, setLastGachaBanner] = useState<
+    "STANDARD" | "PREMIUM" | null
+  >(null);
+  const [showGachaResultModal, setShowGachaResultModal] = useState(false);
+  const [repairBuffExpiresAt, setRepairBuffExpiresAt] = useState<string | null>(
+    null,
+  );
+  const [maintenance, setMaintenance] = useState<MaintenanceSnapshot | null>(
+    null,
+  );
+  const repairStateRef = useRef<Parameters<typeof computeMaintenanceSnapshot>[0]>(
+    null,
+  );
+  const [nearRepairTent, setNearRepairTent] = useState(false);
+  const nearRepairTentRef = useRef(false);
+  const travelMetersAccumRef = useRef(0);
+  const travelFlushBusyRef = useRef(false);
   const [activeShopBuffs, setActiveShopBuffs] = useState<ActiveShopBuff[]>([]);
   const [purchasingShopItemId, setPurchasingShopItemId] =
     useState<ShopItemId | null>(null);
@@ -705,8 +737,6 @@ export function ExcavatorGameWrapper({
   });
   const [showTouchZones, setShowTouchZones] = useState(false);
   const [showEquipmentUpgrade, setShowEquipmentUpgrade] = useState(false);
-  const [upgradingPart, setUpgradingPart] = useState<YanmarEquipmentPart | null>(null);
-  const [resettingEquipment, setResettingEquipment] = useState(false);
   const [headerHudReady, setHeaderHudReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(
     initialPlayMode === "ride" ? 3 : 1,
@@ -769,6 +799,24 @@ export function ExcavatorGameWrapper({
   const couponDiscoveryRef = useRef<CouponDiscoveryState | null>(null);
   const couponDiscoveryHideTimerRef = useRef<number | null>(null);
   const equipmentStatsRef = useRef<YanmarEquipmentStats>(defaultEquipmentStats);
+  const baseEquipmentStatsRef =
+    useRef<YanmarEquipmentStats>(defaultEquipmentStats);
+  const activeShopBuffsRef = useRef(activeShopBuffs);
+  activeShopBuffsRef.current = activeShopBuffs;
+
+  const publishEquipmentStats = useCallback((base: YanmarEquipmentStats) => {
+    baseEquipmentStatsRef.current = base;
+    const effective = applyShopBuffsToStats(
+      base,
+      activeShopBuffIds(activeShopBuffsRef.current),
+    );
+    equipmentStatsRef.current = effective;
+    setEquipmentStats(effective);
+  }, []);
+
+  useEffect(() => {
+    publishEquipmentStats(baseEquipmentStatsRef.current);
+  }, [activeShopBuffs, publishEquipmentStats]);
   const dumpTruckUserIdRef = useRef<string | null>(null);
   const dumpTruckLastSavedAtRef = useRef(0);
   const gameSessionUserIdRef = useRef<string | null>(null);
@@ -898,6 +946,7 @@ export function ExcavatorGameWrapper({
       prev.grappleLiftResult === fb.grappleLiftResult &&
       prev.grappleLiftResultTick === fb.grappleLiftResultTick &&
       prev.digging === fb.digging &&
+      prev.bladeWorking === fb.bladeWorking &&
       Math.abs(prev.groundDepth - fb.groundDepth) < 0.05 &&
       prev.bucketOpenReady === fb.bucketOpenReady &&
       prev.insertedDeepEnough === fb.insertedDeepEnough &&
@@ -1558,21 +1607,29 @@ export function ExcavatorGameWrapper({
       eventId: string;
       stars: number;
       xp: number;
+      enhanceCores?: number;
       label: string;
     }) => {
       if (session?.user?.id) {
         const res = await fetch("/api/rewards/yanmar-quest", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(opts),
+          body: JSON.stringify({
+            ...opts,
+            enhanceCores: opts.enhanceCores ?? 0,
+          }),
         });
         if (res.status === 409) return true;
         if (!res.ok) throw new Error("quest claim failed");
         const data = (await res.json()) as {
           currency?: number;
           totalXp?: number;
+          enhanceCores?: number;
         };
         syncSessionBalances(data, { syncPreviewCurrency: true });
+        if (typeof data.enhanceCores === "number") {
+          setEnhanceCores(data.enhanceCores);
+        }
         return true;
       }
 
@@ -1581,6 +1638,9 @@ export function ExcavatorGameWrapper({
       }
       if (opts.xp > 0) {
         applyTotalXp(totalXpRef.current + opts.xp, { announceLevelUp: true });
+      }
+      if ((opts.enhanceCores ?? 0) > 0) {
+        setEnhanceCores((prev) => prev + (opts.enhanceCores ?? 0));
       }
       return true;
     },
@@ -1650,14 +1710,52 @@ export function ExcavatorGameWrapper({
 
   const loadEquipment = useCallback(async () => {
     try {
-      const res = await fetch("/api/equipment/yanmar");
+      const res = await fetch("/api/gear/yanmar");
       if (!res.ok) return;
       const data = await res.json();
-      if (data.levels) setEquipmentLevels(data.levels);
-      if (data.failBonuses) setEquipmentFailBonuses(data.failBonuses);
       if (data.stats) {
-        equipmentStatsRef.current = data.stats;
-        setEquipmentStats(data.stats);
+        publishEquipmentStats(data.stats);
+      }
+      if (Array.isArray(data.items)) {
+        setGearItems(data.items);
+      }
+      if (typeof data.enhanceCores === "number") {
+        setEnhanceCores(data.enhanceCores);
+      }
+      if (typeof data.inventorySlots === "number") {
+        setGearInventorySlots(data.inventorySlots);
+      }
+      if ("expandCost" in data) {
+        setGearExpandCost(
+          typeof data.expandCost === "number" ? data.expandCost : null,
+        );
+      }
+      if (data.chassis?.activeId) {
+        setActiveChassisId(data.chassis.activeId);
+      }
+      if (Array.isArray(data.chassis?.ownedIds)) {
+        setOwnedChassisIds(data.chassis.ownedIds);
+      }
+      if (data.repair) {
+        repairStateRef.current = data.repair;
+      }
+      if (data.maintenance) {
+        setMaintenance(data.maintenance);
+      } else if (data.repair) {
+        setMaintenance(computeMaintenanceSnapshot(data.repair));
+      }
+      if (
+        data.repair?.buffExpiresAt &&
+        data.repair?.buffKind &&
+        data.repair.buffKind !== "NONE"
+      ) {
+        setRepairBuffExpiresAt(
+          typeof data.repair.buffExpiresAt === "string"
+            ? data.repair.buffExpiresAt
+            : new Date(data.repair.buffExpiresAt).toISOString(),
+        );
+      } else {
+        setRepairBuffExpiresAt(null);
       }
       if (typeof data.currency === "number") {
         currencyRef.current = data.currency;
@@ -1669,10 +1767,281 @@ export function ExcavatorGameWrapper({
       if (typeof data.totalXp === "number") {
         applyTotalXp(data.totalXp);
       }
+      if (data.migration?.migrated && data.migration.refundStars > 0) {
+        // optional toast — migration refund applied server-side
+      }
     } catch {
       // Equipment data is optional for unauthenticated previews.
     }
-  }, [applyTotalXp]);
+  }, [applyTotalXp, publishEquipmentStats]);
+
+  useEffect(() => {
+    if (!repairBuffExpiresAt) return;
+    const expiresMs = new Date(repairBuffExpiresAt).getTime();
+    if (!Number.isFinite(expiresMs)) return;
+    const delay = expiresMs - Date.now();
+    if (delay <= 0) {
+      void loadEquipment();
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void loadEquipment();
+    }, delay + 100);
+    return () => window.clearTimeout(timer);
+  }, [repairBuffExpiresAt, loadEquipment]);
+
+  const notifyGearDrop = useCallback(
+    (
+      drop:
+        | {
+            nameSnapshot?: string;
+            grade?: string;
+            mailed?: boolean;
+          }
+        | null
+        | undefined,
+    ) => {
+      if (!drop?.nameSnapshot) return;
+      const gradeLabel =
+        drop.grade && drop.grade in ITEM_GRADE_LABEL
+          ? ITEM_GRADE_LABEL[drop.grade as ItemGrade]
+          : drop.grade ?? "";
+      showAttachmentWarning(
+        drop.mailed
+          ? `인벤 가득 — [${gradeLabel}] ${drop.nameSnapshot} → 스타 우편 전환`
+          : `장비 획득! [${gradeLabel}] ${drop.nameSnapshot}`,
+      );
+      void loadEquipment();
+    },
+    [loadEquipment, showAttachmentWarning],
+  );
+
+  const notifyCoresDrop = useCallback(
+    (amount: unknown, enhanceCoresTotal?: unknown) => {
+      const n = typeof amount === "number" ? amount : 0;
+      if (n <= 0) return;
+      if (typeof enhanceCoresTotal === "number") {
+        setEnhanceCores(enhanceCoresTotal);
+      } else {
+        setEnhanceCores((prev) => prev + n);
+      }
+      showAttachmentWarning(`강화코어 획득! +${n}`);
+    },
+    [showAttachmentWarning],
+  );
+
+  const flushMaintenanceTravel = useCallback(
+    async (meters: number) => {
+      if (modeRef.current !== "game" || meters <= 0) return;
+      if (travelFlushBusyRef.current) {
+        travelMetersAccumRef.current += meters;
+        return;
+      }
+      travelFlushBusyRef.current = true;
+      try {
+        const payload = Math.max(0.1, Math.min(50_000, meters));
+        const res = await fetch("/api/repair/yanmar/consume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ travelMeters: payload }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.repair) repairStateRef.current = data.repair;
+        if (data.maintenance) setMaintenance(data.maintenance);
+        if (data.stats) publishEquipmentStats(data.stats);
+      } catch {
+        // Maintenance sync is best-effort during travel.
+      } finally {
+        travelFlushBusyRef.current = false;
+        const leftover = travelMetersAccumRef.current;
+        if (leftover >= 5) {
+          travelMetersAccumRef.current = 0;
+          void flushMaintenanceTravel(leftover);
+        }
+      }
+    },
+    [publishEquipmentStats],
+  );
+
+  const runGearAction = useCallback(
+    async (action: string, itemId: string) => {
+      setGearBusy(true);
+      try {
+        const res = await fetch("/api/gear/yanmar/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, itemId }),
+        });
+        const data = await res.json();
+        if (!res.ok) return null;
+        if (data.stats) {
+          publishEquipmentStats(data.stats);
+        }
+        if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
+          setCurrency(data.currency);
+          setPreviewStars(data.currency);
+        }
+        if (typeof data.enhanceCores === "number") {
+          setEnhanceCores(data.enhanceCores);
+        }
+        await loadEquipment();
+        return data as Record<string, unknown>;
+      } finally {
+        setGearBusy(false);
+      }
+    },
+    [loadEquipment, publishEquipmentStats],
+  );
+
+  const handleExpandInventory = useCallback(async () => {
+    setGearBusy(true);
+    try {
+      const res = await fetch("/api/gear/yanmar/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "expandInventory" }),
+      });
+      const data = await res.json();
+      if (!res.ok) return;
+      if (typeof data.currency === "number") {
+        currencyRef.current = data.currency;
+        setCurrency(data.currency);
+        setPreviewStars(data.currency);
+      }
+      if (typeof data.inventorySlots === "number") {
+        setGearInventorySlots(data.inventorySlots);
+      }
+      if ("expandCost" in data) {
+        setGearExpandCost(
+          typeof data.expandCost === "number" ? data.expandCost : null,
+        );
+      }
+      await loadEquipment();
+    } finally {
+      setGearBusy(false);
+    }
+  }, [loadEquipment]);
+
+  const handleChassisAction = useCallback(
+    async (action: "purchase" | "equip", chassisId: ChassisModelId) => {
+      setGearBusy(true);
+      try {
+        const res = await fetch("/api/chassis/yanmar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, chassisId }),
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+        if (data.stats) {
+          publishEquipmentStats(data.stats);
+        }
+        if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
+          setCurrency(data.currency);
+          setPreviewStars(data.currency);
+        }
+        if (data.activeId) setActiveChassisId(data.activeId);
+        if (Array.isArray(data.ownedIds)) setOwnedChassisIds(data.ownedIds);
+        await loadEquipment();
+      } finally {
+        setGearBusy(false);
+      }
+    },
+    [loadEquipment, publishEquipmentStats],
+  );
+
+  const handleRepair = useCallback(
+    async (fluid: MaintenanceFluidId, kind: MaintenanceRepairKind) => {
+      setGearBusy(true);
+      try {
+        const res = await fetch("/api/repair/yanmar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fluid, kind }),
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+        if (data.stats) {
+          publishEquipmentStats(data.stats);
+        }
+        if (data.maintenance) {
+          setMaintenance(data.maintenance);
+        }
+        if (data.repair) {
+          repairStateRef.current = data.repair;
+        }
+        if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
+          setCurrency(data.currency);
+          setPreviewStars(data.currency);
+        }
+        await loadEquipment();
+        setShowRepairPanel(false);
+      } finally {
+        setGearBusy(false);
+      }
+    },
+    [loadEquipment, publishEquipmentStats],
+  );
+
+  const handleGacha = useCallback(
+    async (banner: "STANDARD" | "PREMIUM", count: 1 | 10) => {
+      setGachaBusy(true);
+      try {
+        const res = await fetch("/api/gacha/yanmar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ banner, count }),
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+        if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
+          setCurrency(data.currency);
+          setPreviewStars(data.currency);
+        }
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          setLastGachaBanner(banner);
+          setLastGachaResults(data.items);
+          setShowGachaResultModal(true);
+        }
+        await loadEquipment();
+      } finally {
+        setGachaBusy(false);
+      }
+    },
+    [loadEquipment],
+  );
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const sim = simRef.current;
+      if (!sim) return;
+      const near = isInRepairTentRange(sim.posX, sim.posZ);
+      if (near !== nearRepairTentRef.current) {
+        nearRepairTentRef.current = near;
+        setNearRepairTent(near);
+        if (!near) setShowRepairPanel(false);
+      }
+    }, 250);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    void loadEquipment();
+  }, [loadEquipment]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const row = repairStateRef.current;
+      if (!row) return;
+      setMaintenance(computeMaintenanceSnapshot(row));
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const sessionXp = session?.user?.totalXp;
@@ -2269,6 +2638,7 @@ export function ExcavatorGameWrapper({
     persistDumpTruckCooldown();
 
     const modeNow = modeRef.current;
+
     if (modeNow !== "intro" && modeNow !== "ride" && modeNow !== "gameReady") {
       const sim = simRef.current;
       const track = questTrackRef.current;
@@ -2290,6 +2660,14 @@ export function ExcavatorGameWrapper({
         const travelDelta = Math.hypot(sim.posX - track.posX, sim.posZ - track.posZ);
         if (travelDelta > 0.0001) {
           pushQuestProgress("travel", travelDelta);
+          if (modeNow === "game") {
+            travelMetersAccumRef.current += travelDelta;
+            if (travelMetersAccumRef.current >= 5) {
+              const meters = travelMetersAccumRef.current;
+              travelMetersAccumRef.current = 0;
+              void flushMaintenanceTravel(meters);
+            }
+          }
         }
         track.posX = sim.posX;
         track.posZ = sim.posZ;
@@ -2410,6 +2788,7 @@ export function ExcavatorGameWrapper({
       }
     }
   }, [
+    flushMaintenanceTravel,
     persistDumpTruckCooldown,
     persistGameSession,
     pushQuestProgress,
@@ -2542,6 +2921,7 @@ export function ExcavatorGameWrapper({
           eventId: questClaimEventId("daily", current.dayKey, questId),
           stars: claimed.reward.stars,
           xp: claimed.reward.xp,
+          enhanceCores: claimed.reward.enhanceCores ?? 0,
           label: `일일:${questId}`,
         });
         questStateRef.current = claimed.state;
@@ -2549,6 +2929,11 @@ export function ExcavatorGameWrapper({
         saveQuestState(claimed.state);
         if (claimed.reward.stars > 0) {
           rewardStarsRef.current += claimed.reward.stars;
+        }
+        if ((claimed.reward.enhanceCores ?? 0) > 0) {
+          showAttachmentWarning(
+            `강화코어 획득! +${claimed.reward.enhanceCores}`,
+          );
         }
         showStandaloneRewardPanel(
           0,
@@ -2585,6 +2970,7 @@ export function ExcavatorGameWrapper({
         ),
         stars: claimed.reward.stars,
         xp: claimed.reward.xp,
+        enhanceCores: claimed.reward.enhanceCores ?? 0,
         label: `미션:${claimed.roundIndex + 1}`,
       });
       questStateRef.current = claimed.state;
@@ -2592,6 +2978,11 @@ export function ExcavatorGameWrapper({
       saveQuestState(claimed.state);
       if (claimed.reward.stars > 0) {
         rewardStarsRef.current += claimed.reward.stars;
+      }
+      if ((claimed.reward.enhanceCores ?? 0) > 0) {
+        showAttachmentWarning(
+          `강화코어 획득! +${claimed.reward.enhanceCores}`,
+        );
       }
       showStandaloneRewardPanel(
         claimed.reward.score ?? 0,
@@ -2627,6 +3018,7 @@ export function ExcavatorGameWrapper({
           ),
           stars: claimed.reward.stars,
           xp: claimed.reward.xp,
+          enhanceCores: claimed.reward.enhanceCores ?? 0,
           label: `반복:${questId}`,
         });
         questStateRef.current = claimed.state;
@@ -2634,6 +3026,11 @@ export function ExcavatorGameWrapper({
         saveQuestState(claimed.state);
         if (claimed.reward.stars > 0) {
           rewardStarsRef.current += claimed.reward.stars;
+        }
+        if ((claimed.reward.enhanceCores ?? 0) > 0) {
+          showAttachmentWarning(
+            `강화코어 획득! +${claimed.reward.enhanceCores}`,
+          );
         }
         showStandaloneRewardPanel(
           0,
@@ -2745,7 +3142,26 @@ export function ExcavatorGameWrapper({
             currency?: number;
             totalXp?: number;
             xpGained?: number;
+            gearDrops?: { nameSnapshot: string; grade: string; mailed?: boolean }[];
+            coresDropped?: number;
+            enhanceCores?: number;
           };
+          if (data.gearDrops && data.gearDrops.length > 0) {
+            for (const drop of data.gearDrops) {
+              if (!drop?.nameSnapshot) continue;
+              const gradeLabel =
+                drop.grade && drop.grade in ITEM_GRADE_LABEL
+                  ? ITEM_GRADE_LABEL[drop.grade as ItemGrade]
+                  : drop.grade ?? "";
+              showAttachmentWarning(
+                drop.mailed
+                  ? `인벤 가득 — [${gradeLabel}] ${drop.nameSnapshot} → 스타 우편 전환`
+                  : `장비 획득! [${gradeLabel}] ${drop.nameSnapshot}`,
+              );
+            }
+            void loadEquipment();
+          }
+          notifyCoresDrop(data.coresDropped, data.enhanceCores);
           const remaining = removeDumpRewardOutboxBatch(
             parseDumpRewardOutbox(window.localStorage.getItem(storageKey)),
             batch.eventId,
@@ -2827,7 +3243,10 @@ export function ExcavatorGameWrapper({
     }
   }, [
     adjustDumpScorePanel,
+    loadEquipment,
+    notifyCoresDrop,
     session?.user?.id,
+    showAttachmentWarning,
     showCouponDiscovery,
     syncSessionBalances,
   ]);
@@ -3079,6 +3498,14 @@ export function ExcavatorGameWrapper({
           showCouponDiscovery(couponEvent.couponType, couponEvent.discountPct);
         }
 
+        notifyGearDrop(
+          data.gearDrop as
+            | { nameSnapshot?: string; grade?: string; mailed?: boolean }
+            | null
+            | undefined,
+        );
+        notifyCoresDrop(data.coresDropped, data.enhanceCores);
+
         if (kind === "crash") {
           if (stars > 0) {
             rewardStarsRef.current += stars;
@@ -3113,6 +3540,8 @@ export function ExcavatorGameWrapper({
     },
     [
       accumulateDumpScore,
+      notifyGearDrop,
+      notifyCoresDrop,
       showAttachmentWarning,
       showCouponDiscovery,
       showStandaloneRewardPanel,
@@ -3142,134 +3571,48 @@ export function ExcavatorGameWrapper({
     [claimSpecialReward, pushQuestProgress],
   );
 
-  const handleEquipmentUpgrade = useCallback(
-    async (part: YanmarEquipmentPart): Promise<boolean | null> => {
-      const previewMode = modeRef.current !== "game";
-      const practiceMode = modeRef.current === "practice";
-      if (previewMode) {
-        const currentLevel = equipmentLevels[part];
-        const maxLevel = YANMAR_EQUIPMENT_CONFIG[part].maxLevel;
-        if (currentLevel >= maxLevel) return null;
-
-        const nextLevel = currentLevel + 1;
-        const cost = getYanmarUpgradeCost(part, nextLevel);
-        const pity = equipmentFailBonuses[part] ?? 0;
-        const successRate = getYanmarUpgradeSuccessRate(nextLevel, pity);
-        const success = Math.random() < successRate;
-
-        setEquipmentFailBonuses((current) => ({
-          ...current,
-          [part]: success
-            ? 0
-            : Math.min(1, (current[part] ?? 0) + getYanmarUpgradeFailBonusGain(nextLevel)),
-        }));
-
-        if (success) {
-          setEquipmentLevels((current) => {
-            const next = {
-              ...current,
-              [part]: Math.min(maxLevel, current[part] + 1),
-            };
-            const nextStats = calculateYanmarEquipmentStats(next);
-            equipmentStatsRef.current = nextStats;
-            setEquipmentStats(nextStats);
-            return next;
-          });
-        }
-
-        if (!practiceMode) {
-          setPreviewStars((value) => Math.max(0, value - cost));
-        }
-        return success;
-      }
-
-      setUpgradingPart(part);
+  const claimTruckFullReward = useCallback(
+    async (kind: "dump" | "haul") => {
+      if (modeRef.current !== "game") return;
       try {
-        const res = await fetch("/api/equipment/yanmar/upgrade", {
+        const res = await fetch("/api/rewards/yanmar-truck-full", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ part }),
+          body: JSON.stringify({
+            kind,
+            eventId: `truck-full:${kind}:${window.crypto.randomUUID()}`,
+          }),
         });
-        const data = await res.json();
-        if (!res.ok) return null;
-        if (data.levels) setEquipmentLevels(data.levels);
-        if (data.failBonuses) setEquipmentFailBonuses(data.failBonuses);
-        if (data.stats) {
-          equipmentStatsRef.current = data.stats;
-          setEquipmentStats(data.stats);
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          bonusScore?: number;
+          gearDrop?: {
+            nameSnapshot?: string;
+            grade?: string;
+            mailed?: boolean;
+          } | null;
+          coresDropped?: number;
+          enhanceCores?: number;
+        };
+        if (typeof data.bonusScore === "number" && data.bonusScore > 0) {
+          accumulateDumpScore(data.bonusScore, false, "트럭 만재 보너스");
         }
-        syncSessionBalances(data);
-        return Boolean(data.success);
+        notifyGearDrop(data.gearDrop);
+        notifyCoresDrop(data.coresDropped, data.enhanceCores);
       } catch {
-        return null;
-      } finally {
-        setUpgradingPart(null);
+        // Best-effort master-option score / drop on truck departure.
       }
     },
-    [equipmentFailBonuses, equipmentLevels, syncSessionBalances],
+    [accumulateDumpScore, notifyCoresDrop, notifyGearDrop],
   );
 
-  const handleEquipmentReset = useCallback((part: YanmarEquipmentPart) => {
-    const previewMode = modeRef.current !== "game";
-    const practiceMode = modeRef.current === "practice";
-    const partLevel = equipmentLevels[part];
-    if (partLevel <= 0) return;
+  const handleDumpTruckFull = useCallback(() => {
+    void claimTruckFullReward("dump");
+  }, [claimTruckFullReward]);
 
-    if (previewMode) {
-      setEquipmentLevels((current) => {
-        const next = {
-          ...current,
-          [part]: DEFAULT_YANMAR_EQUIPMENT_LEVELS[part],
-        };
-        const nextStats = calculateYanmarEquipmentStats(next);
-        equipmentStatsRef.current = nextStats;
-        setEquipmentStats(nextStats);
-        return next;
-      });
-      setEquipmentFailBonuses((current) => ({
-        ...current,
-        [part]: 0,
-      }));
-      if (!practiceMode) {
-        const refundStars = getYanmarPartResetRefundStars(part, partLevel);
-        if (refundStars > 0) {
-          setPreviewStars((value) => value + refundStars);
-        }
-      }
-      return;
-    }
-
-    const refundStars = getYanmarPartResetRefundStars(part, partLevel);
-    const partLabel = YANMAR_EQUIPMENT_CONFIG[part].label;
-    const confirmed = window.confirm(
-      `${partLabel} 강화를 초기화하면 사용한 스타의 ${Math.round(
-        YANMAR_EQUIPMENT_RESET_REFUND_RATE * 100,
-      )}%인 ${refundStars.toLocaleString()} 스타를 돌려받습니다.\n초기화하시겠습니까?`,
-    );
-    if (!confirmed) return;
-
-    setResettingEquipment(true);
-    void (async () => {
-      try {
-        const res = await fetch("/api/equipment/yanmar/reset", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ part }),
-        });
-        const data = await res.json();
-        if (!res.ok) return;
-        if (data.levels) setEquipmentLevels(data.levels);
-        if (data.failBonuses) setEquipmentFailBonuses(data.failBonuses);
-        if (data.stats) {
-          equipmentStatsRef.current = data.stats;
-          setEquipmentStats(data.stats);
-        }
-        syncSessionBalances(data);
-      } finally {
-        setResettingEquipment(false);
-      }
-    })();
-  }, [equipmentLevels, syncSessionBalances]);
+  const handleHaulTruckFull = useCallback(() => {
+    void claimTruckFullReward("haul");
+  }, [claimTruckFullReward]);
 
   useEffect(() => {
     if (mode !== "game") return;
@@ -3430,20 +3773,50 @@ export function ExcavatorGameWrapper({
           onSelect={startTutorial}
           onFreePlay={startFreePractice}
         />
-        <EquipmentUpgradePanel
+        <GearPanel
           open={showEquipmentUpgrade}
-          mode={mode}
-          levels={equipmentLevels}
-          failBonuses={equipmentFailBonuses}
-          currency={currency}
-          previewStars={previewStars}
-          upgradingPart={upgradingPart}
-          resettingEquipment={resettingEquipment}
-          playerLevel={getPlayerLevelProgress(totalXp).level}
-          unlockAllAttachments={practiceUnlocksAll}
           onClose={() => setShowEquipmentUpgrade(false)}
-          onUpgrade={handleEquipmentUpgrade}
-          onResetEquipment={handleEquipmentReset}
+          items={gearItems}
+          currency={mode === "game" ? currency : previewStars}
+          enhanceCores={enhanceCores}
+          inventorySlots={gearInventorySlots}
+          expandCost={gearExpandCost}
+          busy={gearBusy}
+          activeChassisId={activeChassisId}
+          equipmentStats={equipmentStats}
+          onEquip={(id) => void runGearAction("equip", id)}
+          onUnequip={(id) => void runGearAction("unequip", id)}
+          onEnhance={(id) => runGearAction("enhance", id)}
+          onDismantle={async (id) => {
+            const data = await runGearAction("dismantle", id);
+            if (!data || typeof data.cores !== "number") return null;
+            return { cores: data.cores as number };
+          }}
+          onExpandInventory={() => void handleExpandInventory()}
+        />
+        <PlayerProfileModal
+          open={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          nickname={
+            session?.user?.nickname ?? session?.user?.loginId ?? "PLAYER"
+          }
+          xpProgress={getPlayerLevelProgress(totalXp)}
+          stars={mode === "game" ? currency : previewStars}
+          playerLevel={getPlayerLevelProgress(totalXp).level}
+          currency={mode === "game" ? currency : previewStars}
+          activeChassisId={activeChassisId}
+          ownedChassisIds={ownedChassisIds}
+          busy={gearBusy}
+          onPurchaseChassis={(id) => void handleChassisAction("purchase", id)}
+          onEquipChassis={(id) => void handleChassisAction("equip", id)}
+        />
+        <RepairPanel
+          open={showRepairPanel}
+          onClose={() => setShowRepairPanel(false)}
+          currency={mode === "game" ? currency : previewStars}
+          maintenance={maintenance}
+          busy={gearBusy}
+          onRepair={(fluid, kind) => void handleRepair(fluid, kind)}
         />
 
         {mode !== "intro" && mode !== "gameReady" && travelRaiseWarn ? (
@@ -3467,6 +3840,40 @@ export function ExcavatorGameWrapper({
               adhesion={digFeedback.gripAdhesion}
               pressure={digFeedback.gripPressure}
             />
+          </div>
+        ) : null}
+
+        {mode !== "intro" &&
+        mode !== "gameReady" &&
+        mode !== "ride" &&
+        nearRepairTent &&
+        !showRepairPanel ? (
+          <div className="pointer-events-auto absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2">
+            <button
+              type="button"
+              className="yanmar-repair-prompt-btn"
+              onClick={() => {
+                setShowQuestPanel(false);
+                setShowShopPanel(false);
+                setShowEquipmentUpgrade(false);
+                setShowProfileModal(false);
+                setShowRepairPanel(true);
+              }}
+              aria-label="정비소 열기"
+            >
+              <span className="yanmar-repair-prompt-media" aria-hidden>
+                <img
+                  className="yanmar-repair-prompt-icon"
+                  src="/images/yanmar/2d/cockpit/repair-tent-premium.png?v=2"
+                  alt=""
+                  draggable={false}
+                />
+              </span>
+              <span className="yanmar-repair-prompt-copy">
+                <span className="yanmar-repair-prompt-eyebrow">정비소</span>
+                <span className="yanmar-repair-prompt-label">정비하기</span>
+              </span>
+            </button>
           </div>
         ) : null}
 
@@ -3524,6 +3931,7 @@ export function ExcavatorGameWrapper({
                     onClick={() => {
                       setShowQuestPanel(false);
                       setShowShopPanel(false);
+                      setShowProfileModal(false);
                       setShowEquipmentUpgrade((open) => !open);
                     }}
                     aria-expanded={showEquipmentUpgrade}
@@ -3537,7 +3945,7 @@ export function ExcavatorGameWrapper({
                       alt=""
                       draggable={false}
                     />
-                    <span className="yanmar-upgrade-hud-button-label">강화</span>
+                    <span className="yanmar-upgrade-hud-button-label">장비</span>
                   </button>
                   <button
                     type="button"
@@ -3547,6 +3955,7 @@ export function ExcavatorGameWrapper({
                     onClick={() => {
                       setShowQuestPanel(false);
                       setShowEquipmentUpgrade(false);
+                      setShowProfileModal(false);
                       setShowShopPanel((open) => !open);
                     }}
                     aria-expanded={showShopPanel}
@@ -3586,6 +3995,16 @@ export function ExcavatorGameWrapper({
                   onPurchase={(itemId) => {
                     void handleShopPurchase(itemId);
                   }}
+                  gachaBusy={gachaBusy}
+                  onGacha={(banner, count) => {
+                    void handleGacha(banner, count);
+                  }}
+                />
+                <GachaResultModal
+                  open={showGachaResultModal}
+                  onClose={() => setShowGachaResultModal(false)}
+                  results={lastGachaResults}
+                  banner={lastGachaBanner}
                 />
               </>
             ) : null}
@@ -3610,7 +4029,7 @@ export function ExcavatorGameWrapper({
                     alt=""
                     draggable={false}
                   />
-                  <span className="yanmar-upgrade-hud-button-label">강화</span>
+                  <span className="yanmar-upgrade-hud-button-label">장비</span>
                 </button>
                 <button
                   type="button"
@@ -3619,16 +4038,6 @@ export function ExcavatorGameWrapper({
                 >
                   튜토리얼
                 </button>
-              </div>
-            ) : null}
-            {showDigPoseGraph ? (
-              <div className="yanmar-dig-pose-panel w-[7.3125rem] rounded-sm border border-white/10 bg-black/55 px-2 py-1.5 text-white shadow-xl backdrop-blur-sm">
-                <DigPoseGraph
-                  boom={hud.boom}
-                  arm={hud.arm}
-                  bucket={hud.bucket}
-                  feedback={digFeedback}
-                />
               </div>
             ) : null}
             {!questsDisabled && showMissionQuest ? (
@@ -3835,46 +4244,49 @@ export function ExcavatorGameWrapper({
                 <>
                   {leftTarget && mode === "game"
                     ? createPortal(
-                        <div className="flex min-w-0 w-full max-w-full items-center overflow-hidden text-white">
-                          <div className="flex h-8 min-w-0 w-full flex-col justify-center gap-0.5 rounded-lg border border-white/15 bg-black/25 px-2">
-                            <div className="flex min-w-0 items-baseline gap-1">
-                              <span className="shrink-0 text-[9px] font-black text-amber-200">
-                                Lv.{xpProgress.level}
-                              </span>
-                              <p
-                                className="min-w-0 truncate text-[10px] font-black leading-none"
-                                title={nickname}
-                              >
-                                {nickname}
-                              </p>
-                            </div>
-                            <div className="relative min-w-0 w-full overflow-hidden">
-                              <XpProgressBar
-                                progress={xpProgress}
-                                compact
-                                showLabel={false}
-                                className="min-w-0 w-full"
-                                barClassName="!h-2.5 bg-white/20"
-                              />
+                        <button
+                          type="button"
+                          className="yanmar-profile-chip"
+                          onClick={() => {
+                            setShowQuestPanel(false);
+                            setShowShopPanel(false);
+                            setShowEquipmentUpgrade(false);
+                            setShowRepairPanel(false);
+                            setShowProfileModal(true);
+                          }}
+                          aria-label="프로필 열기"
+                        >
+                          <span className="yanmar-profile-chip-avatar-col">
+                            <span
+                              className="yanmar-profile-chip-avatar"
+                              aria-hidden
+                            >
+                              {(nickname.trim().charAt(0) || "?").toUpperCase()}
+                            </span>
+                            <span className="yanmar-profile-chip-xp" aria-hidden>
                               <span
-                                className="pointer-events-none absolute inset-0 flex items-center justify-end px-1.5 text-[7px] font-black leading-none tabular-nums text-white"
+                                className="yanmar-profile-chip-xp-fill"
                                 style={{
-                                  textShadow:
-                                    "0 0 2px rgba(0,0,0,0.95), 0 1px 1px rgba(0,0,0,0.85)",
+                                  width: `${Math.max(
+                                    0,
+                                    Math.min(100, xpProgress.progressPct),
+                                  )}%`,
                                 }}
-                                title={`${xpProgress.currentXp.toLocaleString()}/${xpProgress.requiredXp.toLocaleString()}(${xpProgress.progressPct}%)`}
-                              >
-                                <span className="truncate">
-                                  {xpProgress.currentXp.toLocaleString()}/
-                                  {xpProgress.requiredXp.toLocaleString()}
-                                  <span className="text-amber-100">
-                                    ({xpProgress.progressPct}%)
-                                  </span>
-                                </span>
-                              </span>
-                            </div>
-                          </div>
-                        </div>,
+                              />
+                            </span>
+                          </span>
+                          <span className="yanmar-profile-chip-meta">
+                            <span className="yanmar-profile-chip-lv">
+                              Lv.{xpProgress.level}
+                            </span>
+                            <span
+                              className="yanmar-profile-chip-name"
+                              title={nickname}
+                            >
+                              {nickname}
+                            </span>
+                          </span>
+                        </button>,
                         leftTarget,
                       )
                     : null}
@@ -3989,6 +4401,22 @@ export function ExcavatorGameWrapper({
                 />
               ) : null}
             </div>
+            {mode !== "gameReady" &&
+            maintenance &&
+            maintenance.warnings.length > 0 ? (
+              <div className="yanmar-maintenance-warn-stack" aria-live="polite">
+                {maintenance.warnings.map((fluid) => (
+                  <div
+                    key={fluid.id}
+                    className={`yanmar-maintenance-warn${
+                      fluid.depleted ? " is-depleted" : ""
+                    }`}
+                  >
+                    {fluid.label} 교체 {fluid.percent}%
+                  </div>
+                ))}
+              </div>
+            ) : null}
             </div>
           </div>
         )}
@@ -4065,8 +4493,6 @@ export function ExcavatorGameWrapper({
           onOpenChange={setShowSettingsMenu}
           showMinimap={showMinimap}
           onToggleMinimap={() => setShowMinimap((v) => !v)}
-          showDigPose={showDigPoseGraph}
-          onToggleDigPose={() => setShowDigPoseGraph((v) => !v)}
           showTouchZones={showTouchZones}
           onToggleTouchZones={() => setShowTouchZones((v) => !v)}
           touchZonesAvailable={mode !== "gameReady"}
@@ -4144,6 +4570,8 @@ export function ExcavatorGameWrapper({
               onCrashTileDestroyed={handleCrashTileDestroyed}
               onHillRockDelivered={handleHillRockDelivered}
               onAttachmentWarning={showAttachmentWarning}
+              onDumpTruckFull={handleDumpTruckFull}
+              onHaulTruckFull={handleHaulTruckFull}
               onSimTick={handleSimTick}
               cameraMode={cameraMode}
               lookOffsetRef={lookOffsetRef}

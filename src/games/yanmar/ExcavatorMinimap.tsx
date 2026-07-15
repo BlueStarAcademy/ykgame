@@ -5,6 +5,7 @@ import type { ExcavatorSimState } from "./ExcavatorScene";
 import type { TerrainData } from "./terrain";
 import { DUMP_ZONE, getActiveDigZones, getMapWorldBounds } from "./terrain";
 import type { TutorialStep, TutorialWaypoint } from "./tutorial";
+import { REPAIR_TENT } from "./gearCatalog";
 
 interface ExcavatorMinimapProps {
   simRef: React.RefObject<ExcavatorSimState>;
@@ -210,6 +211,36 @@ export function ExcavatorMinimap({
       context.fillStyle = "#c8e6c9";
       context.fillRect(dump.px - dumpMark, dump.py - dumpMark, dumpMark * 2, dumpMark * 2);
 
+      const repair = worldToMinimap(REPAIR_TENT.x, REPAIR_TENT.z, bounds, size, pad);
+      const repairR =
+        (REPAIR_TENT.radius / (bounds.maxX - bounds.minX)) * inner;
+      const repairScale = size / DEFAULT_DISPLAY_SIZE;
+      context.fillStyle = "rgba(196,163,90,0.28)";
+      context.beginPath();
+      context.arc(
+        repair.px,
+        repair.py,
+        Math.max(repairR, 4.2 * repairScale),
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+      context.strokeStyle = "#e8c56a";
+      context.lineWidth = 2;
+      context.stroke();
+      // Tent mark (chevron roof)
+      const roof = 4.2 * repairScale;
+      context.beginPath();
+      context.moveTo(repair.px, repair.py - roof);
+      context.lineTo(repair.px + roof * 0.9, repair.py + roof * 0.15);
+      context.lineTo(repair.px - roof * 0.9, repair.py + roof * 0.15);
+      context.closePath();
+      context.fillStyle = "#f5d78e";
+      context.fill();
+      context.strokeStyle = "#8b1e1e";
+      context.lineWidth = Math.max(1, 1.2 * repairScale);
+      context.stroke();
+
       if (wp) {
         const goal = worldToMinimap(wp.x, wp.z, bounds, size, pad);
         const pulse = 0.7 + Math.sin(Date.now() / 200) * 0.3;
@@ -298,6 +329,7 @@ export function ExcavatorMinimap({
     { label: "하역", swatch: "bg-emerald-400 ring-1 ring-emerald-200/70" },
     { label: "철거", swatch: "bg-amber-500 ring-1 ring-yellow-300/70" },
     { label: "석재", swatch: "bg-slate-300 ring-1 ring-slate-100/70" },
+    { label: "정비", swatch: "bg-amber-200 ring-1 ring-yellow-100/80" },
   ] as const;
 
   return (

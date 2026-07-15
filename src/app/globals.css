@@ -279,6 +279,140 @@ body {
   animation: yanmar-travel-raise-warn-fade 3s ease-out forwards;
 }
 
+@keyframes yanmar-repair-prompt-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes yanmar-repair-prompt-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 14px 36px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(245, 215, 142, 0.22) inset,
+      0 0 18px rgba(185, 58, 42, 0.28);
+  }
+  50% {
+    box-shadow:
+      0 14px 36px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(245, 215, 142, 0.32) inset,
+      0 0 26px rgba(185, 58, 42, 0.45);
+  }
+}
+
+.yanmar-repair-prompt-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  width: 8.75rem;
+  padding: 0.7rem 0.7rem 0.85rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(245, 215, 142, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 28%),
+    linear-gradient(
+      165deg,
+      rgba(72, 42, 22, 0.96) 0%,
+      rgba(24, 16, 10, 0.98) 100%
+    );
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(139, 30, 30, 0.35) inset;
+  color: #f8e7b8;
+  cursor: pointer;
+  animation:
+    yanmar-repair-prompt-in 0.28s ease-out,
+    yanmar-repair-prompt-glow 2.4s ease-in-out 0.28s infinite;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 120ms ease;
+}
+
+.yanmar-repair-prompt-btn:hover {
+  border-color: rgba(255, 230, 160, 0.92);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 28%),
+    linear-gradient(
+      165deg,
+      rgba(88, 52, 24, 0.98) 0%,
+      rgba(32, 20, 12, 0.99) 100%
+    );
+}
+
+.yanmar-repair-prompt-btn:hover .yanmar-repair-prompt-icon {
+  transform: scale(1.05) translateY(-1px);
+  filter:
+    drop-shadow(0 0.18rem 0.14rem rgba(0, 0, 0, 0.85))
+    drop-shadow(0 0 0.32rem rgba(251, 191, 36, 0.45));
+}
+
+.yanmar-repair-prompt-btn:active {
+  transform: scale(0.97);
+}
+
+.yanmar-repair-prompt-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(245, 215, 142, 0.28);
+  background:
+    radial-gradient(
+      circle at 50% 38%,
+      rgba(185, 58, 42, 0.22) 0%,
+      transparent 58%
+    ),
+    linear-gradient(180deg, rgba(18, 12, 8, 0.92), rgba(8, 6, 4, 0.98));
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.yanmar-repair-prompt-icon {
+  display: block;
+  width: 92%;
+  height: 92%;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0.16rem 0.12rem rgba(0, 0, 0, 0.82))
+    drop-shadow(0 0 0.2rem rgba(251, 191, 36, 0.25));
+  transition:
+    transform 140ms ease,
+    filter 140ms ease;
+}
+
+.yanmar-repair-prompt-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+  line-height: 1;
+}
+
+.yanmar-repair-prompt-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(248, 231, 184, 0.78);
+}
+
+.yanmar-repair-prompt-label {
+  font-size: 1.08rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #fff6d6;
+  text-shadow: 0 0.08rem 0.16rem rgba(0, 0, 0, 0.55);
+}
+
 @keyframes yanmar-tutorial-flash-pop {
   0% {
     opacity: 0;
@@ -2402,8 +2536,8 @@ body {
 }
 
 .yanmar-shop-card-image {
-  width: 78%;
-  height: 78%;
+  width: 58%;
+  height: 58%;
   object-fit: contain;
   filter: drop-shadow(0 0.16rem 0.18rem rgba(0, 0, 0, 0.55));
   pointer-events: none;
@@ -4067,11 +4201,6 @@ body {
   top: 50%;
   height: 72%;
   width: 58%;
-}
-
-.yanmar-layout-portrait .yanmar-dig-pose-panel {
-  top: 9.9rem !important;
-  right: 0.5rem !important;
 }
 
 .yanmar-layout-portrait .yanmar-zone-legend {
@@ -6241,5 +6370,4025 @@ html.pwa-mode body {
 
   .yanmar-unlock-body {
     padding-bottom: 0.9rem;
+  }
+}
+
+/* --- Gear grade frames & loadout --- */
+.yanmar-shop-panel {
+  color: #f8fafc;
+  background: linear-gradient(180deg, #0f172a, #020617);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  border-radius: 1rem;
+  padding: 0.75rem 0.9rem 1rem;
+}
+
+.yanmar-shop-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.yanmar-shop-panel-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #fde68a;
+}
+
+.yanmar-shop-panel-header button {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0.15rem 0.35rem;
+  cursor: pointer;
+}
+
+.yanmar-repair-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(26.5rem, calc(100vw - 1.25rem));
+  max-height: min(92dvh, 42rem);
+  overflow: hidden;
+  color: #f8fafc;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(245, 215, 142, 0.32);
+  background:
+    radial-gradient(ellipse at 18% 0%, rgba(185, 58, 42, 0.18), transparent 42%),
+    radial-gradient(ellipse at 88% 8%, rgba(251, 191, 36, 0.12), transparent 40%),
+    linear-gradient(180deg, rgba(42, 28, 16, 0.98), rgba(10, 12, 18, 0.98) 48%, #020617);
+  box-shadow:
+    0 1.25rem 2.5rem rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(139, 30, 30, 0.2) inset;
+  padding: 0.65rem 0.7rem 0.7rem;
+}
+
+.yanmar-repair-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin-bottom: 0.55rem;
+  flex-shrink: 0;
+}
+
+.yanmar-repair-panel-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.yanmar-repair-panel-art {
+  display: grid;
+  place-items: center;
+  width: 2.65rem;
+  height: 2.65rem;
+  flex-shrink: 0;
+  padding: 0.18rem;
+  box-sizing: border-box;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(245, 215, 142, 0.35);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(185, 58, 42, 0.28), transparent 60%),
+    linear-gradient(180deg, rgba(24, 16, 10, 0.95), rgba(8, 6, 4, 0.98));
+}
+
+.yanmar-repair-panel-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.yanmar-repair-panel-titles {
+  min-width: 0;
+}
+
+.yanmar-repair-panel-eyebrow {
+  margin: 0 0 0.1rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(253, 230, 138, 0.72);
+}
+
+.yanmar-repair-panel-titles h2 {
+  margin: 0;
+  font-size: 1.18rem;
+  font-weight: 900;
+  color: #fff6d6;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0.08rem 0.16rem rgba(0, 0, 0, 0.45);
+}
+
+.yanmar-repair-panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.yanmar-repair-panel-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(15, 23, 42, 0.72);
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: rgba(254, 243, 199, 0.78);
+}
+
+.yanmar-repair-panel-star-value {
+  font-size: 0.86rem !important;
+  font-weight: 900 !important;
+  color: #fde68a !important;
+}
+
+.yanmar-repair-panel-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.55rem;
+  background: rgba(15, 23, 42, 0.65);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1.15rem;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.yanmar-repair-panel-close:hover {
+  border-color: rgba(253, 230, 138, 0.45);
+  color: #fff;
+}
+
+.yanmar-repair-fluid-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
+  isolation: isolate;
+}
+
+.yanmar-repair-fluid-tab {
+  position: relative;
+  z-index: 0;
+  display: grid;
+  grid-template-columns: 2.55rem minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  column-gap: 0.45rem;
+  row-gap: 0.12rem;
+  align-items: center;
+  min-width: 0;
+  padding: 0.4rem 0.45rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(245, 215, 142, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 40%),
+    rgba(15, 23, 42, 0.9);
+  color: #fde68a;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 120ms ease;
+}
+
+.yanmar-repair-fluid-tab-art {
+  grid-row: 1 / span 3;
+  grid-column: 1;
+  position: relative;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  padding: 0.12rem;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.yanmar-repair-fluid-tab-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.yanmar-repair-fluid-tab:active {
+  transform: scale(0.98);
+}
+
+.yanmar-repair-fluid-tab.is-active {
+  z-index: 1;
+  border-color: rgba(251, 191, 36, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 230, 160, 0.14), transparent 36%),
+    linear-gradient(165deg, rgba(120, 53, 15, 0.72), rgba(15, 23, 42, 0.92));
+  box-shadow:
+    0 0.15rem 0.4rem rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(251, 191, 36, 0.18) inset;
+}
+
+.yanmar-repair-fluid-tab.is-warn {
+  border-color: rgba(251, 146, 60, 0.55);
+  color: #fed7aa;
+}
+
+.yanmar-repair-fluid-tab.is-dead {
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fecaca;
+}
+
+.yanmar-repair-fluid-tab-label {
+  grid-column: 2;
+  position: relative;
+  z-index: 1;
+  overflow: visible;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #fff8e7;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  word-break: keep-all;
+}
+
+.yanmar-repair-fluid-tab.is-warn .yanmar-repair-fluid-tab-label {
+  color: #ffedd5;
+}
+
+.yanmar-repair-fluid-tab.is-dead .yanmar-repair-fluid-tab-label {
+  color: #fee2e2;
+}
+
+.yanmar-repair-fluid-tab-pct {
+  grid-column: 2;
+  position: relative;
+  z-index: 1;
+  font-size: 0.92rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: inherit;
+}
+
+.yanmar-repair-fluid-tab-bar {
+  grid-column: 2;
+  position: relative;
+  z-index: 1;
+  display: block;
+  height: 0.18rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.yanmar-repair-fluid-tab-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f59e0b, #fde68a);
+}
+
+.yanmar-repair-fluid-tab.is-warn .yanmar-repair-fluid-tab-bar > span {
+  background: linear-gradient(90deg, #ea580c, #fdba74);
+}
+
+.yanmar-repair-fluid-tab.is-dead .yanmar-repair-fluid-tab-bar > span {
+  background: linear-gradient(90deg, #b91c1c, #f87171);
+}
+
+.yanmar-repair-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1;
+  min-height: 0;
+  padding: 0.55rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(245, 215, 142, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 30%),
+    rgba(2, 6, 23, 0.55);
+}
+
+.yanmar-repair-detail.is-warn {
+  border-color: rgba(251, 146, 60, 0.35);
+}
+
+.yanmar-repair-detail.is-dead {
+  border-color: rgba(248, 113, 113, 0.4);
+  background:
+    linear-gradient(180deg, rgba(127, 29, 29, 0.22), transparent 40%),
+    rgba(2, 6, 23, 0.55);
+}
+
+.yanmar-repair-detail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.yanmar-repair-detail-copy {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.yanmar-repair-detail-art {
+  display: grid;
+  place-items: center;
+  width: 4.6rem;
+  height: 4.6rem;
+  flex-shrink: 0;
+  padding: 0.28rem;
+  box-sizing: border-box;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(245, 215, 142, 0.28);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(251, 191, 36, 0.14), transparent 65%),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.9), rgba(2, 6, 23, 0.96));
+}
+
+.yanmar-repair-detail-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.yanmar-repair-detail-name-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.yanmar-repair-detail-name-row h3 {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 900;
+  color: #fff7ed;
+}
+
+.yanmar-repair-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.16rem 0.48rem;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(120, 53, 15, 0.45);
+  color: #fde68a;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.yanmar-repair-status.is-warn {
+  border-color: rgba(251, 146, 60, 0.55);
+  background: rgba(154, 52, 18, 0.5);
+  color: #ffedd5;
+}
+
+.yanmar-repair-status.is-dead {
+  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(127, 29, 29, 0.55);
+  color: #fee2e2;
+}
+
+.yanmar-repair-gauge {
+  --repair-pct: 100%;
+  position: relative;
+  width: 3.85rem;
+  height: 3.85rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at center, rgba(2, 6, 23, 0.92) 56%, transparent 57%),
+    conic-gradient(
+      from -90deg,
+      #fbbf24 0 var(--repair-pct),
+      rgba(255, 255, 255, 0.1) var(--repair-pct) 100%
+    );
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.22),
+    0 0.2rem 0.55rem rgba(0, 0, 0, 0.4);
+}
+
+.yanmar-repair-detail.is-warn .yanmar-repair-gauge {
+  background:
+    radial-gradient(circle at center, rgba(2, 6, 23, 0.92) 56%, transparent 57%),
+    conic-gradient(
+      from -90deg,
+      #fb923c 0 var(--repair-pct),
+      rgba(255, 255, 255, 0.1) var(--repair-pct) 100%
+    );
+}
+
+.yanmar-repair-detail.is-dead .yanmar-repair-gauge {
+  background:
+    radial-gradient(circle at center, rgba(2, 6, 23, 0.92) 56%, transparent 57%),
+    conic-gradient(
+      from -90deg,
+      #f87171 0 var(--repair-pct),
+      rgba(255, 255, 255, 0.1) var(--repair-pct) 100%
+    );
+}
+
+.yanmar-repair-gauge-ring {
+  position: absolute;
+  inset: 0.36rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.95), rgba(2, 6, 23, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.yanmar-repair-gauge-ring strong {
+  font-size: 1.02rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff6d6;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.yanmar-repair-tier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.32rem;
+  flex-shrink: 0;
+}
+
+.yanmar-repair-tier {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 3.05rem;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(245, 215, 142, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 34%),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(2, 6, 23, 0.96));
+  color: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    transform 120ms ease,
+    filter 140ms ease;
+}
+
+.yanmar-repair-tier:not(:disabled):hover {
+  border-color: rgba(251, 191, 36, 0.55);
+}
+
+.yanmar-repair-tier:not(:disabled):active {
+  transform: scale(0.99);
+}
+
+.yanmar-repair-tier:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  filter: grayscale(0.25);
+}
+
+.yanmar-repair-tier.is-premium {
+  border-color: rgba(251, 191, 36, 0.38);
+  background:
+    linear-gradient(180deg, rgba(251, 191, 36, 0.12), transparent 36%),
+    linear-gradient(180deg, rgba(69, 40, 16, 0.95), rgba(15, 23, 42, 0.96));
+}
+
+.yanmar-repair-tier.is-top {
+  border-color: rgba(248, 113, 113, 0.42);
+  background:
+    linear-gradient(180deg, rgba(185, 58, 42, 0.18), transparent 36%),
+    linear-gradient(180deg, rgba(69, 26, 22, 0.95), rgba(15, 23, 42, 0.96));
+}
+
+.yanmar-repair-tier-main {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.12rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.38rem 0.55rem;
+}
+
+.yanmar-repair-tier-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  column-gap: 0.35rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.yanmar-repair-tier-rank {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-self: center;
+  padding: 0.08rem 0.36rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.45);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: rgba(248, 250, 252, 0.72);
+}
+
+.yanmar-repair-tier.is-premium .yanmar-repair-tier-rank {
+  border-color: rgba(251, 191, 36, 0.45);
+  color: #fde68a;
+}
+
+.yanmar-repair-tier.is-top .yanmar-repair-tier-rank {
+  border-color: rgba(252, 165, 165, 0.5);
+  color: #fecaca;
+}
+
+.yanmar-repair-tier-name {
+  flex-shrink: 0;
+  font-size: 0.94rem;
+  font-weight: 900;
+  color: #fff7ed;
+  line-height: 1.15;
+}
+
+.yanmar-repair-tier-cycle {
+  margin-left: auto;
+  min-width: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(254, 243, 199, 0.86);
+  line-height: 1.2;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.yanmar-repair-tier-buff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.08rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 0.42rem;
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  background: rgba(120, 53, 15, 0.42);
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #fde68a;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.yanmar-repair-tier.is-top .yanmar-repair-tier-buff {
+  border-color: rgba(252, 165, 165, 0.45);
+  background: rgba(127, 29, 29, 0.42);
+  color: #fecaca;
+}
+
+.yanmar-repair-tier-cooldown {
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: #fdba74;
+  line-height: 1.25;
+}
+
+.yanmar-repair-tier-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.9rem;
+  padding: 0 0.5rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(2, 6, 23, 0.35);
+  font-size: 0.82rem;
+  font-weight: 900;
+  color: #fde68a;
+}
+
+.yanmar-repair-tier.is-premium .yanmar-repair-tier-cta {
+  background: rgba(120, 53, 15, 0.35);
+}
+
+.yanmar-repair-tier.is-top .yanmar-repair-tier-cta {
+  background: rgba(127, 29, 29, 0.35);
+  color: #fecaca;
+}
+
+.yanmar-repair-tier-star {
+  font-size: 0.88rem !important;
+  font-weight: 900 !important;
+  color: inherit !important;
+}
+
+.yanmar-repair-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 0.85rem;
+  border-radius: inherit;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.yanmar-repair-confirm-card {
+  width: min(100%, 19.5rem);
+  padding: 1rem 0.95rem 0.9rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(245, 215, 142, 0.4);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(251, 191, 36, 0.14), transparent 55%),
+    linear-gradient(180deg, rgba(42, 28, 16, 0.98), rgba(10, 12, 18, 0.98));
+  box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.yanmar-repair-confirm-art {
+  display: grid;
+  place-items: center;
+  width: 4.2rem;
+  height: 4.2rem;
+  margin: 0 auto 0.65rem;
+  padding: 0.28rem;
+  box-sizing: border-box;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(245, 215, 142, 0.3);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(251, 191, 36, 0.16), transparent 65%),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(2, 6, 23, 0.98));
+}
+
+.yanmar-repair-confirm-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.yanmar-repair-confirm-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.12rem;
+  font-weight: 900;
+  color: #fff6d6;
+}
+
+.yanmar-repair-confirm-item {
+  margin: 0 0 0.7rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #fde68a;
+}
+
+.yanmar-repair-confirm-facts {
+  list-style: none;
+  margin: 0 0 0.85rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+  text-align: center;
+}
+
+.yanmar-repair-confirm-facts li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.42rem 0.58rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(2, 6, 23, 0.45);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(254, 243, 199, 0.92);
+}
+
+.yanmar-repair-confirm-cost {
+  gap: 0.35rem;
+}
+
+.yanmar-repair-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.yanmar-repair-confirm-cancel,
+.yanmar-repair-confirm-ok {
+  min-height: 2.4rem;
+  border-radius: 0.65rem;
+  font-size: 0.88rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.yanmar-repair-confirm-cancel {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.72);
+  color: rgba(248, 250, 252, 0.88);
+}
+
+.yanmar-repair-confirm-ok {
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  background:
+    linear-gradient(180deg, rgba(251, 191, 36, 0.28), rgba(120, 53, 15, 0.85));
+  color: #fff7ed;
+}
+
+.yanmar-repair-confirm-cancel:disabled,
+.yanmar-repair-confirm-ok:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.yanmar-maintenance-warn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  width: 100%;
+}
+
+.yanmar-maintenance-warn {
+  width: 100%;
+  padding: 0.28rem 0.32rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(120, 53, 15, 0.82);
+  color: #ffedd5;
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  animation: yanmar-maintenance-warn-pulse 1.6s ease-in-out infinite;
+}
+
+.yanmar-maintenance-warn.is-depleted {
+  border-color: rgba(248, 113, 113, 0.65);
+  background: rgba(127, 29, 29, 0.88);
+  color: #fee2e2;
+}
+
+@keyframes yanmar-maintenance-warn-pulse {
+  0%,
+  100% {
+    opacity: 0.92;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.yanmar-gear-frame {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-style: solid;
+  border-width: 2px;
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.1), transparent 45%),
+    rgba(8, 10, 14, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.yanmar-gear-frame--empty {
+  border-style: solid;
+  border-color: rgba(212, 181, 106, 0.22);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.05), transparent 48%),
+    linear-gradient(180deg, rgba(30, 36, 48, 0.72), rgba(8, 10, 16, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+
+.yanmar-gear-frame--normal {
+  border-color: #9ca3af;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(226, 232, 240, 0.14), transparent 55%),
+    linear-gradient(180deg, rgba(71, 85, 105, 0.28), rgba(15, 23, 42, 0.35));
+  box-shadow:
+    inset 0 0 0 1px rgba(226, 232, 240, 0.18),
+    0 0 0.35rem rgba(148, 163, 184, 0.22);
+}
+
+.yanmar-gear-frame--enhanced {
+  border-color: #60a5fa;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(96, 165, 250, 0.32), transparent 58%),
+    linear-gradient(180deg, rgba(37, 99, 235, 0.28), rgba(15, 23, 42, 0.4));
+  box-shadow:
+    inset 0 0 0 1px rgba(147, 197, 253, 0.35),
+    0 0 0.55rem rgba(59, 130, 246, 0.45);
+}
+
+.yanmar-gear-frame--precision {
+  border-color: #c084fc;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(192, 132, 252, 0.34), transparent 58%),
+    linear-gradient(180deg, rgba(126, 34, 206, 0.3), rgba(15, 23, 42, 0.42));
+  box-shadow:
+    inset 0 0 0 1px rgba(216, 180, 254, 0.35),
+    0 0 0.65rem rgba(168, 85, 247, 0.5);
+}
+
+.yanmar-gear-frame--master {
+  border-color: #f87171;
+  background:
+    radial-gradient(circle at 50% 15%, rgba(251, 191, 36, 0.28), transparent 42%),
+    radial-gradient(circle at 50% 30%, rgba(248, 113, 113, 0.4), transparent 60%),
+    linear-gradient(180deg, rgba(185, 28, 28, 0.35), rgba(15, 23, 42, 0.45));
+  box-shadow:
+    inset 0 0 0 1px rgba(254, 202, 202, 0.35),
+    0 0 0.75rem rgba(239, 68, 68, 0.55),
+    0 0 0.35rem rgba(251, 191, 36, 0.25);
+}
+
+.yanmar-gear-frame--purchase {
+  border-style: solid;
+  border-color: rgba(251, 191, 36, 0.55);
+  background:
+    radial-gradient(circle at 50% 28%, rgba(251, 191, 36, 0.22), transparent 58%),
+    linear-gradient(180deg, rgba(120, 53, 15, 0.55), rgba(15, 23, 42, 0.85));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 237, 180, 0.22),
+    0 0 0.55rem rgba(245, 158, 11, 0.28);
+}
+
+button.yanmar-gear-icon-cell.is-purchase:hover .yanmar-gear-frame--purchase,
+button.yanmar-gear-icon-cell.is-purchase:focus-visible .yanmar-gear-frame--purchase {
+  border-color: rgba(253, 230, 138, 0.85);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 247, 210, 0.3),
+    0 0 0.75rem rgba(251, 191, 36, 0.45);
+}
+
+.yanmar-gear-icon-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  padding: 0;
+  margin: 0;
+  cursor: default;
+  color: inherit;
+  overflow: hidden;
+}
+
+button.yanmar-gear-icon-cell {
+  cursor: pointer;
+}
+
+.yanmar-gear-icon-cell--sm {
+  width: 2.4rem;
+  height: 2.4rem;
+}
+
+.yanmar-gear-icon-cell--md {
+  width: 3.35rem;
+  height: 3.35rem;
+}
+
+.yanmar-gear-icon-cell--lg {
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.yanmar-gear-icon-cell--xl {
+  width: 11.5rem;
+  height: 11.5rem;
+}
+
+.yanmar-gear-icon-cell.is-selected {
+  outline: 2px solid #f5c451;
+  outline-offset: 1px;
+}
+
+.yanmar-gear-icon-cell-img {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 0.12rem 0.18rem rgba(0, 0, 0, 0.45));
+}
+
+.yanmar-gear-frame--enhanced .yanmar-gear-icon-cell-img {
+  filter:
+    drop-shadow(0 0 0.25rem rgba(96, 165, 250, 0.35))
+    drop-shadow(0 0.12rem 0.18rem rgba(0, 0, 0, 0.4));
+}
+
+.yanmar-gear-frame--precision .yanmar-gear-icon-cell-img {
+  filter:
+    drop-shadow(0 0 0.28rem rgba(192, 132, 252, 0.4))
+    drop-shadow(0 0.12rem 0.18rem rgba(0, 0, 0, 0.4));
+}
+
+.yanmar-gear-frame--master .yanmar-gear-icon-cell-img {
+  filter:
+    drop-shadow(0 0 0.3rem rgba(248, 113, 113, 0.45))
+    drop-shadow(0 0 0.18rem rgba(251, 191, 36, 0.25))
+    drop-shadow(0 0.12rem 0.18rem rgba(0, 0, 0, 0.4));
+}
+
+.yanmar-gear-icon-cell-img--empty {
+  opacity: 0.38;
+  filter: grayscale(1) brightness(1.15);
+}
+
+.yanmar-gear-icon-cell-empty {
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  line-height: 1.1;
+  padding: 0.15rem;
+}
+
+.yanmar-gear-icon-cell-badge {
+  position: absolute;
+  top: 0.1rem;
+  right: 0.12rem;
+  min-width: 0.9rem;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.85);
+  border: 1px solid rgba(245, 196, 81, 0.55);
+  color: #fde68a;
+  font-size: 0.5rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0.12rem 0.18rem;
+  z-index: 1;
+}
+
+.yanmar-gear-icon-cell-e {
+  position: absolute;
+  left: 0.1rem;
+  top: 0.1rem;
+  z-index: 1;
+  min-width: 0.72rem;
+  border-radius: 0.15rem;
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.48rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0.1rem 0.14rem;
+  text-align: center;
+}
+
+.yanmar-gear-icon-cell.is-purchase {
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.yanmar-gear-icon-cell-plus {
+  font-size: 1.45rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #fde68a;
+  text-shadow: 0 0 0.55rem rgba(251, 191, 36, 0.55);
+}
+
+.yanmar-gear-icon-cell-purchase-label {
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(254, 243, 199, 0.92);
+  line-height: 1;
+  text-align: center;
+}
+
+.yanmar-gear-icon-cell-purchase-cost {
+  font-size: 0.42rem;
+  font-weight: 800;
+  color: #fde68a;
+  line-height: 1.1;
+  text-align: center;
+  padding: 0 0.1rem;
+}
+
+.yanmar-gear-icon-cell-slot-tag {
+  position: absolute;
+  left: 50%;
+  bottom: 0.15rem;
+  transform: translateX(-50%);
+  font-size: 0.42rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.yanmar-gear-muted {
+  margin: 0;
+  opacity: 0.7;
+  font-size: 0.72rem;
+}
+
+.yanmar-gear-grade-text--normal {
+  color: #d1d5db;
+}
+
+.yanmar-gear-grade-text--enhanced {
+  color: #60a5fa;
+}
+
+.yanmar-gear-grade-text--precision {
+  color: #c084fc;
+}
+
+.yanmar-gear-grade-text--master {
+  color: #f87171;
+}
+
+.yanmar-gear-mgr {
+  --yanmar-gear-gold: #d4b56a;
+  --yanmar-gear-gold-soft: rgba(212, 181, 106, 0.42);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  color: #f4efe4;
+  background:
+    radial-gradient(ellipse 90% 55% at 12% -10%, rgba(212, 181, 106, 0.14), transparent 50%),
+    radial-gradient(ellipse 70% 45% at 92% 8%, rgba(148, 163, 184, 0.08), transparent 48%),
+    linear-gradient(165deg, #1a1d24 0%, #0c0e13 48%, #08090c 100%);
+  border: 1px solid var(--yanmar-gear-gold-soft);
+  box-shadow:
+    0 1.2rem 2.4rem rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.yanmar-gear-mgr::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.035) 50%, transparent 60%);
+  opacity: 0.7;
+}
+
+.yanmar-gear-mgr--embedded {
+  min-height: 28rem;
+  max-height: 100%;
+  border: 0;
+  box-shadow: none;
+}
+
+.yanmar-gear-mgr-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  padding: 0.65rem 0.85rem 0.55rem;
+  border-bottom: 1px solid rgba(212, 181, 106, 0.22);
+  background: linear-gradient(180deg, rgba(212, 181, 106, 0.08), transparent 85%);
+}
+
+.yanmar-gear-mgr-header-lead {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.yanmar-gear-mgr-kicker {
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 181, 106, 0.35);
+  background: rgba(15, 17, 22, 0.55);
+  padding: 0.1rem 0.42rem;
+  color: rgba(232, 210, 155, 0.78);
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.yanmar-gear-mgr-header-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.yanmar-gear-core-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.22rem 0.5rem 0.22rem 0.3rem;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.42);
+  background:
+    linear-gradient(180deg, rgba(34, 211, 238, 0.18), transparent 55%),
+    rgba(8, 47, 73, 0.55);
+  color: #ecfeff;
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.yanmar-gear-core-chip img {
+  display: block;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+  filter: drop-shadow(0 0.06rem 0.1rem rgba(0, 0, 0, 0.55));
+}
+
+.yanmar-gear-mgr-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #f6e7c2;
+  text-shadow: 0 0.08rem 0.35rem rgba(0, 0, 0, 0.35);
+}
+
+.yanmar-gear-mgr-header button {
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.35rem;
+}
+
+.yanmar-gear-mgr-header button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.yanmar-gear-mgr-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 0.55rem;
+  padding: 0.55rem 0.7rem 0.75rem;
+  overflow: hidden;
+}
+
+.yanmar-gear-mgr-compact {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.65rem 0.85rem;
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(212, 181, 106, 0.2);
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.045), transparent 42%),
+    linear-gradient(180deg, rgba(28, 32, 40, 0.92), rgba(8, 10, 14, 0.96));
+  padding: 0.55rem 0.65rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0.25rem 0.7rem rgba(0, 0, 0, 0.28);
+}
+
+.yanmar-gear-mgr-compact-left {
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: none;
+  min-width: 0;
+}
+
+.yanmar-gear-mgr-compact-stats {
+  flex: 0 1 13.5rem;
+  max-width: 13.5rem;
+  min-width: 0;
+  width: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.yanmar-gear-mgr-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  margin-bottom: 0.35rem;
+}
+
+.yanmar-gear-mgr-pane-head h3 {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: rgba(246, 231, 194, 0.88);
+}
+
+.yanmar-gear-mgr-compare-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 181, 106, 0.45);
+  background:
+    linear-gradient(180deg, rgba(212, 181, 106, 0.22), rgba(120, 90, 40, 0.28));
+  color: #f6e7c2;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.yanmar-gear-mgr-equip-grid {
+  display: grid;
+  gap: 0.4rem 0.55rem;
+  justify-items: center;
+  flex-shrink: 0;
+}
+
+/* 2열 × 3행 (장착 6슬롯) + 우측 능력치 */
+.yanmar-gear-mgr-equip-grid--2x3 {
+  grid-template-columns: repeat(2, 4.1rem);
+  grid-template-rows: repeat(3, auto);
+}
+
+.yanmar-gear-mgr-equip-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  width: 4.1rem;
+}
+
+.yanmar-gear-mgr-equip-slot .yanmar-gear-icon-cell {
+  width: 4.1rem;
+  height: 4.1rem;
+  max-width: 4.1rem;
+  flex-shrink: 0;
+}
+
+.yanmar-gear-mgr-slot-label {
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.yanmar-gear-mgr-stats-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.yanmar-gear-mgr-stat-grid {
+  display: grid;
+  gap: 0.2rem 0.45rem;
+  font-size: 0.64rem;
+}
+
+.yanmar-gear-mgr-stat-grid--2x3 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(3, auto);
+}
+
+.yanmar-gear-mgr-stat-derived {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  margin-top: 0.05rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(212, 181, 106, 0.16);
+  font-size: 0.62rem;
+}
+
+.yanmar-gear-mgr-stat-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0.22rem 0.35rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.22);
+  min-width: 0;
+}
+
+.yanmar-gear-mgr-stat-cell span {
+  color: rgba(244, 239, 228, 0.58);
+  white-space: nowrap;
+}
+
+.yanmar-gear-mgr-stat-cell strong {
+  color: #fff8e8;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.yanmar-gear-mgr-stat-block {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.15rem 0.55rem;
+  font-size: 0.64rem;
+}
+
+.yanmar-gear-mgr-stat-block--side {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  align-content: start;
+}
+
+.yanmar-gear-mgr-stat-block p {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.08rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.yanmar-gear-mgr-stat-block span {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.yanmar-gear-mgr-stat-block strong {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.yanmar-gear-mgr-detail {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  flex-shrink: 0;
+  margin-bottom: 0.3rem;
+}
+
+.yanmar-gear-mgr-detail-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.yanmar-gear-mgr-name {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  word-break: keep-all;
+}
+
+.yanmar-gear-mgr-grade {
+  margin: 0.18rem 0 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(244, 239, 228, 0.55);
+  letter-spacing: 0.02em;
+}
+
+.yanmar-gear-mgr-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.yanmar-gear-mgr-main .yanmar-gear-mgr-attr-main {
+  display: inline-flex;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(212, 181, 106, 0.35);
+  background: rgba(212, 181, 106, 0.12);
+  padding: 0.18rem 0.4rem;
+  color: #f6e7c2;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.yanmar-gear-mgr-attr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  font-size: 0.62rem;
+  max-height: 8.5rem;
+}
+
+.yanmar-gear-mgr-attr-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.28rem 0.4rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(248, 250, 252, 0.88);
+  font-weight: 700;
+}
+
+.yanmar-gear-mgr-attr-list li.is-master-opt {
+  border-color: rgba(248, 113, 113, 0.35);
+  background:
+    linear-gradient(180deg, rgba(248, 113, 113, 0.14), rgba(127, 29, 29, 0.18));
+  color: #fecaca;
+}
+
+.yanmar-gear-mgr-attr-main {
+  color: #f6e7c2;
+  font-weight: 800;
+}
+
+.yanmar-gear-delta-up {
+  color: #86efac;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.yanmar-gear-delta-down {
+  color: #fca5a5;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.yanmar-gear-mgr-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.yanmar-gear-mgr-actions > .yanmar-gear-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto !important;
+  max-width: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yanmar-gear-btn {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.55rem;
+  padding: 0.52rem 0.4rem;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #fff8ef;
+  cursor: pointer;
+  white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 0.12rem 0.35rem rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition:
+    border-color 140ms ease,
+    filter 140ms ease,
+    transform 120ms ease,
+    box-shadow 140ms ease;
+}
+
+.yanmar-gear-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16),
+    transparent 42%
+  );
+  pointer-events: none;
+}
+
+.yanmar-gear-btn:not(:disabled):hover {
+  filter: brightness(1.08);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow:
+    0 0.18rem 0.45rem rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.yanmar-gear-btn:not(:disabled):active {
+  transform: translateY(1px) scale(0.99);
+  filter: brightness(0.96);
+}
+
+.yanmar-gear-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+  box-shadow: none;
+}
+
+.yanmar-gear-btn--equip {
+  border-color: rgba(74, 222, 128, 0.4);
+  background:
+    linear-gradient(180deg, rgba(74, 222, 128, 0.22), transparent 40%),
+    linear-gradient(180deg, #1f9d57, #146b3a 70%, #0f5130);
+}
+
+.yanmar-gear-btn--unequip {
+  border-color: rgba(148, 163, 184, 0.38);
+  background:
+    linear-gradient(180deg, rgba(226, 232, 240, 0.12), transparent 40%),
+    linear-gradient(180deg, #64748b, #3f4b5c 70%, #273040);
+}
+
+.yanmar-gear-btn--enhance {
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #fff7e0;
+  background:
+    linear-gradient(180deg, rgba(253, 230, 138, 0.28), transparent 42%),
+    linear-gradient(180deg, #d97706, #a16207 70%, #7c4a04);
+  box-shadow:
+    0 0.12rem 0.4rem rgba(120, 53, 15, 0.45),
+    inset 0 1px 0 rgba(255, 237, 180, 0.28);
+}
+
+.yanmar-gear-btn--enhance:not(:disabled):hover {
+  border-color: rgba(252, 211, 77, 0.7);
+}
+
+.yanmar-gear-btn--sell {
+  border-color: rgba(248, 113, 113, 0.42);
+  background:
+    linear-gradient(180deg, rgba(252, 165, 165, 0.18), transparent 40%),
+    linear-gradient(180deg, #dc2626, #9f1239 70%, #7f1d1d);
+}
+
+.yanmar-gear-actions button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(251, 191, 36, 0.38);
+  background:
+    linear-gradient(180deg, rgba(253, 230, 138, 0.18), transparent 40%),
+    linear-gradient(180deg, rgba(120, 53, 15, 0.65), rgba(45, 28, 12, 0.9));
+  color: #fff7ed;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  padding: 0.4rem 0.65rem;
+  box-shadow:
+    0 0.1rem 0.3rem rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    filter 140ms ease,
+    transform 120ms ease;
+}
+
+.yanmar-gear-actions button:not(:disabled):hover {
+  filter: brightness(1.08);
+  border-color: rgba(252, 211, 77, 0.55);
+}
+
+.yanmar-gear-actions button:not(:disabled):active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.yanmar-gear-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.yanmar-gear-enhance-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+}
+
+.yanmar-gear-enhance-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+.yanmar-gear-enhance-modal {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 23rem);
+  max-height: min(92%, 40rem);
+  overflow: auto;
+  border-radius: 1rem;
+  border: 1px solid rgba(245, 215, 142, 0.4);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(251, 191, 36, 0.16), transparent 52%),
+    linear-gradient(180deg, rgba(42, 28, 16, 0.98), rgba(10, 12, 18, 0.98) 55%, #020617);
+  box-shadow:
+    0 1.2rem 2.6rem rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(139, 30, 30, 0.12) inset;
+  padding: 0.85rem 0.9rem 0.95rem;
+  color: #f8fafc;
+}
+
+.yanmar-gear-enhance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid rgba(245, 215, 142, 0.16);
+}
+
+.yanmar-gear-enhance-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #fff6d6;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0.08rem 0.16rem rgba(0, 0, 0, 0.4);
+}
+
+.yanmar-gear-enhance-header button {
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.5rem;
+  background: rgba(15, 23, 42, 0.65);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.yanmar-gear-enhance-header button:hover:not(:disabled) {
+  border-color: rgba(253, 230, 138, 0.45);
+  color: #fff;
+}
+
+.yanmar-gear-enhance-header button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.yanmar-gear-enhance-info {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.yanmar-gear-enhance-info li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.38rem 0.55rem;
+  font-size: 0.68rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.yanmar-gear-enhance-info li:last-child {
+  border-bottom: 0;
+}
+
+.yanmar-gear-enhance-info span {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.yanmar-gear-enhance-info strong {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.yanmar-gear-enhance-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.yanmar-gear-enhance-panel {
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(245, 215, 142, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 42%),
+    rgba(2, 6, 23, 0.55);
+}
+
+.yanmar-gear-enhance-panel.is-emphasis {
+  border-color: rgba(251, 191, 36, 0.38);
+  background:
+    linear-gradient(180deg, rgba(251, 191, 36, 0.14), transparent 40%),
+    rgba(30, 20, 10, 0.72);
+  padding: 0.7rem 0.75rem;
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.08);
+}
+
+.yanmar-gear-enhance-panel-label {
+  margin: 0 0 0.4rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: rgba(253, 230, 138, 0.78);
+}
+
+.yanmar-gear-enhance-cost-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.yanmar-gear-enhance-cost-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.65rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(245, 215, 142, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 50%),
+    rgba(0, 0, 0, 0.32);
+}
+
+.yanmar-gear-enhance-cost-item img {
+  display: block;
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  object-fit: contain;
+  filter: drop-shadow(0 0.08rem 0.12rem rgba(0, 0, 0, 0.55));
+}
+
+.yanmar-gear-enhance-cost-item strong {
+  font-size: 1.15rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff7ed;
+  line-height: 1;
+}
+
+.yanmar-gear-enhance-cost-item strong.is-shortage {
+  color: #f87171;
+  text-shadow: 0 0 0.35rem rgba(248, 113, 113, 0.35);
+}
+
+.yanmar-gear-enhance-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.yanmar-gear-enhance-meta-grid > div {
+  text-align: center;
+}
+
+.yanmar-gear-enhance-meta-value {
+  margin: 0;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.28rem;
+  font-size: 1.2rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff7ed;
+  line-height: 1.1;
+}
+
+.yanmar-gear-enhance-meta-value span {
+  font-size: 0.78rem;
+  color: rgba(253, 230, 138, 0.7);
+}
+
+.yanmar-gear-enhance-meta-value.is-rate {
+  color: #fde68a;
+  font-size: 1.45rem;
+}
+
+.yanmar-gear-enhance-meta-value .is-unit {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: rgba(253, 230, 138, 0.75);
+}
+
+.yanmar-gear-enhance-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.yanmar-gear-enhance-option-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.yanmar-gear-enhance-option-row strong {
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #fef3c7;
+  flex-shrink: 0;
+}
+
+.yanmar-gear-enhance-option-row span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.82);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.yanmar-gear-enhance-max {
+  margin: 0.65rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fde68a;
+  text-align: center;
+}
+
+.yanmar-gear-enhance-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+}
+
+.yanmar-gear-enhance-result .yanmar-gear-enhance-actions {
+  grid-template-columns: 1fr;
+}
+
+.yanmar-gear-confirm-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 85;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem;
+}
+
+.yanmar-gear-confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, 0.74);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+.yanmar-gear-confirm-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 21rem);
+  padding: 1.05rem 1rem 0.95rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(245, 215, 142, 0.38);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(248, 113, 113, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(42, 22, 18, 0.98), rgba(10, 12, 18, 0.98));
+  box-shadow:
+    0 1.2rem 2.4rem rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  text-align: center;
+  color: #f8fafc;
+}
+
+.yanmar-gear-confirm-eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(252, 165, 165, 0.85);
+}
+
+.yanmar-gear-confirm-card h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.12rem;
+  font-weight: 900;
+  color: #fff6d6;
+  letter-spacing: 0.02em;
+}
+
+.yanmar-gear-confirm-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  margin: 0 0 0.7rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(2, 6, 23, 0.5);
+  text-align: left;
+}
+
+.yanmar-gear-confirm-item-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.yanmar-gear-confirm-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.55rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background:
+    linear-gradient(180deg, rgba(34, 211, 238, 0.14), transparent 48%),
+    rgba(8, 47, 73, 0.55);
+}
+
+.yanmar-gear-confirm-reward-label {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: rgba(165, 243, 252, 0.82);
+}
+
+.yanmar-gear-confirm-reward-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: #ecfeff;
+}
+
+.yanmar-gear-confirm-reward-value img {
+  display: block;
+  width: 1.35rem;
+  height: 1.35rem;
+  object-fit: contain;
+  filter: drop-shadow(0 0.08rem 0.12rem rgba(0, 0, 0, 0.5));
+}
+
+.yanmar-gear-confirm-reward-value strong {
+  font-size: 1.35rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #fff;
+}
+
+.yanmar-gear-confirm-reward-value span {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: rgba(207, 250, 254, 0.88);
+}
+
+.yanmar-gear-confirm-warn {
+  margin: 0.65rem 0 0;
+  text-align: center;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #fca5a5;
+}
+
+.yanmar-gear-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 0.45rem;
+}
+
+.yanmar-gear-confirm-actions--single {
+  display: flex;
+  justify-content: center;
+  grid-template-columns: none;
+}
+
+.yanmar-gear-confirm-actions--single .yanmar-gear-btn {
+  min-width: 7.5rem;
+  flex: 0 0 auto;
+  width: auto !important;
+  max-width: none;
+}
+
+.yanmar-gear-confirm-card--done {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(34, 211, 238, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(18, 32, 42, 0.98), rgba(10, 12, 18, 0.98));
+  border-color: rgba(34, 211, 238, 0.35);
+}
+
+.yanmar-gear-confirm-card--done .yanmar-gear-confirm-eyebrow {
+  color: rgba(165, 243, 252, 0.9);
+}
+
+.yanmar-gear-enhance-progress {
+  margin-top: 0.7rem;
+  text-align: center;
+}
+
+.yanmar-gear-enhance-progress p {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fde68a;
+}
+
+.yanmar-gear-enhance-progress-track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.yanmar-gear-enhance-progress-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  transform: scaleX(0);
+  transform-origin: left center;
+  will-change: transform;
+  background: linear-gradient(
+    90deg,
+    #f59e0b 0%,
+    #fbbf24 45%,
+    #fde68a 78%,
+    #fff7ed 100%
+  );
+  box-shadow: 0 0 0.55rem rgba(251, 191, 36, 0.45);
+}
+
+.yanmar-gear-enhance-pulse {
+  animation: yanmar-gear-enhance-shake 0.45s ease-in-out infinite;
+}
+
+@keyframes yanmar-gear-enhance-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-1.5px) rotate(-0.4deg);
+  }
+  75% {
+    transform: translateX(1.5px) rotate(0.4deg);
+  }
+}
+
+.yanmar-gear-enhance-result {
+  margin-top: 0.55rem;
+}
+
+.yanmar-gear-enhance-result-title {
+  margin: 0;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.yanmar-gear-enhance-result-title.is-success {
+  color: #86efac;
+}
+
+.yanmar-gear-enhance-result-title.is-fail {
+  color: #fca5a5;
+}
+
+.yanmar-gear-enhance-result-level {
+  margin: 0.35rem 0 0;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #fde68a;
+}
+
+.yanmar-gear-enhance-result-stats {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.yanmar-gear-enhance-result-stats li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.42rem 0.55rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(251, 191, 36, 0.18);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.yanmar-gear-enhance-result-stats strong {
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #fef3c7;
+  flex-shrink: 0;
+}
+
+.yanmar-gear-enhance-result-stats span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #86efac;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.yanmar-gear-enhance-result-stats span.is-new {
+  color: #7dd3fc;
+}
+
+.yanmar-gear-enhance-result-stats span.is-muted {
+  color: rgba(226, 232, 240, 0.55);
+}
+
+.yanmar-gear-enhance-result-note {
+  margin: 0.35rem 0 0;
+  text-align: center;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.yanmar-gear-mgr-inv {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  border: 1px solid rgba(212, 181, 106, 0.18);
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.035), transparent 40%),
+    linear-gradient(180deg, rgba(22, 26, 34, 0.94), rgba(6, 8, 12, 0.96));
+  padding: 0.5rem;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.yanmar-gear-mgr-inv-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  margin-bottom: 0.4rem;
+}
+
+.yanmar-gear-mgr-inv-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 0.1rem;
+}
+
+.yanmar-gear-mgr-cap {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: rgba(246, 231, 194, 0.7);
+  white-space: nowrap;
+}
+
+.yanmar-gear-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.22rem;
+}
+
+.yanmar-gear-filter-row button {
+  border-radius: 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.58rem;
+  font-weight: 800;
+  padding: 0.22rem 0.4rem;
+}
+
+.yanmar-gear-filter-row button.is-active {
+  border-color: #f5c451;
+  background: rgba(245, 196, 81, 0.28);
+  color: #fff7ed;
+}
+
+.yanmar-gear-mgr-inv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.15rem, 1fr));
+  gap: 0.4rem;
+  align-content: start;
+  justify-items: stretch;
+  padding: 0.1rem 0.05rem 0.2rem;
+}
+
+.yanmar-gear-mgr-inv-grid--5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: 0.48rem;
+  row-gap: 0.48rem;
+}
+
+/* 인벤 슬롯: 열 너비에 맞춘 정사각 (고정 size 클래스 무시) */
+.yanmar-gear-mgr-inv-grid--5 > .yanmar-gear-mgr-inv-cell,
+.yanmar-gear-mgr-inv-grid--5 > .yanmar-gear-icon-cell {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: auto !important;
+  min-height: 0;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  flex-shrink: 1;
+  align-self: start;
+  justify-self: stretch;
+  border-radius: 0.55rem;
+}
+
+.yanmar-gear-mgr-inv-grid--5 > .yanmar-gear-icon-cell.yanmar-gear-icon-cell--sm,
+.yanmar-gear-mgr-inv-grid--5 > .yanmar-gear-icon-cell.yanmar-gear-icon-cell--md,
+.yanmar-gear-mgr-inv-grid--5 > .yanmar-gear-icon-cell.yanmar-gear-icon-cell--lg {
+  width: 100%;
+  height: auto !important;
+  max-width: none;
+}
+
+.yanmar-gear-mgr-inv-grid--5 .yanmar-gear-icon-cell-img {
+  width: 86%;
+  height: 86%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.yanmar-gear-mgr-inv-grid--5 > .yanmar-gear-icon-cell.is-empty {
+  opacity: 0.92;
+}
+
+.yanmar-gear-expand-facts {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.yanmar-gear-expand-facts li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(212, 181, 106, 0.22);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.05), transparent 55%),
+    rgba(10, 12, 18, 0.72);
+  font-size: 0.78rem;
+  color: rgba(246, 231, 194, 0.78);
+}
+
+.yanmar-gear-expand-facts li strong {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #fff8e7;
+}
+
+.yanmar-gear-expand-facts li.yanmar-gear-expand-cost strong {
+  display: inline-flex;
+  align-items: center;
+}
+
+.yanmar-gear-expand-cost-star {
+  color: #fde68a !important;
+  font-weight: 800;
+}
+
+.yanmar-gear-expand-hint {
+  margin: 0.65rem 0 0;
+  text-align: center;
+  font-size: 0.72rem;
+  color: rgba(246, 231, 194, 0.65);
+}
+
+.yanmar-gear-filter-dd {
+  position: relative;
+}
+
+.yanmar-gear-filter-dd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 14rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 0.28rem 0.5rem;
+  cursor: pointer;
+}
+
+.yanmar-gear-filter-dd-menu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 30;
+  min-width: 8.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #0f172a;
+  box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.55);
+}
+
+.yanmar-gear-filter-dd-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  cursor: pointer;
+  padding: 0.18rem 0.2rem;
+  border-radius: 0.25rem;
+}
+
+.yanmar-gear-filter-dd-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.yanmar-gear-bubble-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem;
+  pointer-events: none;
+}
+
+.yanmar-gear-bubble-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 14, 0.62);
+  backdrop-filter: blur(5px);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.yanmar-gear-bubble {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  width: min(22.5rem, 100%);
+  max-height: calc(100% - 0.25rem);
+  overflow: auto;
+  border-radius: 1rem;
+  border: 1px solid rgba(212, 181, 106, 0.38);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(212, 181, 106, 0.16), transparent 55%),
+    linear-gradient(165deg, #1c2028 0%, #0c0e14 55%, #08090c 100%);
+  box-shadow:
+    0 1.1rem 2.4rem rgba(0, 0, 0, 0.58),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  padding: 0.85rem 0.85rem 0.9rem;
+}
+
+.yanmar-gear-bubble--compare {
+  width: min(46rem, 100%);
+  max-height: calc(100% - 0.25rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0.8rem 0.85rem 0.9rem;
+}
+
+.yanmar-gear-bubble--compare .yanmar-gear-mgr-attr-list {
+  max-height: none;
+  overflow: visible;
+  flex: none;
+}
+
+.yanmar-gear-bubble--compare .yanmar-gear-bubble-card {
+  min-height: 0;
+}
+
+.yanmar-gear-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.42rem;
+  width: 0.85rem;
+  height: 0.85rem;
+  transform: translateX(-50%) rotate(45deg);
+  background: #0c0e14;
+  border-right: 1px solid rgba(212, 181, 106, 0.35);
+  border-bottom: 1px solid rgba(212, 181, 106, 0.35);
+}
+
+.yanmar-gear-bubble-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin: 0 0 0.55rem;
+  min-height: 1.6rem;
+}
+
+.yanmar-gear-bubble-head-lead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+  min-width: 0;
+}
+
+.yanmar-gear-bubble-close {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.18rem 0.45rem;
+}
+
+.yanmar-gear-bubble-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.yanmar-gear-bubble-compare-sub {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: rgba(244, 239, 228, 0.5);
+  letter-spacing: 0.02em;
+}
+
+.yanmar-gear-bubble-compare-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.yanmar-gear-bubble-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.04), transparent 40%),
+    rgba(0, 0, 0, 0.32);
+  padding: 0.55rem 0.55rem 0.6rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.yanmar-gear-bubble-card.is-highlight {
+  border-color: rgba(212, 181, 106, 0.42);
+  background:
+    linear-gradient(165deg, rgba(212, 181, 106, 0.12), transparent 42%),
+    rgba(0, 0, 0, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0.7rem rgba(212, 181, 106, 0.12);
+}
+
+.yanmar-gear-bubble-card.is-precision {
+  border-color: rgba(168, 85, 247, 0.35);
+}
+
+.yanmar-gear-bubble-card.is-master {
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.yanmar-gear-bubble-card.is-empty {
+  min-height: 8rem;
+  justify-content: flex-start;
+}
+
+.yanmar-gear-bubble-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.yanmar-gear-bubble-card-title {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: rgba(246, 231, 194, 0.75);
+  text-transform: uppercase;
+}
+
+.yanmar-gear-bubble-grade {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 17, 22, 0.65);
+  padding: 0.1rem 0.4rem;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.yanmar-gear-bubble-card-head-trail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.yanmar-gear-zoom-btn {
+  border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background:
+    linear-gradient(180deg, rgba(253, 230, 138, 0.18), transparent 55%),
+    rgba(69, 40, 16, 0.75);
+  color: #fff7ed;
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  padding: 0.16rem 0.45rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 140ms ease,
+    filter 140ms ease;
+}
+
+.yanmar-gear-zoom-btn:hover {
+  filter: brightness(1.08);
+  border-color: rgba(252, 211, 77, 0.65);
+}
+
+.yanmar-gear-art-preview-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem;
+}
+
+.yanmar-gear-art-preview-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(5px);
+  cursor: pointer;
+}
+
+.yanmar-gear-art-preview-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  width: min(100%, 18rem);
+  padding: 1.1rem 1rem 0.95rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(245, 215, 142, 0.4);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(251, 191, 36, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(36, 28, 18, 0.98), rgba(10, 12, 18, 0.98));
+  box-shadow: 0 1.2rem 2.6rem rgba(0, 0, 0, 0.55);
+  text-align: center;
+}
+
+.yanmar-gear-art-preview-icon {
+  width: 11.5rem !important;
+  height: 11.5rem !important;
+  max-width: 11.5rem;
+}
+
+.yanmar-gear-art-preview-card .yanmar-gear-mgr-name {
+  margin: 0.15rem 0 0;
+  font-size: 0.95rem;
+}
+
+.yanmar-gear-art-preview-card .yanmar-gear-mgr-grade {
+  margin: 0;
+  font-size: 0.68rem;
+  color: rgba(254, 243, 199, 0.78);
+}
+
+.yanmar-gear-art-preview-card .yanmar-gear-btn {
+  margin-top: 0.35rem;
+  min-width: 6.5rem;
+}
+
+.yanmar-gacha-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.yanmar-gacha-banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.06), transparent 42%),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.88), rgba(2, 6, 23, 0.96));
+  padding: 0.9rem;
+  box-shadow:
+    0 0.35rem 0.9rem rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.yanmar-gacha-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 20%, rgba(148, 163, 184, 0.14), transparent 60%);
+}
+
+.yanmar-gacha-banner-showcase {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 5.6rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.yanmar-gacha-banner-art {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  width: 5.6rem;
+  height: 5.6rem;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    radial-gradient(circle at 45% 28%, rgba(255, 255, 255, 0.14), transparent 55%),
+    linear-gradient(165deg, rgba(51, 65, 85, 0.55), rgba(2, 6, 23, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0.25rem 0.55rem rgba(0, 0, 0, 0.35);
+}
+
+.yanmar-gacha-banner-art img {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.18rem 0.22rem rgba(0, 0, 0, 0.55));
+  pointer-events: none;
+}
+
+.yanmar-gacha-banner-copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.yanmar-gacha-banner-kicker {
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, 0.18);
+  background: rgba(15, 23, 42, 0.55);
+  padding: 0.12rem 0.45rem;
+  color: rgba(226, 232, 240, 0.72);
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.yanmar-gacha-banner-copy h3 {
+  margin: 0;
+  color: #fff7ed;
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.yanmar-gacha-grade-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  margin-top: 0.1rem;
+}
+
+.yanmar-gacha-grade-chip {
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.45);
+  padding: 0.14rem 0.4rem;
+  color: rgba(254, 243, 199, 0.88);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.yanmar-gacha-preview-row,
+.yanmar-gacha-result-row {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding: 0.2rem 0 0.1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.yanmar-gacha-preview-card,
+.yanmar-gacha-result-card {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 3rem;
+}
+
+.yanmar-gacha-preview-card span,
+.yanmar-gacha-result-name {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 4.5rem;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.yanmar-gacha-actions {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 0.5rem;
+}
+
+.yanmar-gacha-pull-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  min-height: 2.7rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 55%),
+    linear-gradient(180deg, rgba(245, 158, 11, 0.22), rgba(120, 53, 15, 0.35));
+  color: #fff7ed;
+  padding: 0.5rem 0.55rem;
+  font-weight: 800;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0.18rem 0.4rem rgba(0, 0, 0, 0.28);
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+.yanmar-gacha-pull-btn--multi {
+  border-color: rgba(253, 230, 138, 0.42);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 50%),
+    linear-gradient(180deg, rgba(251, 191, 36, 0.34), rgba(146, 64, 14, 0.45));
+}
+
+.yanmar-gacha-pull-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.yanmar-gacha-pull-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.yanmar-gacha-pull-label {
+  font-size: 0.7rem;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.yanmar-gacha-pull-star {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.yanmar-gacha-card--standard {
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+.yanmar-gacha-card--standard .yanmar-gacha-banner-art {
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+.yanmar-gacha-card--premium {
+  border-color: rgba(251, 191, 36, 0.42);
+  background:
+    linear-gradient(165deg, rgba(251, 191, 36, 0.14), transparent 40%),
+    linear-gradient(180deg, rgba(69, 26, 3, 0.55), rgba(2, 6, 23, 0.96));
+  box-shadow:
+    0 0.4rem 1rem rgba(0, 0, 0, 0.42),
+    0 0 0.9rem rgba(245, 158, 11, 0.12),
+    inset 0 1px 0 rgba(253, 230, 138, 0.16);
+}
+
+.yanmar-gacha-card--premium::before {
+  background:
+    radial-gradient(ellipse 75% 60% at 20% 18%, rgba(251, 191, 36, 0.22), transparent 58%);
+}
+
+.yanmar-gacha-card--premium .yanmar-gacha-banner-art {
+  border-color: rgba(251, 191, 36, 0.45);
+  background:
+    radial-gradient(circle at 45% 28%, rgba(253, 230, 138, 0.22), transparent 55%),
+    linear-gradient(165deg, rgba(180, 83, 9, 0.45), rgba(2, 6, 23, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(253, 230, 138, 0.22),
+    0 0 0.7rem rgba(245, 158, 11, 0.2);
+}
+
+.yanmar-gacha-card--premium .yanmar-gacha-banner-kicker {
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(120, 53, 15, 0.45);
+  color: #fde68a;
+}
+
+.yanmar-gacha-card--premium .yanmar-gacha-grade-chip {
+  border-color: rgba(251, 191, 36, 0.28);
+  background: rgba(120, 53, 15, 0.35);
+  color: #fef3c7;
+}
+
+.yanmar-gacha-results {
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.28);
+  padding: 0.7rem 0.75rem 0.55rem;
+}
+
+.yanmar-gacha-results-title {
+  margin: 0 0 0.35rem;
+  color: rgba(254, 243, 199, 0.8);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+@keyframes yanmar-gacha-card-reveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.55) rotateY(-28deg);
+    filter: brightness(1.8);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.08) rotateY(6deg);
+    filter: brightness(1.25);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotateY(0);
+    filter: brightness(1);
+  }
+}
+
+@keyframes yanmar-gacha-seal-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 0 0 0 rgba(251, 191, 36, 0);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 0 0.55rem rgba(251, 191, 36, 0.18);
+  }
+}
+
+@keyframes yanmar-gacha-jackpot-card-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0.2rem rgba(255, 255, 255, 0.15));
+  }
+  50% {
+    filter: drop-shadow(0 0 0.65rem rgba(251, 191, 36, 0.55));
+  }
+}
+
+@keyframes yanmar-gacha-jackpot-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes yanmar-gacha-jackpot-label-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) translateY(0.6rem);
+    letter-spacing: 0.2em;
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.18) translateY(0);
+    letter-spacing: 0.12em;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    letter-spacing: 0.08em;
+  }
+}
+
+@keyframes yanmar-gacha-jackpot-burst {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+@keyframes yanmar-gacha-jackpot-rays-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes yanmar-gacha-modal-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-0.18rem);
+  }
+  40% {
+    transform: translateX(0.18rem);
+  }
+  60% {
+    transform: translateX(-0.12rem);
+  }
+  80% {
+    transform: translateX(0.1rem);
+  }
+}
+
+.yanmar-gacha-result-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  background:
+    linear-gradient(165deg, rgba(251, 191, 36, 0.12), transparent 38%),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(2, 6, 23, 0.98));
+  padding: 0.85rem 0.9rem 0.95rem;
+  box-shadow:
+    0 0.45rem 1.2rem rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.yanmar-gacha-result-modal.is-jackpot-flash {
+  animation: yanmar-gacha-modal-shake 0.42s ease-in-out;
+}
+
+.yanmar-gacha-result-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  position: relative;
+  z-index: 2;
+}
+
+.yanmar-gacha-result-modal-header h2 {
+  margin: 0;
+  color: #fff7ed;
+  font-size: 0.92rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.yanmar-gacha-result-modal-count {
+  border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  background: rgba(120, 53, 15, 0.35);
+  padding: 0.12rem 0.45rem;
+  color: #fde68a;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.yanmar-gacha-result-modal-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.yanmar-gacha-result-skip {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0.55rem;
+  background: rgba(15, 23, 42, 0.55);
+  padding: 0.28rem 0.65rem;
+  color: rgba(254, 243, 199, 0.92);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  cursor: pointer;
+}
+
+.yanmar-gacha-result-skip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.yanmar-gacha-result-close {
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  padding: 0.1rem 0.45rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.yanmar-gacha-result-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.yanmar-gacha-result-modal-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.45rem 0.35rem;
+  max-height: min(52dvh, 18rem);
+  overflow-y: auto;
+  overscroll-contain: contain;
+  padding: 0.15rem 0.1rem 0.25rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.yanmar-gacha-result-modal-grid--single {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  max-height: none;
+  padding: 0.55rem 0 0.35rem;
+}
+
+.yanmar-gacha-result-modal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.yanmar-gacha-result-modal-card.is-sealed {
+  min-height: 4.2rem;
+  justify-content: center;
+}
+
+.yanmar-gacha-result-seal {
+  display: flex;
+  width: 2.65rem;
+  height: 2.65rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.7rem;
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  background:
+    radial-gradient(circle at 40% 30%, rgba(255, 255, 255, 0.08), transparent 55%),
+    linear-gradient(165deg, rgba(51, 65, 85, 0.55), rgba(2, 6, 23, 0.92));
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 1rem;
+  font-weight: 900;
+  animation: yanmar-gacha-seal-pulse 1.6s ease-in-out infinite;
+}
+
+.yanmar-gacha-result-modal-grid--single .yanmar-gacha-result-seal {
+  width: 5.2rem;
+  height: 5.2rem;
+  border-radius: 1rem;
+  font-size: 1.8rem;
+}
+
+.yanmar-gacha-result-modal-card.is-revealed.is-pop {
+  animation: yanmar-gacha-card-reveal 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.yanmar-gacha-result-modal-card.is-jackpot:not(.is-pop) {
+  animation: yanmar-gacha-jackpot-card-glow 1.2s ease-in-out infinite;
+}
+
+.yanmar-gacha-result-modal-card.is-jackpot .yanmar-gacha-result-modal-grade {
+  color: #fde68a;
+  text-shadow: 0 0 0.45rem rgba(251, 191, 36, 0.55);
+}
+
+.yanmar-gacha-result-modal-grade {
+  color: rgba(253, 230, 138, 0.88);
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.yanmar-gacha-result-modal-name {
+  max-width: 100%;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.52rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.yanmar-gacha-result-modal-grid--single .yanmar-gacha-result-modal-grade {
+  font-size: 0.68rem;
+  margin-top: 0.2rem;
+}
+
+.yanmar-gacha-result-modal-grid--single .yanmar-gacha-result-modal-name {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fff7ed;
+  -webkit-line-clamp: 3;
+}
+
+.yanmar-gacha-result-modal-confirm {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-height: 2.45rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(251, 191, 36, 0.38);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 55%),
+    linear-gradient(180deg, rgba(245, 158, 11, 0.32), rgba(120, 53, 15, 0.42));
+  color: #fff7ed;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0.18rem 0.4rem rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.yanmar-gacha-result-modal-confirm:active {
+  transform: scale(0.98);
+}
+
+.yanmar-gacha-result-modal-hint {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  min-height: 2.45rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(254, 243, 199, 0.55);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.yanmar-gacha-jackpot-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+  background: rgba(2, 6, 23, 0.42);
+  animation: yanmar-gacha-jackpot-overlay-in 160ms ease-out both;
+}
+
+.yanmar-gacha-jackpot-overlay--precision {
+  background:
+    radial-gradient(circle at 50% 45%, rgba(168, 85, 247, 0.42), transparent 55%),
+    rgba(15, 5, 30, 0.55);
+}
+
+.yanmar-gacha-jackpot-overlay--master {
+  background:
+    radial-gradient(circle at 50% 45%, rgba(239, 68, 68, 0.45), transparent 52%),
+    radial-gradient(circle at 50% 60%, rgba(251, 191, 36, 0.22), transparent 60%),
+    rgba(30, 5, 5, 0.55);
+}
+
+.yanmar-gacha-jackpot-burst {
+  position: absolute;
+  width: 7rem;
+  height: 7rem;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  animation: yanmar-gacha-jackpot-burst 0.85s ease-out both;
+}
+
+.yanmar-gacha-jackpot-overlay--precision .yanmar-gacha-jackpot-burst {
+  border-color: rgba(216, 180, 254, 0.7);
+  box-shadow: 0 0 1.5rem rgba(168, 85, 247, 0.55);
+}
+
+.yanmar-gacha-jackpot-overlay--master .yanmar-gacha-jackpot-burst {
+  border-color: rgba(254, 202, 202, 0.75);
+  box-shadow: 0 0 1.6rem rgba(239, 68, 68, 0.55);
+}
+
+.yanmar-gacha-jackpot-rays {
+  position: absolute;
+  width: 18rem;
+  height: 18rem;
+  opacity: 0.45;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 255, 255, 0.18) 0deg 8deg,
+    transparent 8deg 22deg
+  );
+  mask-image: radial-gradient(circle, #000 12%, transparent 68%);
+  animation: yanmar-gacha-jackpot-rays-spin 6s linear infinite;
+}
+
+.yanmar-gacha-jackpot-overlay--precision .yanmar-gacha-jackpot-rays {
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(192, 132, 252, 0.28) 0deg 8deg,
+    transparent 8deg 22deg
+  );
+}
+
+.yanmar-gacha-jackpot-overlay--master .yanmar-gacha-jackpot-rays {
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(251, 191, 36, 0.28) 0deg 8deg,
+    transparent 8deg 22deg
+  );
+}
+
+.yanmar-gacha-jackpot-label {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: #fff7ed;
+  font-size: 1.85rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-shadow:
+    0 0.15rem 0.35rem rgba(0, 0, 0, 0.55),
+    0 0 1.1rem rgba(255, 255, 255, 0.35);
+  animation: yanmar-gacha-jackpot-label-pop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.yanmar-gacha-jackpot-overlay--precision .yanmar-gacha-jackpot-label {
+  color: #f3e8ff;
+  text-shadow:
+    0 0.15rem 0.35rem rgba(0, 0, 0, 0.55),
+    0 0 1.2rem rgba(168, 85, 247, 0.75);
+}
+
+.yanmar-gacha-jackpot-overlay--master .yanmar-gacha-jackpot-label {
+  color: #fee2e2;
+  text-shadow:
+    0 0.15rem 0.35rem rgba(0, 0, 0, 0.55),
+    0 0 1.2rem rgba(239, 68, 68, 0.7),
+    0 0 0.55rem rgba(251, 191, 36, 0.45);
+}
+
+.yanmar-gacha-jackpot-sub {
+  position: relative;
+  z-index: 1;
+  margin: 0.35rem 0 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+@media (max-width: 380px) {
+  .yanmar-gacha-result-modal-grid:not(.yanmar-gacha-result-modal-grid--single) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 480px) {
+  .yanmar-gacha-result-modal-grid {
+    max-height: min(42dvh, 12rem);
+  }
+
+  .yanmar-gacha-jackpot-label {
+    font-size: 1.45rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yanmar-gacha-result-modal-card.is-revealed.is-pop,
+  .yanmar-gacha-result-modal.is-jackpot-flash,
+  .yanmar-gacha-result-seal,
+  .yanmar-gacha-result-modal-card.is-jackpot,
+  .yanmar-gacha-jackpot-burst,
+  .yanmar-gacha-jackpot-rays,
+  .yanmar-gacha-jackpot-label {
+    animation: none !important;
+  }
+}
+
+.yanmar-profile-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: #fff;
+}
+
+.yanmar-profile-chip-avatar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.18rem;
+  flex-shrink: 0;
+  width: 2rem;
+}
+
+.yanmar-profile-chip-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1.5px solid rgba(251, 191, 36, 0.55);
+  background:
+    linear-gradient(145deg, rgba(251, 191, 36, 0.35), rgba(15, 23, 42, 0.9));
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #fef3c7;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.yanmar-profile-chip-xp {
+  display: block;
+  width: 100%;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.yanmar-profile-chip-xp-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #86efac);
+}
+
+.yanmar-profile-chip-meta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.12rem;
+  min-width: 0;
+  flex: 1;
+  padding: 0.15rem 0.45rem 0.2rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.yanmar-profile-chip:hover .yanmar-profile-chip-meta {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.yanmar-profile-chip:hover .yanmar-profile-chip-avatar {
+  border-color: rgba(253, 230, 138, 0.85);
+}
+
+.yanmar-profile-chip-lv {
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1.1;
+  color: #fde68a;
+  letter-spacing: -0.02em;
+}
+
+.yanmar-profile-chip-name {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.yanmar-profile-modal {
+  display: flex;
+  flex-direction: column;
+  color: #f8fafc;
+  height: min(90dvh, 44rem);
+  max-height: min(90dvh, 44rem);
+  overflow: hidden;
+  background: linear-gradient(180deg, #1a1f2b 0%, #0b0e14 100%);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 0.9rem;
+}
+
+.yanmar-profile-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  padding: 0.65rem 0.8rem 0.55rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.yanmar-profile-modal-header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #fde68a;
+}
+
+.yanmar-profile-modal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.yanmar-profile-stars {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.22rem 0.45rem;
+}
+
+.yanmar-profile-modal-header button {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+}
+
+.yanmar-profile-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.7rem 0.8rem 0.9rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.yanmar-profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.yanmar-profile-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 2px solid rgba(251, 191, 36, 0.55);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(253, 230, 138, 0.45), transparent 55%),
+    linear-gradient(160deg, #334155, #0f172a);
+  color: #fef3c7;
+  font-weight: 900;
+  box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.35);
+}
+
+.yanmar-profile-hero-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.yanmar-profile-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.yanmar-profile-level {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 0.72rem;
+  color: #fde68a;
+  font-weight: 800;
+}
+
+.yanmar-profile-xp-bar {
+  max-width: 12rem;
+}
+
+.yanmar-profile-section-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  color: #fde68a;
+  font-weight: 900;
+}
+
+.yanmar-chassis-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.yanmar-chassis-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.yanmar-chassis-filter-tab {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 0.28rem 0.7rem;
+  cursor: pointer;
+}
+
+.yanmar-chassis-filter-tab.is-active {
+  border-color: rgba(251, 191, 36, 0.65);
+  background: rgba(245, 158, 11, 0.22);
+  color: #fff7ed;
+}
+
+.yanmar-chassis-showcase {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 10rem) minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: stretch;
+  padding: 0.65rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(245, 196, 81, 0.28);
+  background:
+    linear-gradient(145deg, rgba(251, 191, 36, 0.1), transparent 45%),
+    rgba(0, 0, 0, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.yanmar-chassis-showcase-visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 7.5rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(148, 163, 184, 0.18), transparent 60%),
+    rgba(15, 23, 42, 0.65);
+  overflow: hidden;
+}
+
+.yanmar-chassis-showcase-visual.is-active {
+  border-color: rgba(251, 191, 36, 0.55);
+}
+
+.yanmar-chassis-showcase-visual.is-locked .yanmar-chassis-showcase-img {
+  filter: grayscale(0.85) brightness(0.55);
+  opacity: 0.75;
+}
+
+.yanmar-chassis-showcase-img {
+  width: 88%;
+  max-height: 6.2rem;
+  object-fit: contain;
+}
+
+.yanmar-chassis-lock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 23, 0.28);
+}
+
+.yanmar-chassis-lock-icon {
+  color: #fde68a;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
+}
+
+.yanmar-chassis-class-pill,
+.yanmar-chassis-active-pill {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 800;
+  padding: 0.12rem 0.4rem;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #e2e8f0;
+}
+
+.yanmar-chassis-active-pill {
+  left: auto;
+  right: 0.35rem;
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #fde68a;
+}
+
+.yanmar-chassis-showcase-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.yanmar-chassis-showcase-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.yanmar-chassis-showcase-title-row h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #fff7ed;
+}
+
+.yanmar-chassis-page {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.yanmar-chassis-trait {
+  margin: 0;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.62);
+  line-height: 1.35;
+}
+
+.yanmar-chassis-stat-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.15rem 0.55rem;
+  font-size: 0.62rem;
+}
+
+.yanmar-chassis-stat-grid li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.3rem;
+  padding: 0.12rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.yanmar-chassis-stat-grid span {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.yanmar-chassis-stat-grid strong {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.yanmar-chassis-strip-wrap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.yanmar-chassis-nav {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.yanmar-chassis-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.yanmar-chassis-strip {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  padding: 0.15rem 0.1rem 0.35rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.yanmar-chassis-strip-card {
+  position: relative;
+  flex: 0 0 4.6rem;
+  width: 4.6rem;
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.35rem 0.25rem 0.3rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.28);
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.yanmar-chassis-strip-card img {
+  width: 100%;
+  height: 2.2rem;
+  object-fit: contain;
+}
+
+.yanmar-chassis-strip-card.is-locked img {
+  filter: grayscale(0.9) brightness(0.55);
+}
+
+.yanmar-chassis-strip-card.is-selected {
+  border-color: rgba(56, 189, 248, 0.7);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25);
+}
+
+.yanmar-chassis-strip-card.is-active {
+  border-color: rgba(251, 191, 36, 0.7);
+}
+
+.yanmar-chassis-strip-lock {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  line-height: 0;
+  color: #fde68a;
+}
+
+.yanmar-chassis-strip-name {
+  font-size: 0.48rem;
+  font-weight: 800;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yanmar-chassis-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-top: 0.15rem;
+}
+
+.yanmar-chassis-unlock-hint {
+  margin: 0;
+  font-size: 0.68rem;
+  color: rgba(253, 186, 116, 0.9);
+  font-weight: 700;
+}
+
+.yanmar-chassis-unlock-hint.is-ok {
+  color: rgba(167, 243, 208, 0.9);
+}
+
+.yanmar-chassis-cta {
+  width: 100%;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(180deg, #f59e0b, #b45309);
+}
+
+.yanmar-chassis-cta.is-ride {
+  background: linear-gradient(180deg, #22c55e, #15803d);
+}
+
+.yanmar-chassis-cta.is-current {
+  background: linear-gradient(180deg, #64748b, #334155);
+  opacity: 0.85;
+}
+
+.yanmar-chassis-cta:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+@media (max-width: 560px) {
+  .yanmar-chassis-showcase {
+    grid-template-columns: 1fr;
+  }
+
+  .yanmar-chassis-showcase-visual {
+    min-height: 6.5rem;
+  }
+}
+
+@media (max-width: 840px) {
+  .yanmar-gear-mgr-compact {
+    flex-direction: row;
+    flex-wrap: nowrap;
+  }
+
+  .yanmar-gear-mgr-equip-grid--2x3 {
+    grid-template-columns: repeat(2, 3.75rem);
+    justify-content: start;
+  }
+
+  .yanmar-gear-mgr-equip-slot {
+    width: 3.75rem;
+  }
+
+  .yanmar-gear-mgr-equip-slot .yanmar-gear-icon-cell {
+    width: 3.75rem;
+    height: 3.75rem;
+    max-width: 3.75rem;
+  }
+
+  .yanmar-gear-mgr-compact-stats {
+    flex-basis: 11.5rem;
+    max-width: 11.5rem;
+  }
+
+  .yanmar-gear-bubble-compare-row {
+    grid-template-columns: 1fr;
+  }
+
+  .yanmar-gear-mgr-body {
+    overflow: hidden;
+  }
+
+  .yanmar-gear-mgr-inv {
+    min-height: 0;
   }
 }
