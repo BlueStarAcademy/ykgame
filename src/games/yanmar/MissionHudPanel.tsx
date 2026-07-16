@@ -151,10 +151,7 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
             </p>
           ) : (
             <>
-              <p className="text-[8px] font-semibold leading-tight text-amber-200/85">
-                <CompactQuestReward reward={MISSION_DIFFICULTY_REWARDS[mission.difficulty]} />
-              </p>
-              <ul className="mt-1 space-y-1">
+              <ul className="space-y-1">
                 {mission.tasks.map((task) => {
                   const value = mission.progress[task.id] ?? 0;
                   const done = value >= task.target;
@@ -192,9 +189,18 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
                   type="button"
                   disabled={claiming}
                   onClick={onClaim}
-                  className="mt-1.5 w-full rounded border border-amber-300/40 bg-amber-500/90 py-0.5 text-[8px] font-black leading-none text-white disabled:opacity-60"
+                  className="mt-1.5 flex w-full flex-col items-center gap-0.5 rounded border border-amber-300/40 bg-amber-500/90 px-1 py-1 text-white disabled:opacity-60"
                 >
-                  {claiming ? "받는 중" : "보상 받기"}
+                  <span className="text-[8px] font-black leading-none">
+                    {claiming ? "받는 중" : "보상 받기"}
+                  </span>
+                  {!claiming ? (
+                    <span className="text-[7px] font-semibold leading-tight text-white/95">
+                      <CompactQuestReward
+                        reward={MISSION_DIFFICULTY_REWARDS[mission.difficulty]}
+                      />
+                    </span>
+                  ) : null}
                 </button>
               ) : null}
             </>

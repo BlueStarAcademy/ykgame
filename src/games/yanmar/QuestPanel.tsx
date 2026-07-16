@@ -348,12 +348,7 @@ export function QuestPanel({
                 </div>
               ) : (
                 <div className="rounded-xl border border-amber-200/20 bg-black/40 px-3 py-3">
-                  <div className="flex items-center justify-end gap-2">
-                    <p className="text-[10px] font-semibold text-amber-200/85">
-                      <QuestRewardDisplay
-                        reward={MISSION_DIFFICULTY_REWARDS[currentMission.difficulty]}
-                      />
-                    </p>
+                  <div className="flex items-center justify-end">
                     <DifficultyStars count={currentMission.difficulty} />
                   </div>
 
@@ -402,11 +397,22 @@ export function QuestPanel({
                       type="button"
                       disabled={claimingId === "mission"}
                       onClick={onClaimMission}
-                      className="mt-3 w-full rounded-xl border border-amber-300/40 bg-amber-500/90 py-2.5 text-[12px] font-black text-white disabled:opacity-60"
+                      className="mt-3 flex w-full flex-col items-center gap-1 rounded-xl border border-amber-300/40 bg-amber-500/90 px-3 py-2.5 text-white disabled:opacity-60"
                     >
-                      {claimingId === "mission"
-                        ? "보상 수령 중..."
-                        : "미션 보상 받기"}
+                      <span className="text-[12px] font-black leading-none">
+                        {claimingId === "mission"
+                          ? "보상 수령 중..."
+                          : "미션 보상 받기"}
+                      </span>
+                      {claimingId !== "mission" ? (
+                        <span className="text-[10px] font-semibold text-white/95">
+                          <QuestRewardDisplay
+                            reward={
+                              MISSION_DIFFICULTY_REWARDS[currentMission.difficulty]
+                            }
+                          />
+                        </span>
+                      ) : null}
                     </button>
                   ) : (
                     <p className="mt-3 text-center text-[10px] font-semibold text-white/40">
