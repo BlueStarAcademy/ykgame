@@ -47,6 +47,7 @@ import type {
   ExcavatorSimState,
   AutoPoseSlotIndex,
   AutoPoseState,
+  GearDiscoveryState,
 } from "./types";
 import {
   createHydraulicVelocity,
@@ -165,7 +166,20 @@ import {
 import { isInRepairTentRange } from "./RepairTent";
 import type { ChassisModelId } from "./chassisCatalog";
 import { getChassisDef } from "./chassisCatalog";
-import { GEAR_INVENTORY_BASE, ITEM_GRADE_LABEL, type ItemGrade } from "./gearCatalog";
+import {
+  emptyAbilityAlloc,
+  spentAbilityPoints,
+  type AbilityAlloc,
+} from "./abilityAlloc";
+import {
+  GEAR_INVENTORY_BASE,
+  GEAR_SLOTS,
+  GEAR_SLOT_LABEL,
+  ITEM_GRADE_LABEL,
+  type GearSlot,
+  type ItemGrade,
+} from "./gearCatalog";
+import { GearIconCell } from "./GearIconCell";
 import {
   createScoreState,
   getProgress,
@@ -302,6 +316,7 @@ function TutorialSelectModal({
 
 const DUMP_SCORE_PANEL_DURATION_MS = 9500;
 const COUPON_DISCOVERY_DURATION_MS = 8200;
+const GEAR_DISCOVERY_DURATION_MS = 6500;
 const FREE_LOOK_SENSITIVITY = 0.0045;
 const FREE_LOOK_PITCH_MIN = -0.55;
 const FREE_LOOK_PITCH_MAX = 0.42;
@@ -498,6 +513,65 @@ function CouponDiscoveryOverlay({ discovery }: { discovery: CouponDiscoveryState
   );
 }
 
+function isGearDiscoverySlot(v: unknown): v is GearSlot {
+  return typeof v === "string" && (GEAR_SLOTS as readonly string[]).includes(v);
+}
+
+function isGearDiscoveryGrade(v: unknown): v is ItemGrade {
+  return (
+    v === "NORMAL" ||
+    v === "ENHANCED" ||
+    v === "PRECISION" ||
+    v === "MASTER"
+  );
+}
+
+function GearDiscoveryOverlay({ discovery }: { discovery: GearDiscoveryState | null }) {
+  if (!discovery) return null;
+
+  const grade = isGearDiscoveryGrade(discovery.grade) ? discovery.grade : "NORMAL";
+  const slot = isGearDiscoverySlot(discovery.slot) ? discovery.slot : null;
+  const gradeLabel = ITEM_GRADE_LABEL[grade];
+  const slotLabel = slot ? GEAR_SLOT_LABEL[slot] : null;
+  const gradeTone =
+    grade === "MASTER"
+      ? "yanmar-gear-discovery-grade--master"
+      : grade === "PRECISION"
+        ? "yanmar-gear-discovery-grade--precision"
+        : grade === "ENHANCED"
+          ? "yanmar-gear-discovery-grade--enhanced"
+          : "yanmar-gear-discovery-grade--normal";
+
+  return (
+    <div
+      key={discovery.pulseKey}
+      className="yanmar-gear-discovery w-max max-w-[min(16rem,90vw)] rounded-2xl border border-white/20 bg-gradient-to-b from-slate-800/95 via-slate-900/95 to-black/95 px-4 py-3.5 text-center text-white shadow-[0_0_28px_rgba(148,163,184,0.28)] backdrop-blur-md"
+      role="status"
+    >
+      <div className="mx-auto flex justify-center">
+        <GearIconCell slot={slot} grade={grade} size="lg" empty={!slot} />
+      </div>
+      <p className="mt-2.5 text-base font-black tracking-tight text-slate-50">
+        {discovery.mailed ? "인벤토리 가득!" : "장비 획득!"}
+      </p>
+      <p
+        className={`yanmar-gear-discovery-grade mt-1 text-[11px] font-bold uppercase ${gradeTone}`}
+      >
+        {gradeLabel}
+        {slotLabel ? ` · ${slotLabel}` : ""}
+      </p>
+      <p className="mt-1 text-xs font-bold leading-snug text-white">
+        {discovery.nameSnapshot}
+      </p>
+      {discovery.mailed ? (
+        <p className="mt-1.5 text-[10px] font-semibold leading-snug text-amber-200/90">
+          스타 우편으로 전환되었습니다
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function AttachmentUnlockOverlay({
   unlock,
   onClose,
@@ -665,6 +739,7 @@ export function ExcavatorGameWrapper({
   });
   const [dumpScorePanel, setDumpScorePanel] = useState<DumpScorePanelState | null>(null);
   const [couponDiscovery, setCouponDiscovery] = useState<CouponDiscoveryState | null>(null);
+  const [gearDiscovery, setGearDiscovery] = useState<GearDiscoveryState | null>(null);
   const [equipmentStats, setEquipmentStats] =
     useState<YanmarEquipmentStats>(defaultEquipmentStats);
   const [currency, setCurrency] = useState(() => session?.user?.currency ?? 0);
@@ -704,6 +779,7 @@ export function ExcavatorGameWrapper({
   const [gearExpandCost, setGearExpandCost] = useState<number | null>(100);
   const [activeChassisId, setActiveChassisId] = useState<ChassisModelId | string>("ViO17_1");
   const [ownedChassisIds, setOwnedChassisIds] = useState<string[]>(["ViO17_1"]);
+  const [abilityAlloc, setAbilityAlloc] = useState<AbilityAlloc>(() => emptyAbilityAlloc());
   const [gearBusy, setGearBusy] = useState(false);
   const [gachaBusy, setGachaBusy] = useState(false);
   const [lastGachaResults, setLastGachaResults] = useState<
@@ -806,6 +882,8 @@ export function ExcavatorGameWrapper({
   );
   const couponDiscoveryRef = useRef<CouponDiscoveryState | null>(null);
   const couponDiscoveryHideTimerRef = useRef<number | null>(null);
+  const gearDiscoveryRef = useRef<GearDiscoveryState | null>(null);
+  const gearDiscoveryHideTimerRef = useRef<number | null>(null);
   const equipmentStatsRef = useRef<YanmarEquipmentStats>(defaultEquipmentStats);
   const baseEquipmentStatsRef =
     useRef<YanmarEquipmentStats>(defaultEquipmentStats);
@@ -1749,6 +1827,12 @@ export function ExcavatorGameWrapper({
       if (Array.isArray(data.chassis?.ownedIds)) {
         setOwnedChassisIds(data.chassis.ownedIds);
       }
+      if (data.chassis?.abilityAlloc) {
+        setAbilityAlloc({
+          ...emptyAbilityAlloc(),
+          ...data.chassis.abilityAlloc,
+        });
+      }
       if (data.repair) {
         repairStateRef.current = data.repair;
       }
@@ -1809,24 +1893,33 @@ export function ExcavatorGameWrapper({
         | {
             nameSnapshot?: string;
             grade?: string;
+            slot?: string;
             mailed?: boolean;
           }
         | null
         | undefined,
     ) => {
       if (!drop?.nameSnapshot) return;
-      const gradeLabel =
-        drop.grade && drop.grade in ITEM_GRADE_LABEL
-          ? ITEM_GRADE_LABEL[drop.grade as ItemGrade]
-          : drop.grade ?? "";
-      showAttachmentWarning(
-        drop.mailed
-          ? `인벤 가득 — [${gradeLabel}] ${drop.nameSnapshot} → 스타 우편 전환`
-          : `장비 획득! [${gradeLabel}] ${drop.nameSnapshot}`,
-      );
+      const next: GearDiscoveryState = {
+        nameSnapshot: drop.nameSnapshot,
+        grade: drop.grade ?? "NORMAL",
+        slot: drop.slot,
+        mailed: Boolean(drop.mailed),
+        pulseKey: (gearDiscoveryRef.current?.pulseKey ?? 0) + 1,
+      };
+      gearDiscoveryRef.current = next;
+      setGearDiscovery(next);
+      if (gearDiscoveryHideTimerRef.current != null) {
+        window.clearTimeout(gearDiscoveryHideTimerRef.current);
+      }
+      gearDiscoveryHideTimerRef.current = window.setTimeout(() => {
+        gearDiscoveryHideTimerRef.current = null;
+        gearDiscoveryRef.current = null;
+        setGearDiscovery(null);
+      }, GEAR_DISCOVERY_DURATION_MS);
       void loadEquipment();
     },
-    [loadEquipment, showAttachmentWarning],
+    [loadEquipment],
   );
 
   const notifyCoresDrop = useCallback(
@@ -1958,6 +2051,45 @@ export function ExcavatorGameWrapper({
         }
         if (data.activeId) setActiveChassisId(data.activeId);
         if (Array.isArray(data.ownedIds)) setOwnedChassisIds(data.ownedIds);
+        if (data.abilityAlloc) {
+          setAbilityAlloc({
+            ...emptyAbilityAlloc(),
+            ...data.abilityAlloc,
+          });
+        }
+        await loadEquipment();
+      } finally {
+        setGearBusy(false);
+      }
+    },
+    [loadEquipment, publishEquipmentStats],
+  );
+
+  const handleAbilityAllocAction = useCallback(
+    async (
+      action: "allocate" | "resetAlloc" | "recommendAlloc",
+      alloc?: AbilityAlloc,
+    ) => {
+      setGearBusy(true);
+      try {
+        const res = await fetch("/api/chassis/yanmar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            action === "allocate" ? { action, alloc } : { action },
+          ),
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+        if (data.abilityAlloc) {
+          setAbilityAlloc({
+            ...emptyAbilityAlloc(),
+            ...data.abilityAlloc,
+          });
+        }
+        if (data.stats) {
+          publishEquipmentStats(data.stats);
+        }
         await loadEquipment();
       } finally {
         setGearBusy(false);
@@ -2283,10 +2415,16 @@ export function ExcavatorGameWrapper({
       window.clearTimeout(couponDiscoveryHideTimerRef.current);
       couponDiscoveryHideTimerRef.current = null;
     }
+    if (gearDiscoveryHideTimerRef.current != null) {
+      window.clearTimeout(gearDiscoveryHideTimerRef.current);
+      gearDiscoveryHideTimerRef.current = null;
+    }
     dumpScorePanelRef.current = null;
     couponDiscoveryRef.current = null;
+    gearDiscoveryRef.current = null;
     setDumpScorePanel(null);
     setCouponDiscovery(null);
+    setGearDiscovery(null);
     setHud({
       progress: 0,
       timeLeft: config.duration,
@@ -2310,6 +2448,9 @@ export function ExcavatorGameWrapper({
       }
       if (attachmentWarningTimerRef.current != null) {
         window.clearTimeout(attachmentWarningTimerRef.current);
+      }
+      if (gearDiscoveryHideTimerRef.current != null) {
+        window.clearTimeout(gearDiscoveryHideTimerRef.current);
       }
     };
   }, []);
@@ -3166,24 +3307,19 @@ export function ExcavatorGameWrapper({
             currency?: number;
             totalXp?: number;
             xpGained?: number;
-            gearDrops?: { nameSnapshot: string; grade: string; mailed?: boolean }[];
+            gearDrops?: {
+              nameSnapshot: string;
+              grade: string;
+              slot?: string;
+              mailed?: boolean;
+            }[];
             coresDropped?: number;
             enhanceCores?: number;
           };
           if (data.gearDrops && data.gearDrops.length > 0) {
             for (const drop of data.gearDrops) {
-              if (!drop?.nameSnapshot) continue;
-              const gradeLabel =
-                drop.grade && drop.grade in ITEM_GRADE_LABEL
-                  ? ITEM_GRADE_LABEL[drop.grade as ItemGrade]
-                  : drop.grade ?? "";
-              showAttachmentWarning(
-                drop.mailed
-                  ? `인벤 가득 — [${gradeLabel}] ${drop.nameSnapshot} → 스타 우편 전환`
-                  : `장비 획득! [${gradeLabel}] ${drop.nameSnapshot}`,
-              );
+              notifyGearDrop(drop);
             }
-            void loadEquipment();
           }
           notifyCoresDrop(data.coresDropped, data.enhanceCores);
           const remaining = removeDumpRewardOutboxBatch(
@@ -3267,10 +3403,9 @@ export function ExcavatorGameWrapper({
     }
   }, [
     adjustDumpScorePanel,
-    loadEquipment,
     notifyCoresDrop,
+    notifyGearDrop,
     session?.user?.id,
-    showAttachmentWarning,
     showCouponDiscovery,
     syncSessionBalances,
   ]);
@@ -3524,7 +3659,12 @@ export function ExcavatorGameWrapper({
 
         notifyGearDrop(
           data.gearDrop as
-            | { nameSnapshot?: string; grade?: string; mailed?: boolean }
+            | {
+                nameSnapshot?: string;
+                grade?: string;
+                slot?: string;
+                mailed?: boolean;
+              }
             | null
             | undefined,
         );
@@ -3613,6 +3753,7 @@ export function ExcavatorGameWrapper({
           gearDrop?: {
             nameSnapshot?: string;
             grade?: string;
+            slot?: string;
             mailed?: boolean;
           } | null;
           coresDropped?: number;
@@ -3830,9 +3971,13 @@ export function ExcavatorGameWrapper({
           currency={mode === "game" ? currency : previewStars}
           activeChassisId={activeChassisId}
           ownedChassisIds={ownedChassisIds}
+          abilityAlloc={abilityAlloc}
           busy={gearBusy}
           onPurchaseChassis={(id) => void handleChassisAction("purchase", id)}
           onEquipChassis={(id) => void handleChassisAction("equip", id)}
+          onAbilityAllocChange={(alloc) =>
+            void handleAbilityAllocAction("allocate", alloc)
+          }
         />
         <RepairPanel
           open={showRepairPanel}
@@ -3911,88 +4056,101 @@ export function ExcavatorGameWrapper({
           <div className="absolute left-1 top-2 z-50 flex flex-col items-start gap-1.5">
             {!questsDisabled ? (
               <>
-                <div className="pointer-events-auto flex items-start gap-1.5">
-                  <button
-                    type="button"
-                    className={`yanmar-quest-button yanmar-aux-button touch-none active:scale-95${
-                      showQuestPanel ? " is-open" : ""
-                    }`}
-                    onClick={() => {
-                      setShowShopPanel(false);
-                      setShowEquipmentUpgrade(false);
-                      setShowQuestPanel((open) => !open);
-                    }}
-                    aria-expanded={showQuestPanel}
-                    aria-label={
-                      showQuestPanel
-                        ? "퀘스트 닫기"
-                        : questClaimableCount > 0
-                          ? `퀘스트 열기, 미수령 보상 ${questClaimableCount}개`
-                          : "퀘스트 열기"
-                    }
-                  >
-                    <img
-                      className="yanmar-quest-button-icon"
-                      src="/images/yanmar/2d/cockpit/quest-premium.png?v=3"
-                      alt=""
-                      draggable={false}
-                    />
-                    <span className="yanmar-quest-button-label">퀘스트</span>
-                    {questClaimableCount > 0 ? (
-                      <span
-                        className="yanmar-quest-notify-badge is-icon"
-                        aria-hidden
-                      >
-                        {questClaimableCount > 9 ? "9+" : questClaimableCount}
-                      </span>
-                    ) : null}
-                  </button>
-                  <button
-                    type="button"
-                    className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
-                      showEquipmentUpgrade ? " is-open" : ""
-                    }`}
-                    onClick={() => {
-                      setShowQuestPanel(false);
-                      setShowShopPanel(false);
-                      setShowProfileModal(false);
-                      setShowEquipmentUpgrade((open) => !open);
-                    }}
-                    aria-expanded={showEquipmentUpgrade}
-                    aria-label={
-                      showEquipmentUpgrade ? "장비강화 닫기" : "장비강화 열기"
-                    }
-                  >
-                    <img
-                      className="yanmar-upgrade-hud-button-icon"
-                      src="/images/yanmar/2d/cockpit/upgrade-anvil-premium.png?v=2"
-                      alt=""
-                      draggable={false}
-                    />
-                    <span className="yanmar-upgrade-hud-button-label">장비</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`yanmar-shop-button yanmar-aux-button touch-none active:scale-95${
-                      showShopPanel ? " is-open" : ""
-                    }`}
-                    onClick={() => {
-                      setShowQuestPanel(false);
-                      setShowEquipmentUpgrade(false);
-                      setShowProfileModal(false);
-                      setShowShopPanel((open) => !open);
-                    }}
-                    aria-expanded={showShopPanel}
-                    aria-label={showShopPanel ? "상점 닫기" : "상점 열기"}
-                  >
-                    <img
-                      className="yanmar-shop-button-icon"
-                      src="/images/yanmar/2d/cockpit/shop-premium.png?v=4"
-                      alt=""
-                      draggable={false}
-                    />
-                    <span className="yanmar-shop-button-label">상점</span>
-                  </button>
+                <div className="pointer-events-auto flex flex-col items-start gap-1.5">
+                  <div className="flex items-start gap-1.5">
+                    <button
+                      type="button"
+                      className={`yanmar-quest-button yanmar-aux-button touch-none active:scale-95${
+                        showQuestPanel ? " is-open" : ""
+                      }`}
+                      onClick={() => {
+                        setShowShopPanel(false);
+                        setShowEquipmentUpgrade(false);
+                        setShowQuestPanel((open) => !open);
+                      }}
+                      aria-expanded={showQuestPanel}
+                      aria-label={
+                        showQuestPanel
+                          ? "퀘스트 닫기"
+                          : questClaimableCount > 0
+                            ? `퀘스트 열기, 미수령 보상 ${questClaimableCount}개`
+                            : "퀘스트 열기"
+                      }
+                    >
+                      <img
+                        className="yanmar-quest-button-icon"
+                        src="/images/yanmar/2d/cockpit/quest-premium.png?v=3"
+                        alt=""
+                        draggable={false}
+                      />
+                      <span className="yanmar-quest-button-label">퀘스트</span>
+                      {questClaimableCount > 0 ? (
+                        <span
+                          className="yanmar-quest-notify-badge is-icon"
+                          aria-hidden
+                        >
+                          {questClaimableCount > 9 ? "9+" : questClaimableCount}
+                        </span>
+                      ) : null}
+                    </button>
+                    <button
+                      type="button"
+                      className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
+                        showEquipmentUpgrade ? " is-open" : ""
+                      }`}
+                      onClick={() => {
+                        setShowQuestPanel(false);
+                        setShowShopPanel(false);
+                        setShowProfileModal(false);
+                        setShowEquipmentUpgrade((open) => !open);
+                      }}
+                      aria-expanded={showEquipmentUpgrade}
+                      aria-label={
+                        showEquipmentUpgrade ? "장비강화 닫기" : "장비강화 열기"
+                      }
+                    >
+                      <img
+                        className="yanmar-upgrade-hud-button-icon"
+                        src="/images/yanmar/2d/cockpit/upgrade-anvil-premium.png?v=2"
+                        alt=""
+                        draggable={false}
+                      />
+                      <span className="yanmar-upgrade-hud-button-label">장비</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`yanmar-shop-button yanmar-aux-button touch-none active:scale-95${
+                        showShopPanel ? " is-open" : ""
+                      }`}
+                      onClick={() => {
+                        setShowQuestPanel(false);
+                        setShowEquipmentUpgrade(false);
+                        setShowProfileModal(false);
+                        setShowShopPanel((open) => !open);
+                      }}
+                      aria-expanded={showShopPanel}
+                      aria-label={showShopPanel ? "상점 닫기" : "상점 열기"}
+                    >
+                      <img
+                        className="yanmar-shop-button-icon"
+                        src="/images/yanmar/2d/cockpit/shop-premium.png?v=4"
+                        alt=""
+                        draggable={false}
+                      />
+                      <span className="yanmar-shop-button-label">상점</span>
+                    </button>
+                  </div>
+                  {showMissionQuest ? (
+                    <div className="w-[9rem]">
+                      <MissionHudPanel
+                        questState={questState}
+                        claiming={questClaimingId === "mission"}
+                        onClaim={() => {
+                          void handleClaimMissionQuest();
+                        }}
+                      />
+                    </div>
+                  ) : null}
                 </div>
                 <QuestPanel
                   open={showQuestPanel}
@@ -4064,22 +4222,6 @@ export function ExcavatorGameWrapper({
                 </button>
               </div>
             ) : null}
-          </div>
-        ) : null}
-
-        {mode !== "intro" &&
-        mode !== "gameReady" &&
-        mode !== "ride" &&
-        !questsDisabled &&
-        showMissionQuest ? (
-          <div className="pointer-events-auto absolute left-1 top-1/2 z-50 w-[7.3125rem] -translate-y-1/2">
-            <MissionHudPanel
-              questState={questState}
-              claiming={questClaimingId === "mission"}
-              onClaim={() => {
-                void handleClaimMissionQuest();
-              }}
-            />
           </div>
         ) : null}
 
@@ -4207,49 +4349,6 @@ export function ExcavatorGameWrapper({
                 hitDamage={digFeedback.crashHitDamage}
               />
             ) : null}
-            {digFeedback.truckCooldownRemaining > 0 ? (
-              <div className="rounded-xl border border-sky-300/25 bg-black/50 px-3 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-                다음 트럭{" "}
-                <span className="tabular-nums text-sky-200">
-                  {formatDumpTruckReturnTime(digFeedback.truckCooldownRemaining)}
-                </span>
-              </div>
-            ) : null}
-            {digFeedback.haulTruckCooldownRemaining > 0 ? (
-              <div className="rounded-xl border border-slate-300/25 bg-black/50 px-3 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-                돌트럭{" "}
-                <span className="tabular-nums text-slate-200">
-                  {formatDumpTruckReturnTime(digFeedback.haulTruckCooldownRemaining)}
-                </span>
-              </div>
-            ) : null}
-            {digFeedback.digCooldowns.map((zone) => (
-              <div
-                key={zone.id}
-                className="rounded-xl border border-amber-300/25 bg-black/50 px-3 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm"
-              >
-                {zone.label}{" "}
-                <span className="tabular-nums text-amber-200">
-                  ({Math.ceil(zone.etaSec)}초)
-                </span>
-              </div>
-            ))}
-            {digFeedback.crashCooldownEtaSec > 0 ? (
-              <div className="rounded-xl border border-orange-300/25 bg-black/50 px-3 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-                아스팔트{" "}
-                <span className="tabular-nums text-orange-200">
-                  {formatDumpTruckReturnTime(digFeedback.crashCooldownEtaSec)}
-                </span>
-              </div>
-            ) : null}
-            {digFeedback.hillCooldownEtaSec > 0 ? (
-              <div className="rounded-xl border border-sky-300/25 bg-black/50 px-3 py-1 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm">
-                석재{" "}
-                <span className="tabular-nums text-sky-200">
-                  {formatDumpTruckReturnTime(digFeedback.hillCooldownEtaSec)}
-                </span>
-              </div>
-            ) : null}
           </div>
         )}
 
@@ -4269,6 +4368,10 @@ export function ExcavatorGameWrapper({
                 session?.user?.nickname ?? session?.user?.loginId ?? "PLAYER";
               const displayScore =
                 mode === "game" ? seasonScoreBase + hud.score : hud.score;
+              const bonusRemaining = Math.max(
+                0,
+                xpProgress.level - spentAbilityPoints(abilityAlloc),
+              );
               return (
                 <>
                   {leftTarget && mode === "game"
@@ -4283,7 +4386,11 @@ export function ExcavatorGameWrapper({
                             setShowRepairPanel(false);
                             setShowProfileModal(true);
                           }}
-                          aria-label="프로필 열기"
+                          aria-label={
+                            bonusRemaining > 0
+                              ? `프로필 열기, 보너스 분배 ${bonusRemaining}포인트 남음`
+                              : "프로필 열기"
+                          }
                         >
                           <span className="yanmar-profile-chip-avatar-col">
                             <span
@@ -4291,6 +4398,12 @@ export function ExcavatorGameWrapper({
                               aria-hidden
                             >
                               {(nickname.trim().charAt(0) || "?").toUpperCase()}
+                              {bonusRemaining > 0 ? (
+                                <em
+                                  className="yanmar-bonus-point-badge is-on-chip"
+                                  aria-hidden
+                                />
+                              ) : null}
                             </span>
                             <span className="yanmar-profile-chip-xp" aria-hidden>
                               <span
@@ -4429,6 +4542,68 @@ export function ExcavatorGameWrapper({
                   displaySize={88}
                 />
               ) : null}
+              {digFeedback.truckCooldownRemaining > 0 ||
+              digFeedback.haulTruckCooldownRemaining > 0 ||
+              digFeedback.digCooldowns.length > 0 ||
+              digFeedback.crashCooldownEtaSec > 0 ||
+              digFeedback.hillCooldownEtaSec > 0 ? (
+                <ul
+                  className="flex w-full flex-col gap-0.5 border-t border-white/10 px-1 py-0.5"
+                  aria-label="리젠 대기"
+                >
+                  {digFeedback.truckCooldownRemaining > 0 ? (
+                    <li className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85">
+                      <span className="truncate">덤프트럭</span>
+                      <span className="shrink-0 tabular-nums text-sky-200">
+                        {formatDumpTruckReturnTime(
+                          digFeedback.truckCooldownRemaining,
+                        )}
+                      </span>
+                    </li>
+                  ) : null}
+                  {digFeedback.haulTruckCooldownRemaining > 0 ? (
+                    <li className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85">
+                      <span className="truncate">돌트럭</span>
+                      <span className="shrink-0 tabular-nums text-slate-200">
+                        {formatDumpTruckReturnTime(
+                          digFeedback.haulTruckCooldownRemaining,
+                        )}
+                      </span>
+                    </li>
+                  ) : null}
+                  {digFeedback.digCooldowns.map((zone) => (
+                    <li
+                      key={zone.id}
+                      className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85"
+                    >
+                      <span className="truncate">{zone.label}</span>
+                      <span className="shrink-0 tabular-nums text-amber-200">
+                        {Math.ceil(zone.etaSec)}초
+                      </span>
+                    </li>
+                  ))}
+                  {digFeedback.crashCooldownEtaSec > 0 ? (
+                    <li className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85">
+                      <span className="truncate">아스팔트</span>
+                      <span className="shrink-0 tabular-nums text-orange-200">
+                        {formatDumpTruckReturnTime(
+                          digFeedback.crashCooldownEtaSec,
+                        )}
+                      </span>
+                    </li>
+                  ) : null}
+                  {digFeedback.hillCooldownEtaSec > 0 ? (
+                    <li className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85">
+                      <span className="truncate">석재</span>
+                      <span className="shrink-0 tabular-nums text-sky-200">
+                        {formatDumpTruckReturnTime(
+                          digFeedback.hillCooldownEtaSec,
+                        )}
+                      </span>
+                    </li>
+                  ) : null}
+                </ul>
+              ) : null}
             </div>
             {mode !== "gameReady" &&
             maintenance &&
@@ -4471,13 +4646,14 @@ export function ExcavatorGameWrapper({
           </div>
         )}
 
-        {mode !== "intro" && (dumpScorePanel || couponDiscovery) ? (
+        {mode !== "intro" && (dumpScorePanel || couponDiscovery || gearDiscovery) ? (
           <div
             className="pointer-events-none absolute left-1/2 top-1/2 z-[58] flex max-w-[calc(100%-1rem)] -translate-x-1/2 -translate-y-1/2 flex-row flex-wrap items-center justify-center gap-2.5"
             aria-live="polite"
           >
             <RewardPopupOverlay panel={dumpScorePanel} />
             <CouponDiscoveryOverlay discovery={couponDiscovery} />
+            <GearDiscoveryOverlay discovery={gearDiscovery} />
           </div>
         ) : null}
         {mode !== "intro" && poseSaveToastVisible ? (

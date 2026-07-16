@@ -19,6 +19,11 @@ import type { ChassisModelId } from "./chassisCatalog";
 import { parseOwnedChassisIds } from "./chassisCatalog";
 import type { MainOptionInst } from "./gearGenerate";
 import { asJson } from "./jsonCompat";
+import {
+  abilityPointsSummary,
+  parseAbilityAlloc,
+} from "./abilityAlloc";
+import { getPlayerLevelProgress } from "@/lib/playerLevel";
 
 type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
@@ -75,10 +80,11 @@ export async function loadUserFinalStats(
   userId: string,
   gameId = "yanmar",
 ) {
-  const [loadout, items, repair] = await Promise.all([
+  const [loadout, items, repair, user] = await Promise.all([
     tx.userChassisLoadout.findUnique({ where: { userId_gameId: { userId, gameId } } }),
     tx.gearItem.findMany({ where: { userId, gameId } }),
     tx.userRepairState.findUnique({ where: { userId_gameId: { userId, gameId } } }),
+    tx.user.findUnique({ where: { id: userId }, select: { totalXp: true } }),
   ]);
 
   let repairBuff: "NONE" | "SMALL" | "LARGE" = "NONE";
@@ -92,12 +98,15 @@ export async function loadUserFinalStats(
   }
 
   const chassisId = (loadout?.activeChassisId ?? "ViO17_1") as ChassisModelId;
+  const abilityAlloc = parseAbilityAlloc(loadout?.abilityAlloc);
+  const playerLevel = getPlayerLevelProgress(user?.totalXp ?? 0).level;
   const equipped = toEquippedInputs(items);
   const stats = calculateFinalYanmarStats({
     chassisId,
     equipped,
     repairBuff,
     repairState: repair,
+    abilityAlloc,
   });
 
   return {
@@ -107,6 +116,9 @@ export async function loadUserFinalStats(
     repair,
     maintenance: stats.maintenance,
     ownedChassisIds: parseOwnedChassisIds(loadout?.ownedChassisIds),
+    abilityAlloc,
+    abilityPoints: abilityPointsSummary(playerLevel, abilityAlloc),
+    playerLevel,
   };
 }
 

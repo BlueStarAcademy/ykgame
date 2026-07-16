@@ -18,7 +18,6 @@ import {
   YANMAR_BASE_HAUL_TRUCK_CAPACITY,
   YANMAR_BASE_HAUL_TRUCK_COOLDOWN_SEC,
   YANMAR_BASE_HILL_BOULDER_COUNT,
-  YANMAR_BASE_HILL_SAFE_LOAD_CHANCE,
   YANMAR_REWARD_CONFIG,
   type YanmarEquipmentStats,
 } from "./equipment";
@@ -28,6 +27,12 @@ import {
   type MaintenanceSnapshot,
   type RepairStateRow,
 } from "./maintenance";
+import {
+  addAbilityAlloc,
+  emptyAbilityAlloc,
+  parseAbilityAlloc,
+  type AbilityAlloc,
+} from "./abilityAlloc";
 
 export type RepairBuffKind = "NONE" | "SMALL" | "LARGE";
 
@@ -61,25 +66,22 @@ export interface EquippedGearInput {
 }
 
 function deriveFromChassis(stats: ChassisBaseStats) {
-  const travelSpeedMultiplier = Math.min(1.4, 0.85 + stats.agility * 0.015);
-  const workSpeedMultiplier = 0.9 + stats.agility * 0.01;
-  const maxLoadUnits = 800 + stats.strength * 40;
-  const breakerDamage = Math.floor(stats.strength * 0.35);
-  const gripAdhesionBonus = stats.balance * 0.004;
-  const hillSafeLoadBonus = stats.balance * 0.003;
-  const durabilityMaxPerPiece = 40 + stats.stamina * 6;
-  const durabilityDrainMult = Math.max(0.5, 1.2 - stats.endurance * 0.02);
-  const baseCritChance = 0.03 + stats.technique * 0.002;
+  const travelSpeedMultiplier = Math.min(1.85, 0.78 + stats.agility * 0.012);
+  const workSpeedMultiplier = Math.min(2.0, 0.82 + stats.agility * 0.012);
+  const maxLoadUnits = 700 + stats.strength * 55;
+  const breakerDamage = Math.floor(stats.strength * 0.55);
+  const gripAdhesionBonus = stats.balance * 0.008;
+  const hillSafeLoadBonus = stats.balance * 0.005;
+  const durabilityMaxPerPiece = 35 + stats.stamina * 8;
+  const durabilityDrainMult = Math.max(0.45, 1.25 - stats.endurance * 0.025);
+  const baseCritChance = Math.min(0.75, 0.025 + stats.technique * 0.0035);
   return {
     travelSpeedMultiplier,
     workSpeedMultiplier,
     maxLoadUnits,
     breakerDamage,
     gripAdhesionBonus,
-    hillSafeLoadChance: Math.min(
-      1,
-      YANMAR_BASE_HILL_SAFE_LOAD_CHANCE + hillSafeLoadBonus,
-    ),
+    hillSafeLoadChance: Math.min(1, 0.15 + hillSafeLoadBonus),
     durabilityMaxPerPiece,
     durabilityDrainMult,
     criticalChance: baseCritChance,
@@ -112,9 +114,14 @@ export function calculateFinalYanmarStats(input: {
   repairBuff?: RepairBuffKind;
   repairState?: RepairStateRow | null;
   nowMs?: number;
+  /** 계정 단위 레벨 능력치 분배 (차체 base에 flat 가산) */
+  abilityAlloc?: AbilityAlloc | null;
 }): FinalYanmarStats {
   const chassis = getChassisDef(input.chassisId ?? DEFAULT_CHASSIS_ID);
-  let stats = { ...chassis.stats };
+  const alloc = input.abilityAlloc
+    ? parseAbilityAlloc(input.abilityAlloc)
+    : emptyAbilityAlloc();
+  let stats = addAbilityAlloc(chassis.stats, alloc);
   const repairBuff = input.repairBuff ?? "NONE";
   if (repairBuff === "SMALL") {
     stats = {

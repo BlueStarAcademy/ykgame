@@ -3,12 +3,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import {
+  abilityLabel,
+  emptyAbilityAlloc,
+  recommendAbilityAlloc,
+  spentAbilityPoints,
+  type AbilityAlloc,
+} from "./abilityAlloc";
+import {
   CHASSIS_CATALOG,
   CHASSIS_CLASS_LABEL,
   type ChassisClass,
   type ChassisDef,
   type ChassisModelId,
 } from "./chassisCatalog";
+import { MAIN_OPTION_KEYS, type MainOptionKey } from "./gearCatalog";
 import { chassisThumbSrc } from "./gearArt";
 
 interface ChassisPanelProps {
@@ -19,10 +27,12 @@ interface ChassisPanelProps {
   activeId: ChassisModelId | string;
   ownedIds: string[];
   busy?: boolean;
+  abilityAlloc?: AbilityAlloc;
   /** When true, render gallery body without modal chrome. */
   embedded?: boolean;
   onPurchase: (id: ChassisModelId) => void | Promise<void>;
   onEquip: (id: ChassisModelId) => void | Promise<void>;
+  onAbilityAllocSave?: (alloc: AbilityAlloc) => void | Promise<void>;
 }
 
 type ChassisFilter = "ALL" | ChassisClass;
@@ -54,19 +64,29 @@ function chassisStatus(
   return { isOwned, levelLocked, isActive };
 }
 
+function allocEqual(a: AbilityAlloc, b: AbilityAlloc): boolean {
+  return MAIN_OPTION_KEYS.every((key) => a[key] === b[key]);
+}
+
 export function ChassisGallery({
   playerLevel,
   currency,
   activeId,
   ownedIds,
   busy,
+  abilityAlloc,
   onPurchase,
   onEquip,
+  onAbilityAllocSave,
 }: Omit<ChassisPanelProps, "open" | "onClose" | "embedded">) {
   const owned = useMemo(() => new Set(ownedIds), [ownedIds]);
   const [filter, setFilter] = useState<ChassisFilter>("ALL");
   const [index, setIndex] = useState(0);
   const stripRef = useRef<HTMLDivElement>(null);
+  const allocEnabled = Boolean(abilityAlloc && onAbilityAllocSave);
+  const [draft, setDraft] = useState<AbilityAlloc>(
+    () => abilityAlloc ?? emptyAbilityAlloc(),
+  );
 
   const filtered = useMemo(() => {
     if (filter === "ALL") return [...CHASSIS_CATALOG];
@@ -89,13 +109,34 @@ export function ChassisGallery({
     el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   }, [index]);
 
+  useEffect(() => {
+    if (abilityAlloc) setDraft(abilityAlloc);
+  }, [abilityAlloc]);
+
   const selected = filtered[index] ?? getActiveFallback(activeId);
   const status = chassisStatus(selected, owned, playerLevel, String(activeId));
   const pageLabel = `${Math.min(index + 1, filtered.length)} / ${filtered.length}`;
+  const totalPoints = Math.max(0, Math.floor(playerLevel));
+  const spent = spentAbilityPoints(draft);
+  const remaining = Math.max(0, totalPoints - spent);
+  const dirty = useMemo(
+    () => (abilityAlloc ? !allocEqual(draft, abilityAlloc) : false),
+    [draft, abilityAlloc],
+  );
 
   const go = (delta: number) => {
     if (filtered.length === 0) return;
     setIndex((prev) => (prev + delta + filtered.length) % filtered.length);
+  };
+
+  const bump = (key: MainOptionKey, delta: number) => {
+    if (busy || !allocEnabled) return;
+    setDraft((prev) => {
+      const nextVal = prev[key] + delta;
+      if (nextVal < 0) return prev;
+      if (delta > 0 && spentAbilityPoints(prev) + delta > totalPoints) return prev;
+      return { ...prev, [key]: nextVal };
+    });
   };
 
   return (
@@ -159,92 +200,160 @@ export function ChassisGallery({
         <div className="yanmar-chassis-showcase-meta">
           <div className="yanmar-chassis-showcase-title-row">
             <h4>{selected.label}</h4>
-            <span className="yanmar-chassis-page">{pageLabel}</span>
+            {allocEnabled ? (
+              <div className="yanmar-chassis-bonus-inline">
+                <span
+                  className={`yanmar-chassis-bonus-points${
+                    remaining > 0 ? " has-remain" : ""
+                  }`}
+                  title="분배 가능 보너스 포인트"
+                >
+                  보너스 {remaining}
+                </span>
+                <button
+                  type="button"
+                  className="yanmar-chassis-bonus-btn is-save"
+                  disabled={busy || !dirty}
+                  onClick={() => void onAbilityAllocSave?.(draft)}
+                >
+                  저장
+                  {remaining > 0 ? (
+                    <em className="yanmar-bonus-point-badge is-on-btn" aria-hidden />
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  className="yanmar-chassis-bonus-btn"
+                  disabled={busy || totalPoints <= 0}
+                  onClick={() =>
+                    setDraft(
+                      recommendAbilityAlloc(playerLevel, selected.chassisClass),
+                    )
+                  }
+                >
+                  추천분배
+                </button>
+              </div>
+            ) : null}
           </div>
           <p className="yanmar-chassis-trait">{selected.trait}</p>
-          <ul className="yanmar-chassis-stat-grid" aria-label="차체 능력치">
-            {(
-              [
-                ["힘", selected.stats.strength],
-                ["민첩", selected.stats.agility],
-                ["지구력", selected.stats.stamina],
-                ["인내", selected.stats.endurance],
-                ["안정", selected.stats.balance],
-                ["기술", selected.stats.technique],
-              ] as const
-            ).map(([label, value]) => (
-              <li key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </li>
-            ))}
-          </ul>
         </div>
-      </div>
 
-      <div className="yanmar-chassis-strip-wrap">
-        <button
-          type="button"
-          className="yanmar-chassis-nav"
-          aria-label="이전 차체"
-          onClick={() => go(-1)}
-          disabled={filtered.length <= 1}
+        <ul
+          className={`yanmar-chassis-stat-grid yanmar-chassis-stat-grid--2x3${
+            allocEnabled ? " yanmar-chassis-stat-grid--editable" : ""
+          }`}
+          aria-label="차체 능력치"
         >
-          ‹
-        </button>
-        <div className="yanmar-chassis-strip" ref={stripRef}>
-          {filtered.map((c, i) => {
-            const s = chassisStatus(c, owned, playerLevel, String(activeId));
+          {MAIN_OPTION_KEYS.map((key) => {
+            const base = selected.stats[key];
+            const alloc = allocEnabled ? (draft[key] ?? 0) : 0;
+            const preview = base + alloc;
             return (
-              <button
-                key={c.id}
-                type="button"
-                data-chassis-idx={i}
-                className={`yanmar-chassis-strip-card${
-                  i === index ? " is-selected" : ""
-                }${s.isActive ? " is-active" : ""}${
-                  !s.isOwned ? " is-locked" : ""
-                }`}
-                onClick={() => setIndex(i)}
-                title={c.label}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={chassisThumbSrc(c.chassisClass)}
-                  alt=""
-                  draggable={false}
-                />
-                {!s.isOwned ? (
-                  <span className="yanmar-chassis-strip-lock" aria-hidden>
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="12"
-                      height="12"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <rect x="5" y="11" width="14" height="10" rx="2" />
-                      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-                    </svg>
-                  </span>
-                ) : null}
-                <span className="yanmar-chassis-strip-name">{c.label}</span>
-              </button>
+              <li key={key}>
+                <span>{abilityLabel(key)}</span>
+                <div className="yanmar-chassis-stat-right">
+                  <strong>
+                    {preview}
+                    {alloc > 0 ? (
+                      <em className="yanmar-chassis-stat-bonus">+{alloc}</em>
+                    ) : null}
+                  </strong>
+                  {allocEnabled ? (
+                    <div className="yanmar-chassis-stat-stepper">
+                      <button
+                        type="button"
+                        disabled={busy || alloc <= 0}
+                        onClick={() => bump(key, -1)}
+                        aria-label={`${abilityLabel(key)} 감소`}
+                      >
+                        −
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy || remaining <= 0}
+                        onClick={() => bump(key, 1)}
+                        aria-label={`${abilityLabel(key)} 증가`}
+                      >
+                        +
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </li>
             );
           })}
+        </ul>
+      </div>
+
+      <div className="yanmar-chassis-strip-section">
+        <span className="yanmar-chassis-page" aria-live="polite">
+          {pageLabel}
+        </span>
+        <div className="yanmar-chassis-strip-wrap">
+          <button
+            type="button"
+            className="yanmar-chassis-nav"
+            aria-label="이전 차체"
+            onClick={() => go(-1)}
+            disabled={filtered.length <= 1}
+          >
+            ‹
+          </button>
+          <div className="yanmar-chassis-strip" ref={stripRef}>
+            {filtered.map((c, i) => {
+              const s = chassisStatus(c, owned, playerLevel, String(activeId));
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  data-chassis-idx={i}
+                  className={`yanmar-chassis-strip-card${
+                    i === index ? " is-selected" : ""
+                  }${s.isActive ? " is-active" : ""}${
+                    !s.isOwned ? " is-locked" : ""
+                  }`}
+                  onClick={() => setIndex(i)}
+                  title={c.label}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={chassisThumbSrc(c.chassisClass)}
+                    alt=""
+                    draggable={false}
+                  />
+                  {!s.isOwned ? (
+                    <span className="yanmar-chassis-strip-lock" aria-hidden>
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="12"
+                        height="12"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="5" y="11" width="14" height="10" rx="2" />
+                        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                      </svg>
+                    </span>
+                  ) : null}
+                  <span className="yanmar-chassis-strip-name">{c.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className="yanmar-chassis-nav"
+            aria-label="다음 차체"
+            onClick={() => go(1)}
+            disabled={filtered.length <= 1}
+          >
+            ›
+          </button>
         </div>
-        <button
-          type="button"
-          className="yanmar-chassis-nav"
-          aria-label="다음 차체"
-          onClick={() => go(1)}
-          disabled={filtered.length <= 1}
-        >
-          ›
-        </button>
       </div>
 
       <div className="yanmar-chassis-footer">
@@ -298,9 +407,11 @@ export function ChassisPanel({
   activeId,
   ownedIds,
   busy,
+  abilityAlloc,
   embedded,
   onPurchase,
   onEquip,
+  onAbilityAllocSave,
 }: ChassisPanelProps) {
   const gallery = (
     <ChassisGallery
@@ -309,8 +420,10 @@ export function ChassisPanel({
       activeId={activeId}
       ownedIds={ownedIds}
       busy={busy}
+      abilityAlloc={abilityAlloc}
       onPurchase={onPurchase}
       onEquip={onEquip}
+      onAbilityAllocSave={onAbilityAllocSave}
     />
   );
 

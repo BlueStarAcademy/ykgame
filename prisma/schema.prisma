@@ -226,6 +226,8 @@ model UserChassisLoadout {
   activeChassisId  ChassisModelId @default(ViO17_1)
   /** JSON string array of ChassisModelId */
   ownedChassisIds  Json           @default("[\"ViO17_1\"]")
+  /** JSON: { strength, agility, stamina, endurance, balance, technique } */
+  abilityAlloc     Json           @default("{\"strength\":0,\"agility\":0,\"stamina\":0,\"endurance\":0,\"balance\":0,\"technique\":0}")
   migratedAt       DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt

@@ -41,38 +41,33 @@ export const GRADE_SUB_OPTION_COUNT: Record<ItemGrade, number> = {
   MASTER: 4,
 };
 
+/** 주옵션 (2+L+마일스톤)에 곱하는 등급 배율. */
 export const GRADE_MAIN_MULT: Record<ItemGrade, number> = {
   NORMAL: 1,
-  ENHANCED: 1.25,
-  PRECISION: 1.55,
-  MASTER: 2,
-};
-
-/** @deprecated Prefer GRADE_MAIN_FLAT — kept for reference / legacy docs */
-export const GRADE_ENHANCE_MULT: Record<ItemGrade, number> = {
-  NORMAL: 1,
-  ENHANCED: 1.15,
-  PRECISION: 1.35,
-  MASTER: 1.6,
+  ENHANCED: 1.3,
+  PRECISION: 1.7,
+  MASTER: 2.3,
 };
 
 /**
- * Flat main-stat bonus by grade (integer system).
- * Sized so +0 ~ +10 주옵션이 같은 장비의 최대 스택 보조 flat보다 항상 큼
- * (보조 flat 최대 ≈ 5롤 × floor(flatMax×GRADE_RANGE_MULT)).
+ * 주옵션 등급 베이스 flat.
+ * rawMain = round((2+L+milestones) * GRADE_MAIN_MULT + GRADE_MAIN_BASE)
  */
-export const GRADE_MAIN_FLAT: Record<ItemGrade, number> = {
-  NORMAL: 4,
-  ENHANCED: 8,
-  PRECISION: 14,
-  MASTER: 20,
+export const GRADE_MAIN_BASE: Record<ItemGrade, number> = {
+  NORMAL: 3,
+  ENHANCED: 6,
+  PRECISION: 12,
+  MASTER: 22,
 };
+
+/** @deprecated Use GRADE_MAIN_BASE */
+export const GRADE_MAIN_FLAT = GRADE_MAIN_BASE;
 
 export const GRADE_RANGE_MULT: Record<ItemGrade, number> = {
   NORMAL: 1,
-  ENHANCED: 1.2,
-  PRECISION: 1.45,
-  MASTER: 1.8,
+  ENHANCED: 1.35,
+  PRECISION: 1.85,
+  MASTER: 2.6,
 };
 
 export type MainOptionKey =

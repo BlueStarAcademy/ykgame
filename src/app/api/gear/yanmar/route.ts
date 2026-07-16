@@ -49,6 +49,8 @@ export async function GET() {
         ...c,
         classLabel: CHASSIS_CLASS_LABEL[c.chassisClass],
       })),
+      abilityAlloc: result.loaded.abilityAlloc,
+      abilityPoints: result.loaded.abilityPoints,
     },
     repair: result.loaded.repair,
     maintenance: result.loaded.maintenance,

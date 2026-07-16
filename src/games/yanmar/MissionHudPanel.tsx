@@ -64,7 +64,7 @@ function CompactQuestReward({ reward }: { reward: QuestReward }) {
   }
   if (parts.length === 0) return null;
   return (
-    <span className="inline-flex items-center gap-x-1 whitespace-nowrap">
+    <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
       {parts.map((part, index) => (
         <span key={index} className="inline-flex items-center gap-1 whitespace-nowrap">
           {index > 0 ? <span className="text-amber-200/40">+</span> : null}
@@ -98,15 +98,15 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
     : "미션 완료";
 
   return (
-    <div className="yanmar-mission-hud-panel relative w-full overflow-hidden rounded-xl border border-white/12 bg-black/40 text-white shadow-lg backdrop-blur-sm">
+    <div className="yanmar-mission-hud-panel relative w-full overflow-hidden rounded-xl border border-white/8 bg-black/15 text-white shadow-none backdrop-blur-[1px]">
       <button
         type="button"
-        className="flex h-6 w-full items-center justify-between gap-1 px-1.5 text-left hover:bg-white/8"
+        className="flex min-h-6 w-full items-center justify-between gap-1 px-1.5 py-1 text-left hover:bg-white/8"
         onClick={() => setExpanded((open) => !open)}
         aria-expanded={expanded}
         aria-label={expanded ? "미션 패널 접기" : "미션 패널 펼치기"}
       >
-        <span className="min-w-0 overflow-hidden whitespace-nowrap text-[9px] font-black tabular-nums leading-none">
+        <span className="min-w-0 text-[9px] font-black tabular-nums leading-tight">
           {headerLabel}
         </span>
         <span className="inline-flex shrink-0 items-center gap-0.5">
@@ -128,12 +128,12 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
       {expanded ? (
         <div className="border-t border-white/10 px-1.5 pb-1.5 pt-1">
           {!mission ? (
-            <p className="whitespace-nowrap text-center text-[8px] font-black text-emerald-200">
+            <p className="text-center text-[8px] font-black leading-tight text-emerald-200">
               미션 퀘스트 완료
             </p>
           ) : (
             <>
-              <p className="whitespace-nowrap text-[8px] font-semibold leading-none text-amber-200/85">
+              <p className="text-[8px] font-semibold leading-tight text-amber-200/85">
                 <CompactQuestReward reward={MISSION_DIFFICULTY_REWARDS[mission.difficulty]} />
               </p>
               <ul className="mt-1 space-y-1">
@@ -142,8 +142,8 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
                   const done = value >= task.target;
                   return (
                     <li key={task.id}>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="whitespace-nowrap text-[8px] font-bold leading-none text-white/90">
+                      <div className="flex items-start justify-between gap-1.5">
+                        <p className="min-w-0 flex-1 text-[8px] font-bold leading-snug text-white/90">
                           {task.required ? (
                             <span className="mr-0.5 text-[7px] font-black text-orange-300">
                               필수
@@ -152,7 +152,7 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
                           {task.label}
                         </p>
                         <span
-                          className={`shrink-0 whitespace-nowrap text-[7px] font-bold tabular-nums ${
+                          className={`shrink-0 pt-px text-[7px] font-bold tabular-nums leading-snug ${
                             done ? "text-emerald-300" : "text-white/50"
                           }`}
                         >
@@ -174,7 +174,7 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
                   type="button"
                   disabled={claiming}
                   onClick={onClaim}
-                  className="mt-1.5 w-full whitespace-nowrap rounded border border-amber-300/40 bg-amber-500/90 py-0.5 text-[8px] font-black leading-none text-white disabled:opacity-60"
+                  className="mt-1.5 w-full rounded border border-amber-300/40 bg-amber-500/90 py-0.5 text-[8px] font-black leading-none text-white disabled:opacity-60"
                 >
                   {claiming ? "받는 중" : "보상 받기"}
                 </button>

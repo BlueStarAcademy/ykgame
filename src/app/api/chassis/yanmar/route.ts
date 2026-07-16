@@ -11,6 +11,12 @@ import {
 } from "@/games/yanmar/chassisCatalog";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import { loadUserFinalStats } from "@/games/yanmar/gearService";
+import {
+  emptyAbilityAlloc,
+  recommendAbilityAlloc,
+  sanitizeAbilityAlloc,
+} from "@/games/yanmar/abilityAlloc";
+import { asJson } from "@/games/yanmar/jsonCompat";
 
 export async function GET() {
   const session = await auth();
@@ -33,6 +39,8 @@ export async function GET() {
     ownedIds: result.ownedChassisIds,
     catalog: CHASSIS_CATALOG,
     stats: result.stats,
+    abilityAlloc: result.abilityAlloc,
+    abilityPoints: result.abilityPoints,
   });
 }
 
@@ -41,7 +49,11 @@ export async function POST(req: Request) {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  let body: { action?: string; chassisId?: string };
+  let body: {
+    action?: string;
+    chassisId?: string;
+    alloc?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -51,6 +63,47 @@ export async function POST(req: Request) {
   try {
     const result = await prisma.$transaction(async (tx) => {
       await ensureYanmarGearMigration(tx, session.user.id);
+
+      if (
+        body.action === "allocate" ||
+        body.action === "resetAlloc" ||
+        body.action === "recommendAlloc"
+      ) {
+        const user = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { totalXp: true },
+        });
+        if (!user) throw new Error("USER_NOT_FOUND");
+        const level = getPlayerLevelProgress(user.totalXp).level;
+        const loadout = await tx.userChassisLoadout.findUnique({
+          where: { userId_gameId: { userId: session.user.id, gameId: "yanmar" } },
+        });
+        if (!loadout) throw new Error("LOADOUT_NOT_FOUND");
+
+        let nextAlloc = emptyAbilityAlloc();
+        if (body.action === "allocate") {
+          const sanitized = sanitizeAbilityAlloc(body.alloc, level);
+          if (!sanitized) throw new Error("INVALID_ALLOC");
+          nextAlloc = sanitized;
+        } else if (body.action === "recommendAlloc") {
+          const activeId = (loadout.activeChassisId ?? "ViO17_1") as ChassisModelId;
+          const chassisClass = getChassisDef(activeId).chassisClass;
+          nextAlloc = recommendAbilityAlloc(level, chassisClass);
+        }
+
+        await tx.userChassisLoadout.update({
+          where: { userId_gameId: { userId: session.user.id, gameId: "yanmar" } },
+          data: { abilityAlloc: asJson(nextAlloc) },
+        });
+        const loaded = await loadUserFinalStats(tx, session.user.id);
+        return {
+          ok: true,
+          abilityAlloc: loaded.abilityAlloc,
+          abilityPoints: loaded.abilityPoints,
+          stats: loaded.stats,
+        };
+      }
+
       const chassisId = body.chassisId as ChassisModelId;
       const def = getChassisDef(chassisId);
       if (def.id !== chassisId) throw new Error("INVALID_CHASSIS");
@@ -125,6 +178,8 @@ export async function POST(req: Request) {
           ok: true,
           activeId: def.id,
           stats: refreshed.stats,
+          abilityAlloc: refreshed.abilityAlloc,
+          abilityPoints: refreshed.abilityPoints,
         };
       }
 

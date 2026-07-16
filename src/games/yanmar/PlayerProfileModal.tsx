@@ -6,6 +6,7 @@ import { XpProgressBar } from "@/components/ui/XpProgressBar";
 import type { PlayerLevelProgress } from "@/lib/playerLevel";
 import { ChassisGallery } from "./ChassisPanel";
 import type { ChassisModelId } from "./chassisCatalog";
+import type { AbilityAlloc } from "./abilityAlloc";
 
 interface PlayerProfileModalProps {
   open: boolean;
@@ -17,9 +18,11 @@ interface PlayerProfileModalProps {
   currency: number;
   activeChassisId: ChassisModelId | string;
   ownedChassisIds: string[];
+  abilityAlloc: AbilityAlloc;
   busy?: boolean;
   onPurchaseChassis: (id: ChassisModelId) => void | Promise<void>;
   onEquipChassis: (id: ChassisModelId) => void | Promise<void>;
+  onAbilityAllocChange: (alloc: AbilityAlloc) => void | Promise<void>;
 }
 
 function ProfileAvatar({ nickname, size = 48 }: { nickname: string; size?: number }) {
@@ -45,9 +48,11 @@ export function PlayerProfileModal({
   currency,
   activeChassisId,
   ownedChassisIds,
+  abilityAlloc,
   busy,
   onPurchaseChassis,
   onEquipChassis,
+  onAbilityAllocChange,
 }: PlayerProfileModalProps) {
   return (
     <AppModalOverlay
@@ -95,8 +100,10 @@ export function PlayerProfileModal({
             activeId={activeChassisId}
             ownedIds={ownedChassisIds}
             busy={busy}
+            abilityAlloc={abilityAlloc}
             onPurchase={onPurchaseChassis}
             onEquip={onEquipChassis}
+            onAbilityAllocSave={onAbilityAllocChange}
           />
         </div>
       </div>

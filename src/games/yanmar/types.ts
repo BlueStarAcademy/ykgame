@@ -83,3 +83,11 @@ export interface CouponDiscoveryState {
   discountPct: number;
   pulseKey: number;
 }
+
+export interface GearDiscoveryState {
+  nameSnapshot: string;
+  grade: string;
+  slot?: string;
+  mailed?: boolean;
+  pulseKey: number;
+}

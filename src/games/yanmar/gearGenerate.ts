@@ -1,7 +1,8 @@
 import {
   GEAR_SLOTS,
   GEAR_SLOT_LABEL,
-  GRADE_MAIN_FLAT,
+  GRADE_MAIN_BASE,
+  GRADE_MAIN_MULT,
   GRADE_RANGE_MULT,
   GRADE_SUB_OPTION_COUNT,
   GRADE_COST_MULT,
@@ -157,7 +158,8 @@ function milestoneFlatSum(level: number): number {
 }
 
 function rawMainAtLevel(grade: ItemGrade, level: number): number {
-  return 2 + level + GRADE_MAIN_FLAT[grade] + milestoneFlatSum(level);
+  const scaled = (2 + level + milestoneFlatSum(level)) * GRADE_MAIN_MULT[grade];
+  return Math.round(scaled + GRADE_MAIN_BASE[grade]);
 }
 
 /**

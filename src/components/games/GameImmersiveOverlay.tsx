@@ -124,7 +124,7 @@ export function GameImmersiveOverlay({
               ✕ 종료
             </button>
           ) : null}
-          <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 max-w-full flex-1 items-center overflow-hidden" />
+          <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 max-w-full flex-1 items-center overflow-x-clip overflow-y-visible" />
         </div>
         <div
           id={GAME_IMMERSIVE_HEADER_CENTER_ID}

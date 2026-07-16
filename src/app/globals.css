@@ -141,6 +141,47 @@ body {
   white-space: nowrap;
 }
 
+@keyframes yanmar-gear-discovery-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.9);
+  }
+  55% {
+    opacity: 1;
+    transform: translate3d(0, -3px, 0) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.yanmar-gear-discovery {
+  animation: yanmar-gear-discovery-enter 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.yanmar-gear-discovery-grade {
+  letter-spacing: 0.06em;
+}
+
+.yanmar-gear-discovery-grade--normal {
+  color: #e2e8f0;
+}
+
+.yanmar-gear-discovery-grade--enhanced {
+  color: #93c5fd;
+}
+
+.yanmar-gear-discovery-grade--precision {
+  color: #fde68a;
+}
+
+.yanmar-gear-discovery-grade--master {
+  color: #fbbf24;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.55);
+}
+
 @keyframes yanmar-score-pop {
   0% {
     opacity: 0;
@@ -10063,6 +10104,7 @@ button.yanmar-gear-icon-cell {
   text-align: left;
   cursor: pointer;
   color: #fff;
+  overflow: visible;
 }
 
 .yanmar-profile-chip-avatar-col {
@@ -10072,9 +10114,11 @@ button.yanmar-gear-icon-cell {
   gap: 0.18rem;
   flex-shrink: 0;
   width: 2rem;
+  overflow: visible;
 }
 
 .yanmar-profile-chip-avatar {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -10088,6 +10132,7 @@ button.yanmar-gear-icon-cell {
   font-weight: 900;
   color: #fef3c7;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  overflow: visible;
 }
 
 .yanmar-profile-chip-xp {
@@ -10267,6 +10312,85 @@ button.yanmar-gear-icon-cell {
   font-weight: 900;
 }
 
+.yanmar-bonus-point-badge {
+  display: block;
+  width: 0.32rem;
+  height: 0.32rem;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border-radius: 999px;
+  background: #ef4444;
+  color: transparent;
+  font-size: 0;
+  font-style: normal;
+  line-height: 0;
+  box-shadow: 0 0 0 1.5px rgba(15, 23, 42, 0.92);
+  overflow: hidden;
+  text-indent: -999px;
+  pointer-events: none;
+}
+
+.yanmar-bonus-point-badge.is-on-btn {
+  position: absolute;
+  top: -0.06rem;
+  right: -0.06rem;
+}
+
+.yanmar-bonus-point-badge.is-on-chip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+}
+
+.yanmar-chassis-bonus-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.yanmar-chassis-bonus-points {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.yanmar-chassis-bonus-points.has-remain {
+  color: #86efac;
+}
+
+.yanmar-chassis-bonus-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  background: rgba(245, 158, 11, 0.24);
+  color: #fff7ed;
+  font-size: 0.6rem;
+  font-weight: 900;
+  padding: 0.22rem 0.45rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.yanmar-chassis-bonus-btn.is-save {
+  border-color: rgba(251, 191, 36, 0.62);
+  background: rgba(245, 158, 11, 0.88);
+  color: #1c1917;
+}
+
+.yanmar-chassis-bonus-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .yanmar-chassis-gallery {
   display: flex;
   flex-direction: column;
@@ -10308,6 +10432,10 @@ button.yanmar-gear-icon-cell {
     linear-gradient(145deg, rgba(251, 191, 36, 0.1), transparent 45%),
     rgba(0, 0, 0, 0.32);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.yanmar-chassis-showcase > .yanmar-chassis-stat-grid {
+  grid-column: 1 / -1;
 }
 
 .yanmar-chassis-showcase-visual {
@@ -10370,6 +10498,8 @@ button.yanmar-gear-icon-cell {
 .yanmar-chassis-active-pill {
   left: auto;
   right: 0.35rem;
+  display: inline-flex;
+  align-items: center;
   border-color: rgba(251, 191, 36, 0.55);
   color: #fde68a;
 }
@@ -10383,24 +10513,33 @@ button.yanmar-gear-icon-cell {
 
 .yanmar-chassis-showcase-title-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
 }
 
 .yanmar-chassis-showcase-title-row h4 {
   margin: 0;
+  min-width: 0;
   font-size: 0.95rem;
   font-weight: 900;
   color: #fff7ed;
 }
 
 .yanmar-chassis-page {
-  flex-shrink: 0;
+  display: block;
+  text-align: center;
   font-size: 0.62rem;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.55);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.yanmar-chassis-strip-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
 .yanmar-chassis-trait {
@@ -10414,27 +10553,96 @@ button.yanmar-gear-icon-cell {
   list-style: none;
   margin: 0;
   padding: 0;
+  width: 100%;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: row;
   gap: 0.15rem 0.55rem;
   font-size: 0.62rem;
+}
+
+.yanmar-chassis-stat-grid--2x3 {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(3, auto) !important;
+  grid-auto-flow: row !important;
+}
+
+.yanmar-chassis-stat-grid--editable {
+  gap: 0.28rem 0.4rem;
 }
 
 .yanmar-chassis-stat-grid li {
   display: flex;
   justify-content: space-between;
-  gap: 0.3rem;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
   padding: 0.12rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.yanmar-chassis-stat-grid span {
+.yanmar-chassis-stat-grid--editable li {
+  min-height: 1.65rem;
+  padding: 0.16rem 0.1rem;
+}
+
+.yanmar-chassis-stat-grid > li > span {
+  flex-shrink: 0;
   color: rgba(255, 255, 255, 0.58);
 }
 
 .yanmar-chassis-stat-grid strong {
   color: #fff;
   font-variant-numeric: tabular-nums;
+}
+
+.yanmar-chassis-stat-right {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.yanmar-chassis-stat-bonus {
+  margin-left: 0.15rem;
+  font-style: normal;
+  font-size: 0.55rem;
+  font-weight: 900;
+  color: #86efac;
+}
+
+.yanmar-chassis-stat-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+}
+
+.yanmar-chassis-stat-stepper button {
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.yanmar-chassis-stat-stepper button:hover:not(:disabled) {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.14);
+}
+
+.yanmar-chassis-stat-stepper button:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
 }
 
 .yanmar-chassis-strip-wrap {
