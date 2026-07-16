@@ -768,6 +768,16 @@ function usePointerRelease(onRelease: () => void) {
 
 const TRAVEL_INPUT_DEADZONE = 0.2;
 
+/** 주행 드래그(다른 손가락) 중에도 토글/경적이 동작하도록 pointerdown으로 처리 */
+function activateOnPointerDown(handler: () => void) {
+  return (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handler();
+  };
+}
+
 function travelAxisFromClientY(zone: HTMLElement, clientY: number) {
   const rect = zone.getBoundingClientRect();
   const cy = rect.top + rect.height / 2;
@@ -870,7 +880,7 @@ function GameJoystick({
     <>
       <div
         ref={zoneRef}
-        className={`absolute z-[62] touch-none rounded-2xl ${isDisabled ? "pointer-events-none" : ""}`}
+        className={`absolute z-[62] touch-none rounded-2xl ${isDisabled ? "pointer-events-none" : "pointer-events-auto"}`}
         style={{
           left: useDPad
             ? side === "left"
@@ -998,7 +1008,7 @@ function TravelLever({
     <>
       <div
         ref={zoneRef}
-        className={`absolute z-40 touch-none rounded-xl ${!enabled ? "pointer-events-none" : ""}`}
+        className={`absolute z-40 touch-none rounded-xl ${!enabled ? "pointer-events-none" : "pointer-events-auto"}`}
         style={{
           left: `calc(${layout.cx * 100}% + ${hitboxCenterOffset})`,
           top: isPortrait ? TRAVEL_BASELINE : `calc(${layout.cy * 100}%)`,
@@ -1107,7 +1117,7 @@ function DualTravelCenter({
   return (
     <div
       ref={zoneRef}
-      className={`absolute z-30 touch-none rounded-xl ${!enabled ? "pointer-events-none" : ""}`}
+      className={`absolute z-30 touch-none rounded-xl ${!enabled ? "pointer-events-none" : "pointer-events-auto"}`}
       style={{
         left: `${layout.cx * 100}%`,
         top: isPortrait ? TRAVEL_BASELINE : `calc(${layout.cy * 100}%)`,
@@ -1176,7 +1186,7 @@ function RpmLever({
               transform: "translate(-50%, -50%)",
             }
       }
-      onClick={onToggle}
+      onPointerDown={activateOnPointerDown(onToggle)}
       aria-pressed={active}
       aria-label={active ? "RPM(x2)" : "RPM(x1)"}
     >
@@ -1225,7 +1235,7 @@ function SafetyLever({
               transform: "translate(-50%, -50%)",
             }
       }
-      onClick={onToggle}
+      onPointerDown={activateOnPointerDown(onToggle)}
       aria-pressed={active}
       aria-label={active ? "안전(잠금)" : "안전(해제)"}
     >
@@ -1841,7 +1851,9 @@ function AttachmentButton({
       className={`yanmar-attachment-button${selected ? " is-selected" : ""}${
         unlocked ? "" : " is-locked"
       }`}
-      onClick={onSelect}
+      onPointerDown={
+        unlocked ? activateOnPointerDown(onSelect) : undefined
+      }
       disabled={!unlocked}
       aria-pressed={selected}
       aria-label={
@@ -1999,7 +2011,7 @@ function FunctionMenu({
           width: buttonSize,
           height: buttonSize,
         }}
-        onClick={onToggle}
+        onPointerDown={activateOnPointerDown(onToggle)}
         aria-expanded={expanded}
         aria-label={expanded ? "기능 메뉴 닫기" : "기능 메뉴 열기"}
       >
@@ -2038,7 +2050,11 @@ function AutoMenuActionButton({
       className={`yanmar-auto-menu-action yanmar-aux-button relative h-full w-full touch-none active:scale-95${
         active ? " is-active" : ""
       }${disabled ? " is-disabled" : ""}`}
-      onClick={onClick}
+      onPointerDown={
+        disabled
+          ? undefined
+          : activateOnPointerDown(onClick)
+      }
       disabled={disabled}
       aria-label={ariaLabel}
     >
@@ -2232,7 +2248,7 @@ function HornAutoCluster({
           minWidth: buttonSize,
           minHeight: buttonSize,
         }}
-        onClick={onHorn}
+        onPointerDown={activateOnPointerDown(onHorn)}
         aria-label="경적"
       >
         <img
@@ -2369,7 +2385,7 @@ function AutoMenu({
               width: `calc(${buttonSize} * 2 + 0.38rem)`,
               height: `calc(${buttonSize} * 0.72)`,
             }}
-            onClick={onEditLabels}
+            onPointerDown={activateOnPointerDown(onEditLabels)}
             aria-label="실행 이름 편집"
           >
             <span className="yanmar-auto-menu-edit-label">편집</span>
@@ -2388,7 +2404,7 @@ function AutoMenu({
           minWidth: buttonSize,
           minHeight: buttonSize,
         }}
-        onClick={onToggle}
+        onPointerDown={activateOnPointerDown(onToggle)}
         aria-expanded={expanded}
         aria-label={expanded ? "자동 메뉴 닫기" : "자동 메뉴 열기"}
       >

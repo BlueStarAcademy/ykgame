@@ -34,6 +34,8 @@ export interface ChassisDef {
   unlockLevel: number;
   /** Default owned, no purchase */
   granted: boolean;
+  /** Operating weight (kg) — YK / Yanmar catalog */
+  weightKg: number;
   stats: ChassisBaseStats;
   trait: string;
 }
@@ -53,8 +55,9 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     priceStars: 1000,
     unlockLevel: 0,
     granted: false,
+    weightKg: 890,
     stats: { strength: 8, agility: 18, stamina: 10, endurance: 8, balance: 14, technique: 14 },
-    trait: "최기동",
+    trait: "초소형·최기동",
   },
   {
     id: "SV10",
@@ -64,6 +67,7 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     priceStars: 1000,
     unlockLevel: 0,
     granted: false,
+    weightKg: 980,
     stats: { strength: 10, agility: 16, stamina: 11, endurance: 9, balance: 15, technique: 11 },
     trait: "접지·안정",
   },
@@ -75,8 +79,9 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     priceStars: 1000,
     unlockLevel: 0,
     granted: false,
+    weightKg: 1080,
     stats: { strength: 11, agility: 15, stamina: 11, endurance: 10, balance: 12, technique: 13 },
-    trait: "기술 특화",
+    trait: "롤바·기술 특화",
   },
   {
     id: "ViO12_2A",
@@ -86,6 +91,7 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     priceStars: 1000,
     unlockLevel: 0,
     granted: false,
+    weightKg: 1280,
     stats: { strength: 12, agility: 14, stamina: 12, endurance: 11, balance: 12, technique: 11 },
     trait: "경량 균형",
   },
@@ -97,8 +103,9 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     priceStars: 0,
     unlockLevel: 0,
     granted: true,
+    weightKg: 1801,
     stats: { strength: 14, agility: 14, stamina: 14, endurance: 14, balance: 14, technique: 14 },
-    trait: "기본 지급/균형",
+    trait: "기본 지급·캐노피",
   },
   {
     id: "ViO20_6",
@@ -106,8 +113,9 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     chassisClass: "MEDIUM",
     tier: 2,
     priceStars: 2000,
-    unlockLevel: 20,
+    unlockLevel: 0,
     granted: false,
+    weightKg: 2160,
     stats: { strength: 18, agility: 13, stamina: 14, endurance: 14, balance: 13, technique: 12 },
     trait: "힘·적재",
   },
@@ -117,8 +125,9 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     chassisClass: "MEDIUM",
     tier: 2,
     priceStars: 2000,
-    unlockLevel: 20,
+    unlockLevel: 0,
     granted: false,
+    weightKg: 2330,
     stats: { strength: 15, agility: 12, stamina: 14, endurance: 14, balance: 17, technique: 12 },
     trait: "안정 특화",
   },
@@ -128,21 +137,23 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     chassisClass: "MEDIUM",
     tier: 2,
     priceStars: 2000,
-    unlockLevel: 20,
+    unlockLevel: 0,
     granted: false,
+    weightKg: 2580,
     stats: { strength: 16, agility: 12, stamina: 16, endurance: 16, balance: 13, technique: 11 },
     trait: "지구력·인내",
   },
   {
     id: "ViO35_74",
-    label: "ViO35-74",
+    label: "ViO35-7A",
     chassisClass: "HEAVY",
     tier: 3,
     priceStars: 3000,
-    unlockLevel: 30,
+    unlockLevel: 0,
     granted: false,
+    weightKg: 3741,
     stats: { strength: 22, agility: 10, stamina: 18, endurance: 18, balance: 14, technique: 14 },
-    trait: "파워 집중",
+    trait: "파워 집중·캐노피",
   },
   {
     id: "ViO35_7A_CJR",
@@ -150,10 +161,11 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     chassisClass: "HEAVY",
     tier: 3,
     priceStars: 3000,
-    unlockLevel: 30,
+    unlockLevel: 0,
     granted: false,
+    weightKg: 3741,
     stats: { strength: 20, agility: 14, stamina: 17, endurance: 17, balance: 14, technique: 14 },
-    trait: "대형+기동",
+    trait: "밀폐캡·기동",
   },
   {
     id: "ViO55_6A",
@@ -161,8 +173,9 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     chassisClass: "HEAVY",
     tier: 3,
     priceStars: 3000,
-    unlockLevel: 30,
+    unlockLevel: 0,
     granted: false,
+    weightKg: 5705,
     stats: { strength: 24, agility: 9, stamina: 18, endurance: 18, balance: 15, technique: 12 },
     trait: "최대 적재형",
   },
@@ -172,8 +185,9 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     chassisClass: "HEAVY",
     tier: 3,
     priceStars: 3000,
-    unlockLevel: 30,
+    unlockLevel: 0,
     granted: false,
+    weightKg: 8695,
     stats: { strength: 20, agility: 9, stamina: 20, endurance: 22, balance: 13, technique: 12 },
     trait: "내구·인내",
   },
@@ -183,8 +197,9 @@ export const CHASSIS_CATALOG: readonly ChassisDef[] = [
     chassisClass: "HEAVY",
     tier: 3,
     priceStars: 3000,
-    unlockLevel: 30,
+    unlockLevel: 0,
     granted: false,
+    weightKg: 10255,
     stats: { strength: 26, agility: 8, stamina: 20, endurance: 20, balance: 12, technique: 10 },
     trait: "초중량 힘",
   },
@@ -226,4 +241,21 @@ export function parseOwnedChassisIds(raw: unknown): ChassisModelId[] {
     }
   }
   return [...ids];
+}
+
+/** TEST: grant every catalog chassis so equip can be tried without purchase. */
+export function allCatalogChassisIds(): ChassisModelId[] {
+  return CHASSIS_CATALOG.map((c) => c.id);
+}
+
+export function mergeOwnedWithFullCatalog(
+  owned: ChassisModelId[],
+): ChassisModelId[] {
+  const ids = new Set<ChassisModelId>(owned);
+  for (const id of allCatalogChassisIds()) ids.add(id);
+  return [...ids];
+}
+
+export function formatChassisWeightKg(weightKg: number): string {
+  return `${weightKg.toLocaleString("ko-KR")}kg`;
 }

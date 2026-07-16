@@ -16,7 +16,10 @@ import { createGearItem, pickGrade, pickSlot, canonicalizeMainOption, canonicali
 import type { MasterOptionInst } from "./gearGenerate";
 import { calculateFinalYanmarStats, type EquippedGearInput } from "./gearStats";
 import type { ChassisModelId } from "./chassisCatalog";
-import { parseOwnedChassisIds } from "./chassisCatalog";
+import {
+  mergeOwnedWithFullCatalog,
+  parseOwnedChassisIds,
+} from "./chassisCatalog";
 import type { MainOptionInst } from "./gearGenerate";
 import { asJson } from "./jsonCompat";
 import {
@@ -109,13 +112,30 @@ export async function loadUserFinalStats(
     abilityAlloc,
   });
 
+  // TEST unlock: ensure every catalog chassis is owned so players can equip freely.
+  let ownedChassisIds = parseOwnedChassisIds(loadout?.ownedChassisIds);
+  const mergedOwned = mergeOwnedWithFullCatalog(ownedChassisIds);
+  if (
+    loadout &&
+    (mergedOwned.length !== ownedChassisIds.length ||
+      mergedOwned.some((id) => !ownedChassisIds.includes(id)))
+  ) {
+    await tx.userChassisLoadout.update({
+      where: { userId_gameId: { userId, gameId } },
+      data: { ownedChassisIds: asJson(mergedOwned) },
+    });
+    ownedChassisIds = mergedOwned;
+  } else {
+    ownedChassisIds = mergedOwned;
+  }
+
   return {
     stats,
     loadout,
     items,
     repair,
     maintenance: stats.maintenance,
-    ownedChassisIds: parseOwnedChassisIds(loadout?.ownedChassisIds),
+    ownedChassisIds,
     abilityAlloc,
     abilityPoints: abilityPointsSummary(playerLevel, abilityAlloc),
     playerLevel,

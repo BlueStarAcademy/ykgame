@@ -19,6 +19,7 @@ declare module "next-auth" {
       loginId: string;
       email: string;
       nickname: string | null;
+      profileAvatarId: string | null;
       role: Role;
       currency: number;
       totalXp: number;
@@ -30,6 +31,7 @@ declare module "next-auth" {
     loginId: string;
     email: string;
     nickname: string | null;
+    profileAvatarId: string | null;
     role: Role;
     currency: number;
     totalXp: number;
@@ -40,6 +42,7 @@ declare module "next-auth" {
     loginId: string;
     email: string;
     nickname: string | null;
+    profileAvatarId: string | null;
     role: Role;
     currency: number;
     totalXp: number;
@@ -98,6 +101,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           loginId: user.loginId,
           email: user.email,
           nickname: user.nickname,
+          profileAvatarId: user.profileAvatarId,
           role: user.role,
           currency: user.currency,
           totalXp: user.totalXp,

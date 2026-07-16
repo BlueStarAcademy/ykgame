@@ -5,7 +5,15 @@ export const YANMAR_MACHINE_RIG = {
   armLength: 2.5,
   bucketLength: 1.2,
   boomPivotY: 1.68,
+  /** Body-local +X of boom foot relative to undercarriage swing center */
   boomOffset: 0.8,
+  /** Undercarriage swing / house yaw axis in body local +X */
+  swingPivotX: 0,
+  /**
+   * Raise rotating house + boom above track tops (world metres in model space).
+   * Must stay in sync with ExcavatorModel SWING_HOUSE_LIFT_Y usage.
+   */
+  swingHouseLiftY: 0.34,
   /** 암 관절 입력을 과장하지 않고 실제 각도로 표시한다. */
   armRotationScale: 1,
   bucketRotationScale: 1.02,
@@ -27,8 +35,37 @@ export const YANMAR_MACHINE_RIG = {
   dozerBladeHalfHeight: 0.26,
   /** 모델 로컬 +X (회전 후 전방) 기준 블레이드 접촉점 */
   dozerBladeReach: 1.05,
+  /**
+   * PremiumDozerBlade 메시 그룹의 로컬 +X.
+   * blade group X + 이 값 = dozerBladeReach (기준 차체).
+   */
+  dozerBladeMeshLocalX: 1.8,
   excavatorVisualY: 0.68,
 } as const;
+
+/** Chassis scale/trackWidth에 맞춰 블레이드가 궤도 앞에 남도록 reach 계산. */
+export function getDozerBladeReach(scale = 1, trackWidth = 1): number {
+  const s = Math.max(0.85, scale);
+  const tw = Math.max(0.85, trackWidth);
+  // Track front ≈ (straight half + loop radius) * trackScaleX * visual.scale
+  const trackFront = 0.72 * tw * s;
+  const overhang = YANMAR_MACHINE_RIG.dozerBladeReach - 0.72;
+  return trackFront + overhang * s;
+}
+
+/** Center-carbody width between tracks (matches UndercarriageAssembly). */
+export function getCarbodyWidth(trackWidth = 1): number {
+  const tw = Math.max(0.85, trackWidth);
+  const trackScaleZ = 0.82 * tw;
+  const trackCenterZ = 0.72 * trackScaleZ;
+  const trackHalfZ = 0.3 * trackScaleZ;
+  return Math.max(0.42, (trackCenterZ - trackHalfZ) * 2 + 0.08 * trackScaleZ);
+}
+
+/** Dozer push-arm half-spacing — stays inside carbody, never on the track centers. */
+export function getDozerArmHalfWidth(trackWidth = 1): number {
+  return getCarbodyWidth(trackWidth) * 0.28;
+}
 
 export const YANMAR_MACHINE_COLORS = {
   paintRed: "#e2231a",
@@ -338,4 +375,51 @@ export function createYkGeongiWhiteTextTexture() {
   texture.anisotropy = 16;
   texture.needsUpdate = true;
   return texture;
+}
+
+/** Upper-body side model mark (e.g. ViO17-1, SV100-7). */
+export function createChassisModelSideBrandTexture(modelPlate: string): {
+  texture: THREE.Texture;
+  aspect: number;
+} | null {
+  if (typeof document === "undefined" || !modelPlate) return null;
+
+  const scale = 6;
+  const baseWidth = 720;
+  const baseHeight = 200;
+  const canvas = document.createElement("canvas");
+  canvas.width = baseWidth * scale;
+  canvas.height = baseHeight * scale;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.clearRect(0, 0, baseWidth, baseHeight);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const fontStack =
+    'Arial Black, Impact, "Helvetica Neue", Arial, sans-serif';
+  // Keep long plates (ViO35-7A-CJR) readable without clipping.
+  const fontSize = Math.min(92, Math.max(54, Math.floor(640 / modelPlate.length)));
+  ctx.font = `900 ${fontSize}px ${fontStack}`;
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#0b0f14";
+  ctx.lineWidth = Math.max(7, fontSize * 0.11);
+  ctx.strokeText(modelPlate, baseWidth / 2, baseHeight / 2 + 4);
+  const fill = ctx.createLinearGradient(0, 40, 0, baseHeight - 40);
+  fill.addColorStop(0, "#ffffff");
+  fill.addColorStop(0.55, "#f3f6f8");
+  fill.addColorStop(1, "#c8d2da");
+  ctx.fillStyle = fill;
+  ctx.fillText(modelPlate, baseWidth / 2, baseHeight / 2 + 4);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.anisotropy = 16;
+  texture.needsUpdate = true;
+  return { texture, aspect: baseWidth / baseHeight };
 }

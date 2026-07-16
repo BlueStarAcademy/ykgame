@@ -6,6 +6,39 @@ export interface CameraLookOffset {
   pitch: number;
   /** Orbit distance scale (1 = default). Pinch/zoom adjusts this. */
   distance: number;
+  /** Pointer/inertia targets — camera eases toward these each frame. */
+  targetYaw: number;
+  targetPitch: number;
+  targetDistance: number;
+  velYaw: number;
+  velPitch: number;
+  dragging: boolean;
+}
+
+export function createCameraLookOffset(): CameraLookOffset {
+  return {
+    yaw: 0,
+    pitch: 0,
+    distance: 1,
+    targetYaw: 0,
+    targetPitch: 0,
+    targetDistance: 1,
+    velYaw: 0,
+    velPitch: 0,
+    dragging: false,
+  };
+}
+
+export function resetCameraLookOffset(look: CameraLookOffset) {
+  look.yaw = 0;
+  look.pitch = 0;
+  look.distance = 1;
+  look.targetYaw = 0;
+  look.targetPitch = 0;
+  look.targetDistance = 1;
+  look.velYaw = 0;
+  look.velPitch = 0;
+  look.dragging = false;
 }
 
 export type AttachmentType = "bucket" | "breaker" | "grapple";

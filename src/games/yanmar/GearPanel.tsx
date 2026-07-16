@@ -795,12 +795,22 @@ export function GearPanel({
                   grade={item.grade}
                   enhanceLevel={item.enhanceLevel}
                   selected={
-                    bubble?.kind === "compare" && bubble.itemId === item.id
+                    !!bubble &&
+                    bubble.itemId === item.id &&
+                    (bubble.kind === "compare" || bubble.kind === "equipped")
                   }
                   equipped={!!item.equippedSlot}
                   size="md"
                   className="yanmar-gear-mgr-inv-cell"
                   onClick={() => {
+                    if (item.equippedSlot) {
+                      setBubble({
+                        kind: "equipped",
+                        itemId: item.id,
+                        slot: item.equippedSlot,
+                      });
+                      return;
+                    }
                     setBubble({
                       kind: "compare",
                       itemId: item.id,

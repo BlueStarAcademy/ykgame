@@ -40,7 +40,6 @@ import {
 } from "./ExcavatorScene";
 import type {
   AttachmentType,
-  CameraLookOffset,
   CameraMode,
   CouponDiscoveryState,
   DumpScorePopup,
@@ -49,6 +48,11 @@ import type {
   AutoPoseSlotIndex,
   AutoPoseState,
   GearDiscoveryState,
+} from "./types";
+import {
+  createCameraLookOffset,
+  resetCameraLookOffset,
+  type CameraLookOffset,
 } from "./types";
 import {
   createHydraulicVelocity,
@@ -167,6 +171,7 @@ import {
 import { isInRepairTentRange } from "./RepairTent";
 import type { ChassisModelId } from "./chassisCatalog";
 import { getChassisDef } from "./chassisCatalog";
+import { profileAvatarSrc } from "@/lib/profile";
 import {
   emptyAbilityAlloc,
   spentAbilityPoints,
@@ -318,12 +323,14 @@ function TutorialSelectModal({
 const DUMP_SCORE_PANEL_DURATION_MS = 9500;
 const COUPON_DISCOVERY_DURATION_MS = 8200;
 const GEAR_DISCOVERY_DURATION_MS = 6500;
-const FREE_LOOK_SENSITIVITY = 0.0045;
+const FREE_LOOK_SENSITIVITY = 0.0048;
 const FREE_LOOK_PITCH_MIN = -0.55;
 const FREE_LOOK_PITCH_MAX = 0.42;
 const FREE_LOOK_TRAVEL_THRESHOLD = 0.08;
 const FREE_LOOK_DISTANCE_MIN = 0.4;
 const FREE_LOOK_DISTANCE_MAX = 2.5;
+const FREE_LOOK_VEL_MAX = 5.5;
+const FREE_LOOK_VEL_SMOOTH = 0.35;
 
 function appendRewardText(previous: string, next: string) {
   if (!next) return previous;
@@ -807,6 +814,9 @@ export function ExcavatorGameWrapper({
   const [gearExpandCost, setGearExpandCost] = useState<number | null>(100);
   const [activeChassisId, setActiveChassisId] = useState<ChassisModelId | string>("ViO17_1");
   const [ownedChassisIds, setOwnedChassisIds] = useState<string[]>(["ViO17_1"]);
+  const [profileAvatarId, setProfileAvatarId] = useState<string | null>(
+    () => session?.user?.profileAvatarId ?? null,
+  );
   const [abilityAlloc, setAbilityAlloc] = useState<AbilityAlloc>(() => emptyAbilityAlloc());
   const [gearBusy, setGearBusy] = useState(false);
   const [gachaBusy, setGachaBusy] = useState(false);
@@ -853,11 +863,7 @@ export function ExcavatorGameWrapper({
   const [cameraMode, setCameraMode] = useState<CameraMode>(
     initialPlayMode === "ride" ? 3 : 1,
   );
-  const lookOffsetRef = useRef<CameraLookOffset>({
-    yaw: 0,
-    pitch: 0,
-    distance: 1,
-  });
+  const lookOffsetRef = useRef<CameraLookOffset>(createCameraLookOffset());
   const freeLookPointersRef = useRef(
     new Map<number, { x: number; y: number }>(),
   );
@@ -866,7 +872,8 @@ export function ExcavatorGameWrapper({
     pointerId: number | null;
     lastX: number;
     lastY: number;
-  }>({ pointerId: null, lastX: 0, lastY: 0 });
+    lastTime: number;
+  }>({ pointerId: null, lastX: 0, lastY: 0, lastTime: 0 });
   const gameFrameStyle: CSSProperties | undefined = immersive
     ? {
         width: "100%",
@@ -1251,10 +1258,9 @@ export function ExcavatorGameWrapper({
   const inputRef = useRef(input);
 
   const clearFreeLook = useCallback(() => {
-    lookOffsetRef.current.yaw = 0;
-    lookOffsetRef.current.pitch = 0;
-    lookOffsetRef.current.distance = 1;
+    resetCameraLookOffset(lookOffsetRef.current);
     freeLookDragRef.current.pointerId = null;
+    freeLookDragRef.current.lastTime = 0;
     freeLookPointersRef.current.clear();
     freeLookPinchRef.current = null;
   }, []);
@@ -1267,10 +1273,51 @@ export function ExcavatorGameWrapper({
     );
   }, []);
 
+  const clampFreeLookPitch = useCallback((pitch: number) => {
+    return Math.max(FREE_LOOK_PITCH_MIN, Math.min(FREE_LOOK_PITCH_MAX, pitch));
+  }, []);
+
+  const clampFreeLookDistance = useCallback((distance: number) => {
+    return Math.max(
+      FREE_LOOK_DISTANCE_MIN,
+      Math.min(FREE_LOOK_DISTANCE_MAX, distance),
+    );
+  }, []);
+
+  const applyFreeLookDragDelta = useCallback(
+    (dx: number, dy: number, dtSec: number) => {
+      const look = lookOffsetRef.current;
+      const yawDelta = -dx * FREE_LOOK_SENSITIVITY;
+      const pitchDelta = -dy * FREE_LOOK_SENSITIVITY;
+      look.targetYaw += yawDelta;
+      look.targetPitch = clampFreeLookPitch(look.targetPitch + pitchDelta);
+
+      const safeDt = Math.max(0.004, Math.min(dtSec, 0.05));
+      const instantVelYaw = yawDelta / safeDt;
+      const instantVelPitch = pitchDelta / safeDt;
+      look.velYaw =
+        look.velYaw * (1 - FREE_LOOK_VEL_SMOOTH) +
+        instantVelYaw * FREE_LOOK_VEL_SMOOTH;
+      look.velPitch =
+        look.velPitch * (1 - FREE_LOOK_VEL_SMOOTH) +
+        instantVelPitch * FREE_LOOK_VEL_SMOOTH;
+      look.velYaw = Math.max(
+        -FREE_LOOK_VEL_MAX,
+        Math.min(FREE_LOOK_VEL_MAX, look.velYaw),
+      );
+      look.velPitch = Math.max(
+        -FREE_LOOK_VEL_MAX,
+        Math.min(FREE_LOOK_VEL_MAX, look.velPitch),
+      );
+    },
+    [clampFreeLookPitch],
+  );
+
   const syncFreeLookDragFromPointers = useCallback(() => {
     const pointers = freeLookPointersRef.current;
     if (pointers.size !== 1) {
       freeLookDragRef.current.pointerId = null;
+      lookOffsetRef.current.dragging = pointers.size > 0;
       return;
     }
     const [pointerId, point] = pointers.entries().next().value!;
@@ -1278,7 +1325,9 @@ export function ExcavatorGameWrapper({
       pointerId,
       lastX: point.x,
       lastY: point.y,
+      lastTime: performance.now(),
     };
+    lookOffsetRef.current.dragging = true;
   }, []);
 
   const onFreeLookPointerDown = useCallback(
@@ -1291,6 +1340,9 @@ export function ExcavatorGameWrapper({
         y: event.clientY,
       });
       event.currentTarget.setPointerCapture(event.pointerId);
+      lookOffsetRef.current.dragging = true;
+      lookOffsetRef.current.velYaw = 0;
+      lookOffsetRef.current.velPitch = 0;
 
       if (pointers.size >= 2) {
         const [a, b] = pointers.values();
@@ -1310,10 +1362,12 @@ export function ExcavatorGameWrapper({
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const pointers = freeLookPointersRef.current;
       if (!pointers.has(event.pointerId)) return;
-      pointers.set(event.pointerId, {
-        x: event.clientX,
-        y: event.clientY,
-      });
+
+      const native = event.nativeEvent;
+      const samples =
+        typeof native.getCoalescedEvents === "function"
+          ? native.getCoalescedEvents()
+          : [native];
 
       if (isFreeLookTraveling()) {
         clearFreeLook();
@@ -1321,7 +1375,15 @@ export function ExcavatorGameWrapper({
       }
 
       const look = lookOffsetRef.current;
+      look.dragging = true;
+
       if (pointers.size >= 2) {
+        for (const sample of samples) {
+          pointers.set(event.pointerId, {
+            x: sample.clientX,
+            y: sample.clientY,
+          });
+        }
         const [a, b] = pointers.values();
         const span = Math.hypot(a.x - b.x, a.y - b.y);
         let pinch = freeLookPinchRef.current;
@@ -1330,13 +1392,8 @@ export function ExcavatorGameWrapper({
           return;
         }
         if (span > 1) {
-          // Pinch out → zoom in (closer). Pinch in → zoom out.
-          look.distance = Math.max(
-            FREE_LOOK_DISTANCE_MIN,
-            Math.min(
-              FREE_LOOK_DISTANCE_MAX,
-              look.distance * (pinch.lastSpan / span),
-            ),
+          look.targetDistance = clampFreeLookDistance(
+            look.targetDistance * (pinch.lastSpan / span),
           );
           pinch.lastSpan = span;
         }
@@ -1345,20 +1402,39 @@ export function ExcavatorGameWrapper({
 
       const drag = freeLookDragRef.current;
       if (drag.pointerId !== event.pointerId) return;
-      const dx = event.clientX - drag.lastX;
-      const dy = event.clientY - drag.lastY;
-      drag.lastX = event.clientX;
-      drag.lastY = event.clientY;
-      look.yaw -= dx * FREE_LOOK_SENSITIVITY;
-      look.pitch = Math.max(
-        FREE_LOOK_PITCH_MIN,
-        Math.min(
-          FREE_LOOK_PITCH_MAX,
-          look.pitch - dy * FREE_LOOK_SENSITIVITY,
-        ),
-      );
+
+      let prevX = drag.lastX;
+      let prevY = drag.lastY;
+      let prevTime = drag.lastTime || performance.now();
+      for (const sample of samples) {
+        const now =
+          typeof sample.timeStamp === "number" && sample.timeStamp > 0
+            ? sample.timeStamp
+            : performance.now();
+        const dx = sample.clientX - prevX;
+        const dy = sample.clientY - prevY;
+        const dtSec = Math.max(0.001, (now - prevTime) / 1000);
+        if (dx !== 0 || dy !== 0) {
+          applyFreeLookDragDelta(dx, dy, dtSec);
+        }
+        prevX = sample.clientX;
+        prevY = sample.clientY;
+        prevTime = now;
+        pointers.set(event.pointerId, {
+          x: sample.clientX,
+          y: sample.clientY,
+        });
+      }
+      drag.lastX = prevX;
+      drag.lastY = prevY;
+      drag.lastTime = prevTime;
     },
-    [clearFreeLook, isFreeLookTraveling],
+    [
+      applyFreeLookDragDelta,
+      clampFreeLookDistance,
+      clearFreeLook,
+      isFreeLookTraveling,
+    ],
   );
 
   const onFreeLookPointerUp = useCallback(
@@ -1377,6 +1453,14 @@ export function ExcavatorGameWrapper({
         freeLookPinchRef.current = {
           lastSpan: Math.hypot(a.x - b.x, a.y - b.y),
         };
+      }
+
+      if (pointers.size === 0) {
+        lookOffsetRef.current.dragging = false;
+        // Keep a bit of inertia so orbit feels continuous after release.
+        const look = lookOffsetRef.current;
+        look.velYaw *= 0.85;
+        look.velPitch *= 0.85;
       }
       syncFreeLookDragFromPointers();
     },
@@ -1621,6 +1705,13 @@ export function ExcavatorGameWrapper({
     if (sessionStatus === "loading") return;
     setActiveShopBuffs(loadActiveShopBuffs(session?.user?.id));
   }, [session?.user?.id, sessionStatus]);
+
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    if (session?.user?.profileAvatarId !== undefined) {
+      setProfileAvatarId(session.user.profileAvatarId ?? null);
+    }
+  }, [session?.user?.profileAvatarId, sessionStatus]);
 
   const persistActiveShopBuffs = useCallback(
     (next: ActiveShopBuff[]) => {
@@ -4071,6 +4162,7 @@ export function ExcavatorGameWrapper({
           currency={mode === "game" ? currency : previewStars}
           activeChassisId={activeChassisId}
           ownedChassisIds={ownedChassisIds}
+          profileAvatarId={profileAvatarId}
           abilityAlloc={abilityAlloc}
           busy={gearBusy}
           onPurchaseChassis={(id) => void handleChassisAction("purchase", id)}
@@ -4078,6 +4170,21 @@ export function ExcavatorGameWrapper({
           onAbilityAllocChange={(alloc) =>
             void handleAbilityAllocAction("allocate", alloc)
           }
+          onProfileUpdated={async (result) => {
+            setProfileAvatarId(result.profileAvatarId);
+            currencyRef.current = result.currency;
+            setCurrency(result.currency);
+            if (modeRef.current !== "game") {
+              setPreviewStars(result.currency);
+            }
+            await update({
+              user: {
+                nickname: result.nickname,
+                profileAvatarId: result.profileAvatarId,
+                currency: result.currency,
+              },
+            });
+          }}
         />
         <RepairPanel
           open={showRepairPanel}
@@ -4497,7 +4604,20 @@ export function ExcavatorGameWrapper({
                               className="yanmar-profile-chip-avatar"
                               aria-hidden
                             >
-                              {(nickname.trim().charAt(0) || "?").toUpperCase()}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                key={profileAvatarSrc(
+                                  profileAvatarId,
+                                  String(activeChassisId),
+                                )}
+                                src={profileAvatarSrc(
+                                  profileAvatarId,
+                                  String(activeChassisId),
+                                )}
+                                alt=""
+                                className="yanmar-profile-chip-avatar-img"
+                                draggable={false}
+                              />
                               {bonusRemaining > 0 ? (
                                 <em
                                   className="yanmar-bonus-point-badge is-on-chip"
@@ -4901,6 +5021,7 @@ export function ExcavatorGameWrapper({
               cameraMode={cameraMode}
               lookOffsetRef={lookOffsetRef}
               endedRef={endedRef}
+              activeChassisId={String(activeChassisId)}
             />
           </div>
         )}

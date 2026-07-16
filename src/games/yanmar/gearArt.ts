@@ -1,4 +1,5 @@
-import type { ChassisClass } from "./chassisCatalog";
+import type { ChassisClass, ChassisModelId } from "./chassisCatalog";
+import { getChassisDef } from "./chassisCatalog";
 import type { GearSlot, ItemGrade } from "./gearCatalog";
 
 const SLOT_FILE: Record<GearSlot, string> = {
@@ -16,6 +17,8 @@ const GRADE_FILE: Record<ItemGrade, string> = {
   PRECISION: "precision",
   MASTER: "master",
 };
+
+const CHASSIS_MODEL_THUMB_VERSION = 13;
 
 export function gearIconSrc(
   slot: GearSlot,
@@ -54,6 +57,14 @@ export function chassisThumbSrc(chassisClass: ChassisClass): string {
     default:
       return "/images/yanmar/2d/chassis/medium.png?v=3";
   }
+}
+
+/** Per-model catalog thumb (YK 미니굴삭기 13종). */
+export function chassisModelThumbSrc(
+  chassisId: ChassisModelId | string | null | undefined,
+): string {
+  const def = getChassisDef(chassisId ?? "ViO17_1");
+  return `/images/yanmar/2d/chassis/models/${def.id}.png?v=${CHASSIS_MODEL_THUMB_VERSION}`;
 }
 
 export function gachaBannerChromeClass(

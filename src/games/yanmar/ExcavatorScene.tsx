@@ -15,9 +15,12 @@ import {
   PremiumDozerBlade,
   PremiumExcavatorBody,
   PremiumExcavatorLink,
+  SWING_HOUSE_LIFT_Y,
+  SWING_PIVOT_X,
 } from "./ExcavatorModel";
 import { PremiumDumpTruckModel } from "./DumpTruckModel";
-import { YANMAR_MACHINE_RIG } from "./machineVisualTheme";
+import { getDozerBladeReach, YANMAR_MACHINE_RIG } from "./machineVisualTheme";
+import { getChassisVisualProfile } from "./chassisVisualConfig";
 import { yanmarAudio } from "./yanmarAudio";
 import {
   createTerrain,
@@ -135,6 +138,8 @@ interface ExcavatorSceneProps {
   cameraMode: CameraMode;
   lookOffsetRef: React.MutableRefObject<CameraLookOffset>;
   endedRef?: React.RefObject<boolean>;
+  /** Active chassis model — drives cab style / body scale */
+  activeChassisId?: string;
 }
 
 function TerrainMesh({
@@ -644,9 +649,6 @@ function LinkPin({
 const YANMAR_LOGO_ASPECT = 512 / 62;
 const YK_LABEL_ASPECT = 512 / 160;
 const YANMAR_LOGO_WIDTH = 1.24;
-/** 운전석 옆 차체: ViO 17HD 모델 마크 (차체 측면 중앙) */
-const VIO_SIDE_BRAND_WIDTH = 1.18;
-const VIO_SIDE_BRAND_X = -0.06;
 const REAR_BODY_PANEL_X = -1.715;
 const REAR_BODY_PANEL_Z = -0.36;
 const YANMAR_REAR_BODY_Z = -0.24;
@@ -773,151 +775,6 @@ function createYanmarRearLabelTexture() {
   texture.needsUpdate = true;
   configureDecalTexture(texture);
   return texture;
-}
-
-/**
- * 운전석 옆 차체용 ViO 17HD 마크.
- * ViO + 큰 17 + 우측 하단 HD, 흰 필·검정 외곽·미세 상단 그라데이션.
- */
-function createVio17HdSideBrandTexture(): {
-  texture: THREE.Texture;
-  aspect: number;
-} | null {
-  if (typeof document === "undefined") return null;
-
-  const scale = 8;
-  const baseWidth = 760;
-  const baseHeight = 240;
-  const canvas = document.createElement("canvas");
-  canvas.width = baseWidth * scale;
-  canvas.height = baseHeight * scale;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.clearRect(0, 0, baseWidth, baseHeight);
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-
-  const fontStack =
-    'Arial Black, Impact, "Helvetica Neue", Arial, sans-serif';
-  // Mild italic shear matching the factory mark.
-  const shear = -0.18;
-
-  const setFont = (size: number) => {
-    ctx.font = `900 ${size}px ${fontStack}`;
-  };
-
-  const measure = (text: string, size: number) => {
-    setFont(size);
-    return ctx.measureText(text).width;
-  };
-
-  const vioSize = 86;
-  const numSize = 162;
-  const hdSize = 62;
-  const vioW = measure("ViO", vioSize);
-  const numW = measure("17", numSize);
-  const hdW = measure("HD", hdSize);
-  const gapVioNum = 8;
-  const hdOffset = numW * 0.88;
-  const contentW = vioW + gapVioNum + Math.max(numW, hdOffset + hdW);
-  const originX = (baseWidth - contentW) / 2 + 12;
-  const numX = originX + vioW + gapVioNum;
-  const baseline = 178;
-
-  const makeFill = (top: number, bottom: number) => {
-    const gradient = ctx.createLinearGradient(0, top, 0, bottom);
-    gradient.addColorStop(0, "#ffffff");
-    gradient.addColorStop(0.12, "#ffffff");
-    gradient.addColorStop(0.88, "#ffffff");
-    gradient.addColorStop(1, "#f4f7fa");
-    return gradient;
-  };
-
-  // Factory ViO mark: charcoal → silver → white vertical fill.
-  const makeVioFill = (top: number, bottom: number) => {
-    const gradient = ctx.createLinearGradient(0, top, 0, bottom);
-    gradient.addColorStop(0, "#2a3036");
-    gradient.addColorStop(0.2, "#6a737c");
-    gradient.addColorStop(0.45, "#c5ced6");
-    gradient.addColorStop(0.7, "#f5f7f9");
-    gradient.addColorStop(1, "#ffffff");
-    return gradient;
-  };
-
-  const drawMark = (
-    text: string,
-    x: number,
-    y: number,
-    size: number,
-    strokeWidth: number,
-    fill: "white" | "vio" = "white",
-  ) => {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.transform(1, 0, shear, 1, 0, 0);
-    setFont(size);
-
-    // Strong black outline for red-body contrast.
-    ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
-    ctx.shadowBlur = 1.5;
-    ctx.shadowOffsetX = 1.2;
-    ctx.shadowOffsetY = 1.8;
-    ctx.lineWidth = strokeWidth * 1.15;
-    ctx.strokeStyle = "#000000";
-    ctx.strokeText(text, 0, 0);
-
-    ctx.shadowColor = "transparent";
-    ctx.lineWidth = Math.max(1.5, strokeWidth * 0.28);
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
-    ctx.strokeText(text, 0, 0);
-
-    const top = -size * 0.86;
-    const bottom = size * 0.1;
-    ctx.fillStyle =
-      fill === "vio" ? makeVioFill(top, bottom) : makeFill(top, bottom);
-    ctx.fillText(text, 0, 0);
-
-    if (fill === "vio") {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(-size * 0.2, -size * 0.62, size * 4, size * 0.22);
-      ctx.clip();
-      ctx.globalAlpha = 0.4;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(text, 0, 0);
-      ctx.restore();
-    } else {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(-size * 0.15, -size * 0.92, size * 4, size * 0.3);
-      ctx.clip();
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(text, 0, 0);
-      ctx.restore();
-    }
-
-    ctx.restore();
-  };
-
-  drawMark("ViO", originX, baseline - 34, vioSize, 12, "vio");
-  drawMark("17", numX, baseline, numSize, 18);
-  drawMark("HD", numX + hdOffset, baseline + 2, hdSize, 9);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  // Keep non-mipmapped linear filtering so the side mark stays crisp at close range.
-  configureDecalTexture(texture, 16);
-  return {
-    texture,
-    aspect: canvas.width / canvas.height,
-  };
 }
 
 function clampControl(value: number, min = -1, max = 1) {
@@ -1938,6 +1795,10 @@ const FREE_LOOK_RESET_RATE = 10;
 const FREE_LOOK_MIN_GROUND_CLEARANCE = 0.9;
 /** 자유시점으로 차체를 보여줄 최소 시선 오프셋(rad) */
 const FREE_LOOK_BODY_VISIBLE_EPS = 0.02;
+const FREE_LOOK_FOLLOW_RATE = 26;
+const FREE_LOOK_INERTIA_DAMP = 3.2;
+const FREE_LOOK_PITCH_MIN = -0.55;
+const FREE_LOOK_PITCH_MAX = 0.42;
 
 function ExcavatorArm({
   simRef,
@@ -1947,6 +1808,7 @@ function ExcavatorArm({
   inputRef,
   cameraMode,
   lookOffsetRef,
+  activeChassisId,
 }: {
   simRef: React.MutableRefObject<ExcavatorSimState>;
   velRef: React.MutableRefObject<HydraulicVelocity>;
@@ -1955,6 +1817,7 @@ function ExcavatorArm({
   inputRef: React.RefObject<ExcavatorControlState>;
   cameraMode: CameraMode;
   lookOffsetRef: React.MutableRefObject<CameraLookOffset>;
+  activeChassisId?: string;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const machineBodyRef = useRef<THREE.Group>(null);
@@ -1977,27 +1840,10 @@ function ExcavatorArm({
   const bladeRef = useRef<THREE.Group>(null);
   const yanmarLogo = useLoader(THREE.TextureLoader, "/images/yanmar/yanmar-logo-white.png");
   const [ykBoomLogo, setYkBoomLogo] = useState<THREE.Texture | null>(null);
-  const [vioSideBrand, setVioSideBrand] = useState<{
-    texture: THREE.Texture;
-    aspect: number;
-  } | null>(null);
 
   useLayoutEffect(() => {
     configureDecalTexture(yanmarLogo);
   }, [yanmarLogo]);
-
-  useLayoutEffect(() => {
-    const brand = createVio17HdSideBrandTexture();
-    if (!brand) {
-      setVioSideBrand(null);
-      return;
-    }
-    setVioSideBrand(brand);
-    return () => {
-      brand.texture.dispose();
-      setVioSideBrand(null);
-    };
-  }, []);
 
   useLayoutEffect(() => {
     const texture = createYkGeongiLabelTexture("horizontal");
@@ -2009,6 +1855,14 @@ function ExcavatorArm({
   const boomLen = YANMAR_MACHINE_RIG.boomLength;
   const armLen = YANMAR_MACHINE_RIG.armLength;
   const bucketLen = YANMAR_MACHINE_RIG.bucketLength;
+  const chassisVisual = getChassisVisualProfile(activeChassisId);
+  const boomThickness = chassisVisual.boomThickness;
+  const dozerBladeReach = getDozerBladeReach(
+    chassisVisual.scale,
+    chassisVisual.trackWidth,
+  );
+  const bladeGroupX =
+    dozerBladeReach - YANMAR_MACHINE_RIG.dozerBladeMeshLocalX;
 
   useFrame((_, delta) => {
     const g = groupRef.current;
@@ -2019,7 +1873,12 @@ function ExcavatorArm({
     const freeLooking =
       Math.abs(look.yaw) > FREE_LOOK_BODY_VISIBLE_EPS ||
       Math.abs(look.pitch) > FREE_LOOK_BODY_VISIBLE_EPS ||
-      Math.abs(look.distance - 1) > FREE_LOOK_BODY_VISIBLE_EPS;
+      Math.abs(look.distance - 1) > FREE_LOOK_BODY_VISIBLE_EPS ||
+      Math.abs(look.targetYaw) > FREE_LOOK_BODY_VISIBLE_EPS ||
+      Math.abs(look.targetPitch) > FREE_LOOK_BODY_VISIBLE_EPS ||
+      Math.abs(look.targetDistance - 1) > FREE_LOOK_BODY_VISIBLE_EPS ||
+      Math.abs(look.velYaw) > 0.02 ||
+      Math.abs(look.velPitch) > 0.02;
     // 카메라3(운전석)는 기본으로 차체를 숨기지만, 자유시점으로 둘러볼 때는 표시한다.
     const showBody = cameraMode !== 3 || freeLooking;
     // 월드 붐 피벗 = posY + boomPivotY 와 맞춘다 (bucket.ts 접촉점과 동일).
@@ -2075,7 +1934,7 @@ function ExcavatorArm({
     if (workEquipmentYawRef.current) workEquipmentYawRef.current.rotation.y = s.swing;
     const aux = auxiliaryRef.current;
     const blade = Math.max(0, Math.min(1, aux?.blade ?? 0));
-    const bladeProbe = getDozerBladeContactWorld(s, 0);
+    const bladeProbe = getDozerBladeContactWorld(s, 0, dozerBladeReach);
     const bladeAsphaltTile = getCrashTileAt(
       terrainRef.current,
       bladeProbe.x,
@@ -2091,7 +1950,7 @@ function ExcavatorArm({
       );
       visualBlade = Math.min(
         blade,
-        getMaxDozerBladeFromGround(s, asphaltSurface, 0.02),
+        getMaxDozerBladeFromGround(s, asphaltSurface, 0.02, dozerBladeReach),
       );
     }
     // 아스팔트는 posY 리프트로 차체를 들므로 추가 시각 리프트는 쓰지 않는다.
@@ -2212,6 +2071,7 @@ function ExcavatorArm({
       // 흙밭: 레버 그대로(절반 침투 허용). 아스팔트: 표면에서 클램프.
       // 카메라3는 차체 그룹을 낮추므로, 도저만 보일 때도 3인칭과 같은 높이로 보정.
       const bladeHeightOffset = showBody ? 0 : EXCAVATOR_FIXED_VISUAL_Y;
+      bladeRef.current.position.x = bladeGroupX;
       bladeRef.current.position.y =
         YANMAR_MACHINE_RIG.dozerBladeGroupBaseY +
         bladeHeightOffset -
@@ -2243,7 +2103,11 @@ function ExcavatorArm({
       const armEndY = boomEndY + Math.cos(visualArmAngle) * armLen;
       const tipX = armEndX - Math.sin(visualBucketAngle) * bucketLen;
       const tipY = armEndY - Math.cos(visualBucketAngle) * bucketLen;
-      tipRef.current.position.set(0.8 + tipX, armRootY + tipY, 0);
+      tipRef.current.position.set(
+        YANMAR_MACHINE_RIG.boomOffset + tipX,
+        armRootY + SWING_HOUSE_LIFT_Y + tipY,
+        0,
+      );
     }
   });
 
@@ -2254,32 +2118,29 @@ function ExcavatorArm({
         <group ref={machineBodyRef} visible={cameraMode !== 3}>
           <PremiumExcavatorBody
             velRef={velRef}
-            yanmarLogo={vioSideBrand?.texture}
-            yanmarLogoWidth={
-              vioSideBrand ? VIO_SIDE_BRAND_WIDTH : 0.72
-            }
-            yanmarLogoHeight={
-              vioSideBrand
-                ? logoHeightForWidth(VIO_SIDE_BRAND_WIDTH, vioSideBrand.aspect)
-                : 0.087
-            }
-            yanmarLogoX={vioSideBrand ? VIO_SIDE_BRAND_X : 0}
             ykLogo={ykBoomLogo ?? undefined}
             upperBodyRef={upperBodyYawRef}
+            chassisId={activeChassisId}
           />
         </group>
         <group
           ref={bladeRef}
-          position={[-0.75, YANMAR_MACHINE_RIG.dozerBladeGroupBaseY, 0]}
+          position={[bladeGroupX, YANMAR_MACHINE_RIG.dozerBladeGroupBaseY, 0]}
         >
-          <PremiumDozerBlade />
+          <PremiumDozerBlade
+            trackWidth={chassisVisual.trackWidth}
+            scale={chassisVisual.scale}
+          />
         </group>
 
-        <group ref={workEquipmentYawRef}>
+        <group
+          ref={workEquipmentYawRef}
+          position={[SWING_PIVOT_X, SWING_HOUSE_LIFT_Y, 0]}
+        >
         <group
           ref={boomSwingRef}
           position={[
-            0.8,
+            YANMAR_MACHINE_RIG.boomOffset - SWING_PIVOT_X,
             YANMAR_MACHINE_RIG.boomPivotY - EXCAVATOR_FIXED_VISUAL_Y,
             0,
           ]}
@@ -2302,8 +2163,8 @@ function ExcavatorArm({
         <group ref={boomRef}>
           <PremiumExcavatorLink
             length={boomLen}
-            height={0.42}
-            sideDepth={0.155}
+            height={0.42 * boomThickness}
+            sideDepth={0.155 * boomThickness}
             logo={ykBoomLogo ?? undefined}
             logoWidth={0.96}
             logoHeight={logoHeightForWidth(0.96, YK_LABEL_ASPECT)}
@@ -2335,8 +2196,8 @@ function ExcavatorArm({
           <group ref={armRef} position={[boomLen, 0, 0]}>
             <PremiumExcavatorLink
               length={armLen}
-              height={0.36}
-              sideDepth={0.135}
+              height={0.36 * boomThickness}
+              sideDepth={0.135 * boomThickness}
               logo={yanmarLogo}
               logoWidth={YANMAR_LOGO_WIDTH}
               logoHeight={logoHeightForWidth(YANMAR_LOGO_WIDTH, YANMAR_LOGO_ASPECT)}
@@ -2538,18 +2399,69 @@ function GameCamera({
       travel != null &&
       (Math.abs(travel.left) > FREE_LOOK_TRAVEL_THRESHOLD ||
         Math.abs(travel.right) > FREE_LOOK_TRAVEL_THRESHOLD);
+    const dt = Math.max(delta, 0);
 
     if (
       wantsTravel &&
-      (look.yaw !== 0 || look.pitch !== 0 || look.distance !== 1)
+      (look.yaw !== 0 ||
+        look.pitch !== 0 ||
+        look.distance !== 1 ||
+        look.targetYaw !== 0 ||
+        look.targetPitch !== 0 ||
+        look.targetDistance !== 1)
     ) {
-      const k = 1 - Math.exp(-FREE_LOOK_RESET_RATE * Math.max(delta, 0));
+      const k = 1 - Math.exp(-FREE_LOOK_RESET_RATE * dt);
+      look.targetYaw += (0 - look.targetYaw) * k;
+      look.targetPitch += (0 - look.targetPitch) * k;
+      look.targetDistance += (1 - look.targetDistance) * k;
+      look.velYaw = 0;
+      look.velPitch = 0;
+      look.dragging = false;
       look.yaw += (0 - look.yaw) * k;
       look.pitch += (0 - look.pitch) * k;
       look.distance += (1 - look.distance) * k;
       if (Math.abs(look.yaw) < 0.0005) look.yaw = 0;
       if (Math.abs(look.pitch) < 0.0005) look.pitch = 0;
       if (Math.abs(look.distance - 1) < 0.001) look.distance = 1;
+      if (Math.abs(look.targetYaw) < 0.0005) look.targetYaw = 0;
+      if (Math.abs(look.targetPitch) < 0.0005) look.targetPitch = 0;
+      if (Math.abs(look.targetDistance - 1) < 0.001) look.targetDistance = 1;
+    } else if (!look.dragging) {
+      // Coast after release so orbit keeps moving smoothly.
+      if (Math.abs(look.velYaw) > 0.0008 || Math.abs(look.velPitch) > 0.0008) {
+        look.targetYaw += look.velYaw * dt;
+        look.targetPitch = Math.max(
+          FREE_LOOK_PITCH_MIN,
+          Math.min(
+            FREE_LOOK_PITCH_MAX,
+            look.targetPitch + look.velPitch * dt,
+          ),
+        );
+        const damp = Math.exp(-FREE_LOOK_INERTIA_DAMP * dt);
+        look.velYaw *= damp;
+        look.velPitch *= damp;
+        if (Math.abs(look.velYaw) < 0.0008) look.velYaw = 0;
+        if (Math.abs(look.velPitch) < 0.0008) look.velPitch = 0;
+      }
+    }
+
+    {
+      const followRate = look.dragging
+        ? FREE_LOOK_FOLLOW_RATE
+        : FREE_LOOK_FOLLOW_RATE * 0.72;
+      const k = 1 - Math.exp(-followRate * dt);
+      look.yaw += (look.targetYaw - look.yaw) * k;
+      look.pitch += (look.targetPitch - look.pitch) * k;
+      look.distance += (look.targetDistance - look.distance) * k;
+      if (Math.abs(look.yaw - look.targetYaw) < 0.00015) {
+        look.yaw = look.targetYaw;
+      }
+      if (Math.abs(look.pitch - look.targetPitch) < 0.00015) {
+        look.pitch = look.targetPitch;
+      }
+      if (Math.abs(look.distance - look.targetDistance) < 0.0002) {
+        look.distance = look.targetDistance;
+      }
     }
 
     if (look.yaw !== 0 || look.pitch !== 0 || look.distance !== 1) {
@@ -2580,7 +2492,10 @@ function GameCamera({
     );
     const minCamY = groundY + FREE_LOOK_MIN_GROUND_CLEARANCE;
     if (Number.isFinite(minCamY) && camera.position.y < minCamY) {
-      camera.position.y = minCamY;
+      // Soft lift avoids hard clipping pops while orbiting near slopes.
+      const liftK = 1 - Math.exp(-14 * dt);
+      camera.position.y +=
+        (minCamY - camera.position.y) * Math.max(liftK, 0.35);
     }
 
     camera.lookAt(lookX, lookY, lookZ);
@@ -2614,11 +2529,16 @@ function SimLoop({
   onHaulTruckFull,
   onSimTick,
   endedRef,
+  activeChassisId,
 }: ExcavatorSceneProps) {
   const runtimeRef = useRef(createSimLoopRuntime());
   const dustRef = useRef<THREE.Group>(null);
   const dumpSoilVisualRef = useRef<DumpSoilVisualState>(runtimeRef.current.dumpSoilVisual);
   const bladeSprayVisualRef = useRef<BladeSprayVisualState>(runtimeRef.current.bladeSpray);
+  const dozerBladeReach = getDozerBladeReach(
+    getChassisVisualProfile(activeChassisId).scale,
+    getChassisVisualProfile(activeChassisId).trackWidth,
+  );
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
@@ -2648,6 +2568,7 @@ function SimLoop({
       onHaulTruckFull,
       onSimTick,
       endedRef,
+      dozerBladeReach,
     });
 
     const dust = runtimeRef.current.digDust;
@@ -4101,6 +4022,7 @@ function SceneContent(props: ExcavatorSceneProps) {
         inputRef={props.inputRef}
         cameraMode={props.cameraMode}
         lookOffsetRef={props.lookOffsetRef}
+        activeChassisId={props.activeChassisId}
       />
       <NavigationGuide
         simRef={props.simRef}

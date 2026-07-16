@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
+import { StarAmount } from "@/components/StarAmount";
+import { NICKNAME_CHANGE_COST_STARS } from "@/lib/profile";
 
 interface SettingsModalProps {
   open: boolean;
@@ -13,6 +15,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const { data: session, update } = useSession();
   const [loginId, setLoginId] = useState("");
   const [nickname, setNickname] = useState("");
+  const [currency, setCurrency] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -29,11 +32,17 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         if (cancelled) return;
         setLoginId(data.user?.loginId ?? "");
         setNickname(data.user?.nickname ?? session?.user?.nickname ?? "");
+        setCurrency(
+          typeof data.user?.currency === "number"
+            ? data.user.currency
+            : (session?.user?.currency ?? 0),
+        );
       })
       .catch(() => {
         if (!cancelled) {
           setLoginId("");
           setNickname(session?.user?.nickname ?? "");
+          setCurrency(session?.user?.currency ?? 0);
         }
       })
       .finally(() => {
@@ -42,9 +51,13 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     return () => {
       cancelled = true;
     };
-  }, [open, session?.user?.nickname]);
+  }, [open, session?.user?.nickname, session?.user?.currency]);
 
   if (!open) return null;
+
+  const nicknameDirty =
+    nickname.trim() !== (session?.user?.nickname ?? "").trim();
+  const canAfford = currency >= NICKNAME_CHANGE_COST_STARS;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -62,7 +75,16 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         setError(data.error ?? "설정 저장에 실패했습니다.");
         return;
       }
-      await update({ user: { nickname: data.nickname, currency: data.currency } });
+      if (typeof data.currency === "number") {
+        setCurrency(data.currency);
+      }
+      await update({
+        user: {
+          nickname: data.nickname,
+          currency: data.currency,
+          profileAvatarId: data.profileAvatarId,
+        },
+      });
       onClose();
     } catch {
       setError("설정 저장에 실패했습니다.");
@@ -111,16 +133,32 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 maxLength={12}
                 required
               />
+              <p className="mt-1.5 text-[11px] font-semibold text-amber-700">
+                닉네임 변경 시 스타 {NICKNAME_CHANGE_COST_STARS}개가 필요합니다.
+              </p>
             </div>
 
             {error ? <p className="text-xs text-red-500">{error}</p> : null}
 
             <button
               type="submit"
-              disabled={saving}
-              className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-500 disabled:opacity-60"
+              disabled={saving || (nicknameDirty && !canAfford)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-500 disabled:opacity-60"
             >
-              {saving ? "저장 중..." : "저장"}
+              {saving ? (
+                "저장 중..."
+              ) : nicknameDirty ? (
+                <>
+                  <span>변경</span>
+                  <StarAmount
+                    value={NICKNAME_CHANGE_COST_STARS}
+                    size={14}
+                    valueClassName="text-sm font-black tabular-nums"
+                  />
+                </>
+              ) : (
+                "저장"
+              )}
             </button>
           </form>
         )}

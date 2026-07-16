@@ -23,12 +23,15 @@ export const authConfig = {
         token.loginId = user.loginId;
         token.email = user.email;
         token.nickname = user.nickname;
+        token.profileAvatarId = user.profileAvatarId;
         token.role = user.role;
         token.currency = user.currency;
         token.totalXp = user.totalXp;
       }
       if (trigger === "update" && session?.user) {
         token.nickname = session.user.nickname ?? token.nickname;
+        token.profileAvatarId =
+          session.user.profileAvatarId ?? token.profileAvatarId;
         token.currency = session.user.currency ?? token.currency;
         token.totalXp = session.user.totalXp ?? token.totalXp;
       }
@@ -43,6 +46,7 @@ export const authConfig = {
           loginId: token.loginId as string,
           email: token.email as string,
           nickname: token.nickname as string | null,
+          profileAvatarId: (token.profileAvatarId as string | null | undefined) ?? null,
           role: token.role as "USER" | "ADMIN",
           currency: token.currency as number,
           totalXp: (token.totalXp as number | undefined) ?? 0,

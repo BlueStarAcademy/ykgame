@@ -3,6 +3,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AVAILABLE_GAME_IDS, GAMES, getSeasonKey } from "@/lib/games";
 import { getUserGameStatsForGames } from "@/lib/rankings";
+import {
+  isValidProfileAvatarId,
+  NICKNAME_CHANGE_COST_STARS,
+} from "@/lib/profile";
 
 export async function GET() {
   const session = await auth();
@@ -16,6 +20,7 @@ export async function GET() {
       id: true,
       loginId: true,
       nickname: true,
+      profileAvatarId: true,
       currency: true,
       totalXp: true,
       role: true,
@@ -51,6 +56,7 @@ export async function GET() {
       totalStars,
     },
     gameProgress,
+    nicknameChangeCostStars: NICKNAME_CHANGE_COST_STARS,
   });
 }
 
@@ -60,32 +66,158 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { nickname } = await request.json();
-  if (!nickname || nickname.length < 2 || nickname.length > 12) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+
+  const { nickname, profileAvatarId } = body as {
+    nickname?: unknown;
+    profileAvatarId?: unknown;
+  };
+
+  const wantsNickname = nickname !== undefined;
+  const wantsAvatar = profileAvatarId !== undefined;
+
+  if (!wantsNickname && !wantsAvatar) {
     return NextResponse.json(
-      { error: "닉네임은 2~12자여야 합니다." },
+      { error: "변경할 항목이 없습니다." },
       { status: 400 },
     );
   }
 
-  const existing = await prisma.user.findFirst({
-    where: {
-      nickname,
-      NOT: { id: session.user.id },
-    },
-  });
-  if (existing) {
+  if (wantsAvatar && !isValidProfileAvatarId(profileAvatarId)) {
     return NextResponse.json(
-      { error: "이미 사용 중인 닉네임입니다." },
-      { status: 409 },
+      { error: "유효하지 않은 프로필 이미지입니다." },
+      { status: 400 },
     );
   }
 
-  const user = await prisma.user.update({
-    where: { id: session.user.id },
-    data: { nickname },
-    select: { nickname: true, currency: true, totalXp: true },
-  });
+  let nextNickname: string | undefined;
+  if (wantsNickname) {
+    if (typeof nickname !== "string") {
+      return NextResponse.json(
+        { error: "닉네임은 2~12자여야 합니다." },
+        { status: 400 },
+      );
+    }
+    const trimmed = nickname.trim();
+    if (trimmed.length < 2 || trimmed.length > 12) {
+      return NextResponse.json(
+        { error: "닉네임은 2~12자여야 합니다." },
+        { status: 400 },
+      );
+    }
+    nextNickname = trimmed;
+  }
 
-  return NextResponse.json(user);
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const current = await tx.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          nickname: true,
+          profileAvatarId: true,
+          currency: true,
+        },
+      });
+      if (!current) {
+        throw new Error("NOT_FOUND");
+      }
+
+      const data: {
+        nickname?: string;
+        profileAvatarId?: string;
+        currency?: number;
+      } = {};
+
+      if (wantsAvatar) {
+        data.profileAvatarId = profileAvatarId as string;
+      }
+
+      let chargedStars = 0;
+      if (nextNickname !== undefined) {
+        const isFirstNickname = !current.nickname;
+        const nicknameChanged = current.nickname !== nextNickname;
+
+        if (nicknameChanged) {
+          if (!isFirstNickname) {
+            if (current.currency < NICKNAME_CHANGE_COST_STARS) {
+              throw new Error("INSUFFICIENT_STARS");
+            }
+            chargedStars = NICKNAME_CHANGE_COST_STARS;
+            data.currency = current.currency - NICKNAME_CHANGE_COST_STARS;
+          }
+
+          const existing = await tx.user.findFirst({
+            where: {
+              nickname: nextNickname,
+              NOT: { id: session.user.id },
+            },
+            select: { id: true },
+          });
+          if (existing) {
+            throw new Error("NICKNAME_TAKEN");
+          }
+          data.nickname = nextNickname;
+        }
+      }
+
+      if (Object.keys(data).length === 0) {
+        return {
+          nickname: current.nickname,
+          profileAvatarId: current.profileAvatarId,
+          currency: current.currency,
+          totalXp: undefined as number | undefined,
+          chargedStars: 0,
+        };
+      }
+
+      const user = await tx.user.update({
+        where: { id: session.user.id },
+        data,
+        select: {
+          nickname: true,
+          profileAvatarId: true,
+          currency: true,
+          totalXp: true,
+        },
+      });
+
+      return { ...user, chargedStars };
+    });
+
+    return NextResponse.json(result);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (code === "NOT_FOUND") {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+    if (code === "INSUFFICIENT_STARS") {
+      return NextResponse.json(
+        {
+          error: `닉네임 변경에는 스타 ${NICKNAME_CHANGE_COST_STARS}개가 필요합니다.`,
+          costStars: NICKNAME_CHANGE_COST_STARS,
+        },
+        { status: 402 },
+      );
+    }
+    if (code === "NICKNAME_TAKEN") {
+      return NextResponse.json(
+        { error: "이미 사용 중인 닉네임입니다." },
+        { status: 409 },
+      );
+    }
+    console.error("[profile] PATCH failed:", error);
+    return NextResponse.json(
+      { error: "프로필 저장에 실패했습니다." },
+      { status: 500 },
+    );
+  }
 }

@@ -95,6 +95,8 @@ model User {
   email                String                 @unique
   passwordHash         String
   nickname             String?                @unique
+  /** Yanmar profile portrait — ChassisModelId string */
+  profileAvatarId      String?
   role                 Role                   @default(USER)
   currency             Int                    @default(0)
   /** Lifetime dump XP — never reset by season */

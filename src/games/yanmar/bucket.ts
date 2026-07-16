@@ -5,11 +5,15 @@ const {
   boomLength: BOOM_LEN,
   armLength: ARM_LEN,
   bucketLength: BUCKET_LEN,
-  boomPivotY: BOOM_PIVOT_Y,
+  boomPivotY: BOOM_PIVOT_Y_BASE,
   boomOffset: BOOM_OFFSET,
+  swingHouseLiftY: SWING_HOUSE_LIFT_Y,
   armRotationScale: VISUAL_ARM_ROTATION_SCALE,
   bucketRotationScale: VISUAL_BUCKET_ROTATION_SCALE,
 } = YANMAR_MACHINE_RIG;
+
+/** World boom foot height includes raised house deck above tracks. */
+const BOOM_PIVOT_Y = BOOM_PIVOT_Y_BASE + SWING_HOUSE_LIFT_Y;
 
 /** 이 비율 미만이면 적재 불가·급격 유실 */
 export const BUCKET_SOIL_HOLD_MIN = 0.16;
@@ -240,7 +244,11 @@ export function getBucketGroundContactWorld(sim: ExcavatorSimState, boomSwing = 
 }
 
 /** 도저 블레이드 하단 월드 좌표 (blade: 0=상승 … 1=하강) */
-export function getDozerBladeContactWorld(sim: ExcavatorSimState, blade: number): BucketTip {
+export function getDozerBladeContactWorld(
+  sim: ExcavatorSimState,
+  blade: number,
+  reach: number = YANMAR_MACHINE_RIG.dozerBladeReach,
+): BucketTip {
   const facing = sim.heading;
   const drop = Math.max(0, Math.min(1, blade)) * YANMAR_MACHINE_RIG.dozerBladeDrop;
   const localBottomY =
@@ -248,7 +256,6 @@ export function getDozerBladeContactWorld(sim: ExcavatorSimState, blade: number)
     drop +
     YANMAR_MACHINE_RIG.dozerBladeMeshLocalY -
     YANMAR_MACHINE_RIG.dozerBladeHalfHeight;
-  const reach = YANMAR_MACHINE_RIG.dozerBladeReach;
   return {
     x: sim.posX + Math.sin(facing) * reach,
     y: YANMAR_MACHINE_RIG.excavatorVisualY + sim.posY + localBottomY,
@@ -261,8 +268,9 @@ export function getMaxDozerBladeFromGround(
   sim: ExcavatorSimState,
   groundY: number,
   clearance = 0.02,
+  reach: number = YANMAR_MACHINE_RIG.dozerBladeReach,
 ): number {
-  const raised = getDozerBladeContactWorld(sim, 0);
+  const raised = getDozerBladeContactWorld(sim, 0, reach);
   const dropNeeded = raised.y - (groundY + clearance);
   if (dropNeeded <= 0) return 0;
   return Math.max(0, Math.min(1, dropNeeded / YANMAR_MACHINE_RIG.dozerBladeDrop));

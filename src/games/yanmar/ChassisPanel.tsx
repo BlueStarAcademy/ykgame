@@ -12,12 +12,13 @@ import {
 import {
   CHASSIS_CATALOG,
   CHASSIS_CLASS_LABEL,
+  formatChassisWeightKg,
   type ChassisClass,
   type ChassisDef,
   type ChassisModelId,
 } from "./chassisCatalog";
 import { MAIN_OPTION_KEYS, type MainOptionKey } from "./gearCatalog";
-import { chassisThumbSrc } from "./gearArt";
+import { chassisModelThumbSrc } from "./gearArt";
 
 interface ChassisPanelProps {
   open?: boolean;
@@ -82,6 +83,7 @@ export function ChassisGallery({
   const owned = useMemo(() => new Set(ownedIds), [ownedIds]);
   const [filter, setFilter] = useState<ChassisFilter>("ALL");
   const [index, setIndex] = useState(0);
+  const [artPreviewOpen, setArtPreviewOpen] = useState(false);
   const stripRef = useRef<HTMLDivElement>(null);
   const allocEnabled = Boolean(abilityAlloc && onAbilityAllocSave);
   const [draft, setDraft] = useState<AbilityAlloc>(
@@ -139,6 +141,8 @@ export function ChassisGallery({
     });
   };
 
+  const thumbSrc = chassisModelThumbSrc(selected.id);
+
   return (
     <div className="yanmar-chassis-gallery">
       <div className="yanmar-chassis-filter-tabs" role="tablist" aria-label="차체 등급">
@@ -166,7 +170,8 @@ export function ChassisGallery({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={chassisThumbSrc(selected.chassisClass)}
+            key={thumbSrc}
+            src={thumbSrc}
             alt=""
             className="yanmar-chassis-showcase-img"
             draggable={false}
@@ -189,27 +194,40 @@ export function ChassisGallery({
               </svg>
             </div>
           ) : null}
-          <span className="yanmar-chassis-class-pill">
-            {CHASSIS_CLASS_LABEL[selected.chassisClass]}
-          </span>
           {status.isActive ? (
             <span className="yanmar-chassis-active-pill">탑승 중</span>
           ) : null}
+          <button
+            type="button"
+            className="yanmar-chassis-zoom-btn"
+            onClick={() => setArtPreviewOpen(true)}
+          >
+            크게보기
+          </button>
         </div>
 
         <div className="yanmar-chassis-showcase-meta">
-          <div className="yanmar-chassis-showcase-title-row">
-            <h4>{selected.label}</h4>
-            {allocEnabled ? (
-              <div className="yanmar-chassis-bonus-inline">
-                <span
-                  className={`yanmar-chassis-bonus-points${
-                    remaining > 0 ? " has-remain" : ""
-                  }`}
-                  title="분배 가능 보너스 포인트"
-                >
-                  보너스 {remaining}
-                </span>
+          <h4 className="yanmar-chassis-showcase-name">{selected.label}</h4>
+          <div className="yanmar-chassis-showcase-info">
+            <span className="yanmar-chassis-class-pill">
+              {CHASSIS_CLASS_LABEL[selected.chassisClass]}
+            </span>
+            <span className="yanmar-chassis-weight-pill">
+              {formatChassisWeightKg(selected.weightKg)}
+            </span>
+          </div>
+          <p className="yanmar-chassis-trait">{selected.trait}</p>
+          {allocEnabled ? (
+            <div className="yanmar-chassis-bonus-block">
+              <span
+                className={`yanmar-chassis-bonus-points${
+                  remaining > 0 ? " has-remain" : ""
+                }`}
+                title="분배 가능 보너스 포인트"
+              >
+                보너스 {remaining}
+              </span>
+              <div className="yanmar-chassis-bonus-actions">
                 <button
                   type="button"
                   className="yanmar-chassis-bonus-btn is-save"
@@ -234,9 +252,8 @@ export function ChassisGallery({
                   추천분배
                 </button>
               </div>
-            ) : null}
-          </div>
-          <p className="yanmar-chassis-trait">{selected.trait}</p>
+            </div>
+          ) : null}
         </div>
 
         <ul
@@ -318,7 +335,7 @@ export function ChassisGallery({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={chassisThumbSrc(c.chassisClass)}
+                    src={chassisModelThumbSrc(c.id)}
                     alt=""
                     draggable={false}
                   />
@@ -395,6 +412,44 @@ export function ChassisGallery({
           </button>
         )}
       </div>
+
+      {artPreviewOpen ? (
+        <div
+          className="yanmar-chassis-art-preview-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="차체 이미지 크게보기"
+        >
+          <button
+            type="button"
+            className="yanmar-chassis-art-preview-backdrop"
+            aria-label="크게보기 닫기"
+            onClick={() => setArtPreviewOpen(false)}
+          />
+          <div className="yanmar-chassis-art-preview-card">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={thumbSrc}
+              src={thumbSrc}
+              alt=""
+              className="yanmar-chassis-art-preview-img"
+              draggable={false}
+            />
+            <p className="yanmar-chassis-art-preview-name">{selected.label}</p>
+            <p className="yanmar-chassis-art-preview-meta">
+              {CHASSIS_CLASS_LABEL[selected.chassisClass]} ·{" "}
+              {formatChassisWeightKg(selected.weightKg)}
+            </p>
+            <button
+              type="button"
+              className="yanmar-chassis-art-preview-close"
+              onClick={() => setArtPreviewOpen(false)}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

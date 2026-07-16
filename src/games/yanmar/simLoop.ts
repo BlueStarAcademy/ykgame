@@ -229,6 +229,8 @@ export interface SimTickParams {
   onSimTick: () => void;
   /** true면 덤프 트럭·특수구역 시간 진행을 멈춘다 (결과 화면 등). */
   endedRef?: { current: boolean };
+  /** 차체 스케일에 맞춘 도저 전방 reach (미지정 시 기본값). */
+  dozerBladeReach?: number;
 }
 
 function clampControl(value: number, min = -1, max = 1) {
@@ -642,6 +644,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     onHaulTruckFull,
     onSimTick,
     endedRef,
+    dozerBladeReach = YANMAR_MACHINE_RIG.dozerBladeReach,
   } = params;
 
   const systemsFrozen = endedRef?.current === true;
@@ -852,7 +855,7 @@ export function tickExcavatorSim(params: SimTickParams) {
   let dozerSupportLift = 0;
   const bladeCommand = Math.max(0, Math.min(1, auxiliary?.blade ?? 0));
   if (bladeCommand > 0.01) {
-    const bladeProbe = getDozerBladeContactWorld(sim, 0);
+    const bladeProbe = getDozerBladeContactWorld(sim, 0, dozerBladeReach);
     const asphaltTile = getCrashTileAt(terrain, bladeProbe.x, bladeProbe.z);
     if (asphaltTile?.active) {
       const asphaltSurface = sampleCrashContactHeight(
@@ -867,6 +870,7 @@ export function tickExcavatorSim(params: SimTickParams) {
         sim,
         asphaltSurface,
         0.02,
+        dozerBladeReach,
       );
       sim.posY = savedPosY;
       if (bladeCommand > maxBladeOnAsphalt) {
@@ -1775,7 +1779,11 @@ export function tickExcavatorSim(params: SimTickParams) {
   }
 
   const bladeAmount = auxiliary?.blade ?? 0;
-  const bladeGroundProbe = getDozerBladeContactWorld(sim, Math.min(1, Math.max(0, bladeAmount)));
+  const bladeGroundProbe = getDozerBladeContactWorld(
+    sim,
+    Math.min(1, Math.max(0, bladeAmount)),
+    dozerBladeReach,
+  );
   const bladeOnAsphalt = !!getCrashTileAt(
     terrain,
     bladeGroundProbe.x,
@@ -1792,9 +1800,9 @@ export function tickExcavatorSim(params: SimTickParams) {
       : 0.02;
   const effectiveBlade = Math.min(
     bladeAmount,
-    getMaxDozerBladeFromGround(sim, bladeGroundY, bladeClearanceLimit),
+    getMaxDozerBladeFromGround(sim, bladeGroundY, bladeClearanceLimit, dozerBladeReach),
   );
-  const bladeContact = getDozerBladeContactWorld(sim, effectiveBlade);
+  const bladeContact = getDozerBladeContactWorld(sim, effectiveBlade, dozerBladeReach);
   const bladeClearance = bladeContact.y - bladeGroundY;
   const forwardTravel = Math.max(0, vel.travel);
   const bladeInSoilField = isInDigZone(bladeContact.x, bladeContact.z, terrain);
