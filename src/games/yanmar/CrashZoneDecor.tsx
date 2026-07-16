@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useMemo } from "react";
 import { useLoader } from "@react-three/fiber";
-import { Billboard, Outlines, Text } from "@react-three/drei";
+import { Outlines, Text } from "@react-three/drei";
 import * as THREE from "three";
 import {
   CRASH_ASPHALT_BOX_CENTER_Y,
@@ -55,9 +55,8 @@ export function CrashZoneDecor({
   const tileDepth = zone.depth / 3;
   const ground = sampleHeight(terrain, zone.centerX, zone.centerZ);
   const respawnEtaSec = getCrashZoneRespawnEtaSec(zone);
-  const zoneLabel = zone.active
-    ? "노면 파쇄 작업구역"
-    : respawnEtaSec > 0
+  const zoneLabel =
+    respawnEtaSec > 0
       ? `노면 파쇄 · 리젠 ${formatDumpTruckReturnTime(respawnEtaSec)}`
       : "노면 파쇄 작업구역";
 
@@ -141,16 +140,6 @@ export function CrashZoneDecor({
                     <meshBasicMaterial color="#111418" />
                   </mesh>
                 ) : null}
-                <Billboard position={[0, 2.2, 0]}>
-                  <mesh>
-                    <planeGeometry args={[3.6, 0.28]} />
-                    <meshBasicMaterial color="#111827" transparent opacity={0.72} />
-                  </mesh>
-                  <mesh position={[-1.8 + 1.8 * (1 - damage), 0, 0.01]}>
-                    <planeGeometry args={[3.6 * (1 - damage), 0.18]} />
-                    <meshBasicMaterial color={damage < 0.7 ? "#f59e0b" : "#ef4444"} />
-                  </mesh>
-                </Billboard>
               </>
             ) : (
               <group>

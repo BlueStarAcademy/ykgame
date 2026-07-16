@@ -18,6 +18,13 @@ import type { GameMode, TutorialStep } from "./tutorial";
 import type { AttachmentType, AutoPoseSlotIndex, AutoPoseState } from "./types";
 import { AUTO_POSE_SLOT_COUNT } from "./types";
 import {
+  AUTO_POSE_LABEL_MAX_CHARS,
+  AUTO_POSE_LABEL_MIN_CHARS,
+  countAutoPoseLabelChars,
+  defaultAutoPoseSlotLabels,
+  type AutoPoseSlotLabels,
+} from "./autoPosePersistence";
+import {
   getAttachmentRequiredLevel,
   isAttachmentUnlocked,
 } from "@/lib/playerUnlocks";
@@ -43,8 +50,10 @@ interface CockpitOverlayProps {
   showTouchZones: boolean;
   hideVisualDeck?: boolean;
   autoPose: AutoPoseState;
+  autoPoseLabels: AutoPoseSlotLabels;
   onSavePose: (slot: AutoPoseSlotIndex) => void;
   onExecutePose: (slot: AutoPoseSlotIndex) => void;
+  onSaveAutoPoseLabels: (labels: AutoPoseSlotLabels) => void;
   savePoseDisabled?: boolean;
   executePoseDisabled?: boolean;
   attachmentType: AttachmentType;
@@ -2007,6 +2016,7 @@ function FunctionMenu({
 function AutoMenuActionButton({
   variant,
   slot,
+  label,
   active = false,
   disabled = false,
   onClick,
@@ -2015,14 +2025,13 @@ function AutoMenuActionButton({
 }: {
   variant: "save" | "execute";
   slot: AutoPoseSlotIndex;
+  label: string;
   active?: boolean;
   disabled?: boolean;
   onClick: () => void;
   showTouchZone: boolean;
   ariaLabel: string;
 }) {
-  const label = variant === "save" ? `저장${slot + 1}` : `실행${slot + 1}`;
-
   return (
     <button
       type="button"
@@ -2045,14 +2054,124 @@ function AutoMenuActionButton({
   );
 }
 
+function AutoPoseLabelsModal({
+  open,
+  labels,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  labels: AutoPoseSlotLabels;
+  onClose: () => void;
+  onSave: (labels: AutoPoseSlotLabels) => void;
+}) {
+  const [draft, setDraft] = useState<AutoPoseSlotLabels>(labels);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setDraft(labels);
+    setError(null);
+  }, [open, labels]);
+
+  if (!open) return null;
+
+  const handleSave = () => {
+    const defaults = defaultAutoPoseSlotLabels();
+    const next: AutoPoseSlotLabels = [...defaults];
+    for (let i = 0; i < AUTO_POSE_SLOT_COUNT; i++) {
+      const trimmed = draft[i].normalize("NFC").trim();
+      const len = countAutoPoseLabelChars(trimmed);
+      if (len < AUTO_POSE_LABEL_MIN_CHARS || len > AUTO_POSE_LABEL_MAX_CHARS) {
+        setError(`실행${i + 1} 이름은 ${AUTO_POSE_LABEL_MIN_CHARS}~${AUTO_POSE_LABEL_MAX_CHARS}글자로 입력하세요.`);
+        return;
+      }
+      next[i] = Array.from(trimmed).join("");
+    }
+    onSave(next);
+    onClose();
+  };
+
+  return (
+    <div className="yanmar-auto-label-modal-layer" role="presentation">
+      <button
+        type="button"
+        className="yanmar-auto-label-modal-backdrop"
+        aria-label="닫기"
+        onClick={onClose}
+      />
+      <div
+        className="yanmar-auto-label-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="yanmar-auto-label-modal-title"
+      >
+        <div className="yanmar-auto-label-modal-header">
+          <h2 id="yanmar-auto-label-modal-title">실행 이름 편집</h2>
+          <button type="button" onClick={onClose} aria-label="닫기">
+            ✕
+          </button>
+        </div>
+        <p className="yanmar-auto-label-modal-hint">
+          실행 버튼 이름을 {AUTO_POSE_LABEL_MIN_CHARS}~{AUTO_POSE_LABEL_MAX_CHARS}
+          글자로 설정할 수 있습니다.
+        </p>
+        <ul className="yanmar-auto-label-modal-list">
+          {AUTO_POSE_SLOT_ORDER.map((slot) => (
+            <li key={slot}>
+              <label htmlFor={`yanmar-auto-label-${slot}`}>
+                실행{slot + 1}
+              </label>
+              <input
+                id={`yanmar-auto-label-${slot}`}
+                type="text"
+                value={draft[slot]}
+                maxLength={AUTO_POSE_LABEL_MAX_CHARS * 2}
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(event) => {
+                  const chars = Array.from(event.target.value.normalize("NFC")).slice(
+                    0,
+                    AUTO_POSE_LABEL_MAX_CHARS,
+                  );
+                  setDraft((prev) => {
+                    const next: AutoPoseSlotLabels = [...prev];
+                    next[slot] = chars.join("");
+                    return next;
+                  });
+                  setError(null);
+                }}
+              />
+              <span className="yanmar-auto-label-modal-count tabular-nums">
+                {countAutoPoseLabelChars(draft[slot])}/{AUTO_POSE_LABEL_MAX_CHARS}
+              </span>
+            </li>
+          ))}
+        </ul>
+        {error ? <p className="yanmar-auto-label-modal-error">{error}</p> : null}
+        <div className="yanmar-auto-label-modal-actions">
+          <button type="button" onClick={onClose}>
+            취소
+          </button>
+          <button type="button" className="is-primary" onClick={handleSave}>
+            저장
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface AutoMenuProps {
   expanded: boolean;
   onToggle: () => void;
   buttonSize: string;
   showTouchZones: boolean;
   autoPose: AutoPoseState;
+  autoPoseLabels: AutoPoseSlotLabels;
   onSavePose: (slot: AutoPoseSlotIndex) => void;
   onExecutePose: (slot: AutoPoseSlotIndex) => void;
+  onEditLabels: () => void;
   savePoseDisabled?: boolean;
   executePoseDisabled?: boolean;
   isPortrait: boolean;
@@ -2066,8 +2185,10 @@ function HornAutoCluster({
   autoExpanded,
   onAutoToggle,
   autoPose,
+  autoPoseLabels,
   onSavePose,
   onExecutePose,
+  onEditLabels,
   savePoseDisabled = false,
   executePoseDisabled = false,
 }: {
@@ -2078,8 +2199,10 @@ function HornAutoCluster({
   autoExpanded: boolean;
   onAutoToggle: () => void;
   autoPose: AutoPoseState;
+  autoPoseLabels: AutoPoseSlotLabels;
   onSavePose: (slot: AutoPoseSlotIndex) => void;
   onExecutePose: (slot: AutoPoseSlotIndex) => void;
+  onEditLabels: () => void;
   savePoseDisabled?: boolean;
   executePoseDisabled?: boolean;
 }) {
@@ -2130,8 +2253,10 @@ function HornAutoCluster({
         isPortrait={isPortrait}
         showTouchZones={showTouchZones}
         autoPose={autoPose}
+        autoPoseLabels={autoPoseLabels}
         onSavePose={onSavePose}
         onExecutePose={onExecutePose}
+        onEditLabels={onEditLabels}
         savePoseDisabled={savePoseDisabled}
         executePoseDisabled={executePoseDisabled}
       />
@@ -2146,11 +2271,16 @@ function AutoMenu({
   isPortrait,
   showTouchZones,
   autoPose,
+  autoPoseLabels,
   onSavePose,
   onExecutePose,
+  onEditLabels,
   savePoseDisabled = false,
   executePoseDisabled = false,
 }: AutoMenuProps) {
+  const editOpenDelayMs = AUTO_POSE_SLOT_ORDER.length * 50;
+  const editCloseDelayMs = 0;
+
   return (
     <div
       className="yanmar-auto-menu"
@@ -2168,6 +2298,7 @@ function AutoMenu({
           const hasSavedPose = autoPose.slots[slot] != null;
           const isExecutingThis =
             autoPose.executing && autoPose.activeSlot === slot;
+          const executeLabel = autoPoseLabels[slot] || `실행${slot + 1}`;
 
           return (
             <div
@@ -2188,16 +2319,17 @@ function AutoMenu({
                   <AutoMenuActionButton
                     variant="execute"
                     slot={slot}
+                    label={executeLabel}
                     active={isExecutingThis}
                     disabled={!hasSavedPose || autoPose.executing || executePoseDisabled}
                     onClick={() => onExecutePose(slot)}
                     showTouchZone={showTouchZones}
                     ariaLabel={
                       executePoseDisabled
-                        ? `슬롯 ${slot + 1} 자세 실행 대기 중`
+                        ? `${executeLabel} 자세 실행 대기 중`
                         : isExecutingThis
-                          ? `슬롯 ${slot + 1} 자동 자세 실행 중`
-                          : `슬롯 ${slot + 1} 저장된 자세 실행`
+                          ? `${executeLabel} 자동 자세 실행 중`
+                          : `${executeLabel} 저장된 자세 실행`
                     }
                   />
                 </div>
@@ -2205,6 +2337,7 @@ function AutoMenu({
                   <AutoMenuActionButton
                     variant="save"
                     slot={slot}
+                    label={`저장${slot + 1}`}
                     active={hasSavedPose}
                     disabled={savePoseDisabled}
                     onClick={() => onSavePose(slot)}
@@ -2222,6 +2355,26 @@ function AutoMenu({
             </div>
           );
         })}
+        <div
+          className="yanmar-auto-menu-item yanmar-auto-menu-edit-item"
+          style={{
+            transitionDelay: `${expanded ? editOpenDelayMs : editCloseDelayMs}ms`,
+          }}
+          aria-hidden={!expanded}
+        >
+          <button
+            type="button"
+            className="yanmar-auto-menu-edit yanmar-aux-button touch-none active:scale-95"
+            style={{
+              width: `calc(${buttonSize} * 2 + 0.38rem)`,
+              height: `calc(${buttonSize} * 0.72)`,
+            }}
+            onClick={onEditLabels}
+            aria-label="실행 이름 편집"
+          >
+            <span className="yanmar-auto-menu-edit-label">편집</span>
+          </button>
+        </div>
       </div>
 
       <button
@@ -2260,8 +2413,10 @@ export function CockpitOverlay({
   showTouchZones,
   hideVisualDeck = false,
   autoPose,
+  autoPoseLabels,
   onSavePose,
   onExecutePose,
+  onSaveAutoPoseLabels,
   savePoseDisabled = false,
   executePoseDisabled = false,
   attachmentType,
@@ -2283,6 +2438,7 @@ export function CockpitOverlay({
   const useDPad = mode !== "intro";
   const [functionMenuExpanded, setFunctionMenuExpanded] = useState(false);
   const [autoMenuExpanded, setAutoMenuExpanded] = useState(false);
+  const [autoLabelModalOpen, setAutoLabelModalOpen] = useState(false);
   /** 중앙 동시 레버와 좌·우 개별 레버는 서로 배타. 좌·우는 동시 조작 가능. */
   const [travelLock, setTravelLock] = useState<"sides" | "both" | null>(null);
   const sideTravelActiveRef = useRef({ left: false, right: false });
@@ -2460,35 +2616,6 @@ export function CockpitOverlay({
               onAuxiliaryChange((current) => ({ ...current, boomSwing }))
             }
           />
-          <FunctionMenu
-            expanded={functionMenuExpanded}
-            onToggle={() => setFunctionMenuExpanded((open) => !open)}
-            layout={layout}
-            isPortrait={isPortrait}
-            showTouchZones={showTouchZones}
-            auxiliary={auxiliary}
-            onAuxiliaryChange={onAuxiliaryChange}
-            attachmentType={attachmentType}
-            playerLevel={playerLevel}
-            unlockAllAttachments={unlockAllAttachments}
-            onAttachmentChange={onAttachmentChange}
-          />
-          <HornAutoCluster
-            layout={layout}
-            isPortrait={isPortrait}
-            showTouchZones={showTouchZones}
-            onHorn={() => {
-              yanmarAudio.playHorn(hornId);
-              onHorn?.();
-            }}
-            autoExpanded={autoMenuExpanded}
-            onAutoToggle={() => setAutoMenuExpanded((open) => !open)}
-            autoPose={autoPose}
-            onSavePose={onSavePose}
-            onExecutePose={onExecutePose}
-            savePoseDisabled={savePoseDisabled}
-            executePoseDisabled={executePoseDisabled}
-          />
           <GameJoystick
             side="left"
             layout={layout.left}
@@ -2523,6 +2650,50 @@ export function CockpitOverlay({
           />
         </div>
       </div>
+
+      {/* 주행·조이스틱보다 위에 두어 주행 중에도 기능/자동/경적 클릭 가능 */}
+      <div className="yanmar-control-deck yanmar-aux-menu-layer absolute inset-x-0 z-[80] mx-auto pointer-events-none">
+        <div className="relative h-full w-full">
+          <FunctionMenu
+            expanded={functionMenuExpanded}
+            onToggle={() => setFunctionMenuExpanded((open) => !open)}
+            layout={layout}
+            isPortrait={isPortrait}
+            showTouchZones={showTouchZones}
+            auxiliary={auxiliary}
+            onAuxiliaryChange={onAuxiliaryChange}
+            attachmentType={attachmentType}
+            playerLevel={playerLevel}
+            unlockAllAttachments={unlockAllAttachments}
+            onAttachmentChange={onAttachmentChange}
+          />
+          <HornAutoCluster
+            layout={layout}
+            isPortrait={isPortrait}
+            showTouchZones={showTouchZones}
+            onHorn={() => {
+              yanmarAudio.playHorn(hornId);
+              onHorn?.();
+            }}
+            autoExpanded={autoMenuExpanded}
+            onAutoToggle={() => setAutoMenuExpanded((open) => !open)}
+            autoPose={autoPose}
+            autoPoseLabels={autoPoseLabels}
+            onSavePose={onSavePose}
+            onExecutePose={onExecutePose}
+            onEditLabels={() => setAutoLabelModalOpen(true)}
+            savePoseDisabled={savePoseDisabled}
+            executePoseDisabled={executePoseDisabled}
+          />
+        </div>
+      </div>
+
+      <AutoPoseLabelsModal
+        open={autoLabelModalOpen}
+        labels={autoPoseLabels}
+        onClose={() => setAutoLabelModalOpen(false)}
+        onSave={onSaveAutoPoseLabels}
+      />
     </>
   );
 }

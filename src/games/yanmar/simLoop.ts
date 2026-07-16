@@ -116,6 +116,7 @@ import {
   computeComAlignFactor,
   computeGrappleAdhesion,
   createGrappleGripRuntime,
+  GRAPPLE_GRAB_MIN_OPEN,
   grappleBucketAngleReady,
   hillBoulderGripEnvelope,
   hillBoulderWrapRadius,
@@ -161,6 +162,11 @@ export interface SimLoopRuntime {
   breakerHitCount: number;
   warningCooldown: number;
   grappleGrip: GrappleGripRuntime;
+  /**
+   * 집게가 70% 이상 열린 채 닫기를 시작하면 true.
+   * 페달을 떼거나 다시 열기 전까지 유지해, 닫히는 도중에도 지면 집기가 되게 한다.
+   */
+  grappleGrabArmed: boolean;
   /** 트럭·특수구역 쿨타임용 벽시계 (탭 백그라운드 복귀 시 경과 반영). */
   lastSystemsWallMs: number;
 }
@@ -189,6 +195,7 @@ export function createSimLoopRuntime(): SimLoopRuntime {
     breakerHitCount: 0,
     warningCooldown: 0,
     grappleGrip: createGrappleGripRuntime(),
+    grappleGrabArmed: false,
     lastSystemsWallMs: 0,
   };
 }
@@ -659,6 +666,8 @@ export function tickExcavatorSim(params: SimTickParams) {
         stats.crashRespawnSec,
         stats.haulTruckCooldownSec,
         stats.hillBoulderCount,
+        sim.posX,
+        sim.posZ,
       );
     } else {
       updateDumpTruckState(truckState, wallDt, stats.truckCooldownSec);
@@ -669,6 +678,8 @@ export function tickExcavatorSim(params: SimTickParams) {
         stats.crashRespawnSec,
         stats.haulTruckCooldownSec,
         stats.hillBoulderCount,
+        sim.posX,
+        sim.posZ,
       );
     }
   } else {
@@ -1072,6 +1083,20 @@ export function tickExcavatorSim(params: SimTickParams) {
     const permission = checkAttachmentUse("grapple", toolZone, "grab");
     const closing = grapplePedal > 0;
     const opening = grapplePedal < 0;
+    const grappleOpenAmount = auxiliary?.grappleOpen ?? 1;
+    /** 70% 이상 열린 상태에서 접기를 시작하면 닫히는 동안 집기 가능. */
+    if (closing && grappleOpenAmount >= GRAPPLE_GRAB_MIN_OPEN) {
+      runtime.grappleGrabArmed = true;
+    } else if (!closing) {
+      runtime.grappleGrabArmed = false;
+    }
+    const groundPickup =
+      !!wrappableRock &&
+      isGrappleGroundPickupPose(
+        grappleClamp,
+        wrappableRock,
+        sampleHeight(terrain, wrappableRock.x, wrappableRock.z),
+      );
     // Rocks only exist in the stone zone — allow wrap contact even if the clamp
     // samples just outside the painted radius after terrain flatten.
     const canGrabHere = permission.allowed || wrappableRock != null;
@@ -1082,36 +1107,33 @@ export function tickExcavatorSim(params: SimTickParams) {
 
     if (canGrabHere && runtime.attachmentActionCooldown <= 0) {
       if (hillForGrapple?.active && !sim.carriedBoulderId && closing) {
-        const groundPickup =
-          !!wrappableRock &&
-          isGrappleGroundPickupPose(
-            grappleClamp,
-            wrappableRock,
-            sampleHeight(terrain, wrappableRock.x, wrappableRock.z),
-          );
-        if (wrappableRock && !angleReady && !groundPickup) {
-          warnAttachment("버켓 각도를 집게와 맞춰주세요.");
-          runtime.attachmentActionCooldown = 0.35;
-        } else if (wrappableRock && (angleReady || groundPickup)) {
-          wrappableRock.active = false;
-          sim.carriedBoulderId = wrappableRock.id;
-          resetGrappleGrip(runtime.grappleGrip);
-          runtime.grappleGrip.contactElapsed = 0;
-          runtime.grappleGrip.comFactor = computeComAlignFactor(
-            wrappableRock,
-            grappleClamp.x,
-            grappleClamp.z,
-          );
-          const initial = computeGrappleAdhesion({
-            rock: wrappableRock,
-            contactElapsed: 0,
-            bucketAngle: sim.bucket,
-            comFactor: runtime.grappleGrip.comFactor,
-            adhesionBonus: stats.gripAdhesionBonus,
-          });
-          runtime.grappleGrip.adhesion01 = initial.adhesion01;
-          runtime.grappleGrip.pressure01 = initial.pressure01;
-          runtime.attachmentActionCooldown = 0.2;
+        // 접힌 채 닫기·공중 집기 불가. 지면 자세 + (70%↑ 열린 뒤 접기)만 허용.
+        if (wrappableRock && runtime.grappleGrabArmed && groundPickup) {
+          if (!angleReady) {
+            warnAttachment("버켓 각도를 집게와 맞춰주세요.");
+            runtime.attachmentActionCooldown = 0.35;
+          } else {
+            wrappableRock.active = false;
+            sim.carriedBoulderId = wrappableRock.id;
+            runtime.grappleGrabArmed = false;
+            resetGrappleGrip(runtime.grappleGrip);
+            runtime.grappleGrip.contactElapsed = 0;
+            runtime.grappleGrip.comFactor = computeComAlignFactor(
+              wrappableRock,
+              grappleClamp.x,
+              grappleClamp.z,
+            );
+            const initial = computeGrappleAdhesion({
+              rock: wrappableRock,
+              contactElapsed: 0,
+              bucketAngle: sim.bucket,
+              comFactor: runtime.grappleGrip.comFactor,
+              adhesionBonus: stats.gripAdhesionBonus,
+            });
+            runtime.grappleGrip.adhesion01 = initial.adhesion01;
+            runtime.grappleGrip.pressure01 = initial.pressure01;
+            runtime.attachmentActionCooldown = 0.2;
+          }
         }
       } else if (hillForGrapple && sim.carriedBoulderId && opening) {
         const atDrop = isAlignedForTruckDump(
@@ -1435,21 +1457,30 @@ export function tickExcavatorSim(params: SimTickParams) {
   const canStrike =
     breakerOverAsphalt && toolTouchesGround && breakerAngleReady;
 
+  const grappleOpenForHud = auxiliary?.grappleOpen ?? 1;
+  const grappleGroundPickupHud =
+    !!wrappableRock &&
+    isGrappleGroundPickupPose(
+      grappleClamp,
+      wrappableRock,
+      sampleHeight(terrain, wrappableRock.x, wrappableRock.z),
+    );
+  const grappleReadyToCloseGrab =
+    grappleOpenForHud >= GRAPPLE_GRAB_MIN_OPEN || runtime.grappleGrabArmed;
   const canGrab =
     sim.attachmentType === "grapple" &&
     !sim.carriedBoulderId &&
     !!wrappableRock &&
-    (angleReady ||
-      isGrappleGroundPickupPose(
-        grappleClamp,
-        wrappableRock,
-        sampleHeight(terrain, wrappableRock.x, wrappableRock.z),
-      ));
+    angleReady &&
+    grappleGroundPickupHud &&
+    grappleReadyToCloseGrab;
   const grappleNeedsAlignment =
     sim.attachmentType === "grapple" &&
     !sim.carriedBoulderId &&
     !!wrappableRock &&
-    !canGrab;
+    grappleGroundPickupHud &&
+    grappleReadyToCloseGrab &&
+    !angleReady;
   const canDropRock =
     sim.attachmentType === "grapple" &&
     !!sim.carriedBoulderId &&

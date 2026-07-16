@@ -98,7 +98,7 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
     : "미션 완료";
 
   return (
-    <div className="yanmar-mission-hud-panel relative w-full overflow-visible rounded-xl border border-white/15 bg-black/60 text-white shadow-lg backdrop-blur-sm">
+    <div className="yanmar-mission-hud-panel relative w-full overflow-hidden rounded-xl border border-white/12 bg-black/40 text-white shadow-lg backdrop-blur-sm">
       <button
         type="button"
         className="flex h-6 w-full items-center justify-between gap-1 px-1.5 text-left hover:bg-white/8"
@@ -126,7 +126,7 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
       </button>
 
       {expanded ? (
-        <div className="absolute left-0 top-full z-20 mt-1 w-max min-w-full rounded-xl border border-white/15 bg-black/60 px-1.5 py-1.5 shadow-lg backdrop-blur-sm">
+        <div className="border-t border-white/10 px-1.5 pb-1.5 pt-1">
           {!mission ? (
             <p className="whitespace-nowrap text-center text-[8px] font-black text-emerald-200">
               미션 퀘스트 완료

@@ -145,11 +145,12 @@ function StoneZonePaint({ zone, terrain }: { zone: HillZone; terrain: TerrainDat
     (rock) => rock.active && !rock.delivered && !rock.extracted,
   ).length;
   const respawnEtaSec = getHillZoneRespawnEtaSec(zone);
-  const label = zone.active
-    ? `석재 · ${remaining}`
-    : respawnEtaSec > 0
+  const label =
+    respawnEtaSec > 0
       ? `석재 · 리젠 ${formatDumpTruckReturnTime(respawnEtaSec)}`
-      : "석재";
+      : zone.active
+        ? `석재 · ${remaining}`
+        : "석재";
   return (
     <group position={[zone.centerX, paintY, zone.centerZ]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={0}>

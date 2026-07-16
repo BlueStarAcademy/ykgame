@@ -14,6 +14,8 @@ export const GRAPPLE_BUCKET_ANGLE_MIN = 0.35;
 export const GRAPPLE_BUCKET_ANGLE_MAX = 2.4;
 /** 클램프 XZ 기준 돌 집기 반경 (시각·키네마틱 오차 흡수). */
 export const GRAPPLE_GRAB_XZ_RADIUS = 2.35;
+/** 이 이상 열려 있을 때만 접기(닫기)로 돌을 집을 수 있다. 0=닫힘, 1=완전 열림. */
+export const GRAPPLE_GRAB_MIN_OPEN = 0.7;
 /**
  * 집기용 클램프 지면 여유 기본 상한 (작은 돌 기준).
  * 실제 판정은 {@link grapplePickupMaxClearance}로 돌 크기를 반영한다.

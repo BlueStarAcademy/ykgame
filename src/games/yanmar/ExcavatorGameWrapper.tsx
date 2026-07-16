@@ -120,10 +120,14 @@ import {
   type YanmarGameSessionSnapshot,
 } from "./gameSessionPersistence";
 import {
+  defaultAutoPoseSlotLabels,
+  loadAutoPoseSlotLabelsForSession,
   loadAutoPoseSlotsForSession,
   resolveAutoPoseStorageOwner,
+  saveAutoPoseSlotLabels,
   saveSavedArmPoseSlot,
   saveSavedArmPoseSlots,
+  type AutoPoseSlotLabels,
 } from "./autoPosePersistence";
 import {
   loadAuxiliarySettingsForSession,
@@ -623,6 +627,9 @@ export function ExcavatorGameWrapper({
   );
   const autoPoseRef = useRef<AutoPoseState>(createAutoPoseState());
   const [autoPose, setAutoPose] = useState<AutoPoseState>(autoPoseRef.current);
+  const [autoPoseLabels, setAutoPoseLabels] = useState<AutoPoseSlotLabels>(
+    defaultAutoPoseSlotLabels,
+  );
   const [poseSaveToastKey, setPoseSaveToastKey] = useState(0);
   const [poseSaveToastVisible, setPoseSaveToastVisible] = useState(false);
   const [levelUpToast, setLevelUpToast] = useState<{
@@ -634,6 +641,7 @@ export function ExcavatorGameWrapper({
   const [attachmentWarning, setAttachmentWarning] = useState<{
     key: number;
     message: string;
+    enhanceCores?: number;
   } | null>(null);
   const [unlockQueue, setUnlockQueue] = useState<PlayerUnlockKind[]>([]);
   const unlockSeenOwnerRef = useRef("local");
@@ -1046,6 +1054,7 @@ export function ExcavatorGameWrapper({
       ...autoPoseRef.current,
       slots: [...autoPoseRef.current.slots],
     });
+    setAutoPoseLabels(loadAutoPoseSlotLabelsForSession(userId));
 
     if (userId && modeRef.current === "game" && !gameSessionRestoredRef.current) {
       const snapshot = loadYanmarGameSession(userId);
@@ -1332,19 +1341,23 @@ export function ExcavatorGameWrapper({
     }, 2800);
   }, []);
 
-  const showAttachmentWarning = useCallback((message: string) => {
-    if (attachmentWarningTimerRef.current != null) {
-      window.clearTimeout(attachmentWarningTimerRef.current);
-    }
-    setAttachmentWarning((current) => ({
-      key: (current?.key ?? 0) + 1,
-      message,
-    }));
-    attachmentWarningTimerRef.current = window.setTimeout(() => {
-      setAttachmentWarning(null);
-      attachmentWarningTimerRef.current = null;
-    }, 2400);
-  }, []);
+  const showAttachmentWarning = useCallback(
+    (message: string, opts?: { enhanceCores?: number }) => {
+      if (attachmentWarningTimerRef.current != null) {
+        window.clearTimeout(attachmentWarningTimerRef.current);
+      }
+      setAttachmentWarning((current) => ({
+        key: (current?.key ?? 0) + 1,
+        message,
+        enhanceCores: opts?.enhanceCores,
+      }));
+      attachmentWarningTimerRef.current = window.setTimeout(() => {
+        setAttachmentWarning(null);
+        attachmentWarningTimerRef.current = null;
+      }, 2400);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (mode === "intro" || mode === "gameReady") {
@@ -1825,7 +1838,7 @@ export function ExcavatorGameWrapper({
       } else {
         setEnhanceCores((prev) => prev + n);
       }
-      showAttachmentWarning(`강화코어 획득! +${n}`);
+      showAttachmentWarning("", { enhanceCores: n });
     },
     [showAttachmentWarning],
   );
@@ -2183,6 +2196,17 @@ export function ExcavatorGameWrapper({
     setAutoPose({ ...autoPoseRef.current });
     setExecutePoseCooldownUntil(now + poseActionCooldownMs);
   }, [executePoseCooldownUntil, poseActionCooldownMs]);
+
+  const handleSaveAutoPoseLabels = useCallback(
+    (labels: AutoPoseSlotLabels) => {
+      setAutoPoseLabels(labels);
+      const ownerId = resolveAutoPoseStorageOwner(
+        session?.user?.id ?? gameSessionUserIdRef.current,
+      );
+      saveAutoPoseSlotLabels(ownerId, labels);
+    },
+    [session?.user?.id],
+  );
 
   const resetExcavatorPosition = useCallback(() => {
     const initial = createInitialSim();
@@ -2931,9 +2955,9 @@ export function ExcavatorGameWrapper({
           rewardStarsRef.current += claimed.reward.stars;
         }
         if ((claimed.reward.enhanceCores ?? 0) > 0) {
-          showAttachmentWarning(
-            `강화코어 획득! +${claimed.reward.enhanceCores}`,
-          );
+          showAttachmentWarning("", {
+            enhanceCores: claimed.reward.enhanceCores,
+          });
         }
         showStandaloneRewardPanel(
           0,
@@ -2980,9 +3004,9 @@ export function ExcavatorGameWrapper({
         rewardStarsRef.current += claimed.reward.stars;
       }
       if ((claimed.reward.enhanceCores ?? 0) > 0) {
-        showAttachmentWarning(
-          `강화코어 획득! +${claimed.reward.enhanceCores}`,
-        );
+        showAttachmentWarning("", {
+          enhanceCores: claimed.reward.enhanceCores,
+        });
       }
       showStandaloneRewardPanel(
         claimed.reward.score ?? 0,
@@ -3028,9 +3052,9 @@ export function ExcavatorGameWrapper({
           rewardStarsRef.current += claimed.reward.stars;
         }
         if ((claimed.reward.enhanceCores ?? 0) > 0) {
-          showAttachmentWarning(
-            `강화코어 획득! +${claimed.reward.enhanceCores}`,
-          );
+          showAttachmentWarning("", {
+            enhanceCores: claimed.reward.enhanceCores,
+          });
         }
         showStandaloneRewardPanel(
           0,
@@ -4040,22 +4064,27 @@ export function ExcavatorGameWrapper({
                 </button>
               </div>
             ) : null}
-            {!questsDisabled && showMissionQuest ? (
-              <div className="pointer-events-auto w-[7.3125rem]">
-                <MissionHudPanel
-                  questState={questState}
-                  claiming={questClaimingId === "mission"}
-                  onClaim={() => {
-                    void handleClaimMissionQuest();
-                  }}
-                />
-              </div>
-            ) : null}
+          </div>
+        ) : null}
+
+        {mode !== "intro" &&
+        mode !== "gameReady" &&
+        mode !== "ride" &&
+        !questsDisabled &&
+        showMissionQuest ? (
+          <div className="pointer-events-auto absolute left-1 top-1/2 z-50 w-[7.3125rem] -translate-y-1/2">
+            <MissionHudPanel
+              questState={questState}
+              claiming={questClaimingId === "mission"}
+              onClaim={() => {
+                void handleClaimMissionQuest();
+              }}
+            />
           </div>
         ) : null}
 
         {mode !== "intro" && mode !== "ride" && (
-          <div className="pointer-events-none absolute left-1/2 top-2 z-50 flex -translate-x-1/2 flex-col items-center gap-1">
+          <div className="pointer-events-none absolute left-1/2 top-14 z-50 flex -translate-x-1/2 flex-col items-center gap-1">
             {!(immersive && headerHudReady) ? (
               <div className="flex min-w-[5.5rem] flex-col items-center rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-white shadow-lg backdrop-blur-sm">
                 <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/70">
@@ -4459,11 +4488,31 @@ export function ExcavatorGameWrapper({
         {mode !== "intro" && attachmentWarning ? (
           <div
             key={attachmentWarning.key}
-            className="yanmar-attachment-warning-toast"
+            className={`yanmar-attachment-warning-toast${
+              attachmentWarning.enhanceCores
+                ? " yanmar-attachment-warning-toast--cores"
+                : ""
+            }`}
             role="status"
             aria-live="polite"
           >
-            {attachmentWarning.message}
+            {attachmentWarning.enhanceCores ? (
+              <span className="yanmar-enhance-core-toast">
+                <img
+                  src="/images/yanmar/2d/enhance-core.png?v=3"
+                  alt=""
+                  width={28}
+                  height={28}
+                  className="yanmar-enhance-core-toast-img"
+                  draggable={false}
+                />
+                <span className="yanmar-enhance-core-toast-amount tabular-nums">
+                  +{attachmentWarning.enhanceCores}
+                </span>
+              </span>
+            ) : (
+              attachmentWarning.message
+            )}
           </div>
         ) : null}
         {mode !== "intro" && levelUpToast ? (
@@ -4583,7 +4632,13 @@ export function ExcavatorGameWrapper({
         {mode !== "intro" && mode !== "gameReady" && (
           <div
             className="absolute inset-0 z-[5] touch-none"
-            style={{ pointerEvents: "auto" }}
+            style={{
+              pointerEvents:
+                Math.abs(input.travel.left) > FREE_LOOK_TRAVEL_THRESHOLD ||
+                Math.abs(input.travel.right) > FREE_LOOK_TRAVEL_THRESHOLD
+                  ? "none"
+                  : "auto",
+            }}
             onPointerDown={onFreeLookPointerDown}
             onPointerMove={onFreeLookPointerMove}
             onPointerUp={onFreeLookPointerUp}
@@ -4620,8 +4675,10 @@ export function ExcavatorGameWrapper({
             onAttachmentChange={handleAttachmentChange}
             onAttachmentWarning={showAttachmentWarning}
             autoPose={autoPose}
+            autoPoseLabels={autoPoseLabels}
             onSavePose={handleSavePose}
             onExecutePose={handleExecutePose}
+            onSaveAutoPoseLabels={handleSaveAutoPoseLabels}
             savePoseDisabled={savePoseOnCooldown}
             executePoseDisabled={executePoseOnCooldown}
             allowed={allowed}

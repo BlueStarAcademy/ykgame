@@ -13,13 +13,13 @@ import {
 
 export const GRID_SIZE = 64;
 export const CELL_SIZE = 2;
-export const DIG_ZONE_CAPACITY_UNITS = 4000;
-export const DIG_ZONE_CAPACITY_MIN = 4000;
-export const DIG_ZONE_CAPACITY_MAX = 5000;
+export const DIG_ZONE_CAPACITY_UNITS = 8000;
+export const DIG_ZONE_CAPACITY_MIN = 8000;
+export const DIG_ZONE_CAPACITY_MAX = 8000;
 export const DIG_ZONE_CAPACITY_STEP = 100;
 export const DIG_ZONE_COUNT = 2;
-export const DIG_ZONE_RESPAWN_MS = 10 * 1000;
-/** 아스팔트 9칸 전부 파괴 후 일괄 재생성까지 대기. */
+export const DIG_ZONE_RESPAWN_MS = 60 * 1000;
+/** 아스팔트·돌 구역: 이탈 후(또는 전량 소진 후) 풀 리젠까지 대기. */
 export const CRASH_ZONE_RESPAWN_MS = 5 * 60 * 1000;
 export const CRASH_TILE_MAX_HP = 1000;
 export const CRASH_HIT_DAMAGE = 10;
@@ -37,7 +37,7 @@ export const HAUL_TRUCK_ENGINE_START_SEC = 2.2;
 export const HAUL_TRUCK_DEPART_SEC = 5.8;
 export const HAUL_TRUCK_ARRIVE_SEC = 10;
 export const HILL_BOULDER_COUNT = 5;
-/** 돌 구역의 돌을 모두 반출한 뒤 구역 재생성까지 대기. */
+/** 돌 구역: 이탈 후(또는 전량 반출 후) 풀 리젠까지 대기. */
 export const HILL_ZONE_RESPAWN_MS = 300 * 1000;
 /** 채취량은 유지하되 화면에 보이는 지형 침하는 완만하게 제한한다. */
 const DIG_TERRAIN_DEFORMATION_SCALE = 0.16;
@@ -602,11 +602,7 @@ function distance(ax: number, az: number, bx: number, bz: number) {
 }
 
 export function randomDigCapacityUnits() {
-  const steps =
-    Math.floor(
-      (DIG_ZONE_CAPACITY_MAX - DIG_ZONE_CAPACITY_MIN) / DIG_ZONE_CAPACITY_STEP,
-    ) + 1;
-  return DIG_ZONE_CAPACITY_MIN + Math.floor(Math.random() * steps) * DIG_ZONE_CAPACITY_STEP;
+  return DIG_ZONE_CAPACITY_UNITS;
 }
 
 export function digZoneLabel(zoneId: string, index = 0) {
@@ -622,11 +618,24 @@ export function getDigZoneRespawnEtaSec(zone: DigZone, now = Date.now()) {
   return Math.max(0, (zone.respawnAt - now) / 1000);
 }
 
+export function isCrashZoneFull(zone: CrashZone | null | undefined): boolean {
+  if (!zone?.active) return false;
+  return zone.tiles.every((tile) => tile.active && tile.hp >= tile.maxHp);
+}
+
+export function isHillZoneFull(zone: HillZone | null | undefined): boolean {
+  if (!zone?.active || zone.boulders.length === 0) return false;
+  return zone.boulders.every(
+    (rock) => rock.active && !rock.extracted && !rock.delivered,
+  );
+}
+
 export function getCrashZoneRespawnEtaSec(
   zone: CrashZone | null | undefined,
   now = Date.now(),
 ) {
-  if (!zone || zone.active || zone.respawnAt == null) return 0;
+  if (!zone || zone.respawnAt == null) return 0;
+  if (isCrashZoneFull(zone)) return 0;
   return Math.max(0, (zone.respawnAt - now) / 1000);
 }
 
@@ -634,7 +643,8 @@ export function getHillZoneRespawnEtaSec(
   zone: HillZone | null | undefined,
   now = Date.now(),
 ) {
-  if (!zone || zone.active || zone.respawnAt == null) return 0;
+  if (!zone || zone.respawnAt == null) return 0;
+  if (isHillZoneFull(zone)) return 0;
   return Math.max(0, (zone.respawnAt - now) / 1000);
 }
 
@@ -689,7 +699,7 @@ function createRandomDigZones(
   const zones: DigZone[] = [];
   for (let i = 0; i < DIG_ZONE_COUNT; i++) {
     const pos = randomDigZonePosition(originX, originZ, zones, gridSizeX, gridSizeZ);
-    zones.push(createDigZone(`dig-${i + 1}`, pos.x, pos.z, randomDigCapacityUnits()));
+    zones.push(createDigZone(`dig-${i + 1}`, pos.x, pos.z, DIG_ZONE_CAPACITY_UNITS));
   }
   return zones;
 }
@@ -797,7 +807,7 @@ export function updateDigZoneRespawns(terrain: TerrainData, now = Date.now()) {
       terrain.gridSizeZ,
       zone.id,
     );
-    const capacity = randomDigCapacityUnits();
+    const capacity = DIG_ZONE_CAPACITY_UNITS;
     zone.x = pos.x;
     zone.z = pos.z;
     zone.capacityUnits = capacity;
@@ -1085,6 +1095,10 @@ export function tryClearHillZone(
   return true;
 }
 
+/**
+ * 돌·아스팔트: 구역에 남아 있어도 플레이어가 나가 있으면 리젠 타이머를 돌리고,
+ * 시간이 지나면 100%로 채운다. 구역 안에 있으면(아직 활성일 때) 타이머를 취소한다.
+ */
 export function updateSpecialZones(
   terrain: TerrainData,
   dt: number,
@@ -1092,30 +1106,58 @@ export function updateSpecialZones(
   crashRespawnSec = CRASH_ZONE_RESPAWN_MS / 1000,
   haulTruckCooldownSec = HAUL_TRUCK_COOLDOWN_SEC,
   hillBoulderCount = HILL_BOULDER_COUNT,
+  playerX?: number,
+  playerZ?: number,
 ) {
   const crash = terrain.crashZone;
-  if (crash && !crash.active && crash.clearedAt) {
-    crash.respawnAt = crash.clearedAt + crashRespawnSec * 1000;
-  }
-  if (crash && !crash.active && crash.respawnAt && now >= crash.respawnAt) {
-    // 같은 자리에 9칸 아스팔트를 한꺼번에 재생성한다.
-    terrain.crashZone = createCrashZone(crash.centerX, crash.centerZ);
-    rebakeSpecialSiteSurfaces(terrain);
+  if (crash) {
+    const playerInCrash =
+      playerX != null &&
+      playerZ != null &&
+      crash.active &&
+      isInCrashZone(terrain, playerX, playerZ);
+    if (isCrashZoneFull(crash)) {
+      crash.clearedAt = null;
+      crash.respawnAt = null;
+    } else if (playerInCrash) {
+      crash.clearedAt = null;
+      crash.respawnAt = null;
+    } else {
+      if (crash.clearedAt == null) crash.clearedAt = now;
+      crash.respawnAt = crash.clearedAt + crashRespawnSec * 1000;
+      if (now >= crash.respawnAt) {
+        terrain.crashZone = createCrashZone(crash.centerX, crash.centerZ);
+        rebakeSpecialSiteSurfaces(terrain);
+      }
+    }
   }
 
   const hill = terrain.hillZone;
-  if (hill && !hill.active && hill.clearedAt) {
-    hill.respawnAt = hill.clearedAt + HILL_ZONE_RESPAWN_MS;
-  }
-  if (hill && !hill.active && hill.respawnAt && now >= hill.respawnAt) {
-    // 트럭 적재/운행 상태는 유지한 채 같은 자리에 돌 구역만 재생성한다.
-    terrain.hillZone = createHillZone(
-      hill.centerX,
-      hill.centerZ,
-      hill.haulTruck,
-      hillBoulderCount,
-    );
-    rebakeSpecialSiteSurfaces(terrain);
+  if (hill) {
+    const playerInHill =
+      playerX != null &&
+      playerZ != null &&
+      hill.active &&
+      isInHillZone(terrain, playerX, playerZ);
+    if (isHillZoneFull(hill)) {
+      hill.clearedAt = null;
+      hill.respawnAt = null;
+    } else if (playerInHill) {
+      hill.clearedAt = null;
+      hill.respawnAt = null;
+    } else {
+      if (hill.clearedAt == null) hill.clearedAt = now;
+      hill.respawnAt = hill.clearedAt + HILL_ZONE_RESPAWN_MS;
+      if (now >= hill.respawnAt) {
+        terrain.hillZone = createHillZone(
+          hill.centerX,
+          hill.centerZ,
+          hill.haulTruck,
+          hillBoulderCount,
+        );
+        rebakeSpecialSiteSurfaces(terrain);
+      }
+    }
   }
 
   const truck = terrain.hillZone?.haulTruck;

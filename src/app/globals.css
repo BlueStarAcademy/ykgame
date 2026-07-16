@@ -556,6 +556,57 @@ body {
   animation: yanmar-pose-save-toast-fade 2.4s ease-out forwards;
 }
 
+.yanmar-attachment-warning-toast--cores {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: linear-gradient(
+    160deg,
+    rgba(30, 41, 59, 0.88),
+    rgba(15, 23, 42, 0.92)
+  );
+  padding: 0.55rem 0.85rem;
+}
+
+.yanmar-enhance-core-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.yanmar-enhance-core-toast-img {
+  display: block;
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
+  filter: drop-shadow(0 0.12rem 0.18rem rgba(0, 0, 0, 0.55));
+}
+
+.yanmar-enhance-core-toast-amount {
+  color: #fde68a;
+  font-size: clamp(0.95rem, 3.2vw, 1.15rem);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 0.08rem 0.16rem rgba(0, 0, 0, 0.55);
+}
+
+.yanmar-aux-menu-layer {
+  pointer-events: none;
+}
+
+.yanmar-aux-menu-layer .yanmar-function-menu,
+.yanmar-aux-menu-layer .yanmar-horn-auto-cluster {
+  pointer-events: none;
+}
+
+.yanmar-aux-menu-layer .yanmar-function-menu-toggle,
+.yanmar-aux-menu-layer .yanmar-horn-standalone,
+.yanmar-aux-menu-layer .yanmar-auto-menu-toggle,
+.yanmar-aux-menu-layer .yanmar-auto-menu-edit,
+.yanmar-aux-menu-layer .yanmar-function-menu-grid.is-expanded .yanmar-function-menu-item,
+.yanmar-aux-menu-layer .yanmar-function-menu-grid.is-expanded .yanmar-function-menu-attachments,
+.yanmar-aux-menu-layer .yanmar-auto-menu-items.is-expanded .yanmar-auto-menu-item {
+  pointer-events: auto;
+}
+
 .yanmar-practice-ticker {
   background: linear-gradient(180deg, #1c1917 0%, #0c0a09 100%);
   border-bottom: 1px solid rgba(251, 191, 36, 0.32);
@@ -2238,9 +2289,10 @@ body {
 
 .yanmar-function-menu {
   position: absolute;
-  z-index: 65;
+  z-index: 85;
   transform: translate(-50%, -50%);
   overflow: visible;
+  pointer-events: none;
 }
 
 .yanmar-function-menu-grid {
@@ -2770,6 +2822,7 @@ body {
   bottom: 0;
   z-index: 2;
   flex-shrink: 0;
+  pointer-events: auto;
   border-color: rgba(167, 243, 208, 0.34);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 32%),
@@ -3067,7 +3120,7 @@ body {
 
 .yanmar-horn-auto-cluster {
   position: absolute;
-  z-index: 66;
+  z-index: 85;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -3206,11 +3259,180 @@ body {
   pointer-events: auto;
 }
 
+.yanmar-auto-menu-items.is-expanded .yanmar-auto-menu-edit-item {
+  max-height: 2.4rem;
+}
+
+.yanmar-auto-menu-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-color: rgba(196, 181, 253, 0.4);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(76, 29, 149, 0.72), rgba(2, 6, 23, 0.92));
+  color: #f5f3ff;
+}
+
+.yanmar-auto-menu-edit:active {
+  border-color: rgba(167, 139, 250, 0.65);
+}
+
+.yanmar-auto-menu-edit-label {
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.55);
+}
+
 .yanmar-auto-menu-slot-row {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 0.38rem;
+}
+
+.yanmar-auto-label-modal-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  pointer-events: auto;
+}
+
+.yanmar-auto-label-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.yanmar-auto-label-modal {
+  position: relative;
+  z-index: 1;
+  width: min(18.5rem, 100%);
+  border-radius: 0.95rem;
+  border: 1px solid rgba(196, 181, 253, 0.4);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 28%),
+    linear-gradient(165deg, #1e1b4b 0%, #0f172a 52%, #020617 100%);
+  box-shadow: 0 1rem 2.4rem rgba(0, 0, 0, 0.55);
+  padding: 0.85rem 0.9rem 0.9rem;
+  color: #f8fafc;
+}
+
+.yanmar-auto-label-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.yanmar-auto-label-modal-header h2 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.yanmar-auto-label-modal-header button {
+  border: 0;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  width: 1.7rem;
+  height: 1.7rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.yanmar-auto-label-modal-hint {
+  margin: 0 0 0.7rem;
+  color: rgba(221, 214, 254, 0.78);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.yanmar-auto-label-modal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.yanmar-auto-label-modal-list li {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr) 2.1rem;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.yanmar-auto-label-modal-list label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: rgba(237, 233, 254, 0.88);
+}
+
+.yanmar-auto-label-modal-list input {
+  width: 100%;
+  min-width: 0;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(196, 181, 253, 0.35);
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 0.42rem 0.5rem;
+  outline: none;
+}
+
+.yanmar-auto-label-modal-list input:focus {
+  border-color: rgba(167, 139, 250, 0.75);
+  box-shadow: 0 0 0 0.12rem rgba(139, 92, 246, 0.25);
+}
+
+.yanmar-auto-label-modal-count {
+  text-align: right;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: rgba(196, 181, 253, 0.72);
+}
+
+.yanmar-auto-label-modal-error {
+  margin: 0.55rem 0 0;
+  color: #fecaca;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.yanmar-auto-label-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+}
+
+.yanmar-auto-label-modal-actions button {
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(30, 41, 59, 0.9);
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 0.5rem 0.6rem;
+}
+
+.yanmar-auto-label-modal-actions button.is-primary {
+  border-color: rgba(167, 139, 250, 0.55);
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.92), rgba(76, 29, 149, 0.95));
+  color: #fff;
 }
 
 .yanmar-auto-menu-action {
@@ -3275,8 +3497,11 @@ body {
   bottom: 0.06rem;
   border-radius: 999px;
   background: rgba(2, 6, 23, 0.62);
-  padding: 0.08rem 0.22rem;
-  font-size: 0.46rem;
+  padding: 0.08rem 0.18rem;
+  font-size: 0.42rem;
+  max-width: calc(100% - 0.2rem);
+  overflow: hidden;
+  text-overflow: clip;
 }
 
 .yanmar-aux-button {

@@ -8,6 +8,10 @@ const SNAPSHOT_VERSION = 2;
 /** 비로그인·세션 대기 중에도 같은 브라우저에서 자세를 유지한다. */
 export const AUTO_POSE_LOCAL_OWNER = "local";
 
+/** 실행 버튼 표시명 — 한글 기준 1~4글자 */
+export const AUTO_POSE_LABEL_MIN_CHARS = 1;
+export const AUTO_POSE_LABEL_MAX_CHARS = 4;
+
 export type AutoPoseSlots = [
   SavedArmPose | null,
   SavedArmPose | null,
@@ -15,10 +19,13 @@ export type AutoPoseSlots = [
   SavedArmPose | null,
 ];
 
+export type AutoPoseSlotLabels = [string, string, string, string];
+
 interface AutoPoseSnapshotV2 {
   version: typeof SNAPSHOT_VERSION;
   savedAtMs: number;
   slots: AutoPoseSlots;
+  labels?: AutoPoseSlotLabels;
 }
 
 interface AutoPoseSnapshotV1 {
@@ -51,6 +58,39 @@ function isValidPose(value: unknown): value is SavedArmPose {
 
 function emptySlots(): AutoPoseSlots {
   return [null, null, null, null];
+}
+
+export function defaultAutoPoseSlotLabels(): AutoPoseSlotLabels {
+  return ["실행1", "실행2", "실행3", "실행4"];
+}
+
+/** 유니코드 글자 수 (한글 완성형 1글자 = 1). */
+export function countAutoPoseLabelChars(value: string): number {
+  return Array.from(value.normalize("NFC")).length;
+}
+
+export function normalizeAutoPoseLabel(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.normalize("NFC").trim();
+  const chars = Array.from(trimmed);
+  if (
+    chars.length < AUTO_POSE_LABEL_MIN_CHARS ||
+    chars.length > AUTO_POSE_LABEL_MAX_CHARS
+  ) {
+    return fallback;
+  }
+  return chars.join("");
+}
+
+export function normalizeAutoPoseSlotLabels(value: unknown): AutoPoseSlotLabels {
+  const defaults = defaultAutoPoseSlotLabels();
+  if (!Array.isArray(value)) return defaults;
+  return [
+    normalizeAutoPoseLabel(value[0], defaults[0]),
+    normalizeAutoPoseLabel(value[1], defaults[1]),
+    normalizeAutoPoseLabel(value[2], defaults[2]),
+    normalizeAutoPoseLabel(value[3], defaults[3]),
+  ];
 }
 
 function cloneSlots(slots: AutoPoseSlots): AutoPoseSlots {
@@ -134,6 +174,38 @@ export function loadSavedArmPoseSlots(ownerId: string): AutoPoseSlots {
   }
 }
 
+export function loadAutoPoseSlotLabels(ownerId: string): AutoPoseSlotLabels {
+  try {
+    const raw = window.localStorage.getItem(storageKey(ownerId));
+    if (!raw) return defaultAutoPoseSlotLabels();
+    const parsed: unknown = JSON.parse(raw);
+    if (!isValidSnapshotV2(parsed)) return defaultAutoPoseSlotLabels();
+    return normalizeAutoPoseSlotLabels(parsed.labels);
+  } catch {
+    return defaultAutoPoseSlotLabels();
+  }
+}
+
+export function loadAutoPoseSlotLabelsForSession(
+  userId?: string | null,
+): AutoPoseSlotLabels {
+  const ownerId = resolveAutoPoseStorageOwner(userId);
+  const owned = loadAutoPoseSlotLabels(ownerId);
+  if (ownerId === AUTO_POSE_LOCAL_OWNER) return owned;
+
+  const defaults = defaultAutoPoseSlotLabels();
+  const ownedCustom = owned.some((label, i) => label !== defaults[i]);
+  if (ownedCustom) return owned;
+
+  const local = loadAutoPoseSlotLabels(AUTO_POSE_LOCAL_OWNER);
+  const localCustom = local.some((label, i) => label !== defaults[i]);
+  if (!localCustom) return owned;
+
+  const slots = loadSavedArmPoseSlots(ownerId);
+  saveSavedArmPoseSlots(ownerId, slots, Date.now(), local);
+  return local;
+}
+
 /**
  * 로그인 시 사용자 슬롯을 우선하고, 비어 있으면 로컬(게스트) 슬롯을 이어받는다.
  */
@@ -160,17 +232,30 @@ export function saveSavedArmPoseSlots(
   ownerId: string,
   slots: AutoPoseSlots,
   nowMs = Date.now(),
+  labels?: AutoPoseSlotLabels,
 ) {
   try {
+    const nextLabels = normalizeAutoPoseSlotLabels(
+      labels ?? loadAutoPoseSlotLabels(ownerId),
+    );
     const payload: AutoPoseSnapshotV2 = {
       version: SNAPSHOT_VERSION,
       savedAtMs: nowMs,
       slots: cloneSlots(slots),
+      labels: nextLabels,
     };
     window.localStorage.setItem(storageKey(ownerId), JSON.stringify(payload));
   } catch {
     // 저장 공간이 차단되더라도 게임 진행은 유지한다.
   }
+}
+
+export function saveAutoPoseSlotLabels(
+  ownerId: string,
+  labels: AutoPoseSlotLabels,
+  nowMs = Date.now(),
+) {
+  saveSavedArmPoseSlots(ownerId, loadSavedArmPoseSlots(ownerId), nowMs, labels);
 }
 
 export function saveSavedArmPoseSlot(

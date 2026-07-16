@@ -120,9 +120,9 @@ export function createAuxiliaryControls(): AuxiliaryControlState {
   };
 }
 
-/** 최대 각속도·주행속도 (게임 — 빠른 피드백). swing은 전 차체 공통·기존 대비 1/2. */
+/** 최대 각속도·주행속도 (게임 — 빠른 피드백). swing은 전 차체 공통·기존 대비 1/4. */
 export const CONTROL_SPEED = {
-  swing: 0.7,
+  swing: 0.35,
   travel: 5.5,
   trackTurn: 1.35,
   boom: 1.35,
@@ -130,9 +130,9 @@ export const CONTROL_SPEED = {
   bucket: 1.2,
 } as const;
 
-/** 탑승 체험 — 실제 미니 굴착기에 가까운 저속 프로필. swing도 1/2. */
+/** 탑승 체험 — 실제 미니 굴착기에 가까운 저속 프로필. swing도 1/4. */
 export const RIDE_CONTROL_SPEED = {
-  swing: 0.26,
+  swing: 0.13,
   travel: 2.1,
   trackTurn: 0.5,
   boom: 0.48,
