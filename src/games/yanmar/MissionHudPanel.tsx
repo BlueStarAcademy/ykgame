@@ -62,6 +62,24 @@ function CompactQuestReward({ reward }: { reward: QuestReward }) {
       </span>,
     );
   }
+  if ((reward.enhanceCores ?? 0) > 0) {
+    parts.push(
+      <span
+        key="cores"
+        className="inline-flex items-center gap-0.5 whitespace-nowrap tabular-nums"
+      >
+        <img
+          src="/images/yanmar/2d/enhance-core.png?v=3"
+          alt=""
+          width={10}
+          height={10}
+          className="yanmar-score-panel-core shrink-0"
+          draggable={false}
+        />
+        {reward.enhanceCores!.toLocaleString()}
+      </span>,
+    );
+  }
   if (parts.length === 0) return null;
   return (
     <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">

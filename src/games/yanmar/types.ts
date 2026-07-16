@@ -74,6 +74,7 @@ export interface DumpScorePanelState {
   rewardText: string;
   earnedStars: number;
   earnedXp: number;
+  earnedEnhanceCores: number;
   pendingRewards: number;
   pulseKey: number;
 }

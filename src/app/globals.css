@@ -130,11 +130,13 @@ body {
   will-change: transform, opacity, filter;
 }
 
-.yanmar-score-panel-star {
+.yanmar-score-panel-star,
+.yanmar-score-panel-core {
   display: block;
   width: 0.875rem;
   height: 0.875rem;
   flex-shrink: 0;
+  object-fit: contain;
 }
 
 .yanmar-score-panel-reward {
@@ -9390,26 +9392,64 @@ button.yanmar-gear-icon-cell {
   position: relative;
   flex: 0 0 auto;
   display: flex;
-  width: 5.6rem;
-  height: 5.6rem;
+  width: 6.25rem;
+  height: 6.25rem;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  border-radius: 0.85rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  overflow: visible;
+  border-radius: 1.05rem;
+  border: 1px solid rgba(226, 232, 240, 0.4);
   background:
-    radial-gradient(circle at 45% 28%, rgba(255, 255, 255, 0.14), transparent 55%),
-    linear-gradient(165deg, rgba(51, 65, 85, 0.55), rgba(2, 6, 23, 0.9));
+    radial-gradient(circle at 28% 16%, rgba(255, 255, 255, 0.28), transparent 40%),
+    radial-gradient(circle at 70% 78%, rgba(125, 211, 252, 0.1), transparent 52%),
+    linear-gradient(155deg, #dbe4f0 0%, #8b9bb0 28%, #3d4a5c 62%, #1a2230 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 0.25rem 0.55rem rgba(0, 0, 0, 0.35);
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0.45rem 1rem rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(15, 23, 42, 0.35);
+}
+
+.yanmar-gacha-banner-art::before {
+  content: "";
+  position: absolute;
+  inset: 0.3rem;
+  z-index: 0;
+  border-radius: 0.78rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.22),
+    inset 0 0.5rem 1rem rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
+.yanmar-gacha-banner-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      120deg,
+      transparent 0%,
+      transparent 46%,
+      rgba(255, 255, 255, 0.22) 50%,
+      transparent 54%,
+      transparent 100%
+    );
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .yanmar-gacha-banner-art img {
-  width: 88%;
-  height: 88%;
+  position: relative;
+  z-index: 2;
+  width: 94%;
+  height: 94%;
   object-fit: contain;
-  filter: drop-shadow(0 0.18rem 0.22rem rgba(0, 0, 0, 0.55));
+  filter: drop-shadow(0 0.2rem 0.35rem rgba(0, 0, 0, 0.45));
   pointer-events: none;
 }
 
@@ -9419,7 +9459,9 @@ button.yanmar-gear-icon-cell {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.35rem;
+  text-align: center;
 }
 
 .yanmar-gacha-banner-kicker {
@@ -9432,6 +9474,7 @@ button.yanmar-gear-icon-cell {
   font-size: 0.55rem;
   font-weight: 800;
   letter-spacing: 0.08em;
+  text-align: center;
 }
 
 .yanmar-gacha-banner-copy h3 {
@@ -9441,11 +9484,13 @@ button.yanmar-gear-icon-cell {
   font-weight: 900;
   letter-spacing: -0.02em;
   line-height: 1.15;
+  text-align: center;
 }
 
 .yanmar-gacha-grade-row {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 0.28rem;
   margin-top: 0.1rem;
 }
@@ -9541,6 +9586,13 @@ button.yanmar-gear-icon-cell {
   letter-spacing: -0.01em;
 }
 
+.yanmar-gacha-pull-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  line-height: 1;
+}
+
 .yanmar-gacha-pull-star {
   font-size: 0.72rem;
   font-weight: 800;
@@ -9548,12 +9600,29 @@ button.yanmar-gear-icon-cell {
   font-variant-numeric: tabular-nums;
 }
 
+.yanmar-gacha-pull-discount {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #86efac;
+  line-height: 1;
+}
+
 .yanmar-gacha-card--standard {
   border-color: rgba(148, 163, 184, 0.28);
 }
 
 .yanmar-gacha-card--standard .yanmar-gacha-banner-art {
-  border-color: rgba(148, 163, 184, 0.28);
+  border-color: rgba(203, 213, 225, 0.45);
+  background:
+    radial-gradient(circle at 26% 14%, rgba(255, 255, 255, 0.32), transparent 38%),
+    radial-gradient(circle at 72% 84%, rgba(56, 189, 248, 0.12), transparent 48%),
+    linear-gradient(155deg, #e8eef6 0%, #9aa8bc 30%, #445266 64%, #1c2533 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 0.45rem 1rem rgba(0, 0, 0, 0.38),
+    0 0 0.75rem rgba(148, 163, 184, 0.16);
 }
 
 .yanmar-gacha-card--premium {
@@ -9573,13 +9642,36 @@ button.yanmar-gear-icon-cell {
 }
 
 .yanmar-gacha-card--premium .yanmar-gacha-banner-art {
-  border-color: rgba(251, 191, 36, 0.45);
+  border-color: rgba(253, 230, 138, 0.55);
   background:
-    radial-gradient(circle at 45% 28%, rgba(253, 230, 138, 0.22), transparent 55%),
-    linear-gradient(165deg, rgba(180, 83, 9, 0.45), rgba(2, 6, 23, 0.92));
+    radial-gradient(circle at 26% 12%, rgba(255, 251, 235, 0.55), transparent 36%),
+    radial-gradient(circle at 78% 86%, rgba(245, 158, 11, 0.28), transparent 46%),
+    linear-gradient(155deg, #fff1c2 0%, #e6b422 26%, #b45309 58%, #6b2d08 86%, #2a1204 100%);
   box-shadow:
-    inset 0 1px 0 rgba(253, 230, 138, 0.22),
-    0 0 0.7rem rgba(245, 158, 11, 0.2);
+    inset 0 1px 0 rgba(255, 251, 235, 0.65),
+    inset 0 -1px 0 rgba(69, 26, 3, 0.4),
+    0 0.45rem 1.05rem rgba(0, 0, 0, 0.42),
+    0 0 0.95rem rgba(245, 158, 11, 0.3);
+}
+
+.yanmar-gacha-card--premium .yanmar-gacha-banner-art::before {
+  border-color: rgba(253, 230, 138, 0.28);
+  box-shadow:
+    inset 0 0 0 1px rgba(120, 53, 15, 0.28),
+    inset 0 0.5rem 1rem rgba(69, 26, 3, 0.22);
+}
+
+.yanmar-gacha-card--premium .yanmar-gacha-banner-art::after {
+  background:
+    linear-gradient(
+      120deg,
+      transparent 0%,
+      transparent 44%,
+      rgba(255, 251, 235, 0.4) 50%,
+      transparent 56%,
+      transparent 100%
+    );
+  opacity: 0.5;
 }
 
 .yanmar-gacha-card--premium .yanmar-gacha-banner-kicker {
@@ -10155,6 +10247,7 @@ button.yanmar-gear-icon-cell {
 .yanmar-profile-chip-meta {
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
   gap: 0.12rem;
   min-width: 0;
@@ -10163,6 +10256,7 @@ button.yanmar-gear-icon-cell {
   border-radius: 0.45rem;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(0, 0, 0, 0.28);
+  text-align: center;
 }
 
 .yanmar-profile-chip:hover .yanmar-profile-chip-meta {
@@ -10180,6 +10274,7 @@ button.yanmar-gear-icon-cell {
   line-height: 1.1;
   color: #fde68a;
   letter-spacing: -0.02em;
+  text-align: center;
 }
 
 .yanmar-profile-chip-name {
@@ -10192,6 +10287,7 @@ button.yanmar-gear-icon-cell {
   font-size: 0.72rem;
   font-weight: 900;
   line-height: 1.1;
+  text-align: center;
 }
 
 .yanmar-profile-modal {

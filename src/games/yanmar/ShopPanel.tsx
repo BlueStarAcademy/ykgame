@@ -101,7 +101,7 @@ function GachaBannerSection({
       <div className="yanmar-gacha-banner-showcase">
         <div className="yanmar-gacha-banner-art" aria-hidden>
           <img
-            src={`${gachaBannerArtSrc(banner)}?v=1`}
+            src={`${gachaBannerArtSrc(banner)}?v=8`}
             alt=""
             draggable={false}
           />
@@ -140,12 +140,15 @@ function GachaBannerSection({
           className="yanmar-gacha-pull-btn yanmar-gacha-pull-btn--multi"
           onClick={() => void onGacha?.(banner, 10)}
         >
-          <span className="yanmar-gacha-pull-label">10연 뽑기</span>
-          <StarAmount
-            value={cfg.cost10}
-            size={12}
-            valueClassName="yanmar-gacha-pull-star"
-          />
+          <span className="yanmar-gacha-pull-label">10회 뽑기</span>
+          <span className="yanmar-gacha-pull-price">
+            <StarAmount
+              value={cfg.cost10}
+              size={12}
+              valueClassName="yanmar-gacha-pull-star"
+            />
+            <span className="yanmar-gacha-pull-discount">(-10%)</span>
+          </span>
         </button>
       </div>
     </section>

@@ -9,6 +9,7 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
@@ -417,9 +418,53 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
   const showScore = panel.totalScore > 0;
   const showXp = panel.earnedXp > 0;
   const showStars = panel.earnedStars > 0;
-  if (!showScore && !showXp && !showStars && !panel.rewardText) return null;
+  const showCores = panel.earnedEnhanceCores > 0;
+  if (!showScore && !showXp && !showStars && !showCores && !panel.rewardText) {
+    return null;
+  }
 
   const sepClass = panel.critical ? "text-yellow-200/80" : "text-white/35";
+  const valueParts: ReactNode[] = [];
+  if (showScore) {
+    valueParts.push(
+      <span key="score">{panel.totalScore.toLocaleString()}점</span>,
+    );
+  }
+  if (showXp) {
+    valueParts.push(
+      <span key="xp">EXP+{panel.earnedXp.toLocaleString()}</span>,
+    );
+  }
+  if (showStars) {
+    valueParts.push(
+      <span key="stars" className="inline-flex items-center gap-0.5">
+        <img
+          src="/images/star-currency.svg"
+          alt=""
+          width={16}
+          height={16}
+          className="yanmar-score-panel-star"
+          draggable={false}
+        />
+        {panel.earnedStars.toLocaleString()}
+      </span>,
+    );
+  }
+  if (showCores) {
+    valueParts.push(
+      <span key="cores" className="inline-flex items-center gap-0.5">
+        <img
+          src="/images/yanmar/2d/enhance-core.png?v=3"
+          alt=""
+          width={16}
+          height={16}
+          className="yanmar-score-panel-core"
+          draggable={false}
+        />
+        {panel.earnedEnhanceCores.toLocaleString()}
+      </span>,
+    );
+  }
 
   return (
     <div
@@ -439,39 +484,22 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
           CRITICAL
         </div>
       ) : null}
-      {showScore || showXp || showStars ? (
+      {valueParts.length > 0 ? (
         <div
           className={`yanmar-score-panel-value flex items-center justify-center gap-2.5 whitespace-nowrap tabular-nums ${
             panel.critical ? "text-base" : "text-sm"
           }`}
         >
-          {showScore ? (
-            <span>{panel.totalScore.toLocaleString()}점</span>
-          ) : null}
-          {showScore && (showXp || showStars) ? (
-            <span className={sepClass} aria-hidden>
-              ·
-            </span>
-          ) : null}
-          {showXp ? <span>EXP+{panel.earnedXp.toLocaleString()}</span> : null}
-          {showXp && showStars ? (
-            <span className={sepClass} aria-hidden>
-              ·
-            </span>
-          ) : null}
-          {showStars ? (
-            <span className="inline-flex items-center gap-0.5">
-              <img
-                src="/images/star-currency.svg"
-                alt=""
-                width={16}
-                height={16}
-                className="yanmar-score-panel-star"
-                draggable={false}
-              />
-              {panel.earnedStars.toLocaleString()}
-            </span>
-          ) : null}
+          {valueParts.flatMap((part, index) =>
+            index === 0
+              ? [part]
+              : [
+                  <span key={`sep-${index}`} className={sepClass} aria-hidden>
+                    ·
+                  </span>,
+                  part,
+                ],
+          )}
         </div>
       ) : null}
       {panel.rewardText ? (
@@ -1925,15 +1953,15 @@ export function ExcavatorGameWrapper({
   const notifyCoresDrop = useCallback(
     (amount: unknown, enhanceCoresTotal?: unknown) => {
       const n = typeof amount === "number" ? amount : 0;
-      if (n <= 0) return;
+      if (n <= 0) return 0;
       if (typeof enhanceCoresTotal === "number") {
         setEnhanceCores(enhanceCoresTotal);
       } else {
         setEnhanceCores((prev) => prev + n);
       }
-      showAttachmentWarning("", { enhanceCores: n });
+      return n;
     },
-    [showAttachmentWarning],
+    [],
   );
 
   const flushMaintenanceTravel = useCallback(
@@ -3023,7 +3051,14 @@ export function ExcavatorGameWrapper({
   );
 
   const accumulateDumpScore = useCallback(
-    (score: number, critical: boolean, rewardText = "", earnedXp = 0, earnedStars = 0) => {
+    (
+      score: number,
+      critical: boolean,
+      rewardText = "",
+      earnedXp = 0,
+      earnedStars = 0,
+      earnedEnhanceCores = 0,
+    ) => {
       arcadeScoreRef.current += score;
       setHud((h) => ({ ...h, score: arcadeScoreRef.current }));
 
@@ -3034,6 +3069,8 @@ export function ExcavatorGameWrapper({
         rewardText: appendRewardText(previous?.rewardText ?? "", rewardText),
         earnedStars: (previous?.earnedStars ?? 0) + earnedStars,
         earnedXp: (previous?.earnedXp ?? 0) + earnedXp,
+        earnedEnhanceCores:
+          (previous?.earnedEnhanceCores ?? 0) + earnedEnhanceCores,
         pendingRewards: previous?.pendingRewards ?? 0,
         pulseKey: (previous?.pulseKey ?? 0) + 1,
       };
@@ -3052,6 +3089,7 @@ export function ExcavatorGameWrapper({
       earnedStars: number,
       earnedXp = 0,
       rewardText = "",
+      earnedEnhanceCores = 0,
     ) => {
       if (score > 0) {
         arcadeScoreRef.current += score;
@@ -3064,6 +3102,7 @@ export function ExcavatorGameWrapper({
         rewardText,
         earnedStars,
         earnedXp,
+        earnedEnhanceCores,
         pendingRewards: 0,
         pulseKey: (dumpScorePanelRef.current?.pulseKey ?? 0) + 1,
       };
@@ -3072,6 +3111,26 @@ export function ExcavatorGameWrapper({
       scheduleHideDumpScorePanel();
     },
     [scheduleHideDumpScorePanel],
+  );
+
+  const appendEnhanceCoresToRewardPanel = useCallback(
+    (amount: number) => {
+      if (amount <= 0) return;
+      const previous = dumpScorePanelRef.current;
+      if (previous) {
+        const next: DumpScorePanelState = {
+          ...previous,
+          earnedEnhanceCores: previous.earnedEnhanceCores + amount,
+          pulseKey: previous.pulseKey + 1,
+        };
+        dumpScorePanelRef.current = next;
+        setDumpScorePanel(next);
+        scheduleHideDumpScorePanel();
+        return;
+      }
+      showStandaloneRewardPanel(0, false, 0, 0, "", amount);
+    },
+    [scheduleHideDumpScorePanel, showStandaloneRewardPanel],
   );
 
   const handleClaimDailyQuest = useCallback(
@@ -3095,16 +3154,13 @@ export function ExcavatorGameWrapper({
         if (claimed.reward.stars > 0) {
           rewardStarsRef.current += claimed.reward.stars;
         }
-        if ((claimed.reward.enhanceCores ?? 0) > 0) {
-          showAttachmentWarning("", {
-            enhanceCores: claimed.reward.enhanceCores,
-          });
-        }
         showStandaloneRewardPanel(
           0,
           false,
           claimed.reward.stars,
           claimed.reward.xp,
+          "",
+          claimed.reward.enhanceCores ?? 0,
         );
       } catch {
         showAttachmentWarning("퀘스트 보상 수령에 실패했습니다.");
@@ -3144,16 +3200,13 @@ export function ExcavatorGameWrapper({
       if (claimed.reward.stars > 0) {
         rewardStarsRef.current += claimed.reward.stars;
       }
-      if ((claimed.reward.enhanceCores ?? 0) > 0) {
-        showAttachmentWarning("", {
-          enhanceCores: claimed.reward.enhanceCores,
-        });
-      }
       showStandaloneRewardPanel(
         claimed.reward.score ?? 0,
         false,
         claimed.reward.stars,
         claimed.reward.xp,
+        "",
+        claimed.reward.enhanceCores ?? 0,
       );
     } catch {
       showAttachmentWarning("미션 보상 수령에 실패했습니다.");
@@ -3192,16 +3245,13 @@ export function ExcavatorGameWrapper({
         if (claimed.reward.stars > 0) {
           rewardStarsRef.current += claimed.reward.stars;
         }
-        if ((claimed.reward.enhanceCores ?? 0) > 0) {
-          showAttachmentWarning("", {
-            enhanceCores: claimed.reward.enhanceCores,
-          });
-        }
         showStandaloneRewardPanel(
           0,
           false,
           claimed.reward.stars,
           claimed.reward.xp,
+          "",
+          claimed.reward.enhanceCores ?? 0,
         );
       } catch {
         showAttachmentWarning("퀘스트 보상 수령에 실패했습니다.");
@@ -3221,7 +3271,14 @@ export function ExcavatorGameWrapper({
     (
       scoreDelta: number,
       patch: Partial<
-        Pick<DumpScorePanelState, "rewardText" | "critical" | "earnedStars" | "earnedXp">
+        Pick<
+          DumpScorePanelState,
+          | "rewardText"
+          | "critical"
+          | "earnedStars"
+          | "earnedXp"
+          | "earnedEnhanceCores"
+        >
       > = {},
       pendingCompleted = 1,
     ) => {
@@ -3240,6 +3297,8 @@ export function ExcavatorGameWrapper({
         rewardText: patch.rewardText ?? previous.rewardText,
         earnedStars: patch.earnedStars ?? previous.earnedStars,
         earnedXp: patch.earnedXp ?? previous.earnedXp,
+        earnedEnhanceCores:
+          patch.earnedEnhanceCores ?? previous.earnedEnhanceCores,
         pendingRewards: Math.max(0, previous.pendingRewards - pendingCompleted),
         pulseKey: previous.pulseKey + (scoreDelta !== 0 ? 1 : 0),
       };
@@ -3321,7 +3380,13 @@ export function ExcavatorGameWrapper({
               notifyGearDrop(drop);
             }
           }
-          notifyCoresDrop(data.coresDropped, data.enhanceCores);
+          const coresDropped = notifyCoresDrop(
+            data.coresDropped,
+            data.enhanceCores,
+          );
+          if (coresDropped > 0) {
+            appendEnhanceCoresToRewardPanel(coresDropped);
+          }
           const remaining = removeDumpRewardOutboxBatch(
             parseDumpRewardOutbox(window.localStorage.getItem(storageKey)),
             batch.eventId,
@@ -3403,6 +3468,7 @@ export function ExcavatorGameWrapper({
     }
   }, [
     adjustDumpScorePanel,
+    appendEnhanceCoresToRewardPanel,
     notifyCoresDrop,
     notifyGearDrop,
     session?.user?.id,
@@ -3668,25 +3734,41 @@ export function ExcavatorGameWrapper({
             | null
             | undefined,
         );
-        notifyCoresDrop(data.coresDropped, data.enhanceCores);
+        const coresDropped = notifyCoresDrop(
+          data.coresDropped,
+          data.enhanceCores,
+        );
 
         if (kind === "crash") {
           if (stars > 0) {
             rewardStarsRef.current += stars;
           }
-          if (score > 0 || xpGained > 0 || stars > 0 || couponEvent) {
+          if (
+            score > 0 ||
+            xpGained > 0 ||
+            stars > 0 ||
+            coresDropped > 0 ||
+            couponEvent
+          ) {
             showStandaloneRewardPanel(
               score,
               critical || Boolean(couponEvent),
               stars,
               xpGained,
               couponEvent ? "쿠폰 획득!" : undefined,
+              coresDropped,
             );
           }
           return;
         }
 
-        if (score > 0 || xpGained > 0 || stars > 0 || couponEvent) {
+        if (
+          score > 0 ||
+          xpGained > 0 ||
+          stars > 0 ||
+          coresDropped > 0 ||
+          couponEvent
+        ) {
           if (stars > 0) {
             rewardStarsRef.current += stars;
           }
@@ -3696,6 +3778,7 @@ export function ExcavatorGameWrapper({
             couponEvent ? "쿠폰 획득!" : "",
             xpGained,
             stars,
+            coresDropped,
           );
         }
       } catch {
@@ -3759,16 +3842,33 @@ export function ExcavatorGameWrapper({
           coresDropped?: number;
           enhanceCores?: number;
         };
+        const coresDropped = notifyCoresDrop(
+          data.coresDropped,
+          data.enhanceCores,
+        );
         if (typeof data.bonusScore === "number" && data.bonusScore > 0) {
-          accumulateDumpScore(data.bonusScore, false, "트럭 만재 보너스");
+          accumulateDumpScore(
+            data.bonusScore,
+            false,
+            "트럭 만재 보너스",
+            0,
+            0,
+            coresDropped,
+          );
+        } else if (coresDropped > 0) {
+          appendEnhanceCoresToRewardPanel(coresDropped);
         }
         notifyGearDrop(data.gearDrop);
-        notifyCoresDrop(data.coresDropped, data.enhanceCores);
       } catch {
         // Best-effort master-option score / drop on truck departure.
       }
     },
-    [accumulateDumpScore, notifyCoresDrop, notifyGearDrop],
+    [
+      accumulateDumpScore,
+      appendEnhanceCoresToRewardPanel,
+      notifyCoresDrop,
+      notifyGearDrop,
+    ],
   );
 
   const handleDumpTruckFull = useCallback(() => {
