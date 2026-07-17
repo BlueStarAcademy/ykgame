@@ -136,14 +136,14 @@ type BubbleState =
   | { kind: "compare"; itemId: string; slot: GearSlot }
   | null;
 
-/** 장착 2×3 그리드: 왼(버켓/브레이커/집게) · 오른(암/붐/블레이드) */
+/** 장착 2×3 그리드: 왼(버켓/브레이커/집게) · 오른(암/붐/트랙) */
 const GEAR_EQUIP_GRID_ORDER: readonly GearSlot[] = [
   "BUCKET",
   "ARM",
   "BREAKER",
   "BOOM",
   "GRAPPLE",
-  "BLADE",
+  "TRACK",
 ];
 
 function gradeTextClass(grade: ItemGrade) {

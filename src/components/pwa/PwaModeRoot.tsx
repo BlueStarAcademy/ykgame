@@ -46,8 +46,25 @@ function PwaModeRootInner({ children }: { children: React.ReactNode }) {
       document.body.style.overflow = "hidden";
     }
 
+    const isEditableTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      return target.isContentEditable;
+    };
+
+    const blockSelect = (event: Event) => {
+      if (isEditableTarget(event.target)) return;
+      event.preventDefault();
+    };
+
+    document.addEventListener("selectstart", blockSelect, { capture: true });
+    document.addEventListener("contextmenu", blockSelect, { capture: true });
+
     return () => {
       document.body.style.overflow = prevOverflow;
+      document.removeEventListener("selectstart", blockSelect, true);
+      document.removeEventListener("contextmenu", blockSelect, true);
     };
   }, [searchParams, pathname]);
 

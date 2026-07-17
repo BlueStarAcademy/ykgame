@@ -65,7 +65,7 @@ enum ChassisModelId {
 enum GearSlot {
   ARM
   BOOM
-  BLADE
+  TRACK
   BUCKET
   BREAKER
   GRAPPLE

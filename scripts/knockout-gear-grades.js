@@ -98,13 +98,13 @@ async function knockOut(file) {
 (async () => {
   const gearDir = path.join("public", "images", "yanmar", "2d", "gear");
   const re =
-    /^(arm|boom|blade|bucket|breaker|grapple)-(normal|enhanced|precision|master)\.png$/;
+    /^(arm|boom|track|bucket|breaker|grapple)-(normal|enhanced|precision|master)\.png$/;
   const files = fs.readdirSync(gearDir).filter((f) => re.test(f));
   console.log("files", files.length);
   for (const f of files) {
     await knockOut(path.join(gearDir, f));
   }
-  for (const s of ["arm", "boom", "blade", "bucket", "breaker", "grapple"]) {
+  for (const s of ["arm", "boom", "track", "bucket", "breaker", "grapple"]) {
     fs.copyFileSync(
       path.join(gearDir, `${s}-normal.png`),
       path.join(gearDir, `${s}.png`),

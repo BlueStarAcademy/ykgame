@@ -1,11 +1,11 @@
-export type GearSlot = "ARM" | "BOOM" | "BLADE" | "BUCKET" | "BREAKER" | "GRAPPLE";
+export type GearSlot = "ARM" | "BOOM" | "TRACK" | "BUCKET" | "BREAKER" | "GRAPPLE";
 export type ItemGrade = "NORMAL" | "ENHANCED" | "PRECISION" | "MASTER";
 export type GachaBanner = "STANDARD" | "PREMIUM";
 
 export const GEAR_SLOTS: readonly GearSlot[] = [
   "ARM",
   "BOOM",
-  "BLADE",
+  "TRACK",
   "BUCKET",
   "BREAKER",
   "GRAPPLE",
@@ -14,7 +14,7 @@ export const GEAR_SLOTS: readonly GearSlot[] = [
 export const GEAR_SLOT_LABEL: Record<GearSlot, string> = {
   ARM: "암",
   BOOM: "붐",
-  BLADE: "블레이드",
+  TRACK: "트랙",
   BUCKET: "버켓",
   BREAKER: "브레이커",
   GRAPPLE: "집게",
@@ -249,9 +249,9 @@ export interface MainOptionDef {
  */
 export const MAIN_OPTION_BY_SLOT: Record<GearSlot, MainOptionDef> = {
   BOOM: { key: "strength", label: "힘", baseAt0: 6, baseAt10: 22, isPercent: false },
-  ARM: { key: "agility", label: "민첩", baseAt0: 6, baseAt10: 22, isPercent: false },
+  ARM: { key: "endurance", label: "인내", baseAt0: 6, baseAt10: 22, isPercent: false },
   BUCKET: { key: "stamina", label: "지구력", baseAt0: 6, baseAt10: 22, isPercent: false },
-  BLADE: { key: "endurance", label: "인내", baseAt0: 6, baseAt10: 22, isPercent: false },
+  TRACK: { key: "agility", label: "민첩", baseAt0: 6, baseAt10: 22, isPercent: false },
   GRAPPLE: { key: "balance", label: "안정", baseAt0: 6, baseAt10: 22, isPercent: false },
   BREAKER: { key: "technique", label: "기술", baseAt0: 6, baseAt10: 22, isPercent: false },
 };
@@ -431,7 +431,9 @@ export const MILESTONE_MAIN_FLAT: Record<number, number> = {
 };
 
 export const REPAIR_TENT = {
-  x: -26,
-  z: -18,
-  radius: 10,
+  x: -45,
+  z: -42,
+  radius: 14,
+  /** Yaw so the bay-door facade faces the worksite / spawn approach. */
+  rotationY: Math.atan2(27, 20),
 } as const;

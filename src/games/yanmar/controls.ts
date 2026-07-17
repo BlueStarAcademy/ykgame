@@ -202,10 +202,12 @@ export function createHydraulicVelocity(): HydraulicVelocity {
 const TRACK_WIDTH_PHYSICS = 4;
 
 /** 직진 주행 시 하부가 상체 방향으로 따라오는 정렬 속도. */
-const DRIVE_CHASSIS_ALIGN_MAX_SPEED = 0.9;
-const DRIVE_CHASSIS_ALIGN_RESPONSE = 1.8;
+const DRIVE_CHASSIS_ALIGN_MAX_SPEED = 0.72;
+const DRIVE_CHASSIS_ALIGN_RESPONSE = 1.45;
 const DRIVE_CHASSIS_ALIGN_INPUT_THRESHOLD = 0.1;
 const DRIVE_CHASSIS_ALIGN_EPSILON = 0.006;
+/** 주행 중 상체 선회 입력이 있을 때 하부 추종을 조금 늦춰 상체가 먼저 도는 느낌을 남긴다. */
+const DRIVE_CHASSIS_ALIGN_WHILE_SWINGING = 0.55;
 
 function approach(current: number, target: number, accel: number, damp: number, dt: number) {
   if (Math.abs(target) > 0.02) {
@@ -323,20 +325,17 @@ export function applyControls(
 
   // Integrate travel on an arc around the instantaneous center of rotation so a
   // stopped track stays planted (in-place circle) instead of slip-translating.
-  // 주행은 하부 차체 방향만 따른다. 상체 스윙은 궤도 진행 방향에 영향을 주지 않는다.
+  // 직진 주행 중에도 상체 선회(좌 조이스틱 X)는 그대로 적용하고,
+  // 하부는 상체가 향한 쪽으로 점진적으로 따라가며 곡선 정렬한다.
   const facing = state.heading;
   const driveCommand = (travel.left + travel.right) / 2;
   const straightDriveRequested =
     Math.abs(driveCommand) > DRIVE_CHASSIS_ALIGN_INPUT_THRESHOLD &&
     travel.left * travel.right > 0 &&
     Math.abs(travel.left - travel.right) < 0.15;
+  const activeSwingInput = Math.abs(left.x) > 0.08;
 
-  // 직진 주행으로 하부 정렬 중에는 잔여 스윙 속도가 다시 어긋남을 만들지 않게 한다.
-  if (straightDriveRequested && Math.abs(normalizeAngle(state.swing)) > DRIVE_CHASSIS_ALIGN_EPSILON) {
-    vel.swing = 0;
-  } else {
-    state.swing += vel.swing * dt;
-  }
+  state.swing += vel.swing * dt;
 
   const nextArm = state.arm + vel.arm * dt;
   if (nextArm < JOINT_LIMITS.arm.min) vel.arm = Math.max(0, vel.arm);
@@ -352,18 +351,26 @@ export function applyControls(
     if (Math.abs(alignmentError) <= DRIVE_CHASSIS_ALIGN_EPSILON) {
       state.swing = 0;
     } else {
+      const followScale = activeSwingInput ? DRIVE_CHASSIS_ALIGN_WHILE_SWINGING : 1;
       const alignmentSpeed =
         Math.min(
           DRIVE_CHASSIS_ALIGN_MAX_SPEED,
           Math.abs(alignmentError) * DRIVE_CHASSIS_ALIGN_RESPONSE,
-        ) * Math.min(1, Math.abs(driveCommand));
+        ) *
+        Math.min(1, Math.abs(driveCommand)) *
+        followScale;
       chassisAlignmentDelta =
         Math.sign(alignmentError) *
         Math.min(Math.abs(alignmentError), alignmentSpeed * dt);
 
       // 전진·후진을 유지한 채 하부를 상체 쪽으로 돌려 곡선으로 정렬한다.
+      // (한 번에 heading을 바꾸지 않고 기존 정렬 궤적을 따른다.)
       omega += dt > 0 ? chassisAlignmentDelta / dt : 0;
       vel.trackTurn = omega;
+      // 궤도 시각/물리 속도도 선회에 맞게 좌우 차를 준다.
+      const halfTrack = TRACK_WIDTH_PHYSICS * 0.5;
+      vel.trackLeft = speed - omega * halfTrack;
+      vel.trackRight = speed + omega * halfTrack;
     }
   }
   if (Math.abs(omega) > 1e-4) {

@@ -5,7 +5,7 @@ import type { GearSlot, ItemGrade } from "./gearCatalog";
 const SLOT_FILE: Record<GearSlot, string> = {
   ARM: "arm",
   BOOM: "boom",
-  BLADE: "blade",
+  TRACK: "track",
   BUCKET: "bucket",
   BREAKER: "breaker",
   GRAPPLE: "grapple",
@@ -25,11 +25,11 @@ export function gearIconSrc(
   grade: ItemGrade | null | undefined = "NORMAL",
 ): string {
   const gradeKey = grade && GRADE_FILE[grade] ? GRADE_FILE[grade] : "normal";
-  return `/images/yanmar/2d/gear/${SLOT_FILE[slot]}-${gradeKey}.png?v=5`;
+  return `/images/yanmar/2d/gear/${SLOT_FILE[slot]}-${gradeKey}.png?v=6`;
 }
 
 export function gearEmptySlotSrc(): string {
-  return "/images/yanmar/2d/gear/empty-slot.png?v=5";
+  return "/images/yanmar/2d/gear/empty-slot.png?v=6";
 }
 
 export function gradeFrameClass(grade: ItemGrade | null | undefined): string {

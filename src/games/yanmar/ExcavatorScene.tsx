@@ -3985,7 +3985,12 @@ function SceneContent(props: ExcavatorSceneProps) {
         terrainRef={props.terrainRef}
         simRef={props.simRef}
       />
-      <RepairTent x={REPAIR_TENT.x} z={REPAIR_TENT.z} radius={REPAIR_TENT.radius} />
+      <RepairTent
+        x={REPAIR_TENT.x}
+        z={REPAIR_TENT.z}
+        radius={REPAIR_TENT.radius}
+        rotationY={REPAIR_TENT.rotationY}
+      />
       <TerrainRockScatter key={`rocks-${terrainRevision}`} terrainRef={props.terrainRef} />
       <ContactShadows
         position={[48, 0.12, 48]}
