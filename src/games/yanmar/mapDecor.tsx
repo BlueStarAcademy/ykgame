@@ -458,6 +458,14 @@ function SiteBarrierRow({
   );
 }
 
+const SIGN_TEXT_MAX_WIDTH = 2.9;
+const SIGN_SUBTITLE = "안전모 착용 · 관계자 외 출입금지";
+
+/** Fit one-line sign text inside the board so glyphs don't spill past the edges. */
+function fitSignFontSize(text: string, preferred: number, charFactor: number) {
+  return Math.min(preferred, SIGN_TEXT_MAX_WIDTH / Math.max(text.length * charFactor, 1));
+}
+
 function KoreanSafetySign({
   position,
   rotation = 0,
@@ -467,6 +475,9 @@ function KoreanSafetySign({
   rotation?: number;
   title: string;
 }) {
+  const titleSize = fitSignFontSize(title, 0.42, 0.9);
+  const subtitleSize = fitSignFontSize(SIGN_SUBTITLE, 0.19, 0.72);
+
   return (
     <group position={position} rotation={[0, rotation, 0]}>
       {[-1.35, 1.35].map((x) => (
@@ -485,7 +496,11 @@ function KoreanSafetySign({
       </mesh>
       <Text
         position={[0, -0.12, 0.09]}
-        fontSize={0.42}
+        fontSize={titleSize}
+        maxWidth={SIGN_TEXT_MAX_WIDTH}
+        textAlign="center"
+        whiteSpace="nowrap"
+        overflowWrap="normal"
         color="#111827"
         anchorX="center"
         anchorY="middle"
@@ -494,11 +509,16 @@ function KoreanSafetySign({
       </Text>
       <Text
         position={[0, -0.48, 0.09]}
-        fontSize={0.19}
+        fontSize={subtitleSize}
+        maxWidth={SIGN_TEXT_MAX_WIDTH}
+        textAlign="center"
+        whiteSpace="nowrap"
+        overflowWrap="normal"
         color="#475569"
         anchorX="center"
+        anchorY="middle"
       >
-        안전모 착용 · 관계자 외 출입금지
+        {SIGN_SUBTITLE}
       </Text>
     </group>
   );
@@ -589,7 +609,7 @@ function PremiumSiteInfrastructure({
       <KoreanSafetySign
         position={[-30, 2.05, -37]}
         rotation={0}
-        title="YK건기 스마트 작업장"
+        title="YK건기 서비스 지점"
       />
       {terrain.mapTier >= 2 ? (
         <KoreanSafetySign
