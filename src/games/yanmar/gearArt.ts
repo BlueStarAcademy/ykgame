@@ -25,11 +25,11 @@ export function gearIconSrc(
   grade: ItemGrade | null | undefined = "NORMAL",
 ): string {
   const gradeKey = grade && GRADE_FILE[grade] ? GRADE_FILE[grade] : "normal";
-  return `/images/yanmar/2d/gear/${SLOT_FILE[slot]}-${gradeKey}.png?v=6`;
+  return `/images/yanmar/2d/gear/${SLOT_FILE[slot]}-${gradeKey}.png?v=7`;
 }
 
 export function gearEmptySlotSrc(): string {
-  return "/images/yanmar/2d/gear/empty-slot.png?v=6";
+  return "/images/yanmar/2d/gear/empty-slot.png?v=7";
 }
 
 export function gradeFrameClass(grade: ItemGrade | null | undefined): string {
