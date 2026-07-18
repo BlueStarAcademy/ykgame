@@ -186,19 +186,24 @@ export function WorkshopPanel({
   const coin = def.pointsIcon;
 
   return (
-    <AppModalOverlay open={open} onClose={onClose} nested>
-      <div className="yanmar-workshop-panel mx-auto flex h-[min(88dvh,36rem)] w-[min(96vw,26rem)] flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md">
+    <AppModalOverlay
+      open={open}
+      onClose={onClose}
+      nested
+      panelClassName="!max-w-[min(96vw,26rem)] !overflow-hidden landscape:!max-h-[min(94dvh,32rem)]"
+    >
+      <div className="yanmar-workshop-panel flex h-[min(88dvh,36rem)] w-full flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md landscape:h-[min(92dvh,26rem)]">
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="text-lg font-black tracking-tight">{def.label}</h2>
-            <p className="mt-1.5 flex items-center gap-2 text-sm font-semibold text-amber-200">
+            <p className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold text-amber-200">
               <span className="text-stone-400">{def.pointsLabel}</span>
               <WorkshopPointsAmount icon={coin} value={points} size={20} />
             </p>
           </div>
           <button
             type="button"
-            className="rounded-lg px-2 py-1 text-sm text-stone-300 hover:bg-white/10"
+            className="shrink-0 rounded-lg px-2 py-1 text-sm text-stone-300 hover:bg-white/10"
             onClick={onClose}
           >
             닫기
@@ -228,7 +233,7 @@ export function WorkshopPanel({
           ))}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3">
           {tab === "quest" ? (
             <ul className="flex flex-col gap-2">
               {questRows.map(({ def: q, item }) => {
@@ -242,17 +247,19 @@ export function WorkshopPanel({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold">{q.title}</p>
-                        <p className="mt-0.5 text-xs text-stone-400">
-                          {q.kind === "daily" ? "일일" : "반복"}
-                        </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <WorkshopPointsAmount
-                          icon={coin}
-                          value={q.rewardPoints}
-                          size={16}
-                          className="text-xs font-bold text-amber-200"
-                        />
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-stone-400">
+                            {q.kind === "daily" ? "일일" : "반복"}
+                          </span>
+                          <WorkshopPointsAmount
+                            icon={coin}
+                            value={q.rewardPoints}
+                            size={16}
+                            className="text-xs font-bold text-amber-200"
+                          />
+                        </div>
                         {canClaim ? (
                           <button
                             type="button"
@@ -345,7 +352,7 @@ export function WorkshopPanel({
                     className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold">
                           {u.label}{" "}
                           <span className="text-amber-200">
@@ -360,35 +367,34 @@ export function WorkshopPanel({
                             {effectPreview(workshopId, u.key, level)}
                           </p>
                         ) : null}
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          disabled={busy || !canBuy || otherPending || isThisPending}
+                          className="inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                          onClick={() => void onUpgrade(u.key)}
+                        >
+                          {maxed ? (
+                            "MAX"
+                          ) : isThisPending ? (
+                            "진행중"
+                          ) : levelLocked ? (
+                            `Lv.${reqLevel}`
+                          ) : (
+                            <WorkshopPointsAmount
+                              icon={coin}
+                              value={cost ?? 0}
+                              size={14}
+                            />
+                          )}
+                        </button>
                         {!maxed && durationMs != null ? (
-                          <p className="mt-0.5 text-[11px] text-stone-500">
-                            소요 {formatUpgradeRemaining(durationMs)}
-                            {levelLocked
-                              ? ` · ${reqLevel}레벨 필요`
-                              : ""}
+                          <p className="text-[11px] tabular-nums text-stone-500">
+                            {formatUpgradeRemaining(durationMs)}
                           </p>
                         ) : null}
                       </div>
-                      <button
-                        type="button"
-                        disabled={busy || !canBuy || otherPending || isThisPending}
-                        className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
-                        onClick={() => void onUpgrade(u.key)}
-                      >
-                        {maxed ? (
-                          "MAX"
-                        ) : isThisPending ? (
-                          "진행중"
-                        ) : levelLocked ? (
-                          `Lv.${reqLevel}`
-                        ) : (
-                          <WorkshopPointsAmount
-                            icon={coin}
-                            value={cost ?? 0}
-                            size={14}
-                          />
-                        )}
-                      </button>
                     </div>
                   </li>
                 );
