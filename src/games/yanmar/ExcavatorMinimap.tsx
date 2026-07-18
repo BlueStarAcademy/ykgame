@@ -60,12 +60,32 @@ function setupHiDpiCanvas(canvas: HTMLCanvasElement, displaySize: number) {
   if (!ctx) return null;
 
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  canvas.width = Math.round(displaySize * dpr);
-  canvas.height = Math.round(displaySize * dpr);
+  const bufW = Math.round(displaySize * dpr);
+  const bufH = Math.round(displaySize * dpr);
+  // Assigning width/height resets the context (including transform).
+  if (canvas.width !== bufW) canvas.width = bufW;
+  if (canvas.height !== bufH) canvas.height = bufH;
   canvas.style.width = `${displaySize}px`;
   canvas.style.height = `${displaySize}px`;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.imageSmoothingEnabled = true;
+  return { ctx, dpr };
+}
+
+/** DPR/컨텍스트 유실 후에도 CSS 픽셀 좌표계를 유지한다 (미니맵 1/4 축소 방지). */
+function ensureMinimapHiDpi(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  displaySize: number,
+): CanvasRenderingContext2D {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const bufW = Math.round(displaySize * dpr);
+  const bufH = Math.round(displaySize * dpr);
+  if (canvas.width !== bufW || canvas.height !== bufH) {
+    return setupHiDpiCanvas(canvas, displaySize)?.ctx ?? ctx;
+  }
+  // width 미변경이어도 GPU 컨텍스트 복구 등으로 transform이 identity로 돌아갈 수 있음
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return ctx;
 }
 
@@ -161,14 +181,18 @@ export function ExcavatorMinimap({
     const inset = Math.max(4, Math.round(5 * (size / DEFAULT_DISPLAY_SIZE)));
 
     let raf = 0;
-    let ctx = setupHiDpiCanvas(canvas, size);
+    let ctx = setupHiDpiCanvas(canvas, size)?.ctx ?? null;
     if (!ctx) return;
 
     const draw = () => {
-      if (!ctx) return;
+      ctx = ensureMinimapHiDpi(canvas, ctx!, size);
       const context = ctx;
       const sim = simRef.current;
       const terrain = terrainRef.current;
+      if (!sim || !terrain) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       const wp =
         tutorialWaypointRef?.current ?? tutorialStepRef.current?.waypoint ?? null;
       const bounds = getMapWorldBounds(terrain);
@@ -327,22 +351,58 @@ export function ExcavatorMinimap({
           size,
           pad,
         );
-        context.fillStyle =
-          monumentPhase === "active" ? "#e30613" : "#fbbf24";
-        context.fillRect(
-          mon.px - 3.5 * repairScale,
-          mon.py - 5.5 * repairScale,
-          7 * repairScale,
-          11 * repairScale,
+        // Keep the pylon mark inside the padded map so it doesn't sit under
+        // the red shell stroke at the north edge (same red = invisible).
+        const edgePad = 7 * repairScale;
+        const monPx = Math.min(
+          size - pad - edgePad,
+          Math.max(pad + edgePad, mon.px),
         );
-        context.strokeStyle = "#ffffff";
-        context.lineWidth = Math.max(1, 1.1 * repairScale);
-        context.strokeRect(
-          mon.px - 3.5 * repairScale,
-          mon.py - 5.5 * repairScale,
-          7 * repairScale,
-          11 * repairScale,
+        const monPy = Math.min(
+          size - pad - edgePad,
+          Math.max(pad + edgePad + 2 * repairScale, mon.py),
         );
+        const pillarW = 5.5 * repairScale;
+        const pillarH = 10 * repairScale;
+        const tipH = 3.2 * repairScale;
+        const active = monumentPhase === "active";
+
+        // Soft halo so the mark reads against the dark shell / red border.
+        context.beginPath();
+        context.arc(monPx, monPy, 7.5 * repairScale, 0, Math.PI * 2);
+        context.fillStyle = active
+          ? "rgba(255, 214, 102, 0.35)"
+          : "rgba(251, 191, 36, 0.28)";
+        context.fill();
+
+        // Pylon body + tip (gold / cream — not Yanmar red on red border)
+        context.beginPath();
+        context.moveTo(monPx, monPy - pillarH * 0.55 - tipH);
+        context.lineTo(monPx + pillarW * 0.55, monPy - pillarH * 0.55);
+        context.lineTo(monPx + pillarW * 0.42, monPy + pillarH * 0.45);
+        context.lineTo(monPx - pillarW * 0.42, monPy + pillarH * 0.45);
+        context.lineTo(monPx - pillarW * 0.55, monPy - pillarH * 0.55);
+        context.closePath();
+        context.fillStyle = active ? "#ffe082" : "#fbbf24";
+        context.fill();
+        context.strokeStyle = "#fffef6";
+        context.lineWidth = Math.max(1.2, 1.6 * repairScale);
+        context.stroke();
+        context.strokeStyle = active ? "#b71c1c" : "#92400e";
+        context.lineWidth = Math.max(0.7, 0.95 * repairScale);
+        context.stroke();
+
+        // Tiny brand accent at the tip
+        context.fillStyle = "#e30613";
+        context.beginPath();
+        context.arc(
+          monPx,
+          monPy - pillarH * 0.55 - tipH * 0.35,
+          Math.max(1.2, 1.6 * repairScale),
+          0,
+          Math.PI * 2,
+        );
+        context.fill();
       }
 
       const pickups = worldPickupsRef?.current?.active;
@@ -446,16 +506,33 @@ export function ExcavatorMinimap({
     };
 
     const onResize = () => {
-      ctx = setupHiDpiCanvas(canvas, size) ?? ctx;
+      ctx = setupHiDpiCanvas(canvas, size)?.ctx ?? ctx;
     };
 
     window.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    // 모니터 이동·브라우저 줌으로 devicePixelRatio만 바뀔 때
+    const dprQuery = window.matchMedia(
+      `(resolution: ${window.devicePixelRatio}dppx)`,
+    );
+    const onDprChange = () => onResize();
+    if (typeof dprQuery.addEventListener === "function") {
+      dprQuery.addEventListener("change", onDprChange);
+    } else {
+      dprQuery.addListener(onDprChange);
+    }
     raf = requestAnimationFrame(draw);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      if (typeof dprQuery.removeEventListener === "function") {
+        dprQuery.removeEventListener("change", onDprChange);
+      } else {
+        dprQuery.removeListener(onDprChange);
+      }
     };
-  }, [visible, displaySize, monumentPhase, simRef, terrainRef, tutorialStepRef, tutorialWaypointRef]);
+  }, [visible, displaySize, monumentPhase, simRef, terrainRef, tutorialStepRef, tutorialWaypointRef, worldPickupsRef]);
 
   if (!visible) return null;
 
@@ -465,7 +542,7 @@ export function ExcavatorMinimap({
     { label: "철거", swatch: "bg-amber-500 ring-1 ring-yellow-300/70" },
     { label: "석재", swatch: "bg-slate-300 ring-1 ring-slate-100/70" },
     { label: "정비", swatch: "bg-amber-200 ring-1 ring-yellow-100/80" },
-    { label: "조형", swatch: "bg-red-500 ring-1 ring-red-200/80" },
+    { label: "조형", swatch: "bg-amber-200 ring-1 ring-yellow-100/90" },
   ] as const;
 
   return (

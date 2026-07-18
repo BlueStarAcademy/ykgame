@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { MISSION_DIFFICULTY_REWARDS, QUEST_MISSIONS_PER_DAY } from "./quests/config";
 import { getCurrentMission, type YanmarQuestState } from "./quests/questState";
 import type { QuestReward } from "./quests/types";
+import { formatQuestProgressCurrent } from "./quests/formatProgress";
 
 interface MissionHudPanelProps {
   questState: YanmarQuestState | null;
@@ -209,7 +210,11 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
                         >
                           {done
                             ? `${task.target.toLocaleString()}/${task.target.toLocaleString()}`
-                            : `${Math.floor(value).toLocaleString()}/${task.target.toLocaleString()}`}
+                            : `${formatQuestProgressCurrent(
+                                value,
+                                task.target,
+                                task.metric,
+                              ).toLocaleString()}/${task.target.toLocaleString()}`}
                         </span>
                       </div>
                       <TaskProgressBar

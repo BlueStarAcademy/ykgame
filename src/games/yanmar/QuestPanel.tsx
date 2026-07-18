@@ -16,6 +16,7 @@ import {
   type YanmarQuestState,
 } from "./quests/questState";
 import type { QuestReward, QuestTab } from "./quests/types";
+import { formatQuestProgressCurrent } from "./quests/formatProgress";
 
 function QuestNotifyBadge({
   count,
@@ -385,8 +386,12 @@ export function QuestPanel({
                         </button>
                       ) : (
                         <span className="shrink-0 text-[10px] font-bold tabular-nums text-white/55">
-                          {Math.floor(progress).toLocaleString()}/
-                          {target.toLocaleString()}
+                          {formatQuestProgressCurrent(
+                            progress,
+                            target,
+                            def.metric,
+                          ).toLocaleString()}
+                          /{target.toLocaleString()}
                         </span>
                       )}
                     </div>
@@ -469,7 +474,11 @@ export function QuestPanel({
                             >
                               {done
                                 ? `${task.target.toLocaleString()}/${task.target.toLocaleString()}`
-                                : `${Math.floor(value).toLocaleString()}/${task.target.toLocaleString()}`}
+                                : `${formatQuestProgressCurrent(
+                                    value,
+                                    task.target,
+                                    task.metric,
+                                  ).toLocaleString()}/${task.target.toLocaleString()}`}
                             </span>
                           </div>
                         </li>
@@ -537,8 +546,12 @@ export function QuestPanel({
                         </button>
                       ) : (
                         <span className="shrink-0 text-[10px] font-bold tabular-nums text-white/55">
-                          {Math.floor(progress).toLocaleString()}/
-                          {def.target.toLocaleString()}
+                          {formatQuestProgressCurrent(
+                            progress,
+                            def.target,
+                            def.metric,
+                          ).toLocaleString()}
+                          /{def.target.toLocaleString()}
                         </span>
                       )}
                     </div>

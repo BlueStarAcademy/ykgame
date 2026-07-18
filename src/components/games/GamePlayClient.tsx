@@ -22,49 +22,33 @@ const PhaserGameWrapper = dynamic(
   { ssr: false },
 );
 
-/** 인게임 텍스처를 브라우저/ R3F 캐시에 미리 올려 Suspense 대기 시간을 줄인다. */
-async function preloadYanmarSceneAssets(): Promise<void> {
-  const [THREE, { useLoader }, { PREMIUM_SITE_TEXTURES }, { YK_GEONGI_LOGO }] =
-    await Promise.all([
-      import("three"),
-      import("@react-three/fiber"),
-      import("@/games/yanmar/siteTextures"),
-      import("@/lib/brand-assets"),
-    ]);
-
-  const urls = [
-    ...Object.values(PREMIUM_SITE_TEXTURES),
-    YK_GEONGI_LOGO.white,
-    YK_GEONGI_LOGO.black,
-    "/images/yanmar/yanmar-logo-white.png",
-  ];
-
-  useLoader.preload(THREE.TextureLoader, urls);
-
-  const loader = new THREE.TextureLoader();
-  await Promise.all(
-    urls.map(
-      (url) =>
-        new Promise<void>((resolve) => {
-          loader.load(
-            url,
-            () => resolve(),
-            undefined,
-            () => resolve(),
-          );
-        }),
-    ),
-  );
+/** 인게임 텍스처를 R3F 캐시에 미리 올려 Suspense 대기 시간을 줄인다 (논블로킹). */
+function preloadYanmarSceneAssets(): void {
+  void Promise.all([
+    import("three"),
+    import("@react-three/fiber"),
+    import("@/games/yanmar/siteTextures"),
+    import("@/lib/brand-assets"),
+  ])
+    .then(([THREE, { useLoader }, { PREMIUM_SITE_TEXTURES }, { YK_GEONGI_LOGO }]) => {
+      const urls = [
+        ...Object.values(PREMIUM_SITE_TEXTURES),
+        YK_GEONGI_LOGO.white,
+        YK_GEONGI_LOGO.black,
+        "/images/yanmar/yanmar-logo-white.png",
+      ];
+      useLoader.preload(THREE.TextureLoader, urls);
+    })
+    .catch(() => undefined);
 }
 
-/** 모드 버튼 클릭(사용자 제스처)에서 전체화면 + 세로 고정 후 인게임 진입 */
+/** 사용자 제스처에서 전체화면만 건다. 에셋/청크는 마운트와 병렬로 진행. */
 async function prepareGameEntry(): Promise<void> {
   enablePwaMode();
-  await Promise.all([
-    prepareInGameFullscreen(),
-    import("@/components/games/PhaserGameWrapper"),
-    preloadYanmarSceneAssets().catch(() => undefined),
-  ]);
+  // Warm the dynamic import + texture cache without blocking mount.
+  void import("@/components/games/PhaserGameWrapper");
+  preloadYanmarSceneAssets();
+  await prepareInGameFullscreen();
 }
 
 export interface LobbyProfileProps {
@@ -169,10 +153,12 @@ export function GamePlayClient({
     setEntryLoading(true);
     void (async () => {
       try {
-        await Promise.all([prepareGameEntry(), loadStats()]);
+        // Fullscreen must stay in the click gesture; everything else loads under the splash.
+        await prepareGameEntry();
       } catch {
-        // 프리로드 실패해도 인게임 진입은 진행
+        // 전체화면 실패해도 인게임 진입은 진행
       }
+      void loadStats();
       setResult(null);
       setPlayMode("game");
       setYanmarSeasonBaseScore(myStats.bestScore);
@@ -182,16 +168,13 @@ export function GamePlayClient({
   };
 
   const handleGameReady = useCallback(() => {
-    // Keep the splash fully opaque until the in-game canvas has been painted,
-    // then hard-cut (no fade) so sky/black underlays never show through.
+    // Hard-cut once the canvas has been painted under the opaque splash.
     if (entryRevealRafRef.current != null) {
       window.cancelAnimationFrame(entryRevealRafRef.current);
     }
     entryRevealRafRef.current = window.requestAnimationFrame(() => {
-      entryRevealRafRef.current = window.requestAnimationFrame(() => {
-        entryRevealRafRef.current = null;
-        setEntryLoading(false);
-      });
+      entryRevealRafRef.current = null;
+      setEntryLoading(false);
     });
   }, []);
 

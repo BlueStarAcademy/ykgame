@@ -3913,7 +3913,7 @@ function AuxiliarySceneEffects({
 
 /**
  * Mounts only after Canvas Suspense resolves (all useLoader textures ready).
- * Waits several rendered frames so ContactShadows / first paint complete before reveal.
+ * Waits two rendered frames so the first paint is on screen before reveal.
  */
 function SceneReadySignal({ onReady }: { onReady?: () => void }) {
   const firedRef = useRef(false);
@@ -3922,8 +3922,7 @@ function SceneReadySignal({ onReady }: { onReady?: () => void }) {
   useFrame(() => {
     if (firedRef.current || !onReady) return;
     framesRef.current += 1;
-    // Wait for several rendered frames so terrain/excavator are on screen.
-    if (framesRef.current < 12) return;
+    if (framesRef.current < 2) return;
     firedRef.current = true;
     queueMicrotask(() => onReady());
   });

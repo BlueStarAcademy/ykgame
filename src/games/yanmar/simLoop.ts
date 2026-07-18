@@ -124,7 +124,6 @@ import {
   computeComAlignFactor,
   computeGrappleAdhesion,
   createGrappleGripRuntime,
-  GRAPPLE_GRAB_MIN_OPEN,
   grappleBucketAngleReady,
   hillBoulderGripEnvelope,
   hillBoulderWrapRadius,
@@ -135,6 +134,10 @@ import {
   GRAPPLE_TRAVEL_LOCK_CLEARANCE,
   type GrappleGripRuntime,
 } from "./grappleGrip";
+import {
+  clampGrappleOpenAgainstArm,
+  grappleOpenEnoughToGrab,
+} from "./grappleArmClearance";
 
 export interface DumpSoilVisual {
   active: boolean;
@@ -1017,6 +1020,8 @@ export function tickExcavatorSim(params: SimTickParams) {
     } else if (pedal < 0) {
       auxiliary.grappleOpen = Math.min(1, auxiliary.grappleOpen + openRate * dt);
     }
+    // 암과 겹치면 더 이상 열리지 않음. 버켓을 말아 암이 들어오면 자동으로 조금 닫힘.
+    auxiliary.grappleOpen = clampGrappleOpenAgainstArm(sim, auxiliary.grappleOpen);
   }
   const grappleJawSamples =
     sim.attachmentType === "grapple"
@@ -1160,8 +1165,8 @@ export function tickExcavatorSim(params: SimTickParams) {
     const closing = grapplePedal > 0;
     const opening = grapplePedal < 0;
     const grappleOpenAmount = auxiliary?.grappleOpen ?? 1;
-    /** 70% 이상 열린 상태에서 접기를 시작하면 닫히는 동안 집기 가능. */
-    if (closing && grappleOpenAmount >= GRAPPLE_GRAB_MIN_OPEN) {
+    /** 충분히 연 뒤 접기 시작하면 닫히는 동안 집기 가능 (암 한도 반영). */
+    if (closing && grappleOpenEnoughToGrab(sim, grappleOpenAmount)) {
       runtime.grappleGrabArmed = true;
     } else if (!closing) {
       runtime.grappleGrabArmed = false;
@@ -1556,7 +1561,8 @@ export function tickExcavatorSim(params: SimTickParams) {
       sampleHeight(terrain, wrappableRock.x, wrappableRock.z),
     );
   const grappleReadyToCloseGrab =
-    grappleOpenForHud >= GRAPPLE_GRAB_MIN_OPEN || runtime.grappleGrabArmed;
+    grappleOpenEnoughToGrab(sim, grappleOpenForHud) ||
+    runtime.grappleGrabArmed;
   const canGrab =
     sim.attachmentType === "grapple" &&
     !sim.carriedBoulderId &&

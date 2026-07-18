@@ -7,6 +7,7 @@ import {
   YANMAR_MACHINE_COLORS as COLOR,
   YANMAR_MACHINE_MATERIALS as MATERIAL,
 } from "./machineVisualTheme";
+import { GRAPPLE_THUMB_MAX_OPEN_RAD } from "./grappleArmClearance";
 
 export interface ExcavatorGrappleProps {
   /** Parent group userData.openAmount: 0=closed against bucket, 1=fully open. */
@@ -104,11 +105,17 @@ export function ExcavatorGrapple({
       Math.min(1, Number(openAmountRef.current?.userData.openAmount ?? 1)),
     );
     // 유압 엄지 개폐 속도: 기존 대비 1/8 (직전에 비해 절반)
-    const follow = 1 - Math.exp(-delta * 0.625);
-    currentOpenRef.current += (target - currentOpenRef.current) * follow;
+    // 암 충돌로 open이 줄어들 때는 관통이 보이지 않게 즉시 맞춤
+    if (target < currentOpenRef.current) {
+      currentOpenRef.current = target;
+    } else {
+      const follow = 1 - Math.exp(-delta * 0.625);
+      currentOpenRef.current += (target - currentOpenRef.current) * follow;
+    }
     if (thumbRef.current) {
-      // 발판 좌측(열기) 최대 벌림 ≈ 92° (암과 겹침 최소화)
-      thumbRef.current.rotation.z = -currentOpenRef.current * (92 * Math.PI) / 180;
+      // 최대 각도는 크게 두고, 암 충돌 한도는 sim의 openAmount에 반영됨
+      thumbRef.current.rotation.z =
+        -currentOpenRef.current * GRAPPLE_THUMB_MAX_OPEN_RAD;
     }
   });
 

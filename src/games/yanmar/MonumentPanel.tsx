@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import {
@@ -27,6 +27,7 @@ import {
   getUpgradeDurationMs,
   instantCompleteStars,
 } from "./upgradeTimers";
+import { formatQuestProgressCurrent } from "./quests/formatProgress";
 import type { WorkshopShopItemId } from "./workshop";
 
 type TabId = "quest" | "upgrade" | "shop" | "build";
@@ -38,6 +39,8 @@ export interface MonumentPanelState {
   pending: MonumentPendingInfo | null;
   constructionEndsAt: string | null;
   starsStored: number;
+  /** ISO — 다음 생산 틱 기준 시각 */
+  prodUpdatedAt: string | null;
   shopPurchases: Record<string, { count: number; remaining: number }>;
   weekKey: string;
   totalXp?: number;
@@ -56,6 +59,8 @@ interface MonumentPanelProps {
   onShopPurchase: (itemId: WorkshopShopItemId) => void | Promise<void>;
   onStartConstruction?: () => void | Promise<void>;
   onClaimConstruction?: () => void | Promise<void>;
+  onClaimStars?: () => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
 }
 
 function PointsAmount({
@@ -94,6 +99,8 @@ export function MonumentPanel({
   onShopPurchase,
   onStartConstruction,
   onClaimConstruction,
+  onClaimStars,
+  onRefresh,
 }: MonumentPanelProps) {
   const [tab, setTab] = useState<TabId>("quest");
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -131,6 +138,37 @@ export function MonumentPanel({
   const storageLv = levels.storage_cap ?? 0;
   const speedLv = levels.prod_speed ?? 0;
   const currency = panelState?.currency ?? 0;
+  const storageCap = monumentStorageCap(storageLv);
+  const intervalMs = monumentIntervalMs(speedLv);
+  const starsStored = panelState?.starsStored ?? 0;
+  const storageFull = starsStored >= storageCap;
+  const prodUpdatedMs = panelState?.prodUpdatedAt
+    ? Date.parse(panelState.prodUpdatedAt)
+    : NaN;
+  const nextProdRemainingMs =
+    storageFull || !Number.isFinite(prodUpdatedMs)
+      ? 0
+      : Math.max(0, prodUpdatedMs + intervalMs - nowMs);
+  const prevRemainingRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      prevRemainingRef.current = null;
+      return;
+    }
+    if (!onRefresh || storageFull || !Number.isFinite(prodUpdatedMs)) return;
+    const prev = prevRemainingRef.current;
+    prevRemainingRef.current = nextProdRemainingMs;
+    if (prev != null && prev > 0 && nextProdRemainingMs <= 0) {
+      void onRefresh();
+    }
+  }, [
+    open,
+    onRefresh,
+    storageFull,
+    prodUpdatedMs,
+    nextProdRemainingMs,
+  ]);
 
   const buildComplete = useMemo(() => {
     if (!questState) return false;
@@ -141,6 +179,11 @@ export function MonumentPanel({
 
   const phase = panelState.phase;
   const showManage = phase === "active";
+  const canClaimStars = showManage && starsStored > 0;
+  const storagePct = Math.min(
+    100,
+    Math.round((starsStored / Math.max(1, storageCap)) * 100),
+  );
 
   return (
     <AppModalOverlay
@@ -157,14 +200,6 @@ export function MonumentPanel({
               <span className="text-stone-400">조형물 포인트</span>
               <PointsAmount value={panelState.points} size={20} />
             </p>
-            {phase === "active" ? (
-              <p className="mt-1 text-xs text-amber-100/90">
-                저장 ★{panelState.starsStored} / {monumentStorageCap(storageLv)}
-                {" · "}
-                {Math.round(monumentIntervalMs(speedLv) / 1000)}초마다{" "}
-                {MONUMENT_STARS_PER_TICK}★
-              </p>
-            ) : null}
           </div>
           <button
             type="button"
@@ -174,6 +209,97 @@ export function MonumentPanel({
             닫기
           </button>
         </header>
+
+        {showManage ? (
+          <div className="shrink-0 border-b border-white/10 px-3 pb-2.5 pt-2.5">
+            <div className="relative overflow-hidden rounded-2xl border border-amber-300/30 bg-gradient-to-br from-amber-500/18 via-[#241c14]/96 to-[#12161d] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+              <div
+                className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-amber-300/12 blur-3xl"
+                aria-hidden
+              />
+              <div className="relative flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="inline-flex items-center gap-1.5 text-[1.65rem] font-black leading-none tracking-tight tabular-nums text-amber-50">
+                      <img
+                        src="/images/star-currency.svg"
+                        alt=""
+                        width={26}
+                        height={26}
+                        className="yanmar-score-panel-star shrink-0"
+                        draggable={false}
+                      />
+                      {starsStored.toLocaleString()}
+                    </span>
+                    <span className="text-xs font-semibold tabular-nums text-stone-400">
+                      / {storageCap.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-black/40">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-amber-500 via-amber-300 to-yellow-200 transition-[width] duration-500"
+                      style={{ width: `${storagePct}%` }}
+                    />
+                  </div>
+                  <div className="mt-2 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10px] font-semibold tracking-wide text-stone-300">
+                    {storageFull ? (
+                      <span className="truncate text-amber-200/90">
+                        저장이 가득 찼습니다
+                      </span>
+                    ) : (
+                      <>
+                        <span className="shrink-0 text-stone-400">다음 생산</span>
+                        <span className="shrink-0 tabular-nums text-amber-100">
+                          {formatUpgradeRemaining(nextProdRemainingMs)}
+                        </span>
+                        <span className="shrink-0 text-stone-600" aria-hidden>
+                          ·
+                        </span>
+                        <span className="inline-flex min-w-0 items-center gap-0.5 truncate tabular-nums text-stone-400">
+                          <img
+                            src="/images/star-currency.svg"
+                            alt=""
+                            width={11}
+                            height={11}
+                            className="yanmar-score-panel-star shrink-0"
+                            draggable={false}
+                          />
+                          {MONUMENT_STARS_PER_TICK}/
+                          {intervalMs >= 60_000
+                            ? `${Math.round(intervalMs / 60_000)}분`
+                            : `${Math.round(intervalMs / 1000)}초`}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy || !canClaimStars || !onClaimStars}
+                  onClick={() => void onClaimStars?.()}
+                  className="inline-flex shrink-0 items-center justify-center gap-1 rounded-xl border border-amber-200/45 bg-gradient-to-b from-amber-200 to-amber-500 px-3.5 py-2.5 text-sm font-black text-[#3b2208] shadow-[0_8px_18px_rgba(245,158,11,0.26)] transition enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-none disabled:bg-white/10 disabled:text-stone-500 disabled:shadow-none"
+                >
+                  {canClaimStars ? (
+                    <>
+                      수령
+                      <img
+                        src="/images/star-currency.svg"
+                        alt=""
+                        width={14}
+                        height={14}
+                        className="yanmar-score-panel-star shrink-0"
+                        draggable={false}
+                      />
+                      {starsStored.toLocaleString()}
+                    </>
+                  ) : (
+                    "수령"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {showManage ? (
           <div className="flex shrink-0 gap-1 border-b border-white/10 px-2 pt-2">
@@ -230,7 +356,12 @@ export function MonumentPanel({
                         />
                       </div>
                       <p className="mt-1 text-right text-[11px] tabular-nums text-stone-400">
-                        {Math.min(item.progress, q.target)} / {q.target}
+                        {formatQuestProgressCurrent(
+                          item.progress,
+                          q.target,
+                          q.metric,
+                        ).toLocaleString()}{" "}
+                        / {q.target.toLocaleString()}
                         {item.completed ? " ✓" : ""}
                       </p>
                     </li>
@@ -332,7 +463,12 @@ export function MonumentPanel({
                       />
                     </div>
                     <p className="mt-1 text-right text-[11px] tabular-nums text-stone-400">
-                      {Math.min(item.progress, q.target)} / {q.target}
+                      {formatQuestProgressCurrent(
+                        item.progress,
+                        q.target,
+                        q.metric,
+                      ).toLocaleString()}{" "}
+                      / {q.target.toLocaleString()}
                     </p>
                   </li>
                 );
@@ -396,9 +532,6 @@ export function MonumentPanel({
                               레벨제한{reqLevel}
                             </span>
                           ) : null}
-                        </p>
-                        <p className="mt-0.5 text-xs text-stone-400">
-                          {u.description}
                         </p>
                         {!maxed ? (
                           <p className="mt-1 text-[11px] text-sky-200/90">
