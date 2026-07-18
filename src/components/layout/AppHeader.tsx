@@ -27,13 +27,16 @@ function HamburgerButton({
   onClick,
   open,
   badgeCount,
+  buttonRef,
 }: {
   onClick: () => void;
   open: boolean;
   badgeCount: number;
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
 }) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={onClick}
       className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white shadow-sm hover:bg-slate-50"
@@ -83,6 +86,7 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
   const [mailboxOpen, setMailboxOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rankingOpen, setRankingOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const sessionCurrency = session?.user?.currency;
   const menuNotifyCount = mailNotifyCount + couponNotifyCount;
@@ -153,6 +157,7 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
             <HamburgerButton
               open={menuOpen}
               badgeCount={menuNotifyCount}
+              buttonRef={menuButtonRef}
               onClick={() => setMenuOpen((prev) => !prev)}
             />
           </div>
@@ -162,6 +167,7 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
       <AppSideMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
+        anchorRef={menuButtonRef}
         nickname={displayNickname}
         mailNotifyCount={mailNotifyCount}
         couponNotifyCount={couponNotifyCount}

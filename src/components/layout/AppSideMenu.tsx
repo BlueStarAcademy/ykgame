@@ -1,12 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
 
 interface AppSideMenuProps {
   open: boolean;
   onClose: () => void;
+  /** 메뉴 버튼 — 패널을 이 버튼 아래·우측에 붙인다 */
+  anchorRef?: RefObject<HTMLElement | null>;
   nickname: string;
   mailNotifyCount: number;
   couponNotifyCount: number;
@@ -66,6 +73,7 @@ function MenuItem({ icon, label, badge, onClick, href, danger }: MenuItemProps) 
 export function AppSideMenu({
   open,
   onClose,
+  anchorRef,
   nickname,
   mailNotifyCount,
   couponNotifyCount,
@@ -76,6 +84,37 @@ export function AppSideMenu({
   onOpenSettings,
   onLogout,
 }: AppSideMenuProps) {
+  const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(
+    null,
+  );
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanelPos(null);
+      return;
+    }
+
+    const updatePos = () => {
+      const rect = anchorRef?.current?.getBoundingClientRect();
+      if (!rect) {
+        setPanelPos({ top: 56, right: 12 });
+        return;
+      }
+      setPanelPos({
+        top: rect.bottom + 6,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    };
+
+    updatePos();
+    window.addEventListener("resize", updatePos);
+    window.addEventListener("scroll", updatePos, true);
+    return () => {
+      window.removeEventListener("resize", updatePos);
+      window.removeEventListener("scroll", updatePos, true);
+    };
+  }, [open, anchorRef]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -83,12 +122,8 @@ export function AppSideMenu({
       if (e.key === "Escape") onClose();
     }
 
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     document.addEventListener("keydown", handleKeyDown);
-
     return () => {
-      document.body.style.overflow = prevOverflow;
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open, onClose]);
@@ -101,38 +136,36 @@ export function AppSideMenu({
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/55 p-4"
-      onClick={onClose}
-    >
+    <>
+      {/* 뒤쪽이 보이도록 딤 없이 클릭만 흡수 */}
+      <button
+        type="button"
+        className="fixed inset-0 z-[300] cursor-default bg-transparent"
+        aria-label="메뉴 닫기"
+        onClick={onClose}
+      />
       <div
-        className="w-[min(100%,18rem)] overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="fixed z-[310] w-[min(100%,17.5rem)] overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-md"
         role="dialog"
         aria-modal="true"
         aria-label="메뉴"
-        onClick={(e) => e.stopPropagation()}
+        style={
+          panelPos
+            ? { top: panelPos.top, right: panelPos.right }
+            : { top: 56, right: 12 }
+        }
       >
-        <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3.5">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-              {nickname.charAt(0)}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-gray-900">{nickname}</p>
-              <p className="text-[11px] text-gray-400">메뉴</p>
-            </div>
+        <div className="flex items-center gap-3 border-b border-gray-100 px-3.5 py-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+            {nickname.charAt(0)}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-600 hover:bg-gray-200"
-            aria-label="메뉴 닫기"
-          >
-            닫기
-          </button>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-gray-900">{nickname}</p>
+            <p className="text-[11px] text-gray-400">메뉴</p>
+          </div>
         </div>
 
-        <nav className="space-y-0.5 p-2">
+        <nav className="space-y-0.5 p-1.5">
           <MenuItem
             icon="📬"
             label="우편함"
@@ -160,7 +193,7 @@ export function AppSideMenu({
           ) : null}
         </nav>
 
-        <div className="border-t border-gray-100 p-2">
+        <div className="border-t border-gray-100 p-1.5">
           <MenuItem
             icon="🚪"
             label="로그아웃"
@@ -172,7 +205,7 @@ export function AppSideMenu({
           />
         </div>
       </div>
-    </div>,
+    </>,
     document.body,
   );
 }
