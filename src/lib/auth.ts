@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import { authConfig } from "./auth.config";
 import { ensureAuthSecretEnv, resolveAuthSecret } from "./auth-secret";
+import { bumpSessionVersion, assertSessionCurrent } from "./session-guard";
 import type { Role } from "@/generated/prisma/client";
 
 ensureAuthSecretEnv();
@@ -23,6 +24,7 @@ declare module "next-auth" {
       role: Role;
       currency: number;
       totalXp: number;
+      sessionVersion: number;
     };
   }
 
@@ -35,6 +37,7 @@ declare module "next-auth" {
     role: Role;
     currency: number;
     totalXp: number;
+    sessionVersion: number;
   }
 
   interface JWT {
@@ -46,10 +49,16 @@ declare module "next-auth" {
     role: Role;
     currency: number;
     totalXp: number;
+    sessionVersion: number;
   }
 }
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+const {
+  handlers,
+  signIn,
+  signOut,
+  auth: rawAuth,
+} = NextAuth({
   ...authConfig,
   secret: resolveAuthSecret(),
   providers: [
@@ -58,6 +67,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         loginId: { label: "아이디", type: "text" },
         password: { label: "비밀번호", type: "password" },
         rememberMe: { label: "자동 로그인", type: "text" },
+        forceTakeover: { label: "강제 접속", type: "text" },
       },
       authorize: async (credentials) => {
         console.warn("[auth] authorize called");
@@ -93,7 +103,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        console.warn(`[auth] sign-in ok: ${loginId}`);
+        let sessionVersion: number;
+        try {
+          sessionVersion = await bumpSessionVersion(user.id);
+        } catch (error) {
+          console.error("[auth] session version bump failed:", error);
+          return null;
+        }
+
+        console.warn(`[auth] sign-in ok: ${loginId} (sessionVersion=${sessionVersion})`);
 
         return {
           id: user.id,
@@ -105,11 +123,37 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           role: user.role,
           currency: user.currency,
           totalXp: user.totalXp,
+          sessionVersion,
         };
       },
     }),
   ],
 });
+
+export { handlers, signIn, signOut };
+
+/** Raw JWT session (no single-session DB check). */
+export const getTokenSession = rawAuth;
+
+/**
+ * Session with single-session enforcement.
+ * Superseded JWTs resolve to null so API routes reject them.
+ */
+export async function auth() {
+  const session = await rawAuth();
+  if (!session?.user?.id) return session;
+
+  const version = session.user.sessionVersion;
+  if (typeof version !== "number") return null;
+
+  try {
+    await assertSessionCurrent(session.user.id, version);
+  } catch {
+    return null;
+  }
+
+  return session;
+}
 
 export async function requireAuth() {
   const session = await auth();

@@ -95,6 +95,7 @@ import { MapSiteDecor } from "./mapDecor";
 import { RepairTent } from "./RepairTent";
 import { REPAIR_TENT } from "./gearCatalog";
 import { WorkshopSigns } from "./WorkshopSign";
+import { MonumentPylon } from "./MonumentPylon";
 import type { WorkshopId } from "./workshop/types";
 import { CrashZoneDecor } from "./CrashZoneDecor";
 import { HillZoneDecor } from "./HillZoneDecor";
@@ -155,6 +156,8 @@ interface ExcavatorSceneProps {
   worldPickupRevision?: number;
   onWorldPickup?: (pickup: WorldPickup) => void;
   workshopClaimableIds?: ReadonlySet<WorkshopId> | readonly WorkshopId[];
+  monumentPhase?: import("./monument/types").MonumentPhase;
+  monumentStarsStored?: number;
 }
 
 function TerrainMesh({
@@ -3972,6 +3975,10 @@ function SceneContent(props: ExcavatorSceneProps) {
         key={`workshop-signs-${terrainRevision}`}
         mapTier={props.terrainRef.current.mapTier}
         claimableIds={props.workshopClaimableIds ?? []}
+      />
+      <MonumentPylon
+        phase={props.monumentPhase ?? "locked"}
+        starsStored={props.monumentStarsStored ?? 0}
       />
       <TerrainRockScatter key={`rocks-${terrainRevision}`} terrainRef={props.terrainRef} />
       <ContactShadows

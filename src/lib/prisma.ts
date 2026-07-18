@@ -114,8 +114,16 @@ function isStalePrismaClient(client: PrismaClient): boolean {
   const userFields = runtime._runtimeDataModel?.models?.User?.fields;
   if (
     Array.isArray(userFields) &&
-    !userFields.some((field) => field.name === "dumpWorkshopPoints")
+    (!userFields.some((field) => field.name === "dumpWorkshopPoints") ||
+      !userFields.some((field) => field.name === "monumentPoints"))
   ) {
+    return true;
+  }
+
+  const delegatesExtra = client as PrismaClient & {
+    userMonumentUpgrade?: unknown;
+  };
+  if (delegatesExtra.userMonumentUpgrade == null) {
     return true;
   }
 

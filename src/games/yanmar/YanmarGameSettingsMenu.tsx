@@ -112,6 +112,7 @@ function SoundSection({
         <button
           type="button"
           onClick={onToggle}
+          onPointerDown={(e) => e.stopPropagation()}
           aria-pressed={enabled}
           className={`rounded-md px-2.5 py-1 text-[10px] font-black tracking-wide transition-colors ${
             enabled

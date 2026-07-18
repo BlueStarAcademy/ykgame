@@ -61,6 +61,8 @@ export interface WorkshopDef {
   id: WorkshopId;
   label: string;
   pointsLabel: string;
+  /** Workshop-specific point coin icon */
+  pointsIcon: string;
   /** Map tier required (1=always, 2=crash, 3=hill). */
   minMapTier: number;
   sign: WorkshopSignDef;

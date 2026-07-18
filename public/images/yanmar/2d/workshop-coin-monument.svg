@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+  <defs>
+    <radialGradient id="wm-rim" cx="32" cy="28" r="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fca5a5"/>
+      <stop offset="55%" stop-color="#dc2626"/>
+      <stop offset="100%" stop-color="#7f1d1d"/>
+    </radialGradient>
+    <radialGradient id="wm-face" cx="30" cy="26" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fee2e2"/>
+      <stop offset="45%" stop-color="#f87171"/>
+      <stop offset="100%" stop-color="#b91c1c"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#wm-rim)" stroke="#450a0a" stroke-width="2"/>
+  <circle cx="32" cy="32" r="24.5" fill="url(#wm-face)" stroke="#991b1b" stroke-width="1.2"/>
+  <circle cx="32" cy="32" r="21" fill="none" stroke="#fef2f2" stroke-opacity="0.35" stroke-width="1"/>
+  <!-- Yanmar-style chevron mark -->
+  <path
+    d="M22 22l10 7 10-7v5.5L32 34.5 22 27.5V22z"
+    fill="#ffffff"
+    fill-opacity="0.95"
+  />
+  <path
+    d="M22 31l10 7 10-7v5.5L32 43.5 22 36.5V31z"
+    fill="#ffffff"
+    fill-opacity="0.85"
+  />
+</svg>

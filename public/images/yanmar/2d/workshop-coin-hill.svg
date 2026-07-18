@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+  <defs>
+    <radialGradient id="wh-rim" cx="32" cy="28" r="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#94a3b8"/>
+      <stop offset="55%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </radialGradient>
+    <radialGradient id="wh-face" cx="30" cy="26" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="42%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </radialGradient>
+    <linearGradient id="wh-claw" x1="18" y1="18" x2="46" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="50%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#wh-rim)" stroke="#0f172a" stroke-width="2"/>
+  <circle cx="32" cy="32" r="24.5" fill="url(#wh-face)" stroke="#1e293b" stroke-width="1.2"/>
+  <circle cx="32" cy="32" r="21" fill="none" stroke="#f1f5f9" stroke-opacity="0.3" stroke-width="1"/>
+  <!-- grapple claws -->
+  <path
+    fill="url(#wh-claw)"
+    stroke="#0f172a"
+    stroke-width="1.15"
+    stroke-linejoin="round"
+    d="M20 22c0 0 4-4 12-4s12 4 12 4l-3 5c-2.5-1.8-5.5-2.8-9-2.8s-6.5 1-9 2.8l-3-5z"
+  />
+  <path
+    fill="url(#wh-claw)"
+    stroke="#0f172a"
+    stroke-width="1.15"
+    stroke-linejoin="round"
+    d="M18 28c2 10 7 18 14 20 7-2 12-10 14-20l-4.5 1.2c-1.6 7-4.8 12.5-9.5 14.2-4.7-1.7-7.9-7.2-9.5-14.2L18 28z"
+  />
+  <circle cx="32" cy="30" r="4.2" fill="#475569" stroke="#0f172a" stroke-width="1"/>
+  <circle cx="32" cy="30" r="2" fill="#cbd5e1"/>
+  <path d="M24 38c2.5 4 5.5 6.5 8 7.2 2.5-.7 5.5-3.2 8-7.2" stroke="#e2e8f0" stroke-opacity="0.4" stroke-width="1.1" stroke-linecap="round"/>
+  <circle cx="24" cy="22" r="1.6" fill="#f8fafc" fill-opacity="0.7"/>
+</svg>

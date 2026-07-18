@@ -14,7 +14,8 @@ import {
 } from "@/lib/pageAudioLifecycle";
 import {
   getSharedIngameBgmAudio,
-  killAllSiteLegendBgms,
+  getSiteLegendBgmPlayGen,
+  isSiteLegendBgmMasterEnabled,
   setSharedIngameBgmAudio,
   silenceHtmlAudio,
   trackSiteLegendBgm,
@@ -53,7 +54,8 @@ class YanmarAudioController {
   private unlocked = false;
   private sfxEnabled = true;
   private breakerSfxEnabled = true;
-  private bgmEnabled = true;
+  /** False until store hydrates — avoids playing before Off is applied. */
+  private bgmEnabled = false;
   private bgmVolume = 28;
   private sfxVolume = 85;
   private active = false;
@@ -62,7 +64,9 @@ class YanmarAudioController {
   private storeSubscribed = false;
   private readonly onBgmGesture = () => {
     if (isPageAudioSealed()) return;
-    if (!this.active || !this.bgmEnabled) return;
+    if (!this.active || !this.bgmEnabled || !isSiteLegendBgmMasterEnabled()) {
+      return;
+    }
     this.startBgm();
   };
   private breakerWanted = false;
@@ -140,7 +144,8 @@ class YanmarAudioController {
     this.applyBreakerGain();
     this.applyHornVolumes();
     this.syncBreakerPlayback();
-    if (!this.bgmEnabled) {
+    if (!settings.bgmEnabled || !isSiteLegendBgmMasterEnabled()) {
+      this.bgmEnabled = false;
       this.unbindBgmGesture();
       this.stopBgm(true);
       this.bgm = null;
@@ -283,7 +288,11 @@ class YanmarAudioController {
       this.unbindBgmGesture();
       return;
     }
-    if (this.active && this.bgmEnabled) {
+    if (
+      this.active &&
+      this.bgmEnabled &&
+      isSiteLegendBgmMasterEnabled()
+    ) {
       this.startBgm();
       this.bindBgmGesture();
     } else {
@@ -307,16 +316,30 @@ class YanmarAudioController {
   }
 
   private startBgm() {
-    if (isPageAudioSealed() || !this.active || !this.bgmEnabled) return;
+    if (
+      isPageAudioSealed() ||
+      !this.active ||
+      !this.bgmEnabled ||
+      !isSiteLegendBgmMasterEnabled()
+    ) {
+      return;
+    }
     const audio = this.ensureBgm();
     if (!audio) return;
+    const gen = getSiteLegendBgmPlayGen();
     this.applyBgmVolume();
     audio.muted = false;
     if (!audio.paused) return;
     void audio
       .play()
       .then(() => {
-        if (isPageAudioSealed() || !this.active || !this.bgmEnabled) {
+        if (
+          gen !== getSiteLegendBgmPlayGen() ||
+          isPageAudioSealed() ||
+          !this.active ||
+          !this.bgmEnabled ||
+          !isSiteLegendBgmMasterEnabled()
+        ) {
           silenceHtmlAudio(audio);
           return;
         }

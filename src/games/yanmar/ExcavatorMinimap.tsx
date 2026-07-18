@@ -6,17 +6,22 @@ import type { TerrainData } from "./terrain";
 import { DUMP_ZONE, getActiveDigZones, getMapWorldBounds } from "./terrain";
 import type { TutorialStep, TutorialWaypoint } from "./tutorial";
 import { REPAIR_TENT } from "./gearCatalog";
+import { SITE_LAYOUT } from "./siteLayout";
+import type { MonumentPhase } from "./monument/types";
+import type { WorldPickupsState } from "./worldPickups";
 
 interface ExcavatorMinimapProps {
   simRef: React.RefObject<ExcavatorSimState>;
   terrainRef: React.RefObject<TerrainData>;
   tutorialStepRef: React.RefObject<TutorialStep | null>;
   tutorialWaypointRef?: React.RefObject<TutorialWaypoint | null>;
+  worldPickupsRef?: React.RefObject<WorldPickupsState | null>;
   visible: boolean;
   /** 가로 HUD 스택 안에 넣을 때 absolute 포지션 제거 */
   embedded?: boolean;
   /** 세로 HUD 등 공간이 좁을 때 캔버스 한 변 길이(px) */
   displaySize?: number;
+  monumentPhase?: MonumentPhase;
 }
 
 const DEFAULT_DISPLAY_SIZE = 120;
@@ -44,7 +49,8 @@ function worldToMinimap(
   const nz = (z - bounds.minZ) / (bounds.maxZ - bounds.minZ);
   return {
     px: pad + nx * inner,
-    py: pad + nz * inner,
+    // Flip Z so world +Z (north) is toward the top of the minimap (12 o'clock).
+    py: pad + (1 - nz) * inner,
   };
 }
 
@@ -62,14 +68,85 @@ function setupHiDpiCanvas(canvas: HTMLCanvasElement, displaySize: number) {
   return ctx;
 }
 
+function drawMinimapStar(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  outer: number,
+) {
+  const inner = outer * 0.42;
+  const spikes = 5;
+  ctx.beginPath();
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? outer : inner;
+    // Tip points up (-Y) so the star reads as standing.
+    const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+    const x = cx + Math.cos(a) * r;
+    const y = cy + Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
+function drawMinimapBooster(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  scale: number,
+) {
+  const halfW = 1.6 * scale;
+  const bodyH = 3.4 * scale;
+  const tipH = 2.2 * scale;
+  const flameH = 2.0 * scale;
+
+  // Body (standing cylinder)
+  ctx.beginPath();
+  ctx.moveTo(cx - halfW, cy - bodyH * 0.15);
+  ctx.lineTo(cx - halfW, cy + bodyH * 0.45);
+  ctx.lineTo(cx + halfW, cy + bodyH * 0.45);
+  ctx.lineTo(cx + halfW, cy - bodyH * 0.15);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Nose cone (up)
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - bodyH * 0.15 - tipH);
+  ctx.lineTo(cx + halfW * 0.95, cy - bodyH * 0.15);
+  ctx.lineTo(cx - halfW * 0.95, cy - bodyH * 0.15);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Flame (down) — orange accent
+  const prevFill = ctx.fillStyle;
+  const prevStroke = ctx.strokeStyle;
+  ctx.fillStyle = "#ff7a3d";
+  ctx.strokeStyle = "#ffd0b8";
+  ctx.beginPath();
+  ctx.moveTo(cx - halfW * 1.15, cy + bodyH * 0.45);
+  ctx.lineTo(cx, cy + bodyH * 0.45 + flameH);
+  ctx.lineTo(cx + halfW * 1.15, cy + bodyH * 0.45);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = prevFill;
+  ctx.strokeStyle = prevStroke;
+}
+
 export function ExcavatorMinimap({
   simRef,
   terrainRef,
   tutorialStepRef,
   tutorialWaypointRef,
+  worldPickupsRef,
   visible,
   embedded = false,
   displaySize = DEFAULT_DISPLAY_SIZE,
+  monumentPhase = "locked",
 }: ExcavatorMinimapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -241,6 +318,50 @@ export function ExcavatorMinimap({
       context.lineWidth = Math.max(1, 1.2 * repairScale);
       context.stroke();
 
+      if (monumentPhase !== "locked") {
+        const mon = worldToMinimap(
+          SITE_LAYOUT.monument[0],
+          SITE_LAYOUT.monument[1],
+          bounds,
+          size,
+          pad,
+        );
+        context.fillStyle =
+          monumentPhase === "active" ? "#e30613" : "#fbbf24";
+        context.fillRect(
+          mon.px - 3.5 * repairScale,
+          mon.py - 5.5 * repairScale,
+          7 * repairScale,
+          11 * repairScale,
+        );
+        context.strokeStyle = "#ffffff";
+        context.lineWidth = Math.max(1, 1.1 * repairScale);
+        context.strokeRect(
+          mon.px - 3.5 * repairScale,
+          mon.py - 5.5 * repairScale,
+          7 * repairScale,
+          11 * repairScale,
+        );
+      }
+
+      const pickups = worldPickupsRef?.current?.active;
+      if (pickups && pickups.length > 0) {
+        const s = size / DEFAULT_DISPLAY_SIZE;
+        for (const pickup of pickups) {
+          const p = worldToMinimap(pickup.x, pickup.z, bounds, size, pad);
+          context.lineWidth = Math.max(1, 1.05 * s);
+          if (pickup.kind === "star") {
+            context.fillStyle = "#ffd24a";
+            context.strokeStyle = "#fff6c8";
+            drawMinimapStar(context, p.px, p.py, 3.4 * s);
+          } else {
+            context.fillStyle = "#2a9d8f";
+            context.strokeStyle = "#e9f5f3";
+            drawMinimapBooster(context, p.px, p.py, s);
+          }
+        }
+      }
+
       if (wp) {
         const goal = worldToMinimap(wp.x, wp.z, bounds, size, pad);
         const pulse = 0.7 + Math.sin(Date.now() / 200) * 0.3;
@@ -256,7 +377,8 @@ export function ExcavatorMinimap({
       const player = worldToMinimap(sim.posX, sim.posZ, bounds, size, pad);
       const facing = sim.heading + sim.swing;
       const dirX = Math.sin(facing);
-      const dirY = Math.cos(facing);
+      // Canvas Y grows downward; negate so heading 0 (+Z north) points up.
+      const dirY = -Math.cos(facing);
       const nx = -dirY;
       const ny = dirX;
       const markerScale = size / DEFAULT_DISPLAY_SIZE;
@@ -320,7 +442,7 @@ export function ExcavatorMinimap({
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
     };
-  }, [visible, displaySize, simRef, terrainRef, tutorialStepRef, tutorialWaypointRef]);
+  }, [visible, displaySize, monumentPhase, simRef, terrainRef, tutorialStepRef, tutorialWaypointRef]);
 
   if (!visible) return null;
 
@@ -330,6 +452,7 @@ export function ExcavatorMinimap({
     { label: "철거", swatch: "bg-amber-500 ring-1 ring-yellow-300/70" },
     { label: "석재", swatch: "bg-slate-300 ring-1 ring-slate-100/70" },
     { label: "정비", swatch: "bg-amber-200 ring-1 ring-yellow-100/80" },
+    { label: "조형", swatch: "bg-red-500 ring-1 ring-red-200/80" },
   ] as const;
 
   return (

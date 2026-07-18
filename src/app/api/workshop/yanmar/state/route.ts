@@ -9,6 +9,10 @@ import {
   workshopPointsField,
   type WorkshopId,
 } from "@/games/yanmar/workshop";
+import {
+  pendingMapFromRows,
+  settleWorkshopPendingUpgrades,
+} from "@/games/yanmar/workshop/pending";
 
 export async function GET() {
   const session = await auth();
@@ -18,6 +22,10 @@ export async function GET() {
 
   const userId = session.user.id;
   const weekKey = getWorkshopWeekKey();
+
+  await prisma.$transaction(async (tx) => {
+    await settleWorkshopPendingUpgrades(tx, userId);
+  });
 
   const [user, upgrades, purchases] = await Promise.all([
     prisma.user.findUnique({
@@ -30,11 +38,17 @@ export async function GET() {
         gachaTicketsPremium: true,
         enhanceCores: true,
         currency: true,
+        totalXp: true,
       },
     }),
     prisma.userWorkshopUpgrade.findMany({
       where: { userId },
-      select: { workshopId: true, upgradeKey: true, level: true },
+      select: {
+        workshopId: true,
+        upgradeKey: true,
+        level: true,
+        pendingCompletesAt: true,
+      },
     }),
     prisma.userWorkshopShopPurchase.findMany({
       where: { userId, weekKey },
@@ -63,10 +77,16 @@ export async function GET() {
     }
   }
   for (const row of upgrades) {
-    if (row.workshopId === "dump" || row.workshopId === "crash" || row.workshopId === "hill") {
+    if (
+      row.workshopId === "dump" ||
+      row.workshopId === "crash" ||
+      row.workshopId === "hill"
+    ) {
       levels[row.workshopId][row.upgradeKey] = row.level;
     }
   }
+
+  const pendingByWorkshop = pendingMapFromRows(upgrades);
 
   const shopPurchases: Record<
     WorkshopId,
@@ -94,12 +114,14 @@ export async function GET() {
     weekKey,
     points,
     levels,
+    pendingByWorkshop,
     shopPurchases,
     shopItems: WORKSHOP_SHOP_ITEMS,
     gachaTicketsStandard: user.gachaTicketsStandard,
     gachaTicketsPremium: user.gachaTicketsPremium,
     enhanceCores: user.enhanceCores,
     currency: user.currency,
+    totalXp: user.totalXp,
     pointsFields: {
       dump: workshopPointsField("dump"),
       crash: workshopPointsField("crash"),

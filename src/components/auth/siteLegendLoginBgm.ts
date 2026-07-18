@@ -14,7 +14,9 @@ import {
 } from "@/lib/pageAudioLifecycle";
 import {
   getSharedLoginBgmAudio,
-  killAllSiteLegendBgms,
+  getSiteLegendBgmPlayGen,
+  isSiteLegendBgmMasterEnabled,
+  killLoginSiteLegendBgm,
   setSharedLoginBgmAudio,
   silenceHtmlAudio,
   trackSiteLegendBgm,
@@ -23,37 +25,17 @@ import {
 const LOGIN_BGM_SRC = "/sounds/site-legend/login-bgm.ogg";
 
 const GLOBAL_CTRL = "__ykSiteLegendLoginBgmCtrl";
-const GLOBAL_SHOULD_PLAY = "__ykSiteLegendLoginBgmShouldPlay";
 const GLOBAL_GESTURE = "__ykSiteLegendLoginBgmGesture";
-const GLOBAL_PLAY_GEN = "__ykSiteLegendLoginBgmPlayGen";
+const GLOBAL_UNSUB = "__ykSiteLegendLoginBgmUnsub";
 
 type GlobalBag = typeof globalThis & {
   [GLOBAL_CTRL]?: SiteLegendLoginBgmController;
-  [GLOBAL_SHOULD_PLAY]?: boolean;
   [GLOBAL_GESTURE]?: () => void;
-  [GLOBAL_PLAY_GEN]?: number;
+  [GLOBAL_UNSUB]?: () => void;
 };
 
 function bag(): GlobalBag {
   return globalThis as GlobalBag;
-}
-
-function bumpPlayGen() {
-  const g = bag();
-  g[GLOBAL_PLAY_GEN] = (g[GLOBAL_PLAY_GEN] ?? 0) + 1;
-  return g[GLOBAL_PLAY_GEN];
-}
-
-function currentPlayGen() {
-  return bag()[GLOBAL_PLAY_GEN] ?? 0;
-}
-
-function setShouldPlay(value: boolean) {
-  bag()[GLOBAL_SHOULD_PLAY] = value;
-}
-
-function getShouldPlay() {
-  return bag()[GLOBAL_SHOULD_PLAY] === true;
 }
 
 function detachGestureHandler() {
@@ -66,11 +48,21 @@ function detachGestureHandler() {
   g[GLOBAL_GESTURE] = undefined;
 }
 
-// Fast Refresh: seal + kill orphans, replace controller.
+function wantsLoginBgm(allowed: boolean, enabled: boolean) {
+  return (
+    allowed &&
+    enabled &&
+    isSiteLegendBgmMasterEnabled() &&
+    !isPageAudioSealed()
+  );
+}
+
+// Fast Refresh: drop gesture + old store subscription, replace controller.
 if (typeof window !== "undefined") {
   detachGestureHandler();
-  killAllSiteLegendBgms({ unload: true });
-  setShouldPlay(false);
+  killLoginSiteLegendBgm({ unload: true });
+  bag()[GLOBAL_UNSUB]?.();
+  delete bag()[GLOBAL_UNSUB];
   delete bag()[GLOBAL_CTRL];
 }
 
@@ -90,9 +82,11 @@ class SiteLegendLoginBgmController {
     if (!this.storeBound) {
       this.storeBound = true;
       this.applySettings(getSoundSettings());
-      subscribeSoundSettings((settings) => {
+      const unsub = subscribeSoundSettings((settings) => {
         this.applySettings(settings);
       });
+      bag()[GLOBAL_UNSUB]?.();
+      bag()[GLOBAL_UNSUB] = unsub;
     } else {
       this.applySettings(getSoundSettings());
     }
@@ -103,10 +97,8 @@ class SiteLegendLoginBgmController {
     this.lifecycleBound = true;
     registerPageAudioHooks("site-legend-login-bgm", {
       pause: () => {
-        bumpPlayGen();
-        setShouldPlay(false);
         detachGestureHandler();
-        killAllSiteLegendBgms({ unload: false });
+        killLoginSiteLegendBgm({ unload: false });
         this.audio = getSharedLoginBgmAudio();
       },
       resume: () => {
@@ -115,11 +107,8 @@ class SiteLegendLoginBgmController {
         this.sync();
       },
       exit: () => {
-        bumpPlayGen();
-        setShouldPlay(false);
         detachGestureHandler();
         this.audio = null;
-        // page lifecycle already killAll's; keep local pointer clear.
       },
     });
   }
@@ -137,11 +126,9 @@ class SiteLegendLoginBgmController {
   private applySettings(settings: SoundSettings) {
     this.enabled = settings.bgmEnabled;
     this.volume = bgmVolumeToGain(settings.bgmVolume);
-    if (!this.enabled) {
-      bumpPlayGen();
-      setShouldPlay(false);
+    if (!this.enabled || !isSiteLegendBgmMasterEnabled()) {
       detachGestureHandler();
-      // Store already killAll's on Off; keep local state consistent.
+      killLoginSiteLegendBgm({ unload: true });
       this.audio = null;
       return;
     }
@@ -155,17 +142,13 @@ class SiteLegendLoginBgmController {
   private sync() {
     if (typeof window === "undefined") return;
     if (isPageAudioSealed()) {
-      setShouldPlay(false);
       return;
     }
 
-    const shouldPlay = this.allowed && this.enabled;
-    setShouldPlay(shouldPlay);
-
-    if (!shouldPlay) {
-      bumpPlayGen();
+    if (!wantsLoginBgm(this.allowed, this.enabled)) {
       detachGestureHandler();
-      killAllSiteLegendBgms({ unload: true });
+      // Only touch login BGM — do not nuke in-game when leaving the title screen.
+      killLoginSiteLegendBgm({ unload: true });
       this.audio = null;
       return;
     }
@@ -202,21 +185,15 @@ class SiteLegendLoginBgmController {
   }
 
   private tryPlay() {
-    if (
-      isPageAudioSealed() ||
-      !getShouldPlay() ||
-      !(this.allowed && this.enabled)
-    ) {
-      bumpPlayGen();
-      setShouldPlay(false);
-      killAllSiteLegendBgms({ unload: false });
+    if (!wantsLoginBgm(this.allowed, this.enabled)) {
+      killLoginSiteLegendBgm({ unload: false });
       return;
     }
 
     const audio = this.ensureAudio();
     if (!audio) return;
 
-    const gen = currentPlayGen();
+    const gen = getSiteLegendBgmPlayGen();
     audio.muted = false;
     audio.volume = this.volume;
 
@@ -224,9 +201,8 @@ class SiteLegendLoginBgmController {
       .play()
       .then(() => {
         if (
-          gen !== currentPlayGen() ||
-          !getShouldPlay() ||
-          isPageAudioSealed()
+          gen !== getSiteLegendBgmPlayGen() ||
+          !wantsLoginBgm(this.allowed, this.enabled)
         ) {
           silenceHtmlAudio(audio);
           return;
@@ -240,6 +216,7 @@ class SiteLegendLoginBgmController {
 
   private bindGesture() {
     if (typeof window === "undefined") return;
+    if (!wantsLoginBgm(this.allowed, this.enabled)) return;
     const g = bag();
     if (g[GLOBAL_GESTURE]) return;
 

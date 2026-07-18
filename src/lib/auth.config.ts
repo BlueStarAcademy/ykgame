@@ -27,6 +27,7 @@ export const authConfig = {
         token.role = user.role;
         token.currency = user.currency;
         token.totalXp = user.totalXp;
+        token.sessionVersion = user.sessionVersion;
       }
       if (trigger === "update" && session?.user) {
         token.nickname = session.user.nickname ?? token.nickname;
@@ -50,6 +51,7 @@ export const authConfig = {
           role: token.role as "USER" | "ADMIN",
           currency: token.currency as number,
           totalXp: (token.totalXp as number | undefined) ?? 0,
+          sessionVersion: (token.sessionVersion as number | undefined) ?? 0,
         },
       };
     },

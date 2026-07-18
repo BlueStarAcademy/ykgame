@@ -1,16 +1,24 @@
 /**
  * Tracks every Site Legend looping BGM Audio element so Off / page-exit
  * can silence HMR orphans that no longer have a live controller.
+ *
+ * Also owns a master on/off gate + play generation so in-flight `audio.play()`
+ * promises cannot resurrect BGM after the user turns it off (pause during a
+ * pending play is ignored by some browsers until play resolves).
  */
 
 const REGISTRY_KEY = "__ykSiteLegendBgmAudioRegistry";
 const INGAME_KEY = "__ykSiteLegendIngameBgmAudio";
 const LOGIN_KEY = "__ykSiteLegendLoginBgmAudio";
+const MASTER_KEY = "__ykSiteLegendBgmMasterEnabled";
+const PLAY_GEN_KEY = "__ykSiteLegendBgmPlayGen";
 
 type GlobalBag = typeof globalThis & {
   [REGISTRY_KEY]?: Set<HTMLAudioElement>;
   [INGAME_KEY]?: HTMLAudioElement | null;
   [LOGIN_KEY]?: HTMLAudioElement | null;
+  [MASTER_KEY]?: boolean;
+  [PLAY_GEN_KEY]?: number;
 };
 
 function bag(): GlobalBag {
@@ -74,6 +82,27 @@ export function getSharedIngameBgmAudio(): HTMLAudioElement | null {
   return bag()[INGAME_KEY] ?? null;
 }
 
+/** Latest settings-backed master gate (true only after settings say On). */
+export function isSiteLegendBgmMasterEnabled(): boolean {
+  return bag()[MASTER_KEY] === true;
+}
+
+export function getSiteLegendBgmPlayGen(): number {
+  return bag()[PLAY_GEN_KEY] ?? 0;
+}
+
+/**
+ * Sync the master gate from sound settings. When Off, bumps play gen so
+ * in-flight play() callbacks abort even if pause() during pending play is ignored.
+ */
+export function setSiteLegendBgmMasterEnabled(enabled: boolean) {
+  const g = bag();
+  g[MASTER_KEY] = enabled;
+  if (!enabled) {
+    g[PLAY_GEN_KEY] = (g[PLAY_GEN_KEY] ?? 0) + 1;
+  }
+}
+
 /** Hard-stop every known Site Legend BGM element (login + in-game + orphans). */
 export function killAllSiteLegendBgms(opts?: { unload?: boolean }) {
   if (typeof window === "undefined") return;
@@ -95,5 +124,19 @@ export function killAllSiteLegendBgms(opts?: { unload?: boolean }) {
   if (ingame) {
     kill(ingame);
     if (unload) bag()[INGAME_KEY] = null;
+  }
+}
+
+/** Stop only the login/title BGM element (leave in-game alone). */
+export function killLoginSiteLegendBgm(opts?: { unload?: boolean }) {
+  if (typeof window === "undefined") return;
+  const unload = opts?.unload !== false;
+  const kill = unload ? unloadHtmlAudio : silenceHtmlAudio;
+  const login = bag()[LOGIN_KEY];
+  if (!login) return;
+  kill(login);
+  if (unload) {
+    registry().delete(login);
+    bag()[LOGIN_KEY] = null;
   }
 }

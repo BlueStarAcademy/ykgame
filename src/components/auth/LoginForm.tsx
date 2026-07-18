@@ -48,6 +48,7 @@ function LoginFormInner({
   const [loading, setLoading] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
   const [registeredNotice, setRegisteredNotice] = useState(false);
+  const [conflictOpen, setConflictOpen] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -59,30 +60,27 @@ function LoginFormInner({
     if (auto) setAutoLogin(true);
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
+  function persistLoginPrefs() {
     if (saveId) {
       localStorage.setItem(STORAGE_KEY, loginId);
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
     localStorage.setItem(AUTO_LOGIN_KEY, String(autoLogin));
+  }
 
+  async function completeSignIn() {
     const result = await signIn("credentials", {
       loginId,
       password,
       rememberMe: String(autoLogin),
+      forceTakeover: "true",
       redirect: false,
     });
 
-    setLoading(false);
-
     if (result?.error) {
       setError("아이디 또는 비밀번호가 올바르지 않습니다.");
-      return;
+      return false;
     }
 
     onSuccess?.();
@@ -95,9 +93,62 @@ function LoginFormInner({
         window.location.pathname + window.location.search === dest ||
         (defaultCallback.startsWith("/home") && window.location.pathname === "/home"))
     ) {
-      return;
+      return true;
     }
     router.push(dest);
+    return true;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    persistLoginPrefs();
+
+    try {
+      const preRes = await fetch("/api/auth/prelogin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loginId, password }),
+      });
+      const preData = (await preRes.json()) as {
+        conflict?: boolean;
+        error?: string;
+      };
+
+      if (!preRes.ok) {
+        setError(preData.error ?? "아이디 또는 비밀번호가 올바르지 않습니다.");
+        return;
+      }
+
+      if (preData.conflict) {
+        setConflictOpen(true);
+        return;
+      }
+
+      await completeSignIn();
+    } catch {
+      setError("로그인 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleConflictConfirm() {
+    setConflictOpen(false);
+    setError("");
+    setLoading(true);
+    try {
+      await completeSignIn();
+    } catch {
+      setError("로그인 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleConflictCancel() {
+    setConflictOpen(false);
   }
 
   return (
@@ -298,6 +349,36 @@ function LoginFormInner({
           />
         </AppModalOverlay>
       ) : null}
+
+      <AppModalOverlay
+        open={conflictOpen}
+        onClose={handleConflictCancel}
+        nested={isSiteLegend}
+      >
+        <div className="overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="px-5 py-6">
+            <p className="text-center text-base font-semibold text-gray-900">
+              로그인 중인 계정입니다. 로그아웃 처리하고 접속하시겠습니까?
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={handleConflictCancel}
+                className="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConflictConfirm()}
+                className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                접속
+              </button>
+            </div>
+          </div>
+        </div>
+      </AppModalOverlay>
     </div>
   );
 }

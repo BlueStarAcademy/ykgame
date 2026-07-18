@@ -165,6 +165,7 @@ import { GearPanel, type GearPanelItem } from "./GearPanel";
 import { PlayerProfileModal } from "./PlayerProfileModal";
 import { RepairPanel } from "./RepairPanel";
 import { WorkshopPanel, type WorkshopPanelState } from "./WorkshopPanel";
+import { MonumentPanel, type MonumentPanelState } from "./MonumentPanel";
 import { isInWorkshopSignRange } from "./WorkshopSign";
 import {
   WORKSHOP_DEFS,
@@ -182,6 +183,19 @@ import {
   type WorkshopQuestState,
 } from "./workshop/questState";
 import type { WorkshopQuestMetric } from "./workshop/types";
+import {
+  isInMonumentRange,
+  loadMonumentQuestState,
+  markMonumentDailyClaimed,
+  MONUMENT_UNLOCK_LEVEL,
+  pushMonumentQuestProgress,
+  saveMonumentQuestState,
+  type MonumentPhase,
+  type MonumentQuestMetric,
+  type MonumentQuestState,
+  type MonumentUpgradeKey,
+} from "./monument";
+import { SITE_LAYOUT } from "./siteLayout";
 import {
   computeMaintenanceSnapshot,
   type MaintenanceFluidId,
@@ -640,6 +654,70 @@ function AttachmentUnlockOverlay({
   onClose: () => void;
 }) {
   if (!unlock) return null;
+
+  if (unlock === "MONUMENT") {
+    return (
+      <div className="yanmar-unlock-overlay" role="presentation">
+        <div
+          className="yanmar-unlock-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-label="레벨 20 YK 조형물 개방 안내"
+        >
+          <div className="yanmar-unlock-panel-glow" aria-hidden />
+          <div className="yanmar-unlock-panel-frame" aria-hidden />
+          <header className="yanmar-unlock-brand">
+            <span className="yanmar-unlock-brand-mark">YANMAR</span>
+            <span className="yanmar-unlock-brand-rule" aria-hidden />
+            <span className="yanmar-unlock-brand-sub">
+              SV08-1 · MONUMENT UNLOCK
+            </span>
+          </header>
+          <div className="yanmar-unlock-body">
+            <p className="yanmar-unlock-level">
+              <span>LEVEL</span> 20
+            </p>
+            <h2 className="yanmar-unlock-title">YK 조형물이 개방되었습니다</h2>
+            <p className="yanmar-unlock-lead">
+              맵 북쪽(미니맵 12시) 조형물 예정지로 이동합니다. 기본 미션 3개를
+              완료하면 건설을 시작할 수 있습니다.
+            </p>
+            <ul className="yanmar-unlock-perks">
+              <li>
+                <span className="yanmar-unlock-perk-index">01</span>
+                <div>
+                  <strong>덤프트럭 보내기</strong>
+                  <span>흙 하역장에서 트럭을 1회 출발시키세요</span>
+                </div>
+              </li>
+              <li>
+                <span className="yanmar-unlock-perk-index">02</span>
+                <div>
+                  <strong>아스팔트 9개 크래쉬</strong>
+                  <span>브레이커로 아스팔트를 부수세요</span>
+                </div>
+              </li>
+              <li>
+                <span className="yanmar-unlock-perk-index">03</span>
+                <div>
+                  <strong>돌 트럭 보내기</strong>
+                  <span>언덕 하역장에서 돌 트럭을 1회 출발시키세요</span>
+                </div>
+              </li>
+            </ul>
+            <button
+              type="button"
+              className="yanmar-unlock-cta"
+              onClick={onClose}
+            >
+              조형물로 이동
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const breaker = unlock === "BREAKER";
   const level = breaker ? 10 : 15;
   const attachmentLabel = breaker ? "브레이커" : "집게";
@@ -879,6 +957,17 @@ export function ExcavatorGameWrapper({
     useState<WorkshopQuestState | null>(null);
   const workshopQuestStateRef = useRef<WorkshopQuestState | null>(null);
   const [workshopBusy, setWorkshopBusy] = useState(false);
+  const [nearMonument, setNearMonument] = useState(false);
+  const nearMonumentRef = useRef(false);
+  const [showMonumentPanel, setShowMonumentPanel] = useState(false);
+  const [monumentPanelState, setMonumentPanelState] =
+    useState<MonumentPanelState | null>(null);
+  const [monumentQuestState, setMonumentQuestState] =
+    useState<MonumentQuestState | null>(null);
+  const monumentQuestStateRef = useRef<MonumentQuestState | null>(null);
+  const [monumentBusy, setMonumentBusy] = useState(false);
+  const monumentPhaseRef = useRef<MonumentPhase>("locked");
+  const monumentTutorialArmedRef = useRef(false);
   const [gachaTicketsStandard, setGachaTicketsStandard] = useState(0);
   const [gachaTicketsPremium, setGachaTicketsPremium] = useState(0);
   const travelMetersAccumRef = useRef(0);
@@ -1765,6 +1854,26 @@ export function ExcavatorGameWrapper({
           }
         }
       }
+
+      const monumentMetric = metric as MonumentQuestMetric;
+      if (
+        monumentMetric === "soilDump" ||
+        monumentMetric === "dumpTruckDepart" ||
+        monumentMetric === "asphaltBreak" ||
+        monumentMetric === "haulTruckDepart" ||
+        monumentMetric === "rockDump" ||
+        monumentMetric === "travel"
+      ) {
+        const mq = monumentQuestStateRef.current;
+        if (mq) {
+          const nextMq = pushMonumentQuestProgress(mq, monumentMetric, amount);
+          if (nextMq !== mq) {
+            monumentQuestStateRef.current = nextMq;
+            setMonumentQuestState(nextMq);
+            saveMonumentQuestState(nextMq);
+          }
+        }
+      }
     },
     [],
   );
@@ -1780,6 +1889,9 @@ export function ExcavatorGameWrapper({
         levels: data.levels,
         shopPurchases: data.shopPurchases,
         weekKey: data.weekKey,
+        pendingByWorkshop: data.pendingByWorkshop,
+        totalXp: data.totalXp,
+        currency: data.currency,
       });
       if (typeof data.gachaTicketsStandard === "number") {
         setGachaTicketsStandard(data.gachaTicketsStandard);
@@ -1799,6 +1911,66 @@ export function ExcavatorGameWrapper({
     }
   }, []);
 
+  const warpToMonument = useCallback(() => {
+    const sim = simRef.current;
+    if (!sim) return;
+    sim.posX = SITE_LAYOUT.monument[0];
+    sim.posZ = SITE_LAYOUT.monument[1] - 8;
+    sim.heading = 0;
+    const velocity = velRef.current;
+    if (velocity) velocity.travel = 0;
+  }, []);
+
+  const loadMonumentState = useCallback(async () => {
+    try {
+      const res = await fetch("/api/monument/yanmar/state");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.ok) return;
+      const phase = (data.phase ?? "locked") as MonumentPhase;
+      monumentPhaseRef.current = phase;
+      setMonumentPanelState({
+        phase,
+        points: data.points ?? 0,
+        levels: data.levels ?? {},
+        pending: data.pending ?? null,
+        constructionEndsAt: data.constructionEndsAt ?? null,
+        starsStored: data.starsStored ?? 0,
+        shopPurchases: data.shopPurchases ?? {},
+        weekKey: data.weekKey ?? "",
+        totalXp: data.totalXp,
+        currency: data.currency,
+      });
+      if (typeof data.currency === "number") {
+        currencyRef.current = data.currency;
+        setCurrency(data.currency);
+      }
+      if (typeof data.gachaTicketsStandard === "number") {
+        setGachaTicketsStandard(data.gachaTicketsStandard);
+      }
+      if (typeof data.gachaTicketsPremium === "number") {
+        setGachaTicketsPremium(data.gachaTicketsPremium);
+      }
+      if (typeof data.enhanceCores === "number") {
+        setEnhanceCores(data.enhanceCores);
+      }
+
+      const level = getPlayerLevelProgress(
+        data.totalXp ?? session?.user?.totalXp ?? 0,
+      ).level;
+      if (
+        level >= MONUMENT_UNLOCK_LEVEL &&
+        !data.tutorialDone &&
+        !monumentTutorialArmedRef.current
+      ) {
+        monumentTutorialArmedRef.current = true;
+        enqueueUnlockNotices(["MONUMENT"]);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [enqueueUnlockNotices, session?.user?.totalXp]);
+
   useEffect(() => {
     if (sessionStatus === "loading") return;
     const ownerId = session?.user?.id ?? "local";
@@ -1811,11 +1983,21 @@ export function ExcavatorGameWrapper({
     const wq = loadWorkshopQuestState(ownerId);
     workshopQuestStateRef.current = wq;
     setWorkshopQuestState(wq);
+    const mq = loadMonumentQuestState(ownerId);
+    monumentQuestStateRef.current = mq;
+    setMonumentQuestState(mq);
     questTrackRef.current.ready = false;
     if (session?.user?.id) {
       void loadWorkshopState();
+      void loadMonumentState();
     }
-  }, [session?.user?.id, session?.user?.totalXp, sessionStatus, loadWorkshopState]);
+  }, [
+    session?.user?.id,
+    session?.user?.totalXp,
+    sessionStatus,
+    loadWorkshopState,
+    loadMonumentState,
+  ]);
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
@@ -2575,26 +2757,196 @@ export function ExcavatorGameWrapper({
         if (!res.ok) return;
         setWorkshopPanelState((prev) => {
           if (!prev) return prev;
-          const levels = {
-            ...prev.levels,
-            [workshopId]: {
-              ...prev.levels[workshopId],
-              [upgradeKey]: data.level,
-            },
-          };
           return {
             ...prev,
             points: data.points ?? prev.points,
-            levels,
+            pendingByWorkshop: {
+              ...prev.pendingByWorkshop,
+              [workshopId]: {
+                workshopId,
+                upgradeKey,
+                completesAt: data.completesAt,
+                targetLevel: data.targetLevel,
+              },
+            },
+            currency: prev.currency,
           };
         });
+        await loadWorkshopState();
         await loadEquipment();
       } finally {
         setWorkshopBusy(false);
       }
     },
-    [activeWorkshopId, loadEquipment],
+    [activeWorkshopId, loadEquipment, loadWorkshopState],
   );
+
+  const handleWorkshopInstantUpgrade = useCallback(async () => {
+    const workshopId = activeWorkshopId;
+    if (!workshopId) return;
+    setWorkshopBusy(true);
+    try {
+      const res = await fetch("/api/workshop/yanmar/upgrade/instant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workshopId }),
+      });
+      const data = await res.json();
+      if (!res.ok) return;
+      if (typeof data.currency === "number") {
+        currencyRef.current = data.currency;
+        setCurrency(data.currency);
+      }
+      await loadWorkshopState();
+      await loadEquipment();
+    } finally {
+      setWorkshopBusy(false);
+    }
+  }, [activeWorkshopId, loadEquipment, loadWorkshopState]);
+
+  const handleMonumentClaimQuest = useCallback(
+    async (questId: string, points: number) => {
+      setMonumentBusy(true);
+      try {
+        const eventId = `monument-quest:${questId}:${crypto.randomUUID()}`;
+        const res = await fetch("/api/monument/yanmar/quest/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventId, questId, points }),
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+        if (typeof data.points === "number") {
+          setMonumentPanelState((prev) =>
+            prev ? { ...prev, points: data.points } : prev,
+          );
+        }
+        const current = monumentQuestStateRef.current;
+        if (current) {
+          const next = markMonumentDailyClaimed(current, questId);
+          monumentQuestStateRef.current = next;
+          setMonumentQuestState(next);
+          saveMonumentQuestState(next);
+        }
+      } finally {
+        setMonumentBusy(false);
+      }
+    },
+    [],
+  );
+
+  const handleMonumentUpgrade = useCallback(
+    async (upgradeKey: MonumentUpgradeKey) => {
+      setMonumentBusy(true);
+      try {
+        const res = await fetch("/api/monument/yanmar/upgrade/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ upgradeKey }),
+        });
+        if (!res.ok) return;
+        await loadMonumentState();
+      } finally {
+        setMonumentBusy(false);
+      }
+    },
+    [loadMonumentState],
+  );
+
+  const handleMonumentInstantUpgrade = useCallback(async () => {
+    setMonumentBusy(true);
+    try {
+      const res = await fetch("/api/monument/yanmar/upgrade/instant", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) return;
+      if (typeof data.currency === "number") {
+        currencyRef.current = data.currency;
+        setCurrency(data.currency);
+      }
+      await loadMonumentState();
+    } finally {
+      setMonumentBusy(false);
+    }
+  }, [loadMonumentState]);
+
+  const handleMonumentShopPurchase = useCallback(
+    async (itemId: WorkshopShopItemId) => {
+      setMonumentBusy(true);
+      try {
+        const res = await fetch("/api/monument/yanmar/shop/purchase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId }),
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+        if (typeof data.points === "number") {
+          setMonumentPanelState((prev) =>
+            prev ? { ...prev, points: data.points } : prev,
+          );
+        }
+        if (typeof data.gachaTicketsStandard === "number") {
+          setGachaTicketsStandard(data.gachaTicketsStandard);
+        }
+        if (typeof data.gachaTicketsPremium === "number") {
+          setGachaTicketsPremium(data.gachaTicketsPremium);
+        }
+        if (typeof data.enhanceCores === "number") {
+          setEnhanceCores(data.enhanceCores);
+        }
+        await loadMonumentState();
+      } finally {
+        setMonumentBusy(false);
+      }
+    },
+    [loadMonumentState],
+  );
+
+  const handleMonumentStartConstruction = useCallback(async () => {
+    setMonumentBusy(true);
+    try {
+      const res = await fetch("/api/monument/yanmar/construction/start", {
+        method: "POST",
+      });
+      if (!res.ok) return;
+      await loadMonumentState();
+    } finally {
+      setMonumentBusy(false);
+    }
+  }, [loadMonumentState]);
+
+  const handleMonumentClaimConstruction = useCallback(async () => {
+    setMonumentBusy(true);
+    try {
+      const res = await fetch("/api/monument/yanmar/construction/claim", {
+        method: "POST",
+      });
+      if (!res.ok) return;
+      await loadMonumentState();
+    } finally {
+      setMonumentBusy(false);
+    }
+  }, [loadMonumentState]);
+
+  const handleMonumentClaimStars = useCallback(async () => {
+    setMonumentBusy(true);
+    try {
+      const res = await fetch("/api/monument/yanmar/stars/claim", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) return;
+      if (typeof data.currency === "number") {
+        currencyRef.current = data.currency;
+        setCurrency(data.currency);
+      }
+      await loadMonumentState();
+    } finally {
+      setMonumentBusy(false);
+    }
+  }, [loadMonumentState]);
 
   const handleWorkshopShopPurchase = useCallback(
     async (itemId: WorkshopShopItemId) => {
@@ -2652,6 +3004,13 @@ export function ExcavatorGameWrapper({
         nearRepairTentRef.current = near;
         setNearRepairTent(near);
         if (!near) setShowRepairPanel(false);
+      }
+
+      const nearMon = isInMonumentRange(sim.posX, sim.posZ);
+      if (nearMon !== nearMonumentRef.current) {
+        nearMonumentRef.current = nearMon;
+        setNearMonument(nearMon);
+        if (!nearMon) setShowMonumentPanel(false);
       }
 
       const mapTier = terrainRef.current.mapTier;
@@ -4751,7 +5110,23 @@ export function ExcavatorGameWrapper({
           busy={workshopBusy}
           onClaimQuest={(questId) => void handleWorkshopClaim(questId)}
           onUpgrade={(key) => void handleWorkshopUpgrade(key)}
+          onInstantUpgrade={() => void handleWorkshopInstantUpgrade()}
           onShopPurchase={(itemId) => void handleWorkshopShopPurchase(itemId)}
+        />
+        <MonumentPanel
+          open={showMonumentPanel}
+          onClose={() => setShowMonumentPanel(false)}
+          panelState={monumentPanelState}
+          questState={monumentQuestState}
+          busy={monumentBusy}
+          onClaimQuest={(questId, points) =>
+            void handleMonumentClaimQuest(questId, points)
+          }
+          onUpgrade={(key) => void handleMonumentUpgrade(key)}
+          onInstantUpgrade={() => void handleMonumentInstantUpgrade()}
+          onShopPurchase={(itemId) => void handleMonumentShopPurchase(itemId)}
+          onStartConstruction={() => void handleMonumentStartConstruction()}
+          onClaimConstruction={() => void handleMonumentClaimConstruction()}
         />
 
         {mode !== "intro" && mode !== "gameReady" && travelRaiseWarn ? (
@@ -4793,6 +5168,7 @@ export function ExcavatorGameWrapper({
                 setShowEquipmentUpgrade(false);
                 setShowProfileModal(false);
                 setShowWorkshopPanel(false);
+                setShowMonumentPanel(false);
                 setShowRepairPanel(true);
               }}
               aria-label="정비소 열기"
@@ -4816,9 +5192,82 @@ export function ExcavatorGameWrapper({
         {mode !== "intro" &&
         mode !== "gameReady" &&
         mode !== "ride" &&
+        nearMonument &&
+        !showMonumentPanel &&
+        !nearRepairTent &&
+        (monumentPanelState?.phase ?? "locked") !== "locked" ? (
+          <div className="pointer-events-auto absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2">
+            <div className="flex flex-col items-stretch gap-2">
+              {monumentPanelState?.phase === "claimable" ? (
+                <button
+                  type="button"
+                  className="yanmar-repair-prompt-btn"
+                  disabled={monumentBusy}
+                  onClick={() => void handleMonumentClaimConstruction()}
+                  aria-label="건설완료"
+                >
+                  <span className="yanmar-repair-prompt-copy">
+                    <span className="yanmar-repair-prompt-eyebrow">조형물</span>
+                    <span className="yanmar-repair-prompt-label">
+                      건설완료
+                    </span>
+                  </span>
+                </button>
+              ) : null}
+              {monumentPanelState?.phase === "active" &&
+              (monumentPanelState.starsStored ?? 0) > 0 ? (
+                <button
+                  type="button"
+                  className="yanmar-repair-prompt-btn"
+                  disabled={monumentBusy}
+                  onClick={() => void handleMonumentClaimStars()}
+                  aria-label="스타 수령"
+                >
+                  <span className="yanmar-repair-prompt-copy">
+                    <span className="yanmar-repair-prompt-eyebrow">조형물</span>
+                    <span className="yanmar-repair-prompt-label">
+                      스타 수령 ★{monumentPanelState.starsStored}
+                    </span>
+                  </span>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="yanmar-repair-prompt-btn"
+                onClick={() => {
+                  setShowQuestPanel(false);
+                  setShowShopPanel(false);
+                  setShowEquipmentUpgrade(false);
+                  setShowProfileModal(false);
+                  setShowRepairPanel(false);
+                  setShowWorkshopPanel(false);
+                  setShowMonumentPanel(true);
+                  void loadMonumentState();
+                }}
+                aria-label="조형물 입장"
+              >
+                <span className="yanmar-repair-prompt-copy">
+                  <span className="yanmar-repair-prompt-eyebrow">조형물</span>
+                  <span className="yanmar-repair-prompt-label">
+                    {monumentPanelState?.phase === "quest"
+                      ? "미션 확인"
+                      : monumentPanelState?.phase === "building"
+                        ? "건설 현황"
+                        : "조형물 입장"}
+                  </span>
+                </span>
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {mode !== "intro" &&
+        mode !== "gameReady" &&
+        mode !== "ride" &&
         nearWorkshopId &&
         !showWorkshopPanel &&
-        !nearRepairTent ? (
+        !nearRepairTent &&
+        !nearMonument ? (
           <div className="pointer-events-auto absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2">
             <button
               type="button"
@@ -5353,9 +5802,15 @@ export function ExcavatorGameWrapper({
                   terrainRef={terrainRef}
                   tutorialStepRef={tutorialStepRef}
                   tutorialWaypointRef={tutorialWaypointRef}
+                  worldPickupsRef={
+                    mode === "game" && session?.user?.id
+                      ? worldPickupsRef
+                      : undefined
+                  }
                   visible
                   embedded
                   displaySize={88}
+                  monumentPhase={monumentPanelState?.phase ?? "locked"}
                 />
               ) : null}
               {digFeedback.truckCooldownRemaining > 0 ||
@@ -5526,6 +5981,13 @@ export function ExcavatorGameWrapper({
             const closed = unlockQueue[0];
             if (closed) {
               markPlayerUnlockSeen(unlockSeenOwnerRef.current, closed);
+              if (closed === "MONUMENT") {
+                warpToMonument();
+                void fetch("/api/monument/yanmar/tutorial/done", {
+                  method: "POST",
+                });
+                void loadMonumentState();
+              }
             }
             setUnlockQueue((queue) => queue.slice(1));
           }}
@@ -5638,6 +6100,8 @@ export function ExcavatorGameWrapper({
                   ? getClaimableWorkshopIds(workshopQuestState)
                   : []
               }
+              monumentPhase={monumentPanelState?.phase ?? "locked"}
+              monumentStarsStored={monumentPanelState?.starsStored ?? 0}
             />
           </div>
         )}

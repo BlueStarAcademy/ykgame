@@ -1,5 +1,7 @@
 import { EXCAVATOR_COLLISION_RADIUS } from "./simConstants";
 import { REPAIR_TENT } from "./gearCatalog";
+import { MONUMENT_SIGN } from "./monument/catalog";
+import { getSiteRoadsForTier, type SiteRoad } from "./siteLayout";
 import {
   DUMP_ZONE,
   getActiveDigZoneAt,
@@ -42,8 +44,8 @@ export const STARS_PER_HOUR = 10;
 export const MAX_ACTIVE_STARS = 3;
 export const SPEED_PER_HOUR = 3;
 export const MAX_ACTIVE_SPEED = 1;
-export const STAR_REWARD_MIN = 5;
-export const STAR_REWARD_MAX = 10;
+export const STAR_REWARD_MIN = 3;
+export const STAR_REWARD_MAX = 5;
 export const SPEED_BUFF_MS = 10_000;
 export const SPEED_BUFF_MULT = 2;
 /** After collecting a star, next star appears within this window. */
@@ -66,6 +68,13 @@ function isNearRepairTent(wx: number, wz: number) {
   const dx = wx - REPAIR_TENT.x;
   const dz = wz - REPAIR_TENT.z;
   const r = REPAIR_TENT.radius + 4;
+  return dx * dx + dz * dz <= r * r;
+}
+
+function isNearMonument(wx: number, wz: number) {
+  const dx = wx - MONUMENT_SIGN.x;
+  const dz = wz - MONUMENT_SIGN.z;
+  const r = MONUMENT_SIGN.radius + 4;
   return dx * dx + dz * dz <= r * r;
 }
 
@@ -226,6 +235,9 @@ function isBlockedSpawn(
   if (isNearRepairTent(wx, wz)) {
     return true;
   }
+  if (isNearMonument(wx, wz)) {
+    return true;
+  }
   if (isInCrashZone(terrain, wx, wz)) return true;
   if (isInHillZone(terrain, wx, wz)) return true;
   if (getActiveDigZoneAt(terrain, wx, wz)) return true;
@@ -236,11 +248,49 @@ function isBlockedSpawn(
   return false;
 }
 
+function sampleAlongRoad(road: SiteRoad): { x: number; z: number } {
+  const [ax, az] = road.from;
+  const [bx, bz] = road.to;
+  const t = 0.08 + Math.random() * 0.84;
+  const dx = bx - ax;
+  const dz = bz - az;
+  const len = Math.hypot(dx, dz) || 1;
+  // Slight lateral jitter so pickups sit on the road surface, not a single line.
+  const lateral = (Math.random() - 0.5) * road.width * 0.55;
+  const nx = -dz / len;
+  const nz = dx / len;
+  return {
+    x: ax + dx * t + nx * lateral,
+    z: az + dz * t + nz * lateral,
+  };
+}
+
 function pickSpawnPosition(
   terrain: TerrainData,
   existing: WorldPickup[],
 ): { x: number; y: number; z: number } | null {
   const bounds = getMapWorldBounds(terrain);
+  const roads = getSiteRoadsForTier(terrain.mapTier);
+  const roadAttempts = Math.min(MAX_PLACE_ATTEMPTS, Math.max(12, roads.length * 8));
+
+  // Prefer site roads ("길거리") so pickups appear where players actually travel.
+  for (let attempt = 0; attempt < roadAttempts; attempt++) {
+    const road = roads[attempt % roads.length]!;
+    const { x, z } = sampleAlongRoad(road);
+    if (
+      x < bounds.minX + MAP_EDGE_MARGIN ||
+      x > bounds.maxX - MAP_EDGE_MARGIN ||
+      z < bounds.minZ + MAP_EDGE_MARGIN ||
+      z > bounds.maxZ - MAP_EDGE_MARGIN
+    ) {
+      continue;
+    }
+    if (isBlockedSpawn(terrain, x, z, existing)) continue;
+    const ground = sampleHeight(terrain, x, z);
+    return { x, y: ground + WORLD_PICKUP_HOVER, z };
+  }
+
+  // Fallback: open map (roads may be fully blocked by zones).
   for (let attempt = 0; attempt < MAX_PLACE_ATTEMPTS; attempt++) {
     const x =
       bounds.minX +
@@ -282,8 +332,8 @@ function trySpawnKind(
     const pos = pickSpawnPosition(terrain, state.active);
     pending.shift();
     if (!pos) {
-      // Placement failed — retry soon within the respawn window.
-      scheduleRespawn(state, kind, now, respawnMaxMs(kind));
+      // Placement failed — retry soon (not the full collect-respawn window).
+      scheduleRespawn(state, kind, now, INITIAL_SPAWN_JITTER_MS * 4);
       continue;
     }
 

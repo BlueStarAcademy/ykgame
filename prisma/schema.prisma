@@ -105,6 +105,10 @@ model User {
   /** Set when isActive is false — shown to the player on blocked entry */
   sanctionReason       String?
   sanctionedAt         DateTime?
+  /** Incremented on each login — JWT must match to stay valid (single session). */
+  sessionVersion       Int                    @default(0)
+  /** Last heartbeat from the active session — used for concurrent-login conflict. */
+  sessionLastSeenAt    DateTime?
   createdAt            DateTime               @default(now())
   gameScores           GameScore[]
   seasonStats          UserSeasonStats[]
@@ -125,10 +129,20 @@ model User {
   dumpWorkshopPoints   Int                    @default(0)
   crashWorkshopPoints  Int                    @default(0)
   hillWorkshopPoints   Int                    @default(0)
+  /** Yanmar north pylon monument currency */
+  monumentPoints              Int       @default(0)
+  /** locked | quest | building | claimable | active */
+  monumentPhase               String    @default("locked")
+  monumentConstructionEndsAt  DateTime?
+  monumentStarsStored         Int       @default(0)
+  monumentProdUpdatedAt       DateTime?
+  monumentTutorialDone        Boolean   @default(false)
   gachaTicketsStandard Int                    @default(0)
   gachaTicketsPremium  Int                    @default(0)
   workshopUpgrades     UserWorkshopUpgrade[]
   workshopShopPurchases UserWorkshopShopPurchase[]
+  monumentUpgrades     UserMonumentUpgrade[]
+  monumentShopPurchases UserMonumentShopPurchase[]
 }
 
 model GameScore {
@@ -335,17 +349,49 @@ model UserShopBuff {
 
 /** Per-workplace upgrade levels (dump / crash / hill). */
 model UserWorkshopUpgrade {
-  id         String   @id @default(cuid())
-  userId     String
-  workshopId String
-  upgradeKey String
-  level      Int      @default(0)
-  updatedAt  DateTime @updatedAt
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(cuid())
+  userId             String
+  workshopId         String
+  upgradeKey         String
+  level              Int       @default(0)
+  /** When set, an upgrade to level+1 is in progress until this time. */
+  pendingCompletesAt DateTime?
+  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime  @default(now())
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workshopId, upgradeKey])
   @@index([userId, workshopId])
+}
+
+/** North pylon monument upgrade levels. */
+model UserMonumentUpgrade {
+  id                 String    @id @default(cuid())
+  userId             String
+  upgradeKey         String
+  level              Int       @default(0)
+  pendingCompletesAt DateTime?
+  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime  @default(now())
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, upgradeKey])
+  @@index([userId])
+}
+
+/** Weekly monument shop purchase counters (KST Monday weekKey). */
+model UserMonumentShopPurchase {
+  id        String   @id @default(cuid())
+  userId    String
+  itemId    String
+  weekKey   String
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId, weekKey])
+  @@index([userId, weekKey])
 }
 
 /** Weekly shop purchase counters (KST Monday weekKey). */

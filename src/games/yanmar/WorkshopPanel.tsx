@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
+import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import {
   WORKSHOP_DEFS,
   WORKSHOP_SHOP_ITEMS,
@@ -12,6 +13,7 @@ import {
   type WorkshopUpgradeKey,
 } from "./workshop";
 import type { WorkshopQuestProgressItem } from "./workshop/questState";
+import type { WorkshopPendingInfo } from "./workshop/pending";
 import {
   getYanmarHaulTruckCooldownSec,
   getYanmarTruckCapacityUnits,
@@ -27,6 +29,12 @@ import {
   workshopScoreMult,
   workshopXpMult,
 } from "./workshop/effects";
+import {
+  formatUpgradeRemaining,
+  getUpgradeDurationMs,
+  getWorkshopUpgradeRequiredPlayerLevel,
+  instantCompleteStars,
+} from "./upgradeTimers";
 
 type TabId = "quest" | "upgrade" | "shop";
 
@@ -38,6 +46,9 @@ export interface WorkshopPanelState {
     Record<string, { count: number; remaining: number }>
   >;
   weekKey: string;
+  pendingByWorkshop?: Partial<Record<WorkshopId, WorkshopPendingInfo>>;
+  totalXp?: number;
+  currency?: number;
 }
 
 interface WorkshopPanelProps {
@@ -49,7 +60,41 @@ interface WorkshopPanelProps {
   busy?: boolean;
   onClaimQuest: (questId: string) => void | Promise<void>;
   onUpgrade: (upgradeKey: WorkshopUpgradeKey) => void | Promise<void>;
+  onInstantUpgrade?: () => void | Promise<void>;
   onShopPurchase: (itemId: WorkshopShopItemId) => void | Promise<void>;
+}
+
+function WorkshopPointsAmount({
+  icon,
+  value,
+  label,
+  size = 18,
+  className = "",
+}: {
+  icon: string;
+  value: number | string;
+  label?: string;
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 tabular-nums ${className}`.trim()}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={icon}
+        alt=""
+        width={size}
+        height={size}
+        className="shrink-0 object-contain"
+        style={{ width: size, height: size }}
+        draggable={false}
+      />
+      <span>{typeof value === "number" ? value.toLocaleString() : value}</span>
+      {label ? <span className="sr-only">{label}</span> : null}
+    </span>
+  );
 }
 
 function effectPreview(
@@ -98,9 +143,17 @@ export function WorkshopPanel({
   busy,
   onClaimQuest,
   onUpgrade,
+  onInstantUpgrade,
   onShopPurchase,
 }: WorkshopPanelProps) {
   const [tab, setTab] = useState<TabId>("quest");
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [open]);
 
   const def = workshopId ? WORKSHOP_DEFS[workshopId] : null;
   const points = workshopId && panelState ? panelState.points[workshopId] : 0;
@@ -108,6 +161,12 @@ export function WorkshopPanel({
     workshopId && panelState ? panelState.levels[workshopId] : {};
   const shopPurchases =
     workshopId && panelState ? panelState.shopPurchases[workshopId] : {};
+  const pending =
+    workshopId && panelState?.pendingByWorkshop
+      ? panelState.pendingByWorkshop[workshopId]
+      : undefined;
+  const playerLevel = getPlayerLevelProgress(panelState?.totalXp ?? 0).level;
+  const currency = panelState?.currency ?? 0;
 
   const questRows = useMemo(() => {
     if (!def) return [];
@@ -124,15 +183,17 @@ export function WorkshopPanel({
 
   if (!open || !workshopId || !def) return null;
 
+  const coin = def.pointsIcon;
+
   return (
     <AppModalOverlay open={open} onClose={onClose} nested>
-      <div className="yanmar-workshop-panel mx-auto flex max-h-[min(92vh,720px)] w-[min(96vw,440px)] flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md">
-        <header className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
+      <div className="yanmar-workshop-panel mx-auto flex h-[min(88dvh,36rem)] w-[min(96vw,26rem)] flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div>
             <h2 className="text-lg font-black tracking-tight">{def.label}</h2>
-            <p className="mt-1 text-sm font-semibold text-amber-200">
-              {def.pointsLabel}:{" "}
-              <span className="tabular-nums">{points.toLocaleString()}</span>
+            <p className="mt-1.5 flex items-center gap-2 text-sm font-semibold text-amber-200">
+              <span className="text-stone-400">{def.pointsLabel}</span>
+              <WorkshopPointsAmount icon={coin} value={points} size={20} />
             </p>
           </div>
           <button
@@ -144,7 +205,7 @@ export function WorkshopPanel({
           </button>
         </header>
 
-        <div className="flex gap-1 border-b border-white/10 px-2 pt-2">
+        <div className="flex shrink-0 gap-1 border-b border-white/10 px-2 pt-2">
           {(
             [
               ["quest", "퀘스트"],
@@ -179,27 +240,34 @@ export function WorkshopPanel({
                     className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold">{q.title}</p>
                         <p className="mt-0.5 text-xs text-stone-400">
-                          {q.kind === "daily" ? "일일" : "반복"} · 보상{" "}
-                          {q.rewardPoints}pt
+                          {q.kind === "daily" ? "일일" : "반복"}
                         </p>
                       </div>
-                      {canClaim ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
-                          onClick={() => void onClaimQuest(q.id)}
-                        >
-                          완료
-                        </button>
-                      ) : item.claimed && q.kind === "daily" ? (
-                        <span className="text-xs font-semibold text-stone-500">
-                          수령됨
-                        </span>
-                      ) : null}
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                        <WorkshopPointsAmount
+                          icon={coin}
+                          value={q.rewardPoints}
+                          size={16}
+                          className="text-xs font-bold text-amber-200"
+                        />
+                        {canClaim ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
+                            onClick={() => void onClaimQuest(q.id)}
+                          >
+                            완료
+                          </button>
+                        ) : item.claimed && q.kind === "daily" ? (
+                          <span className="text-xs font-semibold text-stone-500">
+                            수령됨
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                       <div
@@ -219,12 +287,58 @@ export function WorkshopPanel({
 
           {tab === "upgrade" ? (
             <ul className="flex flex-col gap-2">
+              {pending ? (
+                <li className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
+                  <p className="text-sm font-bold text-amber-100">
+                    강화 진행 중 · +{pending.targetLevel}
+                  </p>
+                  <p className="mt-1 text-xs text-stone-300">
+                    남은 시간{" "}
+                    {formatUpgradeRemaining(
+                      new Date(pending.completesAt).getTime() - nowMs,
+                    )}
+                  </p>
+                  {onInstantUpgrade ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                      onClick={() => void onInstantUpgrade()}
+                    >
+                      즉시완료 ★
+                      {instantCompleteStars(
+                        new Date(pending.completesAt).getTime() - nowMs,
+                      ).toLocaleString()}
+                      {currency <
+                      instantCompleteStars(
+                        new Date(pending.completesAt).getTime() - nowMs,
+                      )
+                        ? " (부족)"
+                        : ""}
+                    </button>
+                  ) : null}
+                </li>
+              ) : null}
               {def.upgrades.map((u) => {
                 const level = levels[u.key] ?? 0;
                 const max = getWorkshopUpgradeMaxLevel(u.key);
                 const cost = getWorkshopUpgradeCost(u.key, level);
                 const maxed = level >= max;
-                const canBuy = !maxed && cost != null && points >= cost;
+                const targetLevel = level + 1;
+                const reqLevel =
+                  getWorkshopUpgradeRequiredPlayerLevel(targetLevel) ?? 999;
+                const levelLocked = !maxed && playerLevel < reqLevel;
+                const durationMs = getUpgradeDurationMs(targetLevel);
+                const isThisPending =
+                  pending?.upgradeKey === u.key &&
+                  pending.targetLevel === targetLevel;
+                const otherPending = Boolean(pending) && !isThisPending;
+                const canBuy =
+                  !maxed &&
+                  !pending &&
+                  !levelLocked &&
+                  cost != null &&
+                  points >= cost;
                 return (
                   <li
                     key={u.key}
@@ -243,23 +357,37 @@ export function WorkshopPanel({
                         </p>
                         {!maxed ? (
                           <p className="mt-1 text-[11px] text-sky-200/90">
-                            {effectPreview(
-                              workshopId,
-                              u.key,
-                              level,
-                            )}
+                            {effectPreview(workshopId, u.key, level)}
+                          </p>
+                        ) : null}
+                        {!maxed && durationMs != null ? (
+                          <p className="mt-0.5 text-[11px] text-stone-500">
+                            소요 {formatUpgradeRemaining(durationMs)}
+                            {levelLocked
+                              ? ` · ${reqLevel}레벨 필요`
+                              : ""}
                           </p>
                         ) : null}
                       </div>
                       <button
                         type="button"
-                        disabled={busy || !canBuy}
-                        className="shrink-0 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                        disabled={busy || !canBuy || otherPending || isThisPending}
+                        className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
                         onClick={() => void onUpgrade(u.key)}
                       >
-                        {maxed
-                          ? "MAX"
-                          : `${(cost ?? 0).toLocaleString()}pt`}
+                        {maxed ? (
+                          "MAX"
+                        ) : isThisPending ? (
+                          "진행중"
+                        ) : levelLocked ? (
+                          `Lv.${reqLevel}`
+                        ) : (
+                          <WorkshopPointsAmount
+                            icon={coin}
+                            value={cost ?? 0}
+                            size={14}
+                          />
+                        )}
                       </button>
                     </div>
                   </li>
@@ -287,6 +415,7 @@ export function WorkshopPanel({
                       key={item.id}
                       className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
                     >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={item.icon}
                         alt=""
@@ -305,10 +434,14 @@ export function WorkshopPanel({
                       <button
                         type="button"
                         disabled={busy || !canBuy}
-                        className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                        className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
                         onClick={() => void onShopPurchase(item.id)}
                       >
-                        {item.cost.toLocaleString()}pt
+                        <WorkshopPointsAmount
+                          icon={coin}
+                          value={item.cost}
+                          size={14}
+                        />
                       </button>
                     </li>
                   );

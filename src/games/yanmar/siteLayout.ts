@@ -15,6 +15,8 @@ export const SITE_LAYOUT = {
   dump: [33.27, -12.68] as SitePoint,
   crash: [108, 12] as SitePoint,
   hill: [22, 112] as SitePoint,
+  /** North edge (minimap 12 o'clock) — Yanmar pylon monument */
+  monument: [48, 132] as SitePoint,
   coreMaxX: 80,
   coreMaxZ: 80,
   roads: [

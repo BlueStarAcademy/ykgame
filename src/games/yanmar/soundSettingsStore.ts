@@ -4,7 +4,10 @@ import {
   saveSoundSettings,
   type SoundSettings,
 } from "./soundSettings";
-import { killAllSiteLegendBgms } from "@/lib/siteLegendBgmRegistry";
+import {
+  killAllSiteLegendBgms,
+  setSiteLegendBgmMasterEnabled,
+} from "@/lib/siteLegendBgmRegistry";
 
 type SoundSettingsListener = (settings: SoundSettings) => void;
 
@@ -19,6 +22,8 @@ function ensureHydrated(): SoundSettings {
   if (!hydrated) {
     current = loadSoundSettings();
     hydrated = true;
+    // Gate must match storage before any controller can call play().
+    setSiteLegendBgmMasterEnabled(current.bgmEnabled);
   }
   return current;
 }
@@ -53,8 +58,9 @@ export function setSoundSettings(
     typeof patch === "function" ? patch({ ...prev }) : { ...prev, ...patch };
   current = next;
   saveSoundSettings(next);
-  // Nuke every BGM element immediately on Off — including HMR orphans
-  // that are no longer wired to a live controller listener.
+  // Cancel in-flight play() BEFORE kill/emit — pause during pending play is
+  // ignored by some browsers, and late .then() must see Off immediately.
+  setSiteLegendBgmMasterEnabled(next.bgmEnabled);
   if (!next.bgmEnabled) {
     killAllSiteLegendBgms({ unload: true });
   }
