@@ -9,11 +9,10 @@ import { PwaInstallButton } from "./PwaInstallButton";
 import { WebExperienceSection } from "./WebExperienceSection";
 
 interface LandingPageProps {
-  rideHref: string;
   gameHref: string;
 }
 
-export function LandingPage({ rideHref, gameHref }: LandingPageProps) {
+export function LandingPage({ gameHref }: LandingPageProps) {
   return (
     <main className="landing-page relative flex h-[100dvh] flex-col overflow-hidden text-gray-900">
       <LandingPromoPopup />
@@ -39,26 +38,16 @@ export function LandingPage({ rideHref, gameHref }: LandingPageProps) {
 
         <div className="mt-2 space-y-2">
           <WebExperienceSection compact />
-          <div className="mx-auto grid w-full max-w-[280px] grid-cols-2 gap-2">
-            <PwaExperienceButton
-              href={rideHref}
-              experienceMode="ride"
-              className="landing-cta landing-cta-ride flex items-center justify-center rounded-xl px-3 py-2.5 text-xs font-bold text-white shadow-md"
-            >
-              탑승 체험
-            </PwaExperienceButton>
+          <div className="mx-auto flex w-full max-w-[280px] gap-2">
+            <PwaInstallButton />
             <PwaExperienceButton
               href={gameHref}
               experienceMode="game"
-              className="landing-cta landing-cta-game flex items-center justify-center rounded-xl px-3 py-2.5 text-xs font-bold text-white shadow-md"
+              className="landing-cta landing-cta-game flex min-w-0 flex-1 items-center justify-center rounded-xl px-3 py-2.5 text-xs font-bold text-white shadow-md"
             >
               게임 체험
             </PwaExperienceButton>
           </div>
-          <PwaInstallButton />
-          <p className="mx-auto max-w-[280px] text-center text-[9px] leading-relaxed text-gray-400">
-            탑승 체험은 실제 조작감 시뮬레이터 · 게임 체험은 미션·보상·랭킹
-          </p>
         </div>
       </div>
 
@@ -118,7 +107,7 @@ export function LandingPage({ rideHref, gameHref }: LandingPageProps) {
         <footer className="landing-footer pt-5 text-center">
           <p className="text-[11px] font-medium tracking-wide text-gray-500">{COMPANY.name}</p>
           <p className="mt-1 text-[10px] text-gray-300">
-            탑승 체험과 게임 체험으로 장비를 만나보세요
+            게임 체험으로 장비를 만나보세요
           </p>
           <Link
             href={COMPANY.homepage}

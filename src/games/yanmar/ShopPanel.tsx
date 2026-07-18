@@ -14,15 +14,23 @@ import {
 } from "./gearCatalog";
 import { gachaBannerArtSrc, gachaBannerChromeClass } from "./gearArt";
 
+export type GachaPayWith = "stars" | "tickets";
+
 interface ShopPanelProps {
   open: boolean;
   onClose: () => void;
   stars?: number;
+  gachaTicketsStandard?: number;
+  gachaTicketsPremium?: number;
   activeItemIds?: ReadonlySet<ShopItemId> | readonly ShopItemId[];
   purchasingId?: ShopItemId | null;
   onPurchase?: (itemId: ShopItemId) => void | Promise<void>;
   gachaBusy?: boolean;
-  onGacha?: (banner: "STANDARD" | "PREMIUM", count: 1 | 10) => void | Promise<void>;
+  onGacha?: (
+    banner: "STANDARD" | "PREMIUM",
+    count: 1 | 10,
+    payWith: GachaPayWith,
+  ) => void | Promise<void>;
 }
 
 function ShopProductCard({
@@ -86,16 +94,30 @@ function GachaBannerSection({
   title,
   gradeLabels,
   gachaBusy,
+  stars = 0,
+  ticketCount,
   onGacha,
 }: {
   banner: GachaBanner;
   title: string;
   gradeLabels: readonly string[];
   gachaBusy?: boolean;
-  onGacha?: (banner: "STANDARD" | "PREMIUM", count: 1 | 10) => void | Promise<void>;
+  stars?: number;
+  ticketCount: number;
+  onGacha?: (
+    banner: "STANDARD" | "PREMIUM",
+    count: 1 | 10,
+    payWith: GachaPayWith,
+  ) => void | Promise<void>;
 }) {
   const cfg = GACHA_CONFIG[banner];
   const isPremium = banner === "PREMIUM";
+  const ticketIcon = isPremium
+    ? "/images/yanmar/2d/gacha-ticket-premium.svg"
+    : "/images/yanmar/2d/gacha-ticket-standard.svg";
+  const canAfford1 = stars >= cfg.cost1;
+  const canAfford10 = stars >= cfg.cost10;
+
   return (
     <section className={`yanmar-gacha-banner ${gachaBannerChromeClass(banner)}`}>
       <div className="yanmar-gacha-banner-showcase">
@@ -118,38 +140,99 @@ function GachaBannerSection({
               </span>
             ))}
           </div>
+          <p className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-white/70">
+            {isPremium ? "고급 등급 확률 업" : "기본 장비 뽑기"}
+          </p>
         </div>
       </div>
       <div className="yanmar-gacha-actions">
-        <button
-          type="button"
-          disabled={gachaBusy || !onGacha}
-          className="yanmar-gacha-pull-btn yanmar-gacha-pull-btn--single"
-          onClick={() => void onGacha?.(banner, 1)}
-        >
-          <span className="yanmar-gacha-pull-label">1회 뽑기</span>
-          <StarAmount
-            value={cfg.cost1}
-            size={12}
-            valueClassName="yanmar-gacha-pull-star"
-          />
-        </button>
-        <button
-          type="button"
-          disabled={gachaBusy || !onGacha}
-          className="yanmar-gacha-pull-btn yanmar-gacha-pull-btn--multi"
-          onClick={() => void onGacha?.(banner, 10)}
-        >
-          <span className="yanmar-gacha-pull-label">10회 뽑기</span>
-          <span className="yanmar-gacha-pull-price">
-            <StarAmount
-              value={cfg.cost10}
-              size={12}
-              valueClassName="yanmar-gacha-pull-star"
-            />
-            <span className="yanmar-gacha-pull-discount">(-10%)</span>
-          </span>
-        </button>
+        <div className="yanmar-gacha-action-row-btns">
+          <button
+            type="button"
+            disabled={gachaBusy || !onGacha || !canAfford1}
+            className="yanmar-gacha-pull-btn"
+            onClick={() => void onGacha?.(banner, 1, "stars")}
+          >
+            <span className="yanmar-gacha-pull-label">1회</span>
+            <span
+              className={`yanmar-gacha-pull-cost${
+                canAfford1 ? "" : " is-short"
+              }`}
+            >
+              <StarAmount
+                value={cfg.cost1}
+                size={11}
+                className="yanmar-gacha-pull-star-amount"
+                valueClassName="yanmar-gacha-pull-cost-value"
+              />
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={gachaBusy || !onGacha || !canAfford10}
+            className="yanmar-gacha-pull-btn yanmar-gacha-pull-btn--multi"
+            onClick={() => void onGacha?.(banner, 10, "stars")}
+          >
+            <span className="yanmar-gacha-pull-label">10회</span>
+            <span
+              className={`yanmar-gacha-pull-cost${
+                canAfford10 ? "" : " is-short"
+              }`}
+            >
+              <StarAmount
+                value={cfg.cost10}
+                size={11}
+                className="yanmar-gacha-pull-star-amount"
+                valueClassName="yanmar-gacha-pull-cost-value"
+              />
+              <span className="yanmar-gacha-pull-discount">-10%</span>
+            </span>
+          </button>
+        </div>
+        <div className="yanmar-gacha-action-row-btns">
+          <button
+            type="button"
+            disabled={gachaBusy || !onGacha || ticketCount < 1}
+            className="yanmar-gacha-pull-btn yanmar-gacha-pull-btn--ticket"
+            onClick={() => void onGacha?.(banner, 1, "tickets")}
+          >
+            <span className="yanmar-gacha-pull-label">1회</span>
+            <span
+              className={`yanmar-gacha-pull-cost${
+                ticketCount < 1 ? " is-short" : ""
+              }`}
+            >
+              <img
+                src={ticketIcon}
+                alt=""
+                className="yanmar-gacha-pull-cost-icon"
+                draggable={false}
+              />
+              <span className="yanmar-gacha-pull-cost-value">1</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={gachaBusy || !onGacha || ticketCount < 10}
+            className="yanmar-gacha-pull-btn yanmar-gacha-pull-btn--multi yanmar-gacha-pull-btn--ticket"
+            onClick={() => void onGacha?.(banner, 10, "tickets")}
+          >
+            <span className="yanmar-gacha-pull-label">10회</span>
+            <span
+              className={`yanmar-gacha-pull-cost${
+                ticketCount < 10 ? " is-short" : ""
+              }`}
+            >
+              <img
+                src={ticketIcon}
+                alt=""
+                className="yanmar-gacha-pull-cost-icon"
+                draggable={false}
+              />
+              <span className="yanmar-gacha-pull-cost-value">10</span>
+            </span>
+          </button>
+        </div>
       </div>
     </section>
   );
@@ -159,6 +242,8 @@ export function ShopPanel({
   open,
   onClose,
   stars,
+  gachaTicketsStandard = 0,
+  gachaTicketsPremium = 0,
   activeItemIds,
   purchasingId = null,
   onPurchase,
@@ -245,6 +330,8 @@ export function ShopPanel({
                 title="일반 뽑기"
                 gradeLabels={["일반", "강화", "정밀"]}
                 gachaBusy={gachaBusy}
+                stars={stars}
+                ticketCount={gachaTicketsStandard}
                 onGacha={onGacha}
               />
               <GachaBannerSection
@@ -252,6 +339,8 @@ export function ShopPanel({
                 title="고급 뽑기"
                 gradeLabels={["강화", "정밀", "마스터"]}
                 gachaBusy={gachaBusy}
+                stars={stars}
+                ticketCount={gachaTicketsPremium}
                 onGacha={onGacha}
               />
             </div>

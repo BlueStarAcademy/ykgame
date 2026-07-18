@@ -122,6 +122,13 @@ model User {
   enhanceCores         Int                    @default(0)
   /** Yanmar gear inventory capacity (expandable to GEAR_INVENTORY_MAX). */
   gearInventorySlots   Int                    @default(40)
+  dumpWorkshopPoints   Int                    @default(0)
+  crashWorkshopPoints  Int                    @default(0)
+  hillWorkshopPoints   Int                    @default(0)
+  gachaTicketsStandard Int                    @default(0)
+  gachaTicketsPremium  Int                    @default(0)
+  workshopUpgrades     UserWorkshopUpgrade[]
+  workshopShopPurchases UserWorkshopShopPurchase[]
 }
 
 model GameScore {
@@ -324,6 +331,37 @@ model UserShopBuff {
 
   @@unique([userId, gameId, itemId])
   @@index([userId, gameId, expiresAt])
+}
+
+/** Per-workplace upgrade levels (dump / crash / hill). */
+model UserWorkshopUpgrade {
+  id         String   @id @default(cuid())
+  userId     String
+  workshopId String
+  upgradeKey String
+  level      Int      @default(0)
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workshopId, upgradeKey])
+  @@index([userId, workshopId])
+}
+
+/** Weekly shop purchase counters (KST Monday weekKey). */
+model UserWorkshopShopPurchase {
+  id         String   @id @default(cuid())
+  userId     String
+  workshopId String
+  itemId     String
+  weekKey    String
+  count      Int      @default(0)
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workshopId, itemId, weekKey])
+  @@index([userId, workshopId, weekKey])
 }
 
 model UserMail {

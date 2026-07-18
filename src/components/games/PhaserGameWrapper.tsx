@@ -16,7 +16,6 @@ interface PhaserGameWrapperProps {
   immersive?: boolean;
   initialPlayMode?: "practice" | "game" | "ride";
   onShowGuide?: () => void;
-  onShowRewards?: () => void;
   onShowRanking?: () => void;
   onRequestExit?: () => void;
   /** Prior season total (excluded from this session's arcadeScore). */
@@ -112,7 +111,6 @@ export function PhaserGameWrapper({
   immersive = false,
   initialPlayMode,
   onShowGuide,
-  onShowRewards,
   onShowRanking,
   onRequestExit,
   seasonScoreBase = 0,
@@ -128,7 +126,6 @@ export function PhaserGameWrapper({
         immersive={immersive}
         initialPlayMode={initialPlayMode}
         onShowGuide={onShowGuide}
-        onShowRewards={onShowRewards}
         onShowRanking={onShowRanking}
         onRequestExit={onRequestExit}
         seasonScoreBase={seasonScoreBase}

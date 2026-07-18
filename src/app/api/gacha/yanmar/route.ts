@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { banner?: string; count?: number };
+  let body: { banner?: string; count?: number; payWith?: string };
   try {
     body = await req.json();
   } catch {
@@ -31,8 +31,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid banner" }, { status: 400 });
   }
   const count = body.count === 10 ? 10 : 1;
+  const payWith = body.payWith === "tickets" ? "tickets" : "stars";
   const cfg = GACHA_CONFIG[banner];
-  const cost = count === 10 ? cfg.cost10 : cfg.cost1;
+  const starCost = count === 10 ? cfg.cost10 : cfg.cost1;
+  const ticketField =
+    banner === "PREMIUM" ? "gachaTicketsPremium" : "gachaTicketsStandard";
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -49,14 +52,31 @@ export async function POST(req: Request) {
       }
       const user = await tx.user.findUnique({
         where: { id: session.user.id },
-        select: { currency: true },
+        select: {
+          currency: true,
+          gachaTicketsStandard: true,
+          gachaTicketsPremium: true,
+        },
       });
-      if (!user || user.currency < cost) throw new Error("INSUFFICIENT_STARS");
+      if (!user) throw new Error("USER_NOT_FOUND");
 
-      await tx.user.update({
-        where: { id: session.user.id },
-        data: { currency: { decrement: cost } },
-      });
+      if (payWith === "tickets") {
+        const tickets =
+          banner === "PREMIUM"
+            ? user.gachaTicketsPremium
+            : user.gachaTicketsStandard;
+        if (tickets < count) throw new Error("INSUFFICIENT_TICKETS");
+        await tx.user.update({
+          where: { id: session.user.id },
+          data: { [ticketField]: { decrement: count } },
+        });
+      } else {
+        if (user.currency < starCost) throw new Error("INSUFFICIENT_STARS");
+        await tx.user.update({
+          where: { id: session.user.id },
+          data: { currency: { decrement: starCost } },
+        });
+      }
 
       const loaded = await loadUserFinalStats(tx, session.user.id);
       const durabilityMax = loaded.stats.durabilityMaxPerPiece;
@@ -96,16 +116,28 @@ export async function POST(req: Request) {
           gameId: "yanmar",
           banner,
           count,
-          results: created,
+          results: { items: created, payWith },
         },
       });
 
       const refreshed = await tx.user.findUnique({
         where: { id: session.user.id },
-        select: { currency: true },
+        select: {
+          currency: true,
+          gachaTicketsStandard: true,
+          gachaTicketsPremium: true,
+        },
       });
 
-      return { ok: true, items: created, currency: refreshed?.currency ?? 0, cost };
+      return {
+        ok: true,
+        items: created,
+        currency: refreshed?.currency ?? 0,
+        cost: payWith === "tickets" ? 0 : starCost,
+        payWith,
+        gachaTicketsStandard: refreshed?.gachaTicketsStandard ?? 0,
+        gachaTicketsPremium: refreshed?.gachaTicketsPremium ?? 0,
+      };
     });
     return NextResponse.json(result);
   } catch (e) {

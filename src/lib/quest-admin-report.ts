@@ -10,6 +10,7 @@ import {
   getMissionOptionalCount,
   type MissionLevelBand,
 } from "@/games/yanmar/quests/config";
+import type { QuestReward } from "@/games/yanmar/quests/types";
 
 const BAND_LABELS: Record<MissionLevelBand, string> = {
   under10: "레벨 1~9",
@@ -64,9 +65,7 @@ export function getQuestAdminReport() {
   }));
 
   const difficultyRows = (
-    Object.entries(MISSION_DIFFICULTY_REWARDS) as Array<
-      [string, { xp: number; stars: number; score?: number }]
-    >
+    Object.entries(MISSION_DIFFICULTY_REWARDS) as Array<[string, QuestReward]>
   ).map(([diff, reward]) => ({
     level: `난이도 ${diff}`,
     value: formatQuestReward(reward),
@@ -130,7 +129,8 @@ export function getQuestAdminReport() {
           {
             label: "진행 저장",
             value: "클라이언트 localStorage",
-            detail: "수령(claim)만 서버 API로 스타·경험치를 지급합니다.",
+            detail:
+              "수령(claim)만 서버 API로 스타·경험치·강화코어·뽑기권을 지급합니다.",
           },
           {
             label: "일일 미션 개수",
@@ -139,7 +139,7 @@ export function getQuestAdminReport() {
           },
           {
             label: "수령 API 상한",
-            value: "스타 30 / EXP 3,000 (1회)",
+            value: "스타 40 / EXP 6,000 / 코어 16 / 뽑기권 각 1 (1회)",
             detail: "POST /api/rewards/yanmar-quest · eventId는 quest: 접두사 필수",
           },
           {

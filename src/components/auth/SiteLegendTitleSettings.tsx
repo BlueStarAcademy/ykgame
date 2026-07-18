@@ -2,10 +2,7 @@
 
 import { useCallback, useState, type RefObject } from "react";
 import { RankingBoard } from "@/components/games/RankingBoard";
-import {
-  YanmarGuideModal,
-  YanmarRewardsModal,
-} from "@/games/yanmar/YanmarInfoModals";
+import { YanmarGuideModal } from "@/games/yanmar/YanmarInfoModals";
 import { YanmarGameSettingsMenu } from "@/games/yanmar/YanmarGameSettingsMenu";
 import { yanmarAudio } from "@/games/yanmar/yanmarAudio";
 import type { HornId } from "@/games/yanmar/soundSettings";
@@ -30,7 +27,6 @@ export function SiteLegendTitleSettings({
   const [showMinimap, setShowMinimap] = useState(true);
   const [showMissionQuest, setShowMissionQuest] = useState(true);
   const [guideOpen, setGuideOpen] = useState(false);
-  const [rewardsOpen, setRewardsOpen] = useState(false);
   const [rankingOpen, setRankingOpen] = useState(false);
 
   const handleToggleBgm = useCallback(() => {
@@ -88,13 +84,11 @@ export function SiteLegendTitleSettings({
           }
         }}
         onShowGuide={() => setGuideOpen(true)}
-        onShowRewards={() => setRewardsOpen(true)}
         onShowRanking={() => setRankingOpen(true)}
         onLogout={onLogout}
       />
 
       <YanmarGuideModal open={guideOpen} onClose={() => setGuideOpen(false)} />
-      <YanmarRewardsModal open={rewardsOpen} onClose={() => setRewardsOpen(false)} />
       <RankingBoard
         gameId="yanmar"
         open={rankingOpen}

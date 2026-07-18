@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="tp-body" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="40%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="tp-stripe" x1="14" y1="20" x2="50" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="tp-shine" x1="18" y1="14" x2="40" y2="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="14" width="48" height="36" rx="6" fill="url(#tp-body)" stroke="#92400e" stroke-width="1.5"/>
+  <rect x="12" y="18" width="40" height="8" rx="2" fill="url(#tp-stripe)"/>
+  <circle cx="20" cy="40" r="3.5" fill="#78350f" opacity="0.4"/>
+  <circle cx="20" cy="40" r="2" fill="#fbbf24"/>
+  <path d="M28 36h20v2.5H28zM28 41h14v2H28z" fill="#78350f" opacity="0.5"/>
+  <path d="M12 16h28c2 0 4 2 4 4v8" stroke="url(#tp-shine)" stroke-width="2" stroke-linecap="round"/>
+  <text x="44" y="48" text-anchor="end" font-size="9" font-family="system-ui,sans-serif" font-weight="700" fill="#78350f" opacity="0.7">P</text>
+</svg>

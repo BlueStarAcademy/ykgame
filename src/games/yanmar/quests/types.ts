@@ -20,6 +20,10 @@ export type QuestReward = {
   score?: number;
   /** 강화코어 */
   enhanceCores?: number;
+  /** 일반 뽑기권 */
+  gachaTicketsStandard?: number;
+  /** 고급 뽑기권 */
+  gachaTicketsPremium?: number;
 };
 
 /** 고정 목표, 또는 min~max(step 단위) 랜덤 목표 */
@@ -92,13 +96,13 @@ export type MissionRound = {
 };
 
 export type YanmarQuestState = {
-  version: 1;
+  version: 2;
   dayKey: string;
   ownerId: string;
   levelBand: "under10" | "lv10" | "lv15";
   daily: DailyQuestProgress[];
   missions: MissionRound[];
-  /** 오늘 클리어(클레임)한 미션 수 0~10 */
+  /** 오늘 클리어(클레임)한 미션 수 0~QUEST_MISSIONS_PER_DAY */
   missionsCleared: number;
   repeat: RepeatQuestProgress[];
 };

@@ -23,7 +23,8 @@ import type {
 
 export type { YanmarQuestState, QuestMetric };
 
-const STORAGE_PREFIX = "ykgame:yanmar:quests:v1";
+const STORAGE_PREFIX = "ykgame:yanmar:quests:v2";
+const QUEST_STATE_VERSION = 2 as const;
 
 function storageKey(ownerId: string) {
   return `${STORAGE_PREFIX}:${ownerId}`;
@@ -114,7 +115,7 @@ function createMissionRounds(band: MissionLevelBand): MissionRound[] {
 export function createQuestState(ownerId: string, level: number): YanmarQuestState {
   const band = getMissionLevelBand(level);
   return {
-    version: 1,
+    version: QUEST_STATE_VERSION,
     dayKey: getQuestDayKey(),
     ownerId,
     levelBand: band,
@@ -129,7 +130,7 @@ function isValidState(value: unknown): value is YanmarQuestState {
   if (!value || typeof value !== "object") return false;
   const state = value as YanmarQuestState;
   return (
-    state.version === 1 &&
+    state.version === QUEST_STATE_VERSION &&
     typeof state.dayKey === "string" &&
     typeof state.ownerId === "string" &&
     Array.isArray(state.daily) &&
@@ -189,18 +190,29 @@ export function loadQuestState(ownerId: string, level: number): YanmarQuestState
       }
     }
 
+    const needsMissionReset =
+      !Array.isArray(parsed.missions) ||
+      parsed.missions.length !== QUEST_MISSIONS_PER_DAY;
+
     return {
       ...parsed,
+      version: QUEST_STATE_VERSION,
       levelBand: parsed.levelBand ?? band,
       daily: mergedDaily,
       repeat: mergedRepeat,
-      missionsCleared: Math.max(
-        0,
-        Math.min(
-          QUEST_MISSIONS_PER_DAY,
-          parsed.missionsCleared ?? parsed.missions.filter((m) => m.claimed).length,
-        ),
-      ),
+      missions: needsMissionReset
+        ? createMissionRounds(band)
+        : parsed.missions,
+      missionsCleared: needsMissionReset
+        ? 0
+        : Math.max(
+            0,
+            Math.min(
+              QUEST_MISSIONS_PER_DAY,
+              parsed.missionsCleared ??
+                parsed.missions.filter((m) => m.claimed).length,
+            ),
+          ),
     };
   } catch {
     return createQuestState(ownerId, level);

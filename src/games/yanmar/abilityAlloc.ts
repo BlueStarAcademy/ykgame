@@ -29,10 +29,23 @@ export function emptyAbilityAlloc(): AbilityAlloc {
   return { ...EMPTY_ABILITY_ALLOC };
 }
 
+function asAllocRecord(raw: unknown): Record<string, unknown> | null {
+  let data: unknown = raw;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  return data as Record<string, unknown>;
+}
+
 export function parseAbilityAlloc(raw: unknown): AbilityAlloc {
   const out = emptyAbilityAlloc();
-  if (!raw || typeof raw !== "object") return out;
-  const obj = raw as Record<string, unknown>;
+  const obj = asAllocRecord(raw);
+  if (!obj) return out;
   for (const key of MAIN_OPTION_KEYS) {
     const v = obj[key];
     if (typeof v === "number" && Number.isFinite(v) && v >= 0) {
@@ -61,15 +74,15 @@ export function sanitizeAbilityAlloc(
   raw: unknown,
   playerLevel: number,
 ): AbilityAlloc | null {
-  if (!raw || typeof raw !== "object") return null;
-  const obj = raw as Record<string, unknown>;
+  const obj = asAllocRecord(raw);
+  if (!obj) return null;
   const out = emptyAbilityAlloc();
   for (const key of MAIN_OPTION_KEYS) {
     const v = obj[key];
-    if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || !Number.isInteger(v)) {
+    if (typeof v !== "number" || !Number.isFinite(v) || v < 0) {
       return null;
     }
-    out[key] = v;
+    out[key] = Math.floor(v);
   }
   const total = Math.max(0, Math.floor(playerLevel));
   if (spentAbilityPoints(out) > total) return null;

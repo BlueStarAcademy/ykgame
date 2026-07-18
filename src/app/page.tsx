@@ -7,7 +7,6 @@ export default async function RootPage() {
 
   return (
     <LandingPage
-      rideHref={buildExperienceEntryHref("ride", session?.user)}
       gameHref={buildExperienceEntryHref("game", session?.user)}
     />
   );

@@ -5,6 +5,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -39,6 +40,11 @@ import {
   createInitialSim,
   createInitialTerrain,
 } from "./ExcavatorScene";
+import type { WorldPickup } from "./worldPickups";
+import {
+  createWorldPickupsState,
+  rollClientStarReward,
+} from "./worldPickups";
 import type {
   AttachmentType,
   CameraMode,
@@ -158,6 +164,24 @@ import { defaultFinalStats } from "./gearStats";
 import { GearPanel, type GearPanelItem } from "./GearPanel";
 import { PlayerProfileModal } from "./PlayerProfileModal";
 import { RepairPanel } from "./RepairPanel";
+import { WorkshopPanel, type WorkshopPanelState } from "./WorkshopPanel";
+import { isInWorkshopSignRange } from "./WorkshopSign";
+import {
+  WORKSHOP_DEFS,
+  WORKSHOP_IDS,
+  type WorkshopId,
+  type WorkshopShopItemId,
+  type WorkshopUpgradeKey,
+} from "./workshop";
+import {
+  applyWorkshopQuestMetric,
+  getClaimableWorkshopIds,
+  loadWorkshopQuestState,
+  markWorkshopQuestClaimed,
+  saveWorkshopQuestState,
+  type WorkshopQuestState,
+} from "./workshop/questState";
+import type { WorkshopQuestMetric } from "./workshop/types";
 import {
   computeMaintenanceSnapshot,
   type MaintenanceFluidId,
@@ -228,7 +252,6 @@ interface ExcavatorGameWrapperProps {
   immersive?: boolean;
   initialPlayMode?: "practice" | "game" | "ride";
   onShowGuide?: () => void;
-  onShowRewards?: () => void;
   onShowRanking?: () => void;
   onRequestExit?: () => void;
   /** Season total before this session; HUD shows base + session score in game mode. */
@@ -710,7 +733,6 @@ export function ExcavatorGameWrapper({
   immersive = false,
   initialPlayMode,
   onShowGuide,
-  onShowRewards,
   onShowRanking,
   onRequestExit,
   seasonScoreBase = 0,
@@ -786,6 +808,8 @@ export function ExcavatorGameWrapper({
   const [currency, setCurrency] = useState(() => session?.user?.currency ?? 0);
   const [totalXp, setTotalXp] = useState(() => session?.user?.totalXp ?? 0);
   const totalXpRef = useRef(totalXp);
+  /** False until the first real XP value is applied — blocks false level-up on boot. */
+  const xpHydratedRef = useRef((session?.user?.totalXp ?? 0) > 0);
   const attachmentWarningTimerRef = useRef<number | null>(null);
   const [travelRaiseWarn, setTravelRaiseWarn] = useState<{
     key: number;
@@ -843,6 +867,20 @@ export function ExcavatorGameWrapper({
   );
   const [nearRepairTent, setNearRepairTent] = useState(false);
   const nearRepairTentRef = useRef(false);
+  const [nearWorkshopId, setNearWorkshopId] = useState<WorkshopId | null>(null);
+  const nearWorkshopIdRef = useRef<WorkshopId | null>(null);
+  const [showWorkshopPanel, setShowWorkshopPanel] = useState(false);
+  const [activeWorkshopId, setActiveWorkshopId] = useState<WorkshopId | null>(
+    null,
+  );
+  const [workshopPanelState, setWorkshopPanelState] =
+    useState<WorkshopPanelState | null>(null);
+  const [workshopQuestState, setWorkshopQuestState] =
+    useState<WorkshopQuestState | null>(null);
+  const workshopQuestStateRef = useRef<WorkshopQuestState | null>(null);
+  const [workshopBusy, setWorkshopBusy] = useState(false);
+  const [gachaTicketsStandard, setGachaTicketsStandard] = useState(0);
+  const [gachaTicketsPremium, setGachaTicketsPremium] = useState(0);
   const travelMetersAccumRef = useRef(0);
   const travelFlushBusyRef = useRef(false);
   const [activeShopBuffs, setActiveShopBuffs] = useState<ActiveShopBuff[]>([]);
@@ -907,6 +945,9 @@ export function ExcavatorGameWrapper({
   const arcadeScoreRef = useRef(0);
   const rewardStarsRef = useRef(0);
   const currencyRef = useRef(session?.user?.currency ?? 0);
+  const worldPickupsRef = useRef(createWorldPickupsState());
+  const worldPickupRevisionRef = useRef(0);
+  const [worldPickupRevision, setWorldPickupRevision] = useState(0);
   const processedExitSignalRef = useRef(0);
   const processedScoreCommitRef = useRef(0);
   const dumpScorePanelRef = useRef<DumpScorePanelState | null>(null);
@@ -942,6 +983,7 @@ export function ExcavatorGameWrapper({
   publishEquipmentStatsRef.current = publishEquipmentStats;
   /** Entry overlay stays until gear + scene are both ready. */
   const equipmentReadyRef = useRef(false);
+  const equipmentLoadGenRef = useRef(0);
   const sceneReadyRef = useRef(false);
   const tryNotifyEntryReadyRef = useRef<() => void>(() => {});
 
@@ -1638,14 +1680,21 @@ export function ExcavatorGameWrapper({
     (nextXp: number, opts?: { announceLevelUp?: boolean }) => {
       const prevLevel = getPlayerLevelProgress(totalXpRef.current).level;
       const nextLevel = getPlayerLevelProgress(nextXp).level;
+      const wasHydrated = xpHydratedRef.current;
       totalXpRef.current = nextXp;
       setTotalXp(nextXp);
+      xpHydratedRef.current = true;
       const previousTier = terrainRef.current.mapTier;
       terrainRef.current = expandTerrainForLevel(terrainRef.current, nextLevel);
       if (terrainRef.current.mapTier !== previousTier) {
         setTerrainRevision((key) => key + 1);
       }
-      if (opts?.announceLevelUp && nextLevel > prevLevel) {
+      // Only celebrate real in-session gains — not 0→savedXp hydration on connect.
+      if (
+        opts?.announceLevelUp &&
+        wasHydrated &&
+        nextLevel > prevLevel
+      ) {
         showLevelUpToast(nextLevel);
         enqueueUnlockNotices(getCrossedUnlocks(prevLevel, nextLevel));
       }
@@ -1697,9 +1746,58 @@ export function ExcavatorGameWrapper({
       questStateRef.current = next;
       setQuestState(next);
       saveQuestState(next);
+
+      const workshopMetric = metric as WorkshopQuestMetric;
+      if (
+        workshopMetric === "soilDump" ||
+        workshopMetric === "dumpTruckDepart" ||
+        workshopMetric === "asphaltBreak" ||
+        workshopMetric === "rockDump" ||
+        workshopMetric === "haulTruckDepart"
+      ) {
+        const wq = workshopQuestStateRef.current;
+        if (wq) {
+          const nextWq = applyWorkshopQuestMetric(wq, workshopMetric, amount);
+          if (nextWq !== wq) {
+            workshopQuestStateRef.current = nextWq;
+            setWorkshopQuestState(nextWq);
+            saveWorkshopQuestState(nextWq);
+          }
+        }
+      }
     },
     [],
   );
+
+  const loadWorkshopState = useCallback(async () => {
+    try {
+      const res = await fetch("/api/workshop/yanmar/state");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.ok) return;
+      setWorkshopPanelState({
+        points: data.points,
+        levels: data.levels,
+        shopPurchases: data.shopPurchases,
+        weekKey: data.weekKey,
+      });
+      if (typeof data.gachaTicketsStandard === "number") {
+        setGachaTicketsStandard(data.gachaTicketsStandard);
+      }
+      if (typeof data.gachaTicketsPremium === "number") {
+        setGachaTicketsPremium(data.gachaTicketsPremium);
+      }
+      if (typeof data.enhanceCores === "number") {
+        setEnhanceCores(data.enhanceCores);
+      }
+      if (typeof data.currency === "number") {
+        currencyRef.current = data.currency;
+        setCurrency(data.currency);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
@@ -1710,8 +1808,14 @@ export function ExcavatorGameWrapper({
     const loaded = loadQuestState(ownerId, level);
     questStateRef.current = loaded;
     setQuestState(loaded);
+    const wq = loadWorkshopQuestState(ownerId);
+    workshopQuestStateRef.current = wq;
+    setWorkshopQuestState(wq);
     questTrackRef.current.ready = false;
-  }, [session?.user?.id, session?.user?.totalXp, sessionStatus]);
+    if (session?.user?.id) {
+      void loadWorkshopState();
+    }
+  }, [session?.user?.id, session?.user?.totalXp, sessionStatus, loadWorkshopState]);
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
@@ -1830,6 +1934,8 @@ export function ExcavatorGameWrapper({
       stars: number;
       xp: number;
       enhanceCores?: number;
+      gachaTicketsStandard?: number;
+      gachaTicketsPremium?: number;
       label: string;
     }) => {
       if (session?.user?.id) {
@@ -1839,6 +1945,8 @@ export function ExcavatorGameWrapper({
           body: JSON.stringify({
             ...opts,
             enhanceCores: opts.enhanceCores ?? 0,
+            gachaTicketsStandard: opts.gachaTicketsStandard ?? 0,
+            gachaTicketsPremium: opts.gachaTicketsPremium ?? 0,
           }),
         });
         if (res.status === 409) return true;
@@ -1847,10 +1955,18 @@ export function ExcavatorGameWrapper({
           currency?: number;
           totalXp?: number;
           enhanceCores?: number;
+          gachaTicketsStandard?: number;
+          gachaTicketsPremium?: number;
         };
         syncSessionBalances(data, { syncPreviewCurrency: true });
         if (typeof data.enhanceCores === "number") {
           setEnhanceCores(data.enhanceCores);
+        }
+        if (typeof data.gachaTicketsStandard === "number") {
+          setGachaTicketsStandard(data.gachaTicketsStandard);
+        }
+        if (typeof data.gachaTicketsPremium === "number") {
+          setGachaTicketsPremium(data.gachaTicketsPremium);
         }
         return true;
       }
@@ -1863,6 +1979,16 @@ export function ExcavatorGameWrapper({
       }
       if ((opts.enhanceCores ?? 0) > 0) {
         setEnhanceCores((prev) => prev + (opts.enhanceCores ?? 0));
+      }
+      if ((opts.gachaTicketsStandard ?? 0) > 0) {
+        setGachaTicketsStandard(
+          (prev) => prev + (opts.gachaTicketsStandard ?? 0),
+        );
+      }
+      if ((opts.gachaTicketsPremium ?? 0) > 0) {
+        setGachaTicketsPremium(
+          (prev) => prev + (opts.gachaTicketsPremium ?? 0),
+        );
       }
       return true;
     },
@@ -1892,12 +2018,17 @@ export function ExcavatorGameWrapper({
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
-    unlockSeenOwnerRef.current = session?.user?.id ?? "local";
+    const ownerId = session?.user?.id ?? "local";
+    unlockSeenOwnerRef.current = ownerId;
     const level = getPlayerLevelProgress(totalXp).level;
     const sessionLevel = getPlayerLevelProgress(session?.user?.totalXp ?? 0).level;
     const effectiveLevel = Math.max(level, sessionLevel);
+    // Wait until XP is known so we don't flash unlocks against level 0.
+    if (!xpHydratedRef.current && effectiveLevel <= 1 && (session?.user?.totalXp ?? 0) <= 0) {
+      return;
+    }
     enqueueUnlockNotices(
-      getUnseenUnlocksForLevel(unlockSeenOwnerRef.current, effectiveLevel),
+      getUnseenUnlocksForLevel(ownerId, effectiveLevel),
     );
   }, [
     enqueueUnlockNotices,
@@ -1908,10 +2039,13 @@ export function ExcavatorGameWrapper({
   ]);
 
   const loadEquipment = useCallback(async () => {
+    const loadGen = ++equipmentLoadGenRef.current;
     try {
       const res = await fetch("/api/gear/yanmar");
       if (!res.ok) return;
       const data = await res.json();
+      // Ignore outdated responses so concurrent reloads cannot clobber a fresh save.
+      if (loadGen !== equipmentLoadGenRef.current) return;
       if (data.stats) {
         publishEquipmentStatsRef.current(data.stats);
       }
@@ -1920,6 +2054,12 @@ export function ExcavatorGameWrapper({
       }
       if (typeof data.enhanceCores === "number") {
         setEnhanceCores(data.enhanceCores);
+      }
+      if (typeof data.gachaTicketsStandard === "number") {
+        setGachaTicketsStandard(data.gachaTicketsStandard);
+      }
+      if (typeof data.gachaTicketsPremium === "number") {
+        setGachaTicketsPremium(data.gachaTicketsPremium);
       }
       if (typeof data.inventorySlots === "number") {
         setGearInventorySlots(data.inventorySlots);
@@ -1978,8 +2118,10 @@ export function ExcavatorGameWrapper({
     } catch {
       // Equipment data is optional for unauthenticated previews.
     } finally {
-      equipmentReadyRef.current = true;
-      tryNotifyEntryReadyRef.current();
+      if (loadGen === equipmentLoadGenRef.current) {
+        equipmentReadyRef.current = true;
+        tryNotifyEntryReadyRef.current();
+      }
     }
   }, []);
 
@@ -2259,23 +2401,43 @@ export function ExcavatorGameWrapper({
             action === "allocate" ? { action, alloc } : { action },
           ),
         });
-        const data = await res.json();
-        if (!res.ok) return;
-        if (data.abilityAlloc) {
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+          abilityAlloc?: AbilityAlloc;
+          stats?: YanmarEquipmentStats;
+        } | null;
+        if (!res.ok) {
+          const err = data?.error ?? "";
+          showAttachmentWarning(
+            err === "INVALID_ALLOC"
+              ? "보너스 분배가 올바르지 않습니다. 남은 포인트를 확인해 주세요."
+              : err === "LOADOUT_NOT_FOUND" || err.includes("abilityAlloc")
+                ? "보너스 스탯 저장에 실패했습니다. 페이지를 새로고침 후 다시 시도해 주세요."
+                : "보너스 스탯 저장에 실패했습니다.",
+          );
+          return;
+        }
+        // Invalidate in-flight gear loads before applying the saved alloc so a
+        // stale GET cannot wipe the just-saved distribution.
+        equipmentLoadGenRef.current += 1;
+        if (data?.abilityAlloc) {
           setAbilityAlloc({
             ...emptyAbilityAlloc(),
             ...data.abilityAlloc,
           });
         }
-        if (data.stats) {
+        if (data?.stats) {
           publishEquipmentStats(data.stats);
         }
         await loadEquipment();
+        if (action === "allocate") {
+          showAttachmentWarning("보너스 스탯을 저장했습니다.");
+        }
       } finally {
         setGearBusy(false);
       }
     },
-    [loadEquipment, publishEquipmentStats],
+    [loadEquipment, publishEquipmentStats, showAttachmentWarning],
   );
 
   const handleRepair = useCallback(
@@ -2313,13 +2475,17 @@ export function ExcavatorGameWrapper({
   );
 
   const handleGacha = useCallback(
-    async (banner: "STANDARD" | "PREMIUM", count: 1 | 10) => {
+    async (
+      banner: "STANDARD" | "PREMIUM",
+      count: 1 | 10,
+      payWith: "stars" | "tickets" = "stars",
+    ) => {
       setGachaBusy(true);
       try {
         const res = await fetch("/api/gacha/yanmar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ banner, count }),
+          body: JSON.stringify({ banner, count, payWith }),
         });
         const data = await res.json();
         if (!res.ok) return;
@@ -2327,6 +2493,12 @@ export function ExcavatorGameWrapper({
           currencyRef.current = data.currency;
           setCurrency(data.currency);
           setPreviewStars(data.currency);
+        }
+        if (typeof data.gachaTicketsStandard === "number") {
+          setGachaTicketsStandard(data.gachaTicketsStandard);
+        }
+        if (typeof data.gachaTicketsPremium === "number") {
+          setGachaTicketsPremium(data.gachaTicketsPremium);
         }
         if (Array.isArray(data.items) && data.items.length > 0) {
           setLastGachaBanner(banner);
@@ -2341,6 +2513,136 @@ export function ExcavatorGameWrapper({
     [loadEquipment],
   );
 
+  const handleWorkshopClaim = useCallback(
+    async (questId: string) => {
+      const workshopId = activeWorkshopId;
+      if (!workshopId) return;
+      const def = WORKSHOP_DEFS[workshopId].quests.find((q) => q.id === questId);
+      if (!def) return;
+      setWorkshopBusy(true);
+      try {
+        const eventId = `workshop-quest:${workshopId}:${questId}:${crypto.randomUUID()}`;
+        const res = await fetch("/api/workshop/yanmar/quest/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            eventId,
+            workshopId,
+            questId,
+            points: def.rewardPoints,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+        if (data.points) {
+          setWorkshopPanelState((prev) =>
+            prev
+              ? { ...prev, points: data.points }
+              : {
+                  points: data.points,
+                  levels: { dump: {}, crash: {}, hill: {} },
+                  shopPurchases: { dump: {}, crash: {}, hill: {} },
+                  weekKey: "",
+                },
+          );
+        }
+        const current = workshopQuestStateRef.current;
+        if (current) {
+          const next = markWorkshopQuestClaimed(current, workshopId, questId);
+          workshopQuestStateRef.current = next;
+          setWorkshopQuestState(next);
+          saveWorkshopQuestState(next);
+        }
+      } finally {
+        setWorkshopBusy(false);
+      }
+    },
+    [activeWorkshopId],
+  );
+
+  const handleWorkshopUpgrade = useCallback(
+    async (upgradeKey: WorkshopUpgradeKey) => {
+      const workshopId = activeWorkshopId;
+      if (!workshopId) return;
+      setWorkshopBusy(true);
+      try {
+        const res = await fetch("/api/workshop/yanmar/upgrade", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workshopId, upgradeKey }),
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+        setWorkshopPanelState((prev) => {
+          if (!prev) return prev;
+          const levels = {
+            ...prev.levels,
+            [workshopId]: {
+              ...prev.levels[workshopId],
+              [upgradeKey]: data.level,
+            },
+          };
+          return {
+            ...prev,
+            points: data.points ?? prev.points,
+            levels,
+          };
+        });
+        await loadEquipment();
+      } finally {
+        setWorkshopBusy(false);
+      }
+    },
+    [activeWorkshopId, loadEquipment],
+  );
+
+  const handleWorkshopShopPurchase = useCallback(
+    async (itemId: WorkshopShopItemId) => {
+      const workshopId = activeWorkshopId;
+      if (!workshopId) return;
+      setWorkshopBusy(true);
+      try {
+        const res = await fetch("/api/workshop/yanmar/shop/purchase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workshopId, itemId }),
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+        setWorkshopPanelState((prev) => {
+          if (!prev) return prev;
+          const shopPurchases = {
+            ...prev.shopPurchases,
+            [workshopId]: {
+              ...prev.shopPurchases[workshopId],
+              [itemId]: {
+                count: data.weeklyCount ?? 0,
+                remaining: data.weeklyRemaining ?? 0,
+              },
+            },
+          };
+          return {
+            ...prev,
+            points: data.points ?? prev.points,
+            shopPurchases,
+          };
+        });
+        if (typeof data.gachaTicketsStandard === "number") {
+          setGachaTicketsStandard(data.gachaTicketsStandard);
+        }
+        if (typeof data.gachaTicketsPremium === "number") {
+          setGachaTicketsPremium(data.gachaTicketsPremium);
+        }
+        if (typeof data.enhanceCores === "number") {
+          setEnhanceCores(data.enhanceCores);
+        }
+      } finally {
+        setWorkshopBusy(false);
+      }
+    },
+    [activeWorkshopId],
+  );
+
   useEffect(() => {
     const id = window.setInterval(() => {
       const sim = simRef.current;
@@ -2350,6 +2652,24 @@ export function ExcavatorGameWrapper({
         nearRepairTentRef.current = near;
         setNearRepairTent(near);
         if (!near) setShowRepairPanel(false);
+      }
+
+      const mapTier = terrainRef.current.mapTier;
+      let found: WorkshopId | null = null;
+      for (const wid of WORKSHOP_IDS) {
+        if (mapTier < WORKSHOP_DEFS[wid].minMapTier) continue;
+        if (isInWorkshopSignRange(wid, sim.posX, sim.posZ)) {
+          found = wid;
+          break;
+        }
+      }
+      if (found !== nearWorkshopIdRef.current) {
+        nearWorkshopIdRef.current = found;
+        setNearWorkshopId(found);
+        if (!found) {
+          setShowWorkshopPanel(false);
+          setActiveWorkshopId(null);
+        }
       }
     }, 250);
     return () => window.clearInterval(id);
@@ -2787,11 +3107,18 @@ export function ExcavatorGameWrapper({
       readyTimerRef.current = null;
       if (readyNotifiedRef.current) return;
       if (!equipmentReadyRef.current || !sceneReadyRef.current) return;
-      readyNotifiedRef.current = true;
-      setAudioArmed(true);
-      yanmarAudio.unlock();
-      onReady?.();
-    }, 280);
+      // Two paints after settle so the canvas is composited under the splash.
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          if (readyNotifiedRef.current) return;
+          if (!equipmentReadyRef.current || !sceneReadyRef.current) return;
+          readyNotifiedRef.current = true;
+          setAudioArmed(true);
+          yanmarAudio.unlock();
+          onReady?.();
+        });
+      });
+    }, 320);
   }, [onReady]);
   tryNotifyEntryReadyRef.current = tryNotifyEntryReady;
 
@@ -2813,7 +3140,7 @@ export function ExcavatorGameWrapper({
     tryNotifyEntryReady();
   }, [tryNotifyEntryReady]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (hasBootstrappedRef.current) return;
     const bootMode = initialPlayModeRef.current ?? initialPlayMode;
     if (!bootMode) return;
@@ -3027,6 +3354,12 @@ export function ExcavatorGameWrapper({
     syncDigHud();
     persistGameSession();
     persistDumpTruckCooldown();
+
+    const pickups = worldPickupsRef.current;
+    if (pickups.revision !== worldPickupRevisionRef.current) {
+      worldPickupRevisionRef.current = pickups.revision;
+      setWorldPickupRevision(pickups.revision);
+    }
 
     const modeNow = modeRef.current;
 
@@ -3344,6 +3677,8 @@ export function ExcavatorGameWrapper({
           stars: claimed.reward.stars,
           xp: claimed.reward.xp,
           enhanceCores: claimed.reward.enhanceCores ?? 0,
+          gachaTicketsStandard: claimed.reward.gachaTicketsStandard ?? 0,
+          gachaTicketsPremium: claimed.reward.gachaTicketsPremium ?? 0,
           label: `일일:${questId}`,
         });
         questStateRef.current = claimed.state;
@@ -3390,6 +3725,8 @@ export function ExcavatorGameWrapper({
         stars: claimed.reward.stars,
         xp: claimed.reward.xp,
         enhanceCores: claimed.reward.enhanceCores ?? 0,
+        gachaTicketsStandard: claimed.reward.gachaTicketsStandard ?? 0,
+        gachaTicketsPremium: claimed.reward.gachaTicketsPremium ?? 0,
         label: `미션:${claimed.roundIndex + 1}`,
       });
       questStateRef.current = claimed.state;
@@ -3435,6 +3772,8 @@ export function ExcavatorGameWrapper({
           stars: claimed.reward.stars,
           xp: claimed.reward.xp,
           enhanceCores: claimed.reward.enhanceCores ?? 0,
+          gachaTicketsStandard: claimed.reward.gachaTicketsStandard ?? 0,
+          gachaTicketsPremium: claimed.reward.gachaTicketsPremium ?? 0,
           label: `반복:${questId}`,
         });
         questStateRef.current = claimed.state;
@@ -3822,6 +4161,89 @@ export function ExcavatorGameWrapper({
     },
     [accumulateDumpScore, pushQuestProgress, queueDumpRewardChunk],
   );
+
+  const handleWorldPickup = useCallback(
+    (pickup: WorldPickup) => {
+      if (modeRef.current !== "game") return;
+
+      if (pickup.kind === "speed") {
+        showAttachmentWarning("이동속도 2배! (10초)");
+        return;
+      }
+
+      if (!session?.user?.id) return;
+
+      const optimistic = rollClientStarReward();
+      const before = currencyRef.current;
+      currencyRef.current += optimistic;
+      setCurrency(currencyRef.current);
+      setPreviewStars(currencyRef.current);
+      showAttachmentWarning(`스타 +${optimistic}`);
+
+      const eventId = `world-star:${pickup.id}`;
+      void (async () => {
+        try {
+          const res = await fetch("/api/rewards/yanmar-world-pickup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventId }),
+          });
+          if (res.status === 429) {
+            currencyRef.current = before;
+            setCurrency(before);
+            setPreviewStars(before);
+            showAttachmentWarning("시간당 스타 획득 한도에 도달했습니다.");
+            return;
+          }
+          if (!res.ok) {
+            currencyRef.current = before;
+            setCurrency(before);
+            setPreviewStars(before);
+            return;
+          }
+          const data = (await res.json()) as {
+            stars?: number;
+            currency?: number;
+          };
+          if (typeof data.currency === "number") {
+            syncSessionBalances(data, { syncPreviewCurrency: true });
+          } else if (typeof data.stars === "number") {
+            const corrected = before + data.stars;
+            currencyRef.current = corrected;
+            setCurrency(corrected);
+            setPreviewStars(corrected);
+          }
+          if (typeof data.stars === "number" && data.stars !== optimistic) {
+            showAttachmentWarning(`스타 +${data.stars}`);
+          }
+        } catch {
+          currencyRef.current = before;
+          setCurrency(before);
+          setPreviewStars(before);
+        }
+      })();
+    },
+    [session?.user?.id, showAttachmentWarning, syncSessionBalances],
+  );
+
+  useEffect(() => {
+    if (mode === "game" && session?.user?.id) {
+      worldPickupsRef.current = createWorldPickupsState();
+      worldPickupRevisionRef.current = worldPickupsRef.current.revision;
+      setWorldPickupRevision(worldPickupsRef.current.revision);
+      return;
+    }
+    const empty = createWorldPickupsState();
+    empty.active = [];
+    empty.pendingStarAt = [];
+    empty.pendingSpeedAt = [];
+    empty.starCollectedThisHour = 0;
+    empty.speedCollectedThisHour = 0;
+    empty.speedBuffUntilMs = 0;
+    worldPickupsRef.current = empty;
+    worldPickupRevisionRef.current = empty.revision;
+    setWorldPickupRevision(empty.revision);
+  }, [mode, session?.user?.id]);
 
   const claimSpecialReward = useCallback(
     async (kind: "crash" | "hill", eventId: string) => {
@@ -4216,18 +4638,23 @@ export function ExcavatorGameWrapper({
     <div
       className={`relative touch-manipulation ${
         immersive
-          ? "h-full w-full overflow-hidden bg-slate-950"
+          ? "h-full w-full overflow-hidden"
           : "mx-auto w-full max-w-lg"
       } yanmar-layout-portrait`}
+      style={immersive ? { backgroundColor: "#8ec6e8" } : undefined}
     >
       <LandingPromoPopup surface="ingame" />
       <div
-        className={`relative overflow-hidden bg-slate-300 ${
+        className={`relative overflow-hidden ${
           immersive
             ? "shadow-2xl shadow-black/50"
-            : "h-[520px] rounded-b-xl shadow-lg"
+            : "h-[520px] rounded-b-xl bg-slate-300 shadow-lg"
         }`}
-        style={gameFrameStyle}
+        style={
+          immersive
+            ? { ...gameFrameStyle, backgroundColor: "#8ec6e8" }
+            : gameFrameStyle
+        }
       >
         <TutorialSelectModal
           open={showTutorialMenu}
@@ -4307,6 +4734,24 @@ export function ExcavatorGameWrapper({
           busy={gearBusy}
           onRepair={(fluid, kind) => void handleRepair(fluid, kind)}
         />
+        <WorkshopPanel
+          open={showWorkshopPanel}
+          workshopId={activeWorkshopId}
+          onClose={() => {
+            setShowWorkshopPanel(false);
+            setActiveWorkshopId(null);
+          }}
+          panelState={workshopPanelState}
+          questItems={
+            activeWorkshopId && workshopQuestState
+              ? workshopQuestState.byWorkshop[activeWorkshopId]
+              : []
+          }
+          busy={workshopBusy}
+          onClaimQuest={(questId) => void handleWorkshopClaim(questId)}
+          onUpgrade={(key) => void handleWorkshopUpgrade(key)}
+          onShopPurchase={(itemId) => void handleWorkshopShopPurchase(itemId)}
+        />
 
         {mode !== "intro" && mode !== "gameReady" && travelRaiseWarn ? (
           <div
@@ -4346,6 +4791,7 @@ export function ExcavatorGameWrapper({
                 setShowShopPanel(false);
                 setShowEquipmentUpgrade(false);
                 setShowProfileModal(false);
+                setShowWorkshopPanel(false);
                 setShowRepairPanel(true);
               }}
               aria-label="정비소 열기"
@@ -4361,6 +4807,40 @@ export function ExcavatorGameWrapper({
               <span className="yanmar-repair-prompt-copy">
                 <span className="yanmar-repair-prompt-eyebrow">정비소</span>
                 <span className="yanmar-repair-prompt-label">정비하기</span>
+              </span>
+            </button>
+          </div>
+        ) : null}
+
+        {mode !== "intro" &&
+        mode !== "gameReady" &&
+        mode !== "ride" &&
+        nearWorkshopId &&
+        !showWorkshopPanel &&
+        !nearRepairTent ? (
+          <div className="pointer-events-auto absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2">
+            <button
+              type="button"
+              className="yanmar-repair-prompt-btn"
+              onClick={() => {
+                setShowQuestPanel(false);
+                setShowShopPanel(false);
+                setShowEquipmentUpgrade(false);
+                setShowProfileModal(false);
+                setShowRepairPanel(false);
+                setActiveWorkshopId(nearWorkshopId);
+                setShowWorkshopPanel(true);
+                void loadWorkshopState();
+              }}
+              aria-label={`${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기`}
+            >
+              <span className="yanmar-repair-prompt-copy">
+                <span className="yanmar-repair-prompt-eyebrow">
+                  {WORKSHOP_DEFS[nearWorkshopId].promptTitle}
+                </span>
+                <span className="yanmar-repair-prompt-label">
+                  {WORKSHOP_DEFS[nearWorkshopId].promptAction}
+                </span>
               </span>
             </button>
           </div>
@@ -4492,14 +4972,16 @@ export function ExcavatorGameWrapper({
                   open={showShopPanel}
                   onClose={() => setShowShopPanel(false)}
                   stars={mode === "game" ? currency : previewStars}
+                  gachaTicketsStandard={gachaTicketsStandard}
+                  gachaTicketsPremium={gachaTicketsPremium}
                   activeItemIds={activeShopBuffs.map((buff) => buff.id)}
                   purchasingId={purchasingShopItemId}
                   onPurchase={(itemId) => {
                     void handleShopPurchase(itemId);
                   }}
                   gachaBusy={gachaBusy}
-                  onGacha={(banner, count) => {
-                    void handleGacha(banner, count);
+                  onGacha={(banner, count, payWith) => {
+                    void handleGacha(banner, count, payWith);
                   }}
                 />
                 <GachaResultModal
@@ -5040,6 +5522,10 @@ export function ExcavatorGameWrapper({
         <AttachmentUnlockOverlay
           unlock={unlockQueue[0]}
           onClose={() => {
+            const closed = unlockQueue[0];
+            if (closed) {
+              markPlayerUnlockSeen(unlockSeenOwnerRef.current, closed);
+            }
             setUnlockQueue((queue) => queue.slice(1));
           }}
         />
@@ -5087,7 +5573,6 @@ export function ExcavatorGameWrapper({
           }}
           onResetPosition={resetExcavatorPosition}
           onShowGuide={onShowGuide}
-          onShowRewards={onShowRewards}
           onShowRanking={onShowRanking}
           onSaveAndExit={onRequestExit}
         />
@@ -5142,6 +5627,16 @@ export function ExcavatorGameWrapper({
               endedRef={endedRef}
               activeChassisId={String(activeChassisId)}
               onSceneReady={handleSceneReady}
+              worldPickupsRef={
+                mode === "game" && session?.user?.id ? worldPickupsRef : undefined
+              }
+              worldPickupRevision={worldPickupRevision}
+              onWorldPickup={handleWorldPickup}
+              workshopClaimableIds={
+                workshopQuestState
+                  ? getClaimableWorkshopIds(workshopQuestState)
+                  : []
+              }
             />
           </div>
         )}
@@ -5207,10 +5702,13 @@ export function ExcavatorGameWrapper({
         )}
 
         {mode === "intro" && initialPlayMode && (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-gradient-to-b from-slate-900 to-slate-950">
+          <div
+            className="absolute inset-0 z-40 flex items-center justify-center"
+            style={{ backgroundColor: "#8ec6e8" }}
+          >
             <div className="text-center">
-              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-red-500" />
-              <p className="text-xs font-bold text-white/70">시뮬레이터 준비 중</p>
+              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-white/35 border-t-red-500" />
+              <p className="text-xs font-bold text-slate-700/80">시뮬레이터 준비 중</p>
             </div>
           </div>
         )}

@@ -94,6 +94,8 @@ import {
 import { MapSiteDecor } from "./mapDecor";
 import { RepairTent } from "./RepairTent";
 import { REPAIR_TENT } from "./gearCatalog";
+import { WorkshopSigns } from "./WorkshopSign";
+import type { WorkshopId } from "./workshop/types";
 import { CrashZoneDecor } from "./CrashZoneDecor";
 import { HillZoneDecor } from "./HillZoneDecor";
 import { hillBoulderVisualScale } from "./terrain";
@@ -110,6 +112,8 @@ import {
   type DumpSoilVisual,
   type BladeSprayVisual,
 } from "./simLoop";
+import { WorldPickupMeshes } from "./WorldPickupMeshes";
+import type { WorldPickup, WorldPickupsState } from "./worldPickups";
 
 export type { CameraMode, DumpScorePopup, ExcavatorSimState };
 
@@ -147,6 +151,10 @@ interface ExcavatorSceneProps {
   activeChassisId?: string;
   /** Fired once after Suspense loaders resolve and the first frames paint. */
   onSceneReady?: () => void;
+  worldPickupsRef?: React.MutableRefObject<WorldPickupsState | null>;
+  worldPickupRevision?: number;
+  onWorldPickup?: (pickup: WorldPickup) => void;
+  workshopClaimableIds?: ReadonlySet<WorkshopId> | readonly WorkshopId[];
 }
 
 function TerrainMesh({
@@ -2475,6 +2483,8 @@ function SimLoop({
   onSimTick,
   endedRef,
   activeChassisId,
+  worldPickupsRef,
+  onWorldPickup,
 }: ExcavatorSceneProps) {
   const runtimeRef = useRef(createSimLoopRuntime());
   const dustRef = useRef<THREE.Group>(null);
@@ -2514,6 +2524,8 @@ function SimLoop({
       onSimTick,
       endedRef,
       dozerBladeReach,
+      worldPickups: worldPickupsRef?.current ?? null,
+      onWorldPickup,
     });
 
     const dust = runtimeRef.current.digDust;
@@ -3907,7 +3919,8 @@ function SceneReadySignal({ onReady }: { onReady?: () => void }) {
   useFrame(() => {
     if (firedRef.current || !onReady) return;
     framesRef.current += 1;
-    if (framesRef.current < 8) return;
+    // Wait for several rendered frames so terrain/excavator are on screen.
+    if (framesRef.current < 12) return;
     firedRef.current = true;
     queueMicrotask(() => onReady());
   });
@@ -3954,6 +3967,11 @@ function SceneContent(props: ExcavatorSceneProps) {
         z={REPAIR_TENT.z}
         radius={REPAIR_TENT.radius}
         rotationY={REPAIR_TENT.rotationY}
+      />
+      <WorkshopSigns
+        key={`workshop-signs-${terrainRevision}`}
+        mapTier={props.terrainRef.current.mapTier}
+        claimableIds={props.workshopClaimableIds ?? []}
       />
       <TerrainRockScatter key={`rocks-${terrainRevision}`} terrainRef={props.terrainRef} />
       <ContactShadows
@@ -4010,6 +4028,12 @@ function SceneContent(props: ExcavatorSceneProps) {
         inputRef={props.inputRef}
         terrainRef={props.terrainRef}
       />
+      {props.worldPickupsRef ? (
+        <WorldPickupMeshes
+          pickupsRef={props.worldPickupsRef}
+          revision={props.worldPickupRevision ?? 0}
+        />
+      ) : null}
       <SimLoop {...props} />
       <SceneReadySignal onReady={props.onSceneReady} />
     </>
@@ -4032,11 +4056,12 @@ export function ExcavatorScene(props: ExcavatorSceneProps) {
       }}
       dpr={[1, 1.5]}
       camera={{ fov: 58, near: 0.1, far: 420 }}
-      style={{ width: "100%", height: "100%" }}
+      style={{ width: "100%", height: "100%", background: "#8ec6e8" }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 1.08;
         gl.outputColorSpace = THREE.SRGBColorSpace;
+        gl.setClearColor("#8ec6e8", 1);
 
         const canvas = gl.domElement;
         const onContextLost = (event: Event) => {

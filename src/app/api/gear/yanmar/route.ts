@@ -24,6 +24,8 @@ export async function GET() {
         totalXp: true,
         enhanceCores: true,
         gearInventorySlots: true,
+        gachaTicketsStandard: true,
+        gachaTicketsPremium: true,
       },
     });
     return { migration, loaded, user };
@@ -37,6 +39,8 @@ export async function GET() {
   return NextResponse.json({
     currency: result.user?.currency ?? 0,
     enhanceCores: result.user?.enhanceCores ?? 0,
+    gachaTicketsStandard: result.user?.gachaTicketsStandard ?? 0,
+    gachaTicketsPremium: result.user?.gachaTicketsPremium ?? 0,
     inventorySlots,
     expandCost: getGearInventoryExpandCost(inventorySlots),
     totalXp: result.user?.totalXp ?? 0,

@@ -113,6 +113,14 @@ import {
   MIN_GRAPPLE_GROUND_CLEARANCE,
 } from "./simConstants";
 import {
+  isWorldSpeedBuffActive,
+  SPEED_BUFF_MULT,
+  tickWorldPickups,
+  tryCollectWorldPickup,
+  type WorldPickup,
+  type WorldPickupsState,
+} from "./worldPickups";
+import {
   computeComAlignFactor,
   computeGrappleAdhesion,
   createGrappleGripRuntime,
@@ -231,6 +239,9 @@ export interface SimTickParams {
   endedRef?: { current: boolean };
   /** 차체 스케일에 맞춘 도저 전방 reach (미지정 시 기본값). */
   dozerBladeReach?: number;
+  /** Arcade world pickups (stars / speed). Game mode + logged-in only. */
+  worldPickups?: WorldPickupsState | null;
+  onWorldPickup?: (pickup: WorldPickup) => void;
 }
 
 function clampControl(value: number, min = -1, max = 1) {
@@ -711,7 +722,13 @@ export function tickExcavatorSim(params: SimTickParams) {
       ? 0.5
       : 0.25;
   const speedProfile = isRide ? RIDE_CONTROL_SPEED : CONTROL_SPEED;
-  const travelSpeedScale = stats.travelSpeedMultiplier * rpmScale;
+  const nowMs = Date.now();
+  const worldBuffActive =
+    !!params.worldPickups && isWorldSpeedBuffActive(params.worldPickups, nowMs);
+  const travelSpeedScale =
+    stats.travelSpeedMultiplier *
+    rpmScale *
+    (worldBuffActive ? SPEED_BUFF_MULT : 1);
   const workSpeedScale = (stats.workSpeedMultiplier ?? 1) * rpmScale;
   const boomSwing = auxiliary?.boomSwing ?? DEFAULT_BOOM_SWING;
   const grappleOpen = auxiliary?.grappleOpen ?? 1;
@@ -1834,6 +1851,21 @@ export function tickExcavatorSim(params: SimTickParams) {
     runtime.bladeSpray.intensity = Math.max(0, runtime.bladeSpray.intensity - dt * 3.2);
     if (runtime.bladeSpray.intensity <= 0.03) {
       runtime.bladeSpray.active = false;
+    }
+  }
+
+  const worldPickups = params.worldPickups;
+  if (worldPickups && mode === "game" && !systemsFrozen) {
+    const pickupNow = Date.now();
+    tickWorldPickups(worldPickups, terrain, pickupNow);
+    const collected = tryCollectWorldPickup(
+      worldPickups,
+      sim.posX,
+      sim.posZ,
+      pickupNow,
+    );
+    if (collected) {
+      params.onWorldPickup?.(collected);
     }
   }
 

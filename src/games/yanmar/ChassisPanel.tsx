@@ -235,7 +235,7 @@ export function ChassisGallery({
                   onClick={() => void onAbilityAllocSave?.(draft)}
                 >
                   저장
-                  {remaining > 0 ? (
+                  {dirty && remaining > 0 ? (
                     <em className="yanmar-bonus-point-badge is-on-btn" aria-hidden />
                   ) : null}
                 </button>

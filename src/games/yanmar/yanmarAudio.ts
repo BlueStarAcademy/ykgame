@@ -31,7 +31,7 @@ const HORN_SRC: Record<HornId, string> = {
 };
 
 const BREAKER_SRC = `${SOUND_BASE}/breaker.wav`;
-const INGAME_BGM_SRC = "/sounds/site-legend/ingame-bgm.wav";
+const INGAME_BGM_SRC = "/sounds/site-legend/ingame-bgm.ogg";
 const HORN_BASE_VOLUME = 0.88;
 const BREAKER_BASE_GAIN = 0.92;
 /** Ignore brief contact flicker so the loop does not restart mid-strike. */

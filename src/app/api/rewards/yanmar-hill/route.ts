@@ -89,6 +89,10 @@ export async function POST(request: Request) {
           applyShopBuffsToStats,
           applyRankerWillScore,
         } = await import("@/games/yanmar/shopBuffEffects");
+        const {
+          workshopScoreMult,
+          workshopXpMult,
+        } = await import("@/games/yanmar/workshop/effects");
         const buffIds = await loadActiveShopBuffIds(session.user.id);
         const stats = applyShopBuffsToStats(loaded.stats, buffIds);
         const critical = Math.random() < stats.criticalChance;
@@ -100,10 +104,15 @@ export async function POST(request: Request) {
           xpGained,
           stats.activeMasters,
         );
-        score = applyRankerWillScore(boosted.score, buffIds);
-        xpGained = applyWorkExpGainSub(boosted.xp, stats.workExpGainBonus, {
-          workXpMult: stats.workXpMult,
-        });
+        score = Math.round(
+          applyRankerWillScore(boosted.score, buffIds) *
+            workshopScoreMult(loaded.workshopById.hill.score_rank ?? 0),
+        );
+        xpGained = Math.round(
+          applyWorkExpGainSub(boosted.xp, stats.workExpGainBonus, {
+            workXpMult: stats.workXpMult,
+          }) * workshopXpMult(loaded.workshopById.hill.xp_expert ?? 0),
+        );
         const rolled = rollYanmarDropRewards({
           score,
           minStars: minStarReward,

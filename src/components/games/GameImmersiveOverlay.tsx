@@ -31,6 +31,8 @@ export function useImmersiveFullscreenControl() {
 interface GameImmersiveOverlayProps {
   active: boolean;
   headerColor: string;
+  /** Underlay behind game canvas — match scene sky to avoid a black flash on entry. */
+  shellColor?: string;
   onExit: () => void;
   onShowRanking: () => void;
   myRank: number | null;
@@ -46,6 +48,7 @@ interface GameImmersiveOverlayProps {
 export function GameImmersiveOverlay({
   active,
   headerColor,
+  shellColor = "#000000",
   onExit,
   onShowRanking,
   myRank,
@@ -99,8 +102,9 @@ export function GameImmersiveOverlay({
       <div
         ref={containerRef}
         data-game-immersive=""
-        className="fixed inset-0 z-[200] flex flex-col bg-black"
+        className="fixed inset-0 z-[200] flex flex-col"
         style={{
+          backgroundColor: shellColor,
           paddingTop: "env(safe-area-inset-top)",
           paddingBottom: "env(safe-area-inset-bottom)",
           paddingLeft: "env(safe-area-inset-left)",

@@ -73,12 +73,16 @@ function isStalePrismaClient(client: PrismaClient): boolean {
     userMail?: unknown;
     tickerSettings?: unknown;
     tickerNotice?: unknown;
+    userWorkshopUpgrade?: unknown;
+    userWorkshopShopPurchase?: unknown;
   };
   if (
     delegates.userMail == null ||
     delegates.rewardEvent == null ||
     delegates.tickerNotice == null ||
-    delegates.tickerSettings == null
+    delegates.tickerSettings == null ||
+    delegates.userWorkshopUpgrade == null ||
+    delegates.userWorkshopShopPurchase == null
   ) {
     return true;
   }
@@ -94,6 +98,23 @@ function isStalePrismaClient(client: PrismaClient): boolean {
   if (
     Array.isArray(equipmentFields) &&
     !equipmentFields.some((field) => field.name === "failBonus")
+  ) {
+    return true;
+  }
+
+  const chassisFields =
+    runtime._runtimeDataModel?.models?.UserChassisLoadout?.fields;
+  if (
+    Array.isArray(chassisFields) &&
+    !chassisFields.some((field) => field.name === "abilityAlloc")
+  ) {
+    return true;
+  }
+
+  const userFields = runtime._runtimeDataModel?.models?.User?.fields;
+  if (
+    Array.isArray(userFields) &&
+    !userFields.some((field) => field.name === "dumpWorkshopPoints")
   ) {
     return true;
   }

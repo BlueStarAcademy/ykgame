@@ -15,12 +15,13 @@ import {
 import type { GearItemData, MasterOptionInst } from "./gearGenerate";
 import { resolveMaxMasterByKey } from "./gearGenerate";
 import {
-  YANMAR_BASE_HAUL_TRUCK_CAPACITY,
-  YANMAR_BASE_HAUL_TRUCK_COOLDOWN_SEC,
-  YANMAR_BASE_HILL_BOULDER_COUNT,
   YANMAR_REWARD_CONFIG,
   type YanmarEquipmentStats,
 } from "./equipment";
+import {
+  applyWorkshopTruckStats,
+  type WorkshopUpgradeLevels,
+} from "./workshop/effects";
 import {
   accumulateZeroPenalties,
   computeMaintenanceSnapshot,
@@ -116,6 +117,7 @@ export function calculateFinalYanmarStats(input: {
   nowMs?: number;
   /** 계정 단위 레벨 능력치 분배 (차체 base에 flat 가산) */
   abilityAlloc?: AbilityAlloc | null;
+  workshopLevels?: WorkshopUpgradeLevels | null;
 }): FinalYanmarStats {
   const chassis = getChassisDef(input.chassisId ?? DEFAULT_CHASSIS_ID);
   const alloc = input.abilityAlloc
@@ -199,6 +201,9 @@ export function calculateFinalYanmarStats(input: {
   bladeEfficiency *= penalties.bladeEfficiencyMult;
   breakerDamage *= penalties.breakerDamageMult;
 
+  const workshop = applyWorkshopTruckStats(input.workshopLevels ?? {});
+  breakerDamage *= workshop.breakerPowerMult;
+
   const masters = resolveMaxMasterByKey(
     equipped.map((g) => g.data.masterOption),
   );
@@ -208,8 +213,8 @@ export function calculateFinalYanmarStats(input: {
 
   return {
     maxLoadUnits: Math.round(maxLoadUnits),
-    truckCapacityUnits: YANMAR_REWARD_CONFIG.baseTruckCapacityUnits,
-    truckCooldownSec: YANMAR_REWARD_CONFIG.baseTruckCooldownSec,
+    truckCapacityUnits: workshop.truckCapacityUnits,
+    truckCooldownSec: workshop.truckCooldownSec,
     scoreChunkUnits: YANMAR_REWARD_CONFIG.scoreChunkUnits,
     criticalChance: Math.min(0.75, criticalChance),
     criticalMultiplier,
@@ -219,9 +224,9 @@ export function calculateFinalYanmarStats(input: {
     workSpeedMultiplier,
     breakerDamage: Math.max(0, Math.round(breakerDamage)),
     crashRespawnSec: 5 * 60,
-    haulTruckCooldownSec: YANMAR_BASE_HAUL_TRUCK_COOLDOWN_SEC,
-    haulTruckCapacity: YANMAR_BASE_HAUL_TRUCK_CAPACITY,
-    hillBoulderCount: YANMAR_BASE_HILL_BOULDER_COUNT,
+    haulTruckCooldownSec: workshop.haulTruckCooldownSec,
+    haulTruckCapacity: workshop.haulTruckCapacity,
+    hillBoulderCount: workshop.hillBoulderCount,
     gripAdhesionBonus,
     hillSafeLoadChance,
     breakerEvery3HitMult: breakerEvery3,

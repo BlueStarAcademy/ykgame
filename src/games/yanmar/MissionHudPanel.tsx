@@ -80,6 +80,42 @@ function CompactQuestReward({ reward }: { reward: QuestReward }) {
       </span>,
     );
   }
+  if ((reward.gachaTicketsStandard ?? 0) > 0) {
+    parts.push(
+      <span
+        key="ticket-std"
+        className="inline-flex items-center gap-0.5 whitespace-nowrap tabular-nums"
+      >
+        <img
+          src="/images/yanmar/2d/gacha-ticket-standard.svg"
+          alt=""
+          width={10}
+          height={10}
+          className="shrink-0"
+          draggable={false}
+        />
+        {reward.gachaTicketsStandard!.toLocaleString()}
+      </span>,
+    );
+  }
+  if ((reward.gachaTicketsPremium ?? 0) > 0) {
+    parts.push(
+      <span
+        key="ticket-prem"
+        className="inline-flex items-center gap-0.5 whitespace-nowrap tabular-nums"
+      >
+        <img
+          src="/images/yanmar/2d/gacha-ticket-premium.svg"
+          alt=""
+          width={10}
+          height={10}
+          className="shrink-0"
+          draggable={false}
+        />
+        {reward.gachaTicketsPremium!.toLocaleString()}
+      </span>,
+    );
+  }
   if (parts.length === 0) return null;
   return (
     <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">

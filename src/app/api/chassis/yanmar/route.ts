@@ -188,6 +188,9 @@ export async function POST(req: Request) {
     return NextResponse.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "ERROR";
+    if (msg !== "INVALID_ALLOC" && msg !== "INVALID_ACTION" && msg !== "INVALID_CHASSIS") {
+      console.error("[chassis/yanmar]", e);
+    }
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

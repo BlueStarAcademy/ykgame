@@ -9,6 +9,7 @@ import {
 const MAX_STARS = 40;
 const MAX_XP = 6000;
 const MAX_CORES = 16;
+const MAX_TICKETS = 1;
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -21,6 +22,8 @@ export async function POST(request: Request) {
     stars?: unknown;
     xp?: unknown;
     enhanceCores?: unknown;
+    gachaTicketsStandard?: unknown;
+    gachaTicketsPremium?: unknown;
     label?: unknown;
   } | null;
 
@@ -29,6 +32,14 @@ export async function POST(request: Request) {
   const xp = typeof body?.xp === "number" ? Math.floor(body.xp) : NaN;
   const enhanceCores =
     typeof body?.enhanceCores === "number" ? Math.floor(body.enhanceCores) : 0;
+  const gachaTicketsStandard =
+    typeof body?.gachaTicketsStandard === "number"
+      ? Math.floor(body.gachaTicketsStandard)
+      : 0;
+  const gachaTicketsPremium =
+    typeof body?.gachaTicketsPremium === "number"
+      ? Math.floor(body.gachaTicketsPremium)
+      : 0;
   const label =
     typeof body?.label === "string" ? body.label.slice(0, 80) : "퀘스트 보상";
 
@@ -48,7 +59,33 @@ export async function POST(request: Request) {
   ) {
     return NextResponse.json({ error: "Invalid enhanceCores" }, { status: 400 });
   }
-  if (stars === 0 && xp === 0 && enhanceCores === 0) {
+  if (
+    !Number.isFinite(gachaTicketsStandard) ||
+    gachaTicketsStandard < 0 ||
+    gachaTicketsStandard > MAX_TICKETS
+  ) {
+    return NextResponse.json(
+      { error: "Invalid gachaTicketsStandard" },
+      { status: 400 },
+    );
+  }
+  if (
+    !Number.isFinite(gachaTicketsPremium) ||
+    gachaTicketsPremium < 0 ||
+    gachaTicketsPremium > MAX_TICKETS
+  ) {
+    return NextResponse.json(
+      { error: "Invalid gachaTicketsPremium" },
+      { status: 400 },
+    );
+  }
+  if (
+    stars === 0 &&
+    xp === 0 &&
+    enhanceCores === 0 &&
+    gachaTicketsStandard === 0 &&
+    gachaTicketsPremium === 0
+  ) {
     return NextResponse.json({ error: "Empty reward" }, { status: 400 });
   }
 
@@ -66,8 +103,24 @@ export async function POST(request: Request) {
               ...(enhanceCores > 0
                 ? { enhanceCores: { increment: enhanceCores } }
                 : {}),
+              ...(gachaTicketsStandard > 0
+                ? {
+                    gachaTicketsStandard: { increment: gachaTicketsStandard },
+                  }
+                : {}),
+              ...(gachaTicketsPremium > 0
+                ? {
+                    gachaTicketsPremium: { increment: gachaTicketsPremium },
+                  }
+                : {}),
             },
-            select: { currency: true, totalXp: true, enhanceCores: true },
+            select: {
+              currency: true,
+              totalXp: true,
+              enhanceCores: true,
+              gachaTicketsStandard: true,
+              gachaTicketsPremium: true,
+            },
           });
 
           await tx.userRewardInventory.create({
@@ -80,6 +133,8 @@ export async function POST(request: Request) {
                 eventId,
                 xp,
                 enhanceCores,
+                gachaTicketsStandard,
+                gachaTicketsPremium,
                 label,
                 source: "quest",
               },
@@ -91,9 +146,13 @@ export async function POST(request: Request) {
             currency: user.currency,
             totalXp: user.totalXp,
             enhanceCores: user.enhanceCores,
+            gachaTicketsStandard: user.gachaTicketsStandard,
+            gachaTicketsPremium: user.gachaTicketsPremium,
             stars,
             xp,
             coresGranted: enhanceCores,
+            standardTicketsGranted: gachaTicketsStandard,
+            premiumTicketsGranted: gachaTicketsPremium,
           };
         },
       );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { GameId } from "@/lib/games";
 import { formatSeasonRemaining, getGameById } from "@/lib/games";
@@ -90,30 +90,31 @@ function RankingRow({
   entry,
   gameId,
   isMe = false,
+  index = 0,
 }: {
   entry: RankingEntry;
   gameId: GameId;
   isMe?: boolean;
+  index?: number;
 }) {
   const isYanmar = gameId === "yanmar";
   const isTop3 = entry.rank > 0 && entry.rank <= 3;
 
   return (
     <li
-      className={`ranking-modal-row flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 ${
+      className={`ranking-modal-row flex items-center justify-between gap-3 ${
         isMe ? "ranking-modal-row-me" : isTop3 ? "ranking-modal-row-top" : ""
       }`}
+      style={{ animationDelay: `${Math.min(index, 9) * 28}ms` }}
     >
       <div className="flex min-w-0 items-center gap-2.5">
         <RankBadge rank={entry.rank} tone="light" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-slate-800">
+          <p className="ranking-modal-row-name truncate">
             {entry.nickname}
-            {isMe ? (
-              <span className="ml-1 text-[10px] font-bold text-blue-600">나</span>
-            ) : null}
+            {isMe ? <span className="ranking-modal-me-tag">나</span> : null}
           </p>
-          <p className="mt-0.5 text-[10px] text-slate-500">
+          <p className="ranking-modal-row-meta">
             {isYanmar ? (
               "누적 점수"
             ) : (
@@ -122,20 +123,28 @@ function RankingRow({
                   {"★".repeat(entry.stars)}
                   {"☆".repeat(3 - entry.stars)}
                 </span>
-                <span className="mx-1 text-slate-300">·</span>
+                <span className="mx-1 opacity-40">·</span>
                 ⏱ {formatTime(entry.playTime)}
               </>
             )}
           </p>
         </div>
       </div>
-      <span className="shrink-0 text-sm font-black text-slate-900">
-        {entry.score > 0 ? entry.score.toLocaleString() : "-"}
-        {entry.score > 0 ? (
-          <span className="ml-0.5 text-[10px] font-semibold text-slate-400">점</span>
-        ) : null}
+      <span className="ranking-modal-row-score shrink-0 tabular-nums">
+        {entry.score > 0 ? entry.score.toLocaleString() : "—"}
+        {entry.score > 0 ? <span className="ranking-modal-row-unit">점</span> : null}
       </span>
     </li>
+  );
+}
+
+function RankingListSkeleton() {
+  return (
+    <div className="ranking-modal-skeleton" aria-hidden>
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className="ranking-modal-skeleton-row" />
+      ))}
+    </div>
   );
 }
 
@@ -151,7 +160,7 @@ function RankingList({
   gameId: GameId;
 }) {
   if (loading) {
-    return <p className="py-8 text-center text-sm text-slate-400">불러오는 중...</p>;
+    return <RankingListSkeleton />;
   }
 
   const myEntry = myStats
@@ -168,38 +177,46 @@ function RankingList({
 
   if (!myEntry && top10.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-slate-400">아직 랭킹 기록이 없습니다.</p>
+      <div className="ranking-modal-empty">
+        <p className="ranking-modal-empty-title">아직 기록이 없습니다</p>
+        <p className="ranking-modal-empty-desc">첫 플레이로 시즌 순위에 이름을 올려보세요.</p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="ranking-modal-sections">
       {myEntry ? (
-        <div>
-          <p className="mb-1 px-1 text-[10px] font-bold text-slate-400">내 순위</p>
+        <section className="ranking-modal-section">
+          <div className="ranking-modal-section-label">
+            <span>내 순위</span>
+          </div>
           <ul>
             <RankingRow entry={myEntry} gameId={gameId} isMe />
           </ul>
-        </div>
+        </section>
       ) : null}
       {top10.length > 0 ? (
-        <div>
+        <section className="ranking-modal-section ranking-modal-section-list">
           {myEntry ? (
-            <p className="mb-1 px-1 text-[10px] font-bold text-slate-400">TOP 10</p>
+            <div className="ranking-modal-section-label">
+              <span>TOP 10</span>
+            </div>
           ) : null}
-          <ul className="space-y-1.5">
-            {top10.map((r) => (
+          <ul className="ranking-modal-list">
+            {top10.map((r, index) => (
               <RankingRow
                 key={`${r.rank}-${r.nickname}`}
                 entry={r}
                 gameId={gameId}
                 isMe={myEntry?.nickname === r.nickname}
+                index={index}
               />
             ))}
           </ul>
-        </div>
+        </section>
       ) : myEntry ? (
-        <p className="py-4 text-center text-xs text-slate-400">아직 TOP 10 기록이 없습니다.</p>
+        <p className="ranking-modal-empty-inline">아직 TOP 10 기록이 없습니다.</p>
       ) : null}
     </div>
   );
@@ -207,7 +224,7 @@ function RankingList({
 
 export function RankingBoardPanel({
   gameId,
-  highlightNickname,
+  highlightNickname: _highlightNickname,
   active = true,
   embedded = false,
   onClose,
@@ -221,41 +238,49 @@ export function RankingBoardPanel({
 
   const headerColor = game?.headerColor ?? "#1565C0";
   const brandColor = game?.color ?? headerColor;
-
-  const periodTitle = seasonLabel ? `${seasonLabel} 랭킹 Top 10` : "랭킹 Top 10";
+  const periodTitle = seasonLabel ? `${seasonLabel} 랭킹` : "시즌 랭킹";
+  const brandVars = {
+    "--ranking-brand": brandColor,
+    "--ranking-header": headerColor,
+  } as CSSProperties;
 
   const header = (
-    <div
-      className="ranking-embed-header relative shrink-0 overflow-hidden px-4 py-2.5 text-white"
-      style={{
-        background: `linear-gradient(135deg, ${brandColor} 0%, ${headerColor} 55%, #0f172a 100%)`,
-      }}
-    >
-      <div className="flex items-center gap-2">
-        <h3
-          id={onClose ? "ranking-modal-title" : undefined}
-          className="min-w-0 flex-1 truncate text-sm font-black"
-        >
-          {periodTitle}
-        </h3>
-        {seasonRemaining ? (
-          <span className="shrink-0 text-[10px] font-bold text-white/85">{seasonRemaining}</span>
-        ) : null}
+    <header className="ranking-modal-header">
+      <div className="ranking-modal-header-glow" aria-hidden />
+      <div className="ranking-modal-header-grid" aria-hidden />
+      <div className="ranking-modal-header-top">
+        <p className="ranking-modal-eyebrow">Season Ranking</p>
         {onClose ? (
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg border border-white/20 bg-white/15 px-2 py-1 text-[10px] font-bold hover:bg-white/25"
+            className="ranking-modal-close"
+            aria-label="닫기"
           >
-            닫기
+            ✕
           </button>
         ) : null}
       </div>
-    </div>
+      <div className="ranking-modal-header-main">
+        <h3
+          id={onClose ? "ranking-modal-title" : undefined}
+          className="ranking-modal-title"
+        >
+          {periodTitle}
+        </h3>
+        {seasonRemaining ? (
+          <span className="ranking-modal-timer" title="시즌 종료까지">
+            <span className="ranking-modal-timer-dot" aria-hidden />
+            {seasonRemaining}
+          </span>
+        ) : null}
+      </div>
+      <p className="ranking-modal-subtitle">Top 10 · 실시간 누적 순위</p>
+    </header>
   );
 
   const body = (
-    <div className="ranking-embed-body min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
+    <div className="ranking-modal-body">
       <RankingList
         rankings={rankings}
         myStats={myStats}
@@ -267,9 +292,10 @@ export function RankingBoardPanel({
 
   return (
     <div
-      className={`game-lobby-ranking-embed flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm ${
-        embedded ? "h-full" : "max-h-full ranking-modal-card"
+      className={`game-lobby-ranking-embed ranking-modal-card flex min-h-0 flex-col overflow-hidden ${
+        embedded ? "h-full ranking-modal-card-embedded" : "h-full"
       }`}
+      style={brandVars}
     >
       {header}
       {body}
@@ -304,11 +330,18 @@ export function RankingBoard({
 
   return createPortal(
     <div
-      className="ranking-modal-overlay fixed inset-0 z-[280] flex items-start justify-center overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch] [touch-action:pan-y] sm:items-center sm:p-4"
+      className="ranking-modal-overlay"
       onClick={onClose}
+      role="presentation"
+      style={
+        {
+          "--ranking-brand":
+            getGameById(gameId)?.color ?? "#E53935",
+        } as CSSProperties
+      }
     >
       <div
-        className="ranking-modal-panel my-auto flex max-h-[min(92dvh,40rem)] w-full max-w-md flex-col overflow-hidden p-1 landscape:max-h-[min(94dvh,24rem)]"
+        className="ranking-modal-panel"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

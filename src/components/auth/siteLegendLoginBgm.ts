@@ -20,7 +20,7 @@ import {
   trackSiteLegendBgm,
 } from "@/lib/siteLegendBgmRegistry";
 
-const LOGIN_BGM_SRC = "/sounds/site-legend/login-bgm.wav";
+const LOGIN_BGM_SRC = "/sounds/site-legend/login-bgm.ogg";
 
 const GLOBAL_CTRL = "__ykSiteLegendLoginBgmCtrl";
 const GLOBAL_SHOULD_PLAY = "__ykSiteLegendLoginBgmShouldPlay";

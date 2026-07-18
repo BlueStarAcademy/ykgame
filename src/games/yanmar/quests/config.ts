@@ -8,7 +8,7 @@ import type {
   RepeatQuestDef,
 } from "./types";
 
-export const QUEST_MISSIONS_PER_DAY = 10;
+export const QUEST_MISSIONS_PER_DAY = 3;
 
 /** 클리어·수령 후 진행도가 초기화되어 다시 반복 가능한 퀘스트 */
 export const REPEAT_QUEST_DEFS: readonly RepeatQuestDef[] = [
@@ -105,13 +105,43 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
   },
 ] as const;
 
-/** 난이도 1~5 보상 (경험치·스타·점수·강화코어) */
+/** 난이도 1~5 보상 (경험치·스타·점수·강화코어·뽑기권) */
 export const MISSION_DIFFICULTY_REWARDS: Record<1 | 2 | 3 | 4 | 5, QuestReward> = {
-  1: { xp: 2000, stars: 10, score: 2000, enhanceCores: 2 },
-  2: { xp: 3000, stars: 15, score: 3000, enhanceCores: 3 },
-  3: { xp: 4000, stars: 20, score: 5000, enhanceCores: 5 },
-  4: { xp: 5000, stars: 25, score: 7500, enhanceCores: 6 },
-  5: { xp: 6000, stars: 30, score: 10000, enhanceCores: 8 },
+  1: {
+    xp: 2000,
+    stars: 10,
+    score: 2000,
+    enhanceCores: 2,
+    gachaTicketsStandard: 1,
+  },
+  2: {
+    xp: 3000,
+    stars: 15,
+    score: 3000,
+    enhanceCores: 3,
+    gachaTicketsStandard: 1,
+  },
+  3: {
+    xp: 4000,
+    stars: 20,
+    score: 5000,
+    enhanceCores: 5,
+    gachaTicketsStandard: 1,
+  },
+  4: {
+    xp: 5000,
+    stars: 25,
+    score: 7500,
+    enhanceCores: 6,
+    gachaTicketsStandard: 1,
+  },
+  5: {
+    xp: 6000,
+    stars: 30,
+    score: 10000,
+    enhanceCores: 8,
+    gachaTicketsPremium: 1,
+  },
 };
 
 export type MissionLevelBand = "under10" | "lv10" | "lv15";
@@ -122,14 +152,14 @@ export function getMissionLevelBand(level: number): MissionLevelBand {
   return "under10";
 }
 
-export function getMissionMaxDifficulty(band: MissionLevelBand): 3 | 4 | 5 {
+export function getMissionMaxDifficulty(band: MissionLevelBand): 2 | 3 | 5 {
   if (band === "lv15") return 5;
-  if (band === "lv10") return 4;
-  return 3;
+  if (band === "lv10") return 3;
+  return 2;
 }
 
-export function getMissionOptionalCount(band: MissionLevelBand): 1 | 2 {
-  return band === "under10" ? 1 : 2;
+export function getMissionOptionalCount(_band: MissionLevelBand): 1 {
+  return 1;
 }
 
 type MissionPoolEntry = {
@@ -148,8 +178,8 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
       kind: "soilDump",
       metric: "soilDump",
       label: (t) => `흙 하역 ${t.toLocaleString()}`,
-      min: 1000,
-      max: 3000,
+      min: 300,
+      max: 800,
       required: true,
     },
     {
@@ -157,7 +187,7 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
       metric: "horn",
       label: (t) => `경적 ${t}회`,
       min: 1,
-      max: 5,
+      max: 2,
       required: false,
     },
     {
@@ -165,15 +195,15 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
       metric: "swing180",
       label: (t) => `상부 180° 회전 ${t}회`,
       min: 1,
-      max: 5,
+      max: 2,
       required: false,
     },
     {
       kind: "travel",
       metric: "travel",
       label: (t) => `주행거리 ${t}m`,
-      min: 100,
-      max: 500,
+      min: 50,
+      max: 150,
       required: false,
     },
   ],
@@ -182,16 +212,16 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
       kind: "soilDump",
       metric: "soilDump",
       label: (t) => `흙 하역 ${t.toLocaleString()}`,
-      min: 3000,
-      max: 5000,
+      min: 800,
+      max: 1500,
       required: true,
     },
     {
       kind: "asphaltBreak",
       metric: "asphaltBreak",
       label: (t) => `아스팔트 크래쉬 ${t}개`,
-      min: 10,
-      max: 15,
+      min: 3,
+      max: 5,
       required: true,
     },
     {
@@ -199,7 +229,7 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
       metric: "horn",
       label: (t) => `경적 ${t}회`,
       min: 1,
-      max: 5,
+      max: 2,
       required: false,
     },
     {
@@ -207,15 +237,15 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
       metric: "swing180",
       label: (t) => `상부 180° 회전 ${t}회`,
       min: 1,
-      max: 5,
+      max: 2,
       required: false,
     },
     {
       kind: "travel",
       metric: "travel",
       label: (t) => `주행거리 ${t}m`,
-      min: 100,
-      max: 500,
+      min: 50,
+      max: 150,
       required: false,
     },
   ],
@@ -224,24 +254,24 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
       kind: "soilDump",
       metric: "soilDump",
       label: (t) => `흙 하역 ${t.toLocaleString()}`,
-      min: 6000,
-      max: 10000,
+      min: 1500,
+      max: 3000,
       required: true,
     },
     {
       kind: "asphaltBreak",
       metric: "asphaltBreak",
       label: (t) => `아스팔트 크래쉬 ${t}개`,
-      min: 10,
-      max: 15,
+      min: 3,
+      max: 5,
       required: true,
     },
     {
       kind: "rockLoad",
       metric: "rockLoad",
       label: (t) => `돌 적재 성공 ${t}회`,
-      min: 3,
-      max: 5,
+      min: 1,
+      max: 2,
       required: true,
     },
     {
@@ -249,15 +279,15 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
       metric: "dumpTruckDepart",
       label: (t) => `덤프트럭 보내기 ${t}회`,
       min: 1,
-      max: 3,
+      max: 1,
       required: false,
     },
     {
       kind: "travel",
       metric: "travel",
       label: (t) => `주행거리 ${t}m`,
-      min: 1000,
-      max: 2000,
+      min: 200,
+      max: 500,
       required: false,
     },
     {
@@ -265,7 +295,7 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
       metric: "haulTruckDepart",
       label: (t) => `돌트럭 보내기 ${t}회`,
       min: 1,
-      max: 3,
+      max: 1,
       required: false,
     },
   ],
@@ -347,6 +377,15 @@ export function formatQuestReward(reward: QuestReward) {
   if (reward.xp > 0) parts.push(`${reward.xp.toLocaleString()} EXP`);
   if (reward.stars > 0) parts.push(`${reward.stars} 스타`);
   if ((reward.score ?? 0) > 0) parts.push(`${reward.score!.toLocaleString()}점`);
+  if ((reward.enhanceCores ?? 0) > 0) {
+    parts.push(`강화코어 ${reward.enhanceCores}`);
+  }
+  if ((reward.gachaTicketsStandard ?? 0) > 0) {
+    parts.push(`일반 뽑기권 ${reward.gachaTicketsStandard}`);
+  }
+  if ((reward.gachaTicketsPremium ?? 0) > 0) {
+    parts.push(`고급 뽑기권 ${reward.gachaTicketsPremium}`);
+  }
   return parts.join(" + ") || "보상 없음";
 }
 

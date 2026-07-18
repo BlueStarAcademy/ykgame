@@ -88,23 +88,21 @@ export const BRAND_PROFILES: Record<
 };
 
 export const EXPERIENCE_STEPS = [
-  { step: "01", title: "소개 페이지", desc: "탑승 체험 또는 게임 체험 중 선택" },
+  { step: "01", title: "소개 페이지", desc: "홈 추가 또는 게임 체험으로 시작" },
   { step: "02", title: "로그인", desc: "QR·버튼으로 로그인 (이미 로그인 시 바로 이동)" },
   {
     step: "03",
-    title: "탑승 / 게임",
-    desc: "탑승 체험은 실제 속도·전 조작부 시뮬레이터, 게임 체험은 「얀마! 너 뭐해?」로비로 이동",
+    title: "장비 선택",
+    desc: "「얀마! 너 뭐해?」로비로 이동해 체험할 장비를 고릅니다",
   },
-  { step: "04", title: "플레이", desc: "탑승은 운전실 체험 · 게임은 굴착·하역·브레이커·석재와 보상 도전" },
+  {
+    step: "04",
+    title: "플레이",
+    desc: "굴착·하역·브레이커·석재 미션에 도전하고 보상을 획득합니다",
+  },
 ] as const;
 
 export const EXPERIENCE_MODES = [
-  {
-    title: "탑승 체험",
-    label: "Ride Experience",
-    desc: "얀마 굴착기의 실제 조작감을 느낄 수 있는 운전실 중심 체험입니다. 점수보다 조작, 회전, 붐·암·버켓 움직임을 천천히 익히는 데 집중합니다.",
-    points: ["실제 장비에 가까운 저속 조작", "튜토리얼 없이 바로 탑승", "체험 종료 시 랜딩으로 복귀"],
-  },
   {
     title: "게임 체험",
     label: "Game Experience",

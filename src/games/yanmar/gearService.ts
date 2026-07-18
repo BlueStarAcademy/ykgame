@@ -27,6 +27,11 @@ import {
   parseAbilityAlloc,
 } from "./abilityAlloc";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
+import {
+  flattenWorkshopLevels,
+  levelsByWorkshopFromRows,
+  workshopLuckyDropBonus,
+} from "./workshop/effects";
 
 type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
@@ -83,11 +88,15 @@ export async function loadUserFinalStats(
   userId: string,
   gameId = "yanmar",
 ) {
-  const [loadout, items, repair, user] = await Promise.all([
+  const [loadout, items, repair, user, workshopRows] = await Promise.all([
     tx.userChassisLoadout.findUnique({ where: { userId_gameId: { userId, gameId } } }),
     tx.gearItem.findMany({ where: { userId, gameId } }),
     tx.userRepairState.findUnique({ where: { userId_gameId: { userId, gameId } } }),
     tx.user.findUnique({ where: { id: userId }, select: { totalXp: true } }),
+    tx.userWorkshopUpgrade.findMany({
+      where: { userId },
+      select: { workshopId: true, upgradeKey: true, level: true },
+    }),
   ]);
 
   let repairBuff: "NONE" | "SMALL" | "LARGE" = "NONE";
@@ -104,12 +113,15 @@ export async function loadUserFinalStats(
   const abilityAlloc = parseAbilityAlloc(loadout?.abilityAlloc);
   const playerLevel = getPlayerLevelProgress(user?.totalXp ?? 0).level;
   const equipped = toEquippedInputs(items);
+  const workshopById = levelsByWorkshopFromRows(workshopRows);
+  const workshopLevels = flattenWorkshopLevels(workshopById);
   const stats = calculateFinalYanmarStats({
     chassisId,
     equipped,
     repairBuff,
     repairState: repair,
     abilityAlloc,
+    workshopLevels,
   });
 
   // TEST unlock: ensure every catalog chassis is owned so players can equip freely.
@@ -139,6 +151,8 @@ export async function loadUserFinalStats(
     abilityAlloc,
     abilityPoints: abilityPointsSummary(playerLevel, abilityAlloc),
     playerLevel,
+    workshopLevels,
+    workshopById,
   };
 }
 
@@ -160,6 +174,7 @@ const DROP_MASTER_KEY: Record<WorkDropTrigger, MasterOptionKey> = {
 export function workDropChance(
   trigger: WorkDropTrigger,
   activeMasters: Partial<Record<MasterOptionKey, MasterOptionInst>>,
+  luckBonus = 0,
 ) {
   const key = DROP_MASTER_KEY[trigger];
   const bonus = activeMasters[key];
@@ -168,7 +183,7 @@ export function workDropChance(
     // value 10 → ×1.10, +10 승단 후 20 → ×1.20
     chance *= 1 + Math.max(0, bonus.value) / 100;
   }
-  return chance;
+  return Math.min(1, chance + Math.max(0, luckBonus));
 }
 
 export type WorkGearDropClientPayload = {
@@ -219,8 +234,18 @@ export async function tryWorkGearDrop(
   trigger: WorkDropTrigger,
   gameId = "yanmar",
 ) {
-  const { stats, items } = await loadUserFinalStats(tx, userId, gameId);
-  const chance = workDropChance(trigger, stats.activeMasters);
+  const { stats, items, workshopById } = await loadUserFinalStats(
+    tx,
+    userId,
+    gameId,
+  );
+  const scopedLuck =
+    trigger === "breaker"
+      ? workshopLuckyDropBonus(workshopById.crash.lucky_drop ?? 0)
+      : trigger === "hillDump"
+        ? workshopLuckyDropBonus(workshopById.hill.lucky_drop ?? 0)
+        : 0;
+  const chance = workDropChance(trigger, stats.activeMasters, scopedLuck);
   if (Math.random() >= chance) {
     return { dropped: false as const, reason: "miss" as const };
   }

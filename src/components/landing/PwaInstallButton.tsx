@@ -96,22 +96,15 @@ export function PwaInstallButton() {
     return null;
   }
 
-  const label =
-    state === "ios"
-      ? "홈 화면에 추가"
-      : state === "unavailable"
-        ? "홈 화면 바로가기"
-        : installing
-          ? "설치 중..."
-          : "홈 화면에 추가";
+  const label = installing ? "설치 중..." : "홈 추가";
 
   return (
-    <div className="mx-auto w-full max-w-[280px]">
+    <div className="relative min-w-0 flex-1">
       <button
         type="button"
         onClick={handleInstall}
         disabled={installing}
-        className="landing-cta landing-cta-install flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold text-white shadow-md disabled:opacity-70"
+        className="landing-cta landing-cta-install flex w-full items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-xs font-bold text-white shadow-md disabled:opacity-70"
       >
         <span className="landing-install-icon" aria-hidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -127,7 +120,7 @@ export function PwaInstallButton() {
       </button>
 
       {showIosGuide && state === "ios" && (
-        <div className="landing-install-guide mt-2 rounded-xl border border-gray-200 bg-white/90 px-3 py-2.5 text-left shadow-sm">
+        <div className="landing-install-guide absolute left-0 right-0 z-20 mt-2 w-[calc(200%+0.5rem)] rounded-xl border border-gray-200 bg-white/95 px-3 py-2.5 text-left shadow-sm">
           <p className="text-[11px] font-semibold text-gray-800">
             iPhone / iPad 설치 방법
           </p>
@@ -149,9 +142,9 @@ export function PwaInstallButton() {
       )}
 
       {showIosGuide && state === "unavailable" && (
-        <div className="landing-install-guide mt-2 rounded-xl border border-gray-200 bg-white/90 px-3 py-2.5 text-left shadow-sm">
+        <div className="landing-install-guide absolute left-0 right-0 z-20 mt-2 w-[calc(200%+0.5rem)] rounded-xl border border-gray-200 bg-white/95 px-3 py-2.5 text-left shadow-sm">
           <p className="text-[11px] font-semibold text-gray-800">
-            바로가기 추가 방법
+            홈 추가 방법
           </p>
           <p className="mt-1.5 text-[10px] leading-relaxed text-gray-500">
             브라우저 메뉴에서{" "}

@@ -21,7 +21,7 @@ export const DIG_ZONE_COUNT = 2;
 export const DIG_ZONE_RESPAWN_MS = 60 * 1000;
 /** 아스팔트·돌 구역: 이탈 후(또는 전량 소진 후) 풀 리젠까지 대기. */
 export const CRASH_ZONE_RESPAWN_MS = 5 * 60 * 1000;
-export const CRASH_TILE_MAX_HP = 1000;
+export const CRASH_TILE_MAX_HP = 2000;
 export const CRASH_HIT_DAMAGE = 10;
 /** 활성 아스팔트 타일 상단이 sampleHeight 위로 올라온 높이 (풀 HP). CrashZoneDecor와 동기. */
 export const CRASH_ASPHALT_SURFACE_TOP = 0.22;

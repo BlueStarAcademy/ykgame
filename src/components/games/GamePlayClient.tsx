@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -12,10 +12,7 @@ import { getGameById, isGameAvailable } from "@/lib/games";
 import { exitFullscreen, prepareInGameFullscreen } from "@/lib/fullscreen";
 import { enablePwaMode } from "@/lib/pwa-mode";
 import type { GameResult } from "@/games/shared/types";
-import {
-  YanmarGuideModal,
-  YanmarRewardsModal,
-} from "@/games/yanmar/YanmarInfoModals";
+import { YanmarGuideModal } from "@/games/yanmar/YanmarInfoModals";
 import { InGameBackProvider } from "@/hooks/useInGameBackNavigation";
 import { GameResultScreen } from "./GameResultScreen";
 
@@ -122,8 +119,8 @@ export function GamePlayClient({
   });
   const [showRanking, setShowRanking] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
-  const [showRewards, setShowRewards] = useState(false);
   const [entryLoading, setEntryLoading] = useState(false);
+  const entryRevealRafRef = useRef<number | null>(null);
 
   const loadStats = useCallback(async () => {
     const res = await fetch(`/api/rankings/${gameId}`);
@@ -146,6 +143,14 @@ export function GamePlayClient({
   }, [entryLoading]);
 
   useEffect(() => {
+    return () => {
+      if (entryRevealRafRef.current != null) {
+        window.cancelAnimationFrame(entryRevealRafRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (gameId === "yanmar" && initialPlay === "ride" && playable) {
       setResult(null);
       setPlayMode("ride");
@@ -157,6 +162,10 @@ export function GamePlayClient({
   /** 홈 화면 「게임 시작」은 항상 게임모드로만 진입한다. */
   const handleStartGame = () => {
     if (!playable || entryLoading) return;
+    if (entryRevealRafRef.current != null) {
+      window.cancelAnimationFrame(entryRevealRafRef.current);
+      entryRevealRafRef.current = null;
+    }
     setEntryLoading(true);
     void (async () => {
       try {
@@ -173,7 +182,17 @@ export function GamePlayClient({
   };
 
   const handleGameReady = useCallback(() => {
-    setEntryLoading(false);
+    // Keep the splash fully opaque until the in-game canvas has been painted,
+    // then hard-cut (no fade) so sky/black underlays never show through.
+    if (entryRevealRafRef.current != null) {
+      window.cancelAnimationFrame(entryRevealRafRef.current);
+    }
+    entryRevealRafRef.current = window.requestAnimationFrame(() => {
+      entryRevealRafRef.current = window.requestAnimationFrame(() => {
+        entryRevealRafRef.current = null;
+        setEntryLoading(false);
+      });
+    });
   }, []);
 
   const resolvedPlayMode: PlayMode =
@@ -274,9 +293,7 @@ export function GamePlayClient({
       {showHome ? (
         <div
           className={
-            entryLoading
-              ? "site-legend-entry-overlay"
-              : undefined
+            entryLoading ? "site-legend-entry-overlay" : undefined
           }
         >
           <SiteLegendHomeScreen
@@ -311,7 +328,6 @@ export function GamePlayClient({
             immersive
             initialPlayMode={resolvedPlayMode}
             onShowGuide={() => setShowGuide(true)}
-            onShowRewards={() => setShowRewards(true)}
             onShowRanking={() => setShowRanking(true)}
             onRequestExit={handleExitGame}
             seasonScoreBase={yanmarSeasonBaseScore}
@@ -331,7 +347,6 @@ export function GamePlayClient({
       ) : null}
 
       <YanmarGuideModal open={showGuide} onClose={() => setShowGuide(false)} />
-      <YanmarRewardsModal open={showRewards} onClose={() => setShowRewards(false)} />
       <RankingBoard
         gameId={gameId}
         open={showRanking}

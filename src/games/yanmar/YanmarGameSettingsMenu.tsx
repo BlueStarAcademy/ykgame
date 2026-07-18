@@ -275,7 +275,6 @@ interface YanmarGameSettingsMenuProps {
   onHornIdChange: (hornId: HornId) => void;
   onResetPosition?: () => void;
   onShowGuide?: () => void;
-  onShowRewards?: () => void;
   onShowRanking?: () => void;
   onSaveAndExit?: () => void;
   onLogout?: () => void;
@@ -313,7 +312,6 @@ export function YanmarGameSettingsMenu({
   onHornIdChange,
   onResetPosition,
   onShowGuide,
-  onShowRewards,
   onShowRanking,
   onSaveAndExit,
   onLogout,
@@ -552,14 +550,6 @@ export function YanmarGameSettingsMenu({
                 onShowGuide?.();
               }}
               disabled={!onShowGuide}
-            />
-            <ActionRow
-              label="보상정보"
-              onClick={() => {
-                onOpenChange(false);
-                onShowRewards?.();
-              }}
-              disabled={!onShowRewards}
             />
             <ActionRow
               label="랭킹정보"
