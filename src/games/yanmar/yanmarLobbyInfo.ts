@@ -180,7 +180,7 @@ export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSection[] = [
       },
       {
         label: "속도 버프",
-        desc: "필드 속도 아이템을 주우면 약 10초간 이동속도가 2배가 됩니다. 시간당 최대 3회.",
+        desc: "필드 속도 아이템을 주우면 약 30초간 이동속도가 2배가 됩니다. 약 10분마다 등장하며 시간당 최대 5회.",
       },
       {
         label: "정비 텐트",

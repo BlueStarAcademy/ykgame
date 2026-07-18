@@ -1,5 +1,5 @@
 /**
- * Singleton login/title BGM — one shared Audio across HMR/remounts.
+ * Singleton login/title BGM — Web Audio loop (not OS media player).
  * Driven by the shared sound settings store + screen `allowed` flag.
  */
 
@@ -13,14 +13,18 @@ import {
   registerPageAudioHooks,
 } from "@/lib/pageAudioLifecycle";
 import {
-  getSharedLoginBgmAudio,
   getSiteLegendBgmPlayGen,
   isSiteLegendBgmMasterEnabled,
   killLoginSiteLegendBgm,
-  setSharedLoginBgmAudio,
-  silenceHtmlAudio,
-  trackSiteLegendBgm,
 } from "@/lib/siteLegendBgmRegistry";
+import {
+  isWebAudioBgmPlaying,
+  setWebAudioBgmGain,
+  startWebAudioBgm,
+  stopWebAudioBgm,
+  suspendWebAudioBgmContext,
+} from "@/lib/siteLegendWebAudioBgm";
+import { clearBrowserMediaSession } from "@/lib/clearBrowserMediaSession";
 
 const LOGIN_BGM_SRC = "/sounds/site-legend/login-bgm.ogg";
 
@@ -67,12 +71,12 @@ if (typeof window !== "undefined") {
 }
 
 class SiteLegendLoginBgmController {
-  private audio: HTMLAudioElement | null = null;
   private enabled = false;
   private volume = bgmVolumeToGain(28);
   private allowed = false;
   private storeBound = false;
   private lifecycleBound = false;
+  private startToken = 0;
 
   start() {
     if (typeof window === "undefined") return;
@@ -99,7 +103,7 @@ class SiteLegendLoginBgmController {
       pause: () => {
         detachGestureHandler();
         killLoginSiteLegendBgm({ unload: false });
-        this.audio = getSharedLoginBgmAudio();
+        void suspendWebAudioBgmContext("login");
       },
       resume: () => {
         if (isPageAudioSealed()) return;
@@ -108,7 +112,9 @@ class SiteLegendLoginBgmController {
       },
       exit: () => {
         detachGestureHandler();
-        this.audio = null;
+        this.startToken += 1;
+        stopWebAudioBgm("login", true);
+        clearBrowserMediaSession();
       },
     });
   }
@@ -129,12 +135,10 @@ class SiteLegendLoginBgmController {
     if (!this.enabled || !isSiteLegendBgmMasterEnabled()) {
       detachGestureHandler();
       killLoginSiteLegendBgm({ unload: true });
-      this.audio = null;
       return;
     }
-    if (this.audio && this.allowed) {
-      this.audio.muted = false;
-      this.audio.volume = this.volume;
+    if (this.allowed && isWebAudioBgmPlaying("login")) {
+      setWebAudioBgmGain("login", this.volume);
     }
     this.sync();
   }
@@ -149,39 +153,11 @@ class SiteLegendLoginBgmController {
       detachGestureHandler();
       // Only touch login BGM — do not nuke in-game when leaving the title screen.
       killLoginSiteLegendBgm({ unload: true });
-      this.audio = null;
       return;
     }
 
-    this.ensureAudio();
     this.bindGesture();
     this.tryPlay();
-  }
-
-  private ensureAudio() {
-    if (typeof window === "undefined") return null;
-
-    const existing = getSharedLoginBgmAudio();
-    if (existing?.src) {
-      this.audio = existing;
-      trackSiteLegendBgm(existing);
-      return existing;
-    }
-    if (existing) setSharedLoginBgmAudio(null);
-
-    if (this.audio?.src) {
-      setSharedLoginBgmAudio(this.audio);
-      return this.audio;
-    }
-
-    const audio = new Audio(LOGIN_BGM_SRC);
-    audio.loop = true;
-    audio.preload = "auto";
-    audio.muted = true;
-    audio.volume = 0;
-    this.audio = audio;
-    setSharedLoginBgmAudio(audio);
-    return audio;
   }
 
   private tryPlay() {
@@ -190,28 +166,26 @@ class SiteLegendLoginBgmController {
       return;
     }
 
-    const audio = this.ensureAudio();
-    if (!audio) return;
+    if (isWebAudioBgmPlaying("login")) {
+      setWebAudioBgmGain("login", this.volume);
+      return;
+    }
 
     const gen = getSiteLegendBgmPlayGen();
-    audio.muted = false;
-    audio.volume = this.volume;
-
-    void audio
-      .play()
-      .then(() => {
-        if (
-          gen !== getSiteLegendBgmPlayGen() ||
-          !wantsLoginBgm(this.allowed, this.enabled)
-        ) {
-          silenceHtmlAudio(audio);
-          return;
-        }
-        detachGestureHandler();
-      })
-      .catch(() => {
-        /* autoplay blocked until gesture */
-      });
+    const token = ++this.startToken;
+    void startWebAudioBgm("login", LOGIN_BGM_SRC, this.volume).then((ok) => {
+      if (
+        !ok ||
+        token !== this.startToken ||
+        gen !== getSiteLegendBgmPlayGen() ||
+        !wantsLoginBgm(this.allowed, this.enabled)
+      ) {
+        stopWebAudioBgm("login", false);
+        return;
+      }
+      detachGestureHandler();
+      clearBrowserMediaSession();
+    });
   }
 
   private bindGesture() {

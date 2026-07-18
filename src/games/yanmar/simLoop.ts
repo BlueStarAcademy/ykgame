@@ -770,6 +770,23 @@ export function tickExcavatorSim(params: SimTickParams) {
     vel.trackRight = 0;
   }
 
+  // 집게로 돌을 집은 뒤 압력이 올라가는 동안(밀착 확정 전) 붐 상승 금지.
+  // 압력 최대·페달 해제로 밀착이 확정되면 붐을 들어 적재 판정한다.
+  const blockBoomRaiseWhileGripping =
+    sim.attachmentType === "grapple" &&
+    !!sim.carriedBoulderId &&
+    !runtime.grappleGrip.locked &&
+    !runtime.grappleGrip.liftChecked;
+  if (blockBoomRaiseWhileGripping) {
+    if (filtered.right.y < 0) {
+      filtered = {
+        ...filtered,
+        right: { x: filtered.right.x, y: 0 },
+      };
+    }
+    if (vel.boom < 0) vel.boom = 0;
+  }
+
   // 운반 중: 밀착감 확정 후 붐을 들어 주행 가능이 되면 낙하 판정
   // (유압 이동·클램프 갱신 이후에 판정)
 
@@ -813,6 +830,15 @@ export function tickExcavatorSim(params: SimTickParams) {
         right: autoInput.right,
       };
     }
+    if (blockBoomRaiseWhileGripping) {
+      if (stepInput.right.y < 0) {
+        stepInput = {
+          ...stepInput,
+          right: { x: stepInput.right.x, y: 0 },
+        };
+      }
+      if (vel.boom < 0) vel.boom = 0;
+    }
     applyControls(
       sim,
       stepInput,
@@ -822,6 +848,10 @@ export function tickExcavatorSim(params: SimTickParams) {
       travelSpeedScale,
       speedProfile,
     );
+    if (blockBoomRaiseWhileGripping && sim.boom < subBefore.boom) {
+      sim.boom = subBefore.boom;
+      if (vel.boom < 0) vel.boom = 0;
+    }
     if (isAutoArm) {
       advanceAutoArmPose(sim, vel, autoPose);
     }
@@ -1226,38 +1256,48 @@ export function tickExcavatorSim(params: SimTickParams) {
       }
     }
 
-    // 운반 중 닫기 유지: 압력·밀착감 갱신 / 페달 떼면 밀착 확정
+    // 운반 중 닫기 유지: 압력·밀착감 갱신
+    // - 압력 최대(또는 페달 해제) 시 밀착 확정 → 이후 붐을 들어 적재 판정
+    // - 닫기 유지 중에도 밀착이 풀리지 않게 해, 발판을 밟은 채 붐을 들어도 판정됨
     if (sim.carriedBoulderId && hillForGrapple) {
       const carried = hillForGrapple.boulders.find(
         (item) => item.id === sim.carriedBoulderId,
       );
       const g = runtime.grappleGrip;
       if (carried && closing && !g.liftChecked) {
-        g.locked = false;
-        g.clearanceAtLock = null;
-        g.contactElapsed += dt;
-        if (
-          Math.hypot(grappleClamp.x - carried.x, grappleClamp.z - carried.z) <=
-          hillBoulderWrapRadius(carried) * 1.8
-        ) {
-          g.comFactor = computeComAlignFactor(
-            carried,
-            grappleClamp.x,
-            grappleClamp.z,
-          );
+        if (!g.locked) {
+          g.contactElapsed += dt;
+          if (
+            Math.hypot(grappleClamp.x - carried.x, grappleClamp.z - carried.z) <=
+            hillBoulderWrapRadius(carried) * 1.8
+          ) {
+            g.comFactor = computeComAlignFactor(
+              carried,
+              grappleClamp.x,
+              grappleClamp.z,
+            );
+          }
+          const next = computeGrappleAdhesion({
+            rock: carried,
+            contactElapsed: g.contactElapsed,
+            bucketAngle: sim.bucket,
+            comFactor: g.comFactor,
+            adhesionBonus: stats.gripAdhesionBonus,
+          });
+          g.adhesion01 = next.adhesion01;
+          g.pressure01 = next.pressure01;
+          // 압력 최대면 페달을 유지해도 밀착 확정 (붐 상승·적재 판정 가능)
+          if (g.pressure01 >= 1) {
+            g.locked = true;
+            g.clearanceAtLock =
+              grappleClamp.y -
+              sampleHeight(terrain, grappleClamp.x, grappleClamp.z);
+          }
         }
-        const next = computeGrappleAdhesion({
-          rock: carried,
-          contactElapsed: g.contactElapsed,
-          bucketAngle: sim.bucket,
-          comFactor: g.comFactor,
-          adhesionBonus: stats.gripAdhesionBonus,
-        });
-        g.adhesion01 = next.adhesion01;
-        g.pressure01 = next.pressure01;
       } else if (carried && !closing && !opening && !g.locked && !g.liftChecked) {
         g.locked = true;
-        g.clearanceAtLock = grappleClamp.y - sampleHeight(terrain, grappleClamp.x, grappleClamp.z);
+        g.clearanceAtLock =
+          grappleClamp.y - sampleHeight(terrain, grappleClamp.x, grappleClamp.z);
       }
     } else if (!sim.carriedBoulderId && !runtime.grappleGrip.liftResult) {
       if (runtime.grappleGrip.contactElapsed > 0 && !runtime.grappleGrip.liftChecked) {

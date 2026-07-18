@@ -13,14 +13,17 @@ import {
   registerPageAudioHooks,
 } from "@/lib/pageAudioLifecycle";
 import {
-  getSharedIngameBgmAudio,
   getSiteLegendBgmPlayGen,
   isSiteLegendBgmMasterEnabled,
-  setSharedIngameBgmAudio,
-  silenceHtmlAudio,
-  trackSiteLegendBgm,
-  unloadHtmlAudio,
 } from "@/lib/siteLegendBgmRegistry";
+import {
+  isWebAudioBgmPlaying,
+  setWebAudioBgmGain,
+  startWebAudioBgm,
+  stopWebAudioBgm,
+  suspendWebAudioBgmContext,
+} from "@/lib/siteLegendWebAudioBgm";
+import { clearBrowserMediaSession } from "@/lib/clearBrowserMediaSession";
 
 const SOUND_BASE = "/sounds/yanmar";
 
@@ -59,9 +62,9 @@ class YanmarAudioController {
   private bgmVolume = 28;
   private sfxVolume = 85;
   private active = false;
-  private bgm: HTMLAudioElement | null = null;
   private bgmGestureBound = false;
   private storeSubscribed = false;
+  private bgmStartToken = 0;
   private readonly onBgmGesture = () => {
     if (isPageAudioSealed()) return;
     if (!this.active || !this.bgmEnabled || !isSiteLegendBgmMasterEnabled()) {
@@ -97,6 +100,7 @@ class YanmarAudioController {
         this.stopBreakerImmediate();
         this.stopBgm(false);
         this.unbindBgmGesture();
+        void suspendWebAudioBgmContext("ingame");
         if (this.audioCtx && this.audioCtx.state === "running") {
           void this.audioCtx.suspend().catch(() => undefined);
         }
@@ -113,7 +117,7 @@ class YanmarAudioController {
         this.breakerWanted = false;
         this.stopBreakerImmediate();
         this.unbindBgmGesture();
-        this.bgm = null;
+        this.stopBgm(true);
         if (this.audioCtx) {
           void this.audioCtx.close().catch(() => undefined);
           this.audioCtx = null;
@@ -130,6 +134,7 @@ class YanmarAudioController {
           }
         }
         this.hornCache.clear();
+        clearBrowserMediaSession();
       },
     });
   }
@@ -148,7 +153,6 @@ class YanmarAudioController {
       this.bgmEnabled = false;
       this.unbindBgmGesture();
       this.stopBgm(true);
-      this.bgm = null;
       return;
     }
     this.applyBgmVolume();
@@ -218,9 +222,7 @@ class YanmarAudioController {
   }
 
   private applyBgmVolume() {
-    if (this.bgm) {
-      this.bgm.volume = bgmVolumeToGain(this.bgmVolume);
-    }
+    setWebAudioBgmGain("ingame", bgmVolumeToGain(this.bgmVolume));
   }
 
   private applyBreakerGain() {
@@ -258,28 +260,6 @@ class YanmarAudioController {
       .catch(() => {
         probe.src = "";
       });
-  }
-
-  private ensureBgm() {
-    if (typeof window === "undefined") return null;
-    const shared = getSharedIngameBgmAudio();
-    if (shared?.src) {
-      this.bgm = shared;
-      trackSiteLegendBgm(shared);
-      return shared;
-    }
-    if (shared) setSharedIngameBgmAudio(null);
-    if (this.bgm?.src) {
-      setSharedIngameBgmAudio(this.bgm);
-      return this.bgm;
-    }
-    const audio = new Audio(INGAME_BGM_SRC);
-    audio.loop = true;
-    audio.preload = "auto";
-    audio.volume = bgmVolumeToGain(this.bgmVolume);
-    this.bgm = audio;
-    setSharedIngameBgmAudio(audio);
-    return audio;
   }
 
   private syncBgm() {
@@ -324,43 +304,39 @@ class YanmarAudioController {
     ) {
       return;
     }
-    const audio = this.ensureBgm();
-    if (!audio) return;
+    if (isWebAudioBgmPlaying("ingame")) {
+      this.applyBgmVolume();
+      return;
+    }
     const gen = getSiteLegendBgmPlayGen();
-    this.applyBgmVolume();
-    audio.muted = false;
-    if (!audio.paused) return;
-    void audio
-      .play()
-      .then(() => {
-        if (
-          gen !== getSiteLegendBgmPlayGen() ||
-          isPageAudioSealed() ||
-          !this.active ||
-          !this.bgmEnabled ||
-          !isSiteLegendBgmMasterEnabled()
-        ) {
-          silenceHtmlAudio(audio);
-          return;
-        }
-        this.unlocked = true;
-        this.unbindBgmGesture();
-      })
-      .catch(() => {
-        /* autoplay blocked until gesture / unlock() */
-      });
+    const token = ++this.bgmStartToken;
+    void startWebAudioBgm(
+      "ingame",
+      INGAME_BGM_SRC,
+      bgmVolumeToGain(this.bgmVolume),
+    ).then((ok) => {
+      if (
+        !ok ||
+        token !== this.bgmStartToken ||
+        gen !== getSiteLegendBgmPlayGen() ||
+        isPageAudioSealed() ||
+        !this.active ||
+        !this.bgmEnabled ||
+        !isSiteLegendBgmMasterEnabled()
+      ) {
+        stopWebAudioBgm("ingame", false);
+        return;
+      }
+      this.unlocked = true;
+      this.unbindBgmGesture();
+      clearBrowserMediaSession();
+    });
   }
 
   private stopBgm(reset = true) {
-    const audio = this.bgm ?? getSharedIngameBgmAudio();
-    if (!audio) return;
-    if (reset) {
-      unloadHtmlAudio(audio);
-      setSharedIngameBgmAudio(null);
-      this.bgm = null;
-      return;
-    }
-    silenceHtmlAudio(audio);
+    this.bgmStartToken += 1;
+    stopWebAudioBgm("ingame", reset);
+    clearBrowserMediaSession();
   }
 
   playHorn(hornId: HornId = this.hornId) {
@@ -535,11 +511,7 @@ class YanmarAudioController {
 
   dispose() {
     this.deactivate();
-    if (this.bgm) {
-      unloadHtmlAudio(this.bgm);
-      setSharedIngameBgmAudio(null);
-      this.bgm = null;
-    }
+    stopWebAudioBgm("ingame", true);
     this.breakerBuffer = null;
     this.breakerBufferLoading = null;
     if (this.audioCtx) {
@@ -551,6 +523,7 @@ class YanmarAudioController {
       audio.src = "";
     }
     this.hornCache.clear();
+    clearBrowserMediaSession();
   }
 }
 

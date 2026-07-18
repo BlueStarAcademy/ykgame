@@ -96,11 +96,23 @@ export function MonumentPanel({
 }: MonumentPanelProps) {
   const [tab, setTab] = useState<TabId>("quest");
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [confirmUpgrade, setConfirmUpgrade] = useState<{
+    key: MonumentUpgradeKey;
+    label: string;
+    fromLevel: number;
+    toLevel: number;
+    cost: number;
+    durationMs: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!open) return;
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) setConfirmUpgrade(null);
   }, [open]);
 
   useEffect(() => {
@@ -117,6 +129,7 @@ export function MonumentPanel({
   const levels = panelState?.levels ?? {};
   const storageLv = levels.storage_cap ?? 0;
   const speedLv = levels.prod_speed ?? 0;
+  const currency = panelState?.currency ?? 0;
 
   const buildComplete = useMemo(() => {
     if (!questState) return false;
@@ -327,32 +340,6 @@ export function MonumentPanel({
 
           {showManage && tab === "upgrade" ? (
             <ul className="flex flex-col gap-2">
-              {pending ? (
-                <li className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
-                  <p className="text-sm font-bold text-amber-100">
-                    강화 진행 중 · +{pending.targetLevel}
-                  </p>
-                  <p className="mt-1 text-xs text-stone-300">
-                    남은 시간{" "}
-                    {formatUpgradeRemaining(
-                      new Date(pending.completesAt).getTime() - nowMs,
-                    )}
-                  </p>
-                  {onInstantUpgrade ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-40"
-                      onClick={() => void onInstantUpgrade()}
-                    >
-                      즉시완료 ★
-                      {instantCompleteStars(
-                        new Date(pending.completesAt).getTime() - nowMs,
-                      ).toLocaleString()}
-                    </button>
-                  ) : null}
-                </li>
-              ) : null}
               {MONUMENT_UPGRADES.map((u) => {
                 const level = levels[u.key] ?? 0;
                 const max = getMonumentUpgradeMaxLevel(u.key);
@@ -363,6 +350,17 @@ export function MonumentPanel({
                   getMonumentUpgradeRequiredPlayerLevel(targetLevel) ?? 999;
                 const levelLocked = !maxed && playerLevel < reqLevel;
                 const durationMs = getUpgradeDurationMs(targetLevel);
+                const isThisPending =
+                  pending?.upgradeKey === u.key &&
+                  pending.targetLevel === targetLevel;
+                const otherPending = Boolean(pending) && !isThisPending;
+                const remainingMs = isThisPending
+                  ? new Date(pending!.completesAt).getTime() - nowMs
+                  : null;
+                const instantCost =
+                  remainingMs != null
+                    ? instantCompleteStars(remainingMs)
+                    : 0;
                 const canBuy =
                   !maxed &&
                   !pending &&
@@ -385,6 +383,17 @@ export function MonumentPanel({
                           <span className="text-amber-200">
                             +{level}/{max}
                           </span>
+                          {!maxed ? (
+                            <span
+                              className={`ml-1.5 text-[11px] font-extrabold ${
+                                levelLocked
+                                  ? "text-red-400"
+                                  : "text-stone-400"
+                              }`}
+                            >
+                              레벨제한{reqLevel}
+                            </span>
+                          ) : null}
                         </p>
                         <p className="mt-0.5 text-xs text-stone-400">
                           {u.description}
@@ -396,23 +405,65 @@ export function MonumentPanel({
                         ) : null}
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
-                        <button
-                          type="button"
-                          disabled={busy || !canBuy}
-                          className="inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
-                          onClick={() => void onUpgrade(u.key)}
-                        >
-                          {maxed ? (
-                            "MAX"
-                          ) : levelLocked ? (
-                            `Lv.${reqLevel}`
-                          ) : (
-                            <PointsAmount value={cost ?? 0} size={14} />
-                          )}
-                        </button>
-                        {!maxed && durationMs != null ? (
-                          <p className="text-[11px] tabular-nums text-stone-500">
-                            {formatUpgradeRemaining(durationMs)}
+                        {isThisPending && onInstantUpgrade ? (
+                          <button
+                            type="button"
+                            disabled={busy || currency < instantCost}
+                            className="inline-flex items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                            onClick={() => void onInstantUpgrade()}
+                          >
+                            즉시완료 ★{instantCost.toLocaleString()}
+                            {currency < instantCost ? " (부족)" : ""}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={
+                              busy ||
+                              maxed ||
+                              levelLocked ||
+                              !canBuy ||
+                              otherPending
+                            }
+                            className="inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                            onClick={() => {
+                              if (
+                                cost == null ||
+                                durationMs == null ||
+                                levelLocked
+                              )
+                                return;
+                              setConfirmUpgrade({
+                                key: u.key,
+                                label: u.label,
+                                fromLevel: level,
+                                toLevel: targetLevel,
+                                cost,
+                                durationMs,
+                              });
+                            }}
+                          >
+                            {maxed ? (
+                              "MAX"
+                            ) : (
+                              <PointsAmount value={cost ?? 0} size={14} />
+                            )}
+                          </button>
+                        )}
+                        {!maxed &&
+                        (isThisPending
+                          ? remainingMs != null
+                          : durationMs != null) ? (
+                          <p
+                            className={`text-[11px] tabular-nums ${
+                              isThisPending
+                                ? "font-semibold text-amber-200"
+                                : "text-stone-500"
+                            }`}
+                          >
+                            {formatUpgradeRemaining(
+                              isThisPending ? remainingMs! : durationMs!,
+                            )}
                           </p>
                         ) : null}
                       </div>
@@ -472,6 +523,54 @@ export function MonumentPanel({
             </div>
           ) : null}
         </div>
+
+        {confirmUpgrade ? (
+          <div
+            className="yanmar-repair-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="yanmar-monument-upgrade-confirm-title"
+          >
+            <div className="yanmar-repair-confirm-card">
+              <h3 id="yanmar-monument-upgrade-confirm-title">업그레이드 확인</h3>
+              <p className="yanmar-repair-confirm-item">
+                {confirmUpgrade.label} +{confirmUpgrade.fromLevel} → +
+                {confirmUpgrade.toLevel}
+              </p>
+              <ul className="yanmar-repair-confirm-facts">
+                <li className="yanmar-repair-confirm-cost">
+                  소모 <PointsAmount value={confirmUpgrade.cost} size={14} />
+                </li>
+                <li>
+                  소요 시간{" "}
+                  {formatUpgradeRemaining(confirmUpgrade.durationMs)}
+                </li>
+              </ul>
+              <div className="yanmar-repair-confirm-actions">
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-cancel"
+                  disabled={busy}
+                  onClick={() => setConfirmUpgrade(null)}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-ok"
+                  disabled={busy}
+                  onClick={() => {
+                    const key = confirmUpgrade.key;
+                    setConfirmUpgrade(null);
+                    void onUpgrade(key);
+                  }}
+                >
+                  업그레이드
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </AppModalOverlay>
   );

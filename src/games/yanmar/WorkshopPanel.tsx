@@ -148,12 +148,24 @@ export function WorkshopPanel({
 }: WorkshopPanelProps) {
   const [tab, setTab] = useState<TabId>("quest");
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [confirmUpgrade, setConfirmUpgrade] = useState<{
+    key: WorkshopUpgradeKey;
+    label: string;
+    fromLevel: number;
+    toLevel: number;
+    cost: number;
+    durationMs: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!open) return;
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) setConfirmUpgrade(null);
+  }, [open, workshopId]);
 
   const def = workshopId ? WORKSHOP_DEFS[workshopId] : null;
   const points = workshopId && panelState ? panelState.points[workshopId] : 0;
@@ -193,21 +205,30 @@ export function WorkshopPanel({
       panelClassName="!max-w-[min(96vw,26rem)] !overflow-hidden landscape:!max-h-[min(94dvh,32rem)]"
     >
       <div className="yanmar-workshop-panel flex h-[min(88dvh,36rem)] w-full flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md landscape:h-[min(92dvh,26rem)]">
-        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-black tracking-tight">{def.label}</h2>
-            <p className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold text-amber-200">
-              <span className="text-stone-400">{def.pointsLabel}</span>
-              <WorkshopPointsAmount icon={coin} value={points} size={20} />
-            </p>
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+          <h2 className="min-w-0 flex-1 truncate text-lg font-black tracking-tight">
+            {def.label}
+          </h2>
+          <div className="flex shrink-0 items-center gap-2">
+            <div
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-sm font-black text-amber-100 shadow-inner"
+              title={def.pointsLabel}
+            >
+              <WorkshopPointsAmount
+                icon={coin}
+                value={points}
+                label={def.pointsLabel}
+                size={20}
+              />
+            </div>
+            <button
+              type="button"
+              className="shrink-0 rounded-lg px-2 py-1 text-sm text-stone-300 hover:bg-white/10"
+              onClick={onClose}
+            >
+              닫기
+            </button>
           </div>
-          <button
-            type="button"
-            className="shrink-0 rounded-lg px-2 py-1 text-sm text-stone-300 hover:bg-white/10"
-            onClick={onClose}
-          >
-            닫기
-          </button>
         </header>
 
         <div className="flex shrink-0 gap-1 border-b border-white/10 px-2 pt-2">
@@ -294,38 +315,6 @@ export function WorkshopPanel({
 
           {tab === "upgrade" ? (
             <ul className="flex flex-col gap-2">
-              {pending ? (
-                <li className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
-                  <p className="text-sm font-bold text-amber-100">
-                    강화 진행 중 · +{pending.targetLevel}
-                  </p>
-                  <p className="mt-1 text-xs text-stone-300">
-                    남은 시간{" "}
-                    {formatUpgradeRemaining(
-                      new Date(pending.completesAt).getTime() - nowMs,
-                    )}
-                  </p>
-                  {onInstantUpgrade ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-40"
-                      onClick={() => void onInstantUpgrade()}
-                    >
-                      즉시완료 ★
-                      {instantCompleteStars(
-                        new Date(pending.completesAt).getTime() - nowMs,
-                      ).toLocaleString()}
-                      {currency <
-                      instantCompleteStars(
-                        new Date(pending.completesAt).getTime() - nowMs,
-                      )
-                        ? " (부족)"
-                        : ""}
-                    </button>
-                  ) : null}
-                </li>
-              ) : null}
               {def.upgrades.map((u) => {
                 const level = levels[u.key] ?? 0;
                 const max = getWorkshopUpgradeMaxLevel(u.key);
@@ -340,6 +329,13 @@ export function WorkshopPanel({
                   pending?.upgradeKey === u.key &&
                   pending.targetLevel === targetLevel;
                 const otherPending = Boolean(pending) && !isThisPending;
+                const remainingMs = isThisPending
+                  ? new Date(pending!.completesAt).getTime() - nowMs
+                  : null;
+                const instantCost =
+                  remainingMs != null
+                    ? instantCompleteStars(remainingMs)
+                    : 0;
                 const canBuy =
                   !maxed &&
                   !pending &&
@@ -358,6 +354,17 @@ export function WorkshopPanel({
                           <span className="text-amber-200">
                             +{level}/{max}
                           </span>
+                          {!maxed ? (
+                            <span
+                              className={`ml-1.5 text-[11px] font-extrabold ${
+                                levelLocked
+                                  ? "text-red-400"
+                                  : "text-stone-400"
+                              }`}
+                            >
+                              레벨제한{reqLevel}
+                            </span>
+                          ) : null}
                         </p>
                         <p className="mt-0.5 text-xs text-stone-400">
                           {u.description}
@@ -369,29 +376,69 @@ export function WorkshopPanel({
                         ) : null}
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
-                        <button
-                          type="button"
-                          disabled={busy || !canBuy || otherPending || isThisPending}
-                          className="inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
-                          onClick={() => void onUpgrade(u.key)}
-                        >
-                          {maxed ? (
-                            "MAX"
-                          ) : isThisPending ? (
-                            "진행중"
-                          ) : levelLocked ? (
-                            `Lv.${reqLevel}`
-                          ) : (
-                            <WorkshopPointsAmount
-                              icon={coin}
-                              value={cost ?? 0}
-                              size={14}
-                            />
-                          )}
-                        </button>
-                        {!maxed && durationMs != null ? (
-                          <p className="text-[11px] tabular-nums text-stone-500">
-                            {formatUpgradeRemaining(durationMs)}
+                        {isThisPending && onInstantUpgrade ? (
+                          <button
+                            type="button"
+                            disabled={busy || currency < instantCost}
+                            className="inline-flex items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                            onClick={() => void onInstantUpgrade()}
+                          >
+                            즉시완료 ★{instantCost.toLocaleString()}
+                            {currency < instantCost ? " (부족)" : ""}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={
+                              busy ||
+                              maxed ||
+                              levelLocked ||
+                              !canBuy ||
+                              otherPending
+                            }
+                            className="inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                            onClick={() => {
+                              if (
+                                cost == null ||
+                                durationMs == null ||
+                                levelLocked
+                              )
+                                return;
+                              setConfirmUpgrade({
+                                key: u.key,
+                                label: u.label,
+                                fromLevel: level,
+                                toLevel: targetLevel,
+                                cost,
+                                durationMs,
+                              });
+                            }}
+                          >
+                            {maxed ? (
+                              "MAX"
+                            ) : (
+                              <WorkshopPointsAmount
+                                icon={coin}
+                                value={cost ?? 0}
+                                size={14}
+                              />
+                            )}
+                          </button>
+                        )}
+                        {!maxed &&
+                        (isThisPending
+                          ? remainingMs != null
+                          : durationMs != null) ? (
+                          <p
+                            className={`text-[11px] tabular-nums ${
+                              isThisPending
+                                ? "font-semibold text-amber-200"
+                                : "text-stone-500"
+                            }`}
+                          >
+                            {formatUpgradeRemaining(
+                              isThisPending ? remainingMs! : durationMs!,
+                            )}
                           </p>
                         ) : null}
                       </div>
@@ -456,6 +503,59 @@ export function WorkshopPanel({
             </div>
           ) : null}
         </div>
+
+        {confirmUpgrade ? (
+          <div
+            className="yanmar-repair-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="yanmar-workshop-upgrade-confirm-title"
+          >
+            <div className="yanmar-repair-confirm-card">
+              <h3 id="yanmar-workshop-upgrade-confirm-title">업그레이드 확인</h3>
+              <p className="yanmar-repair-confirm-item">
+                {confirmUpgrade.label} +{confirmUpgrade.fromLevel} → +
+                {confirmUpgrade.toLevel}
+              </p>
+              <ul className="yanmar-repair-confirm-facts">
+                <li className="yanmar-repair-confirm-cost">
+                  소모{" "}
+                  <WorkshopPointsAmount
+                    icon={coin}
+                    value={confirmUpgrade.cost}
+                    size={14}
+                  />
+                </li>
+                <li>
+                  소요 시간{" "}
+                  {formatUpgradeRemaining(confirmUpgrade.durationMs)}
+                </li>
+              </ul>
+              <div className="yanmar-repair-confirm-actions">
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-cancel"
+                  disabled={busy}
+                  onClick={() => setConfirmUpgrade(null)}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-ok"
+                  disabled={busy}
+                  onClick={() => {
+                    const key = confirmUpgrade.key;
+                    setConfirmUpgrade(null);
+                    void onUpgrade(key);
+                  }}
+                >
+                  업그레이드
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </AppModalOverlay>
   );

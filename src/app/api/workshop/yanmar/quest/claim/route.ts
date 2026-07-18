@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   const field = workshopPointsField(workshopId);
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const outcome = await prisma.$transaction(async (tx) => {
       return runReplayableRewardEvent(
         tx,
         { userId: session.user.id, gameId: "yanmar", eventId },
@@ -96,7 +96,11 @@ export async function POST(request: Request) {
       );
     });
 
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({
+      ok: true,
+      ...outcome.result,
+      replayed: outcome.replayed,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "ERROR";
     return NextResponse.json({ error: msg }, { status: 400 });

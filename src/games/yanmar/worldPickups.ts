@@ -42,16 +42,16 @@ export interface WorldPickupsState {
 
 export const STARS_PER_HOUR = 10;
 export const MAX_ACTIVE_STARS = 3;
-export const SPEED_PER_HOUR = 3;
+export const SPEED_PER_HOUR = 5;
 export const MAX_ACTIVE_SPEED = 1;
 export const STAR_REWARD_MIN = 3;
 export const STAR_REWARD_MAX = 5;
-export const SPEED_BUFF_MS = 10_000;
+export const SPEED_BUFF_MS = 30_000;
 export const SPEED_BUFF_MULT = 2;
 /** After collecting a star, next star appears within this window. */
 export const STAR_RESPAWN_MAX_MS = 5 * 60 * 1000;
 /** After collecting a speed buff, next buff appears within this window. */
-export const SPEED_RESPAWN_MAX_MS = 15 * 60 * 1000;
+export const SPEED_RESPAWN_MAX_MS = 10 * 60 * 1000;
 export const WORLD_PICKUP_RADIUS = EXCAVATOR_COLLISION_RADIUS + 0.6;
 export const WORLD_PICKUP_HOVER = 1.15;
 export const HOUR_MS = 3_600_000;

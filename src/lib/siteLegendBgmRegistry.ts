@@ -5,7 +5,16 @@
  * Also owns a master on/off gate + play generation so in-flight `audio.play()`
  * promises cannot resurrect BGM after the user turns it off (pause during a
  * pending play is ignored by some browsers until play resolves).
+ *
+ * Preferred BGM path is Web Audio (`siteLegendWebAudioBgm`) so playback does
+ * not appear in the OS media player; HTMLAudioElement kill remains for orphans.
  */
+
+import { clearBrowserMediaSession } from "@/lib/clearBrowserMediaSession";
+import {
+  stopAllWebAudioBgms,
+  stopWebAudioBgm,
+} from "@/lib/siteLegendWebAudioBgm";
 
 const REGISTRY_KEY = "__ykSiteLegendBgmAudioRegistry";
 const INGAME_KEY = "__ykSiteLegendIngameBgmAudio";
@@ -109,6 +118,8 @@ export function killAllSiteLegendBgms(opts?: { unload?: boolean }) {
   const unload = opts?.unload !== false;
   const kill = unload ? unloadHtmlAudio : silenceHtmlAudio;
 
+  stopAllWebAudioBgms({ disposeContext: unload });
+
   for (const audio of [...registry()]) {
     kill(audio);
     if (unload) registry().delete(audio);
@@ -125,18 +136,25 @@ export function killAllSiteLegendBgms(opts?: { unload?: boolean }) {
     kill(ingame);
     if (unload) bag()[INGAME_KEY] = null;
   }
+
+  clearBrowserMediaSession();
 }
 
-/** Stop only the login/title BGM element (leave in-game alone). */
+/** Stop only the login/title BGM (leave in-game alone). */
 export function killLoginSiteLegendBgm(opts?: { unload?: boolean }) {
   if (typeof window === "undefined") return;
   const unload = opts?.unload !== false;
   const kill = unload ? unloadHtmlAudio : silenceHtmlAudio;
+
+  stopWebAudioBgm("login", unload);
+
   const login = bag()[LOGIN_KEY];
-  if (!login) return;
-  kill(login);
-  if (unload) {
-    registry().delete(login);
-    bag()[LOGIN_KEY] = null;
+  if (login) {
+    kill(login);
+    if (unload) {
+      registry().delete(login);
+      bag()[LOGIN_KEY] = null;
+    }
   }
+  clearBrowserMediaSession();
 }
