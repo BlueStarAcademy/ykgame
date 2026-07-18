@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createBarcodeCode, getCouponExpiresAt } from "@/lib/coupon";
+import { cappedCurrencyIncrement } from "@/lib/currency";
 import { getSeasonKey } from "@/lib/games";
 import { mutatedExactlyOne } from "@/lib/atomic-mutation";
 
@@ -41,9 +42,17 @@ export async function POST(
       if (!mutatedExactlyOne(claim.count)) throw new Error("ALREADY_CLAIMED");
 
       if (mail.currencyAmount > 0) {
+        const current = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { currency: true },
+        });
+        const { next } = cappedCurrencyIncrement(
+          current?.currency ?? 0,
+          mail.currencyAmount,
+        );
         await tx.user.update({
           where: { id: session.user.id },
-          data: { currency: { increment: mail.currencyAmount } },
+          data: { currency: next },
         });
       }
 

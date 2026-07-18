@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
+import {
+  MAX_USER_CURRENCY,
+  cappedCurrencyIncrement,
+  clampUserCurrency,
+} from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
 
 export async function PATCH(request: Request) {
@@ -22,7 +27,11 @@ export async function PATCH(request: Request) {
     }
 
     const newCurrency =
-      mode === "set" ? Math.max(0, amount) : Math.max(0, user.currency + amount);
+      mode === "set"
+        ? clampUserCurrency(amount)
+        : amount >= 0
+          ? cappedCurrencyIncrement(user.currency, amount).next
+          : clampUserCurrency(user.currency + amount);
 
     const updated = await prisma.user.update({
       where: { id: userId },
@@ -45,12 +54,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
 
-    const result = await prisma.user.updateMany({
-      where: { role: "USER", isActive: true },
-      data: { currency: { increment: amount } },
-    });
+    const floorAmount = Math.floor(amount);
+    const updated = await prisma.$executeRaw`
+      UPDATE "User"
+      SET currency = LEAST("currency" + ${floorAmount}, ${MAX_USER_CURRENCY})
+      WHERE role = 'USER' AND "isActive" = true
+    `;
 
-    return NextResponse.json({ updated: result.count });
+    return NextResponse.json({ updated: Number(updated) });
   } catch {
     return NextResponse.json({ error: "Bulk update failed" }, { status: 500 });
   }

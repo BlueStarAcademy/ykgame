@@ -35,6 +35,7 @@ import {
 } from "@/games/yanmar/gearCatalog";
 import { loadUserFinalStats } from "@/games/yanmar/gearService";
 import { asJson } from "@/games/yanmar/jsonCompat";
+import { cappedCurrencyIncrement } from "@/lib/currency";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 
 function toData(item: {
@@ -352,15 +353,23 @@ export async function POST(req: Request) {
         const grade = item.grade as ItemGrade;
         const stars = SELL_STARS_BY_GRADE[grade];
         await tx.gearItem.delete({ where: { id: item.id } });
+        const current = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { currency: true },
+        });
+        const { next, granted } = cappedCurrencyIncrement(
+          current?.currency ?? 0,
+          stars,
+        );
         const updatedUser = await tx.user.update({
           where: { id: session.user.id },
-          data: { currency: { increment: stars } },
+          data: { currency: next },
           select: { currency: true, enhanceCores: true },
         });
         const loaded = await loadUserFinalStats(tx, session.user.id);
         return {
           ok: true,
-          stars,
+          stars: granted,
           currency: updatedUser.currency,
           enhanceCores: updatedUser.enhanceCores,
           stats: loaded.stats,

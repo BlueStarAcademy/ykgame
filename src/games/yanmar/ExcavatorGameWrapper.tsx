@@ -121,6 +121,7 @@ import {
   serializeDumpRewardOutbox,
   type DumpRewardOutboxBatch,
 } from "./dumpRewardOutbox";
+import { clampUserCurrency } from "@/lib/currency";
 import {
   applyGameSessionTerrain,
   loadYanmarGameSession,
@@ -4506,7 +4507,9 @@ export function ExcavatorGameWrapper({
       }
       accumulateDumpScore(popup.score, popup.critical, "", dumpXp, optimisticStars);
       rewardStarsRef.current += optimisticStars;
-      currencyRef.current += optimisticStars;
+      currencyRef.current = clampUserCurrency(
+        currencyRef.current + optimisticStars,
+      );
       setCurrency(currencyRef.current);
       const panel = dumpScorePanelRef.current;
       if (panel) {
@@ -4534,7 +4537,9 @@ export function ExcavatorGameWrapper({
 
       const optimistic = rollClientStarReward();
       const before = currencyRef.current;
-      currencyRef.current += optimistic;
+      currencyRef.current = clampUserCurrency(
+        currencyRef.current + optimistic,
+      );
       setCurrency(currencyRef.current);
       setPreviewStars(currencyRef.current);
       showAttachmentWarning(`스타 +${optimistic}`);

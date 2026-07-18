@@ -6,6 +6,7 @@ import { getUserGameStatsForGames } from "@/lib/rankings";
 import {
   isValidProfileAvatarId,
   NICKNAME_CHANGE_COST_STARS,
+  validateNickname,
 } from "@/lib/profile";
 
 export async function GET() {
@@ -101,20 +102,11 @@ export async function PATCH(request: Request) {
 
   let nextNickname: string | undefined;
   if (wantsNickname) {
-    if (typeof nickname !== "string") {
-      return NextResponse.json(
-        { error: "닉네임은 2~12자여야 합니다." },
-        { status: 400 },
-      );
+    const parsed = validateNickname(nickname);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.message }, { status: 400 });
     }
-    const trimmed = nickname.trim();
-    if (trimmed.length < 2 || trimmed.length > 12) {
-      return NextResponse.json(
-        { error: "닉네임은 2~12자여야 합니다." },
-        { status: 400 },
-      );
-    }
-    nextNickname = trimmed;
+    nextNickname = parsed.nickname;
   }
 
   try {
@@ -209,6 +201,18 @@ export async function PATCH(request: Request) {
       );
     }
     if (code === "NICKNAME_TAKEN") {
+      return NextResponse.json(
+        { error: "이미 사용 중인 닉네임입니다." },
+        { status: 409 },
+      );
+    }
+    // Prisma unique race
+    if (
+      typeof error === "object" &&
+      error &&
+      "code" in error &&
+      (error as { code?: string }).code === "P2002"
+    ) {
       return NextResponse.json(
         { error: "이미 사용 중인 닉네임입니다." },
         { status: 409 },

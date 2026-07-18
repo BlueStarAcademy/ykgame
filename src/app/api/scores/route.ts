@@ -8,6 +8,7 @@ import {
   getSeasonKey,
   isGameAvailable,
 } from "@/lib/games";
+import { cappedCurrencyIncrement } from "@/lib/currency";
 import { withHotApiObservability } from "@/lib/hot-api-observability";
 import { parseScoreSessionId } from "@/lib/request-idempotency";
 import { invalidateRankingCaches } from "@/lib/rankings";
@@ -159,9 +160,14 @@ export const POST = withHotApiObservability(
     `;
 
     if (stars > 0) {
+      const current = await tx.user.findUnique({
+        where: { id: session.user.id },
+        select: { currency: true },
+      });
+      const { next } = cappedCurrencyIncrement(current?.currency ?? 0, stars);
       await tx.user.update({
         where: { id: session.user.id },
-        data: { currency: { increment: stars } },
+        data: { currency: next },
       });
     }
 

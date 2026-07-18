@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
-import { NICKNAME_CHANGE_COST_STARS } from "@/lib/profile";
+import { NICKNAME_CHANGE_COST_STARS, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH, validateNickname } from "@/lib/profile";
 
 interface SettingsModalProps {
   open: boolean;
@@ -62,6 +62,15 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (nicknameDirty) {
+      const parsed = validateNickname(nickname);
+      if (!parsed.ok) {
+        setError(parsed.message);
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -128,13 +137,13 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                placeholder="닉네임 (2~12자)"
-                minLength={2}
-                maxLength={12}
+                placeholder={`닉네임 (${NICKNAME_MIN_LENGTH}~${NICKNAME_MAX_LENGTH}글자)`}
+                minLength={NICKNAME_MIN_LENGTH}
+                maxLength={NICKNAME_MAX_LENGTH}
                 required
               />
               <p className="mt-1.5 text-[11px] font-semibold text-amber-700">
-                닉네임 변경 시 스타 {NICKNAME_CHANGE_COST_STARS}개가 필요합니다.
+                닉네임 변경 시 스타 {NICKNAME_CHANGE_COST_STARS}개가 필요합니다. 중복 불가.
               </p>
             </div>
 

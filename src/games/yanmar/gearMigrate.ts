@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@/generated/prisma/client";
+import { cappedCurrencyIncrement } from "@/lib/currency";
 import { getYanmarSpentUpgradeCost, type YanmarEquipmentPart } from "./equipment";
 import { DEFAULT_CHASSIS_ID } from "./chassisCatalog";
 import { GEAR_SLOTS } from "./gearCatalog";
@@ -40,10 +41,20 @@ export async function ensureYanmarGearMigration(
   if (rows.length > 0) {
     await tx.userEquipmentUpgrade.deleteMany({ where: { userId, gameId } });
   }
+  let grantedRefund = 0;
   if (refundStars > 0) {
+    const current = await tx.user.findUnique({
+      where: { id: userId },
+      select: { currency: true },
+    });
+    const { next, granted } = cappedCurrencyIncrement(
+      current?.currency ?? 0,
+      refundStars,
+    );
+    grantedRefund = granted;
     await tx.user.update({
       where: { id: userId },
-      data: { currency: { increment: refundStars } },
+      data: { currency: next },
     });
   }
 
@@ -105,5 +116,5 @@ export async function ensureYanmarGearMigration(
     update: {},
   });
 
-  return { migrated: true as const, refundStars };
+  return { migrated: true as const, refundStars: grantedRefund };
 }

@@ -296,19 +296,21 @@ export async function persistYanmarDropRewards({
     }
   }
 
-  await tx.userRewardInventory.create({
-    data: {
-      userId,
-      gameId,
-      type: "STAR",
-      amount: stars.stars,
-      metadata: {
-        ...metadata,
-        score: stars.score,
-        critical: stars.critical,
+  if (stars.stars > 0) {
+    await tx.userRewardInventory.create({
+      data: {
+        userId,
+        gameId,
+        type: "STAR",
+        amount: stars.stars,
+        metadata: {
+          ...metadata,
+          score: stars.score,
+          critical: stars.critical,
+        },
       },
-    },
-  });
+    });
+  }
 
   return { stars, coupon: issuedCoupon };
 }

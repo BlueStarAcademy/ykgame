@@ -7,8 +7,12 @@ import { XpProgressBar } from "@/components/ui/XpProgressBar";
 import type { PlayerLevelProgress } from "@/lib/playerLevel";
 import {
   NICKNAME_CHANGE_COST_STARS,
+  NICKNAME_MAX_LENGTH,
+  NICKNAME_MIN_LENGTH,
+  nicknameCharLength,
   profileAvatarSrc,
   resolveProfileAvatarId,
+  validateNickname,
 } from "@/lib/profile";
 import { ChassisGallery } from "./ChassisPanel";
 import {
@@ -154,8 +158,9 @@ function ProfileEditModal({
   async function saveNickname() {
     const next = draftNickname.trim();
     if (!nicknameDirty) return;
-    if (next.length < 2 || next.length > 12) {
-      setError("닉네임은 2~12자여야 합니다.");
+    const parsed = validateNickname(next);
+    if (!parsed.ok) {
+      setError(parsed.message);
       return;
     }
     if (!canAffordNickname) {
@@ -168,7 +173,7 @@ function ProfileEditModal({
       const res = await fetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname: next }),
+        body: JSON.stringify({ nickname: parsed.nickname }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -176,7 +181,7 @@ function ProfileEditModal({
         return;
       }
       await onProfileUpdated({
-        nickname: data.nickname ?? next,
+        nickname: data.nickname ?? parsed.nickname,
         profileAvatarId: data.profileAvatarId ?? profileAvatarId,
         currency: data.currency,
       });
@@ -262,9 +267,9 @@ function ProfileEditModal({
               value={draftNickname}
               onChange={(e) => setDraftNickname(e.target.value)}
               className="yanmar-profile-edit-nickname"
-              placeholder="닉네임 (2~12자)"
-              minLength={2}
-              maxLength={12}
+              placeholder={`닉네임 (${NICKNAME_MIN_LENGTH}~${NICKNAME_MAX_LENGTH}글자)`}
+              minLength={NICKNAME_MIN_LENGTH}
+              maxLength={NICKNAME_MAX_LENGTH}
               aria-label="닉네임"
             />
             <button
@@ -273,7 +278,7 @@ function ProfileEditModal({
               disabled={
                 !nicknameDirty ||
                 savingNickname ||
-                draftNickname.trim().length < 2
+                nicknameCharLength(draftNickname.trim()) < NICKNAME_MIN_LENGTH
               }
               onClick={() => void saveNickname()}
             >

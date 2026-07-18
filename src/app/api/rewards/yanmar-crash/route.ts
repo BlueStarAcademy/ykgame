@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { cappedCurrencyIncrement } from "@/lib/currency";
 import { getSeasonKey } from "@/lib/games";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import { prisma } from "@/lib/prisma";
@@ -120,11 +121,19 @@ export async function POST(request: Request) {
           seasonKey: getSeasonKey(),
           critical,
         });
+        const currencyUser = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { currency: true },
+        });
+        const { next, granted } = cappedCurrencyIncrement(
+          currencyUser?.currency ?? 0,
+          rolled.stars.stars,
+        );
         const issued = await persistYanmarDropRewards({
           tx,
           userId: session.user.id,
           gameId: GAME_ID,
-          stars: rolled.stars,
+          stars: { ...rolled.stars, stars: granted },
           coupon: rolled.coupon,
           metadata: { eventId, xpGained },
         });
@@ -136,12 +145,12 @@ export async function POST(request: Request) {
           session.user.id,
           "breaker",
         );
-        const totalStars = issued.stars.stars;
+        const totalStars = granted;
         const updated = await tx.user.update({
           where: { id: session.user.id },
           data: {
             totalXp: { increment: xpGained },
-            ...(totalStars > 0 ? { currency: { increment: totalStars } } : {}),
+            ...(granted > 0 ? { currency: next } : {}),
           },
           select: { currency: true, totalXp: true, enhanceCores: true },
         });

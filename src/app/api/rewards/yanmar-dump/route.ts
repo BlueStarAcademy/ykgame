@@ -14,6 +14,7 @@ import {
 } from "@/lib/ticker";
 import { getSeasonKey } from "@/lib/games";
 import { withHotApiObservability } from "@/lib/hot-api-observability";
+import { cappedCurrencyIncrement } from "@/lib/currency";
 import { consumeDumpRateLimit } from "@/lib/redis-token-bucket";
 import {
   YANMAR_REWARD_CONFIG,
@@ -193,20 +194,33 @@ export const POST = withHotApiObservability(
         let totalStars = 0;
         let totalScore = 0;
 
+        const currencyUser = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { currency: true },
+        });
+        let currencyBalance = currencyUser?.currency ?? 0;
+
     for (const { score, stars, coupon } of plannedChunks) {
       totalScore += score;
-      totalStars += stars.stars;
-      responseEvents.push(stars);
-      starInventoryRows.push({
-        userId: session.user.id,
-        gameId: "yanmar",
-        type: "STAR",
-        amount: stars.stars,
-        metadata: {
-          score: stars.score,
-          critical: stars.critical,
-        },
-      });
+      const { next, granted } = cappedCurrencyIncrement(
+        currencyBalance,
+        stars.stars,
+      );
+      currencyBalance = next;
+      totalStars += granted;
+      responseEvents.push({ ...stars, stars: granted });
+      if (granted > 0) {
+        starInventoryRows.push({
+          userId: session.user.id,
+          gameId: "yanmar",
+          type: "STAR",
+          amount: granted,
+          metadata: {
+            score: stars.score,
+            critical: stars.critical,
+          },
+        });
+      }
 
       if (!coupon) continue;
 
@@ -271,7 +285,7 @@ export const POST = withHotApiObservability(
     const updated = await tx.user.update({
       where: { id: session.user.id },
       data: {
-        ...(totalStars > 0 ? { currency: { increment: totalStars } } : {}),
+        ...(totalStars > 0 ? { currency: currencyBalance } : {}),
         totalXp: { increment: xpGained },
       },
       select: { currency: true, totalXp: true, enhanceCores: true },

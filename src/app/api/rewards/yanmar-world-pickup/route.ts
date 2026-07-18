@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { cappedCurrencyIncrement } from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
 import {
   parseRewardEventId,
@@ -87,30 +88,40 @@ export async function POST(request: Request) {
             throw new Error("WORLD_STAR_HOURLY_LIMIT");
           }
 
-          const stars = randomInt(STAR_REWARD_MIN, STAR_REWARD_MAX);
+          const rolled = randomInt(STAR_REWARD_MIN, STAR_REWARD_MAX);
+          const current = await tx.user.findUnique({
+            where: { id: session.user.id },
+            select: { currency: true },
+          });
+          const { next, granted } = cappedCurrencyIncrement(
+            current?.currency ?? 0,
+            rolled,
+          );
           const user = await tx.user.update({
             where: { id: session.user.id },
-            data: { currency: { increment: stars } },
+            data: { currency: next },
             select: { currency: true },
           });
 
-          await tx.userRewardInventory.create({
-            data: {
-              userId: session.user.id,
-              gameId: "yanmar",
-              type: "STAR",
-              amount: stars,
-              metadata: {
-                eventId,
-                source: "world-star",
-                label: "월드 스타",
+          if (granted > 0) {
+            await tx.userRewardInventory.create({
+              data: {
+                userId: session.user.id,
+                gameId: "yanmar",
+                type: "STAR",
+                amount: granted,
+                metadata: {
+                  eventId,
+                  source: "world-star",
+                  label: "월드 스타",
+                },
               },
-            },
-          });
+            });
+          }
 
           return {
             eventId,
-            stars,
+            stars: granted,
             currency: user.currency,
           };
         },

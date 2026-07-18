@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { cappedCurrencyIncrement } from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
 import {
   settleMonumentPendingUpgrades,
@@ -25,20 +26,24 @@ export async function POST() {
         select: { monumentStarsStored: true, currency: true },
       });
       if (!user) throw new Error("USER_NOT_FOUND");
-      const claimed = user.monumentStarsStored;
-      if (claimed <= 0) throw new Error("NO_STARS");
+      const stored = user.monumentStarsStored;
+      if (stored <= 0) throw new Error("NO_STARS");
 
+      const { next, granted } = cappedCurrencyIncrement(user.currency, stored);
+      if (granted <= 0) throw new Error("CURRENCY_CAP");
+
+      const starsStored = stored - granted;
       const updated = await tx.user.update({
         where: { id: session.user.id },
         data: {
-          monumentStarsStored: 0,
+          monumentStarsStored: starsStored,
           monumentProdUpdatedAt: new Date(),
-          currency: { increment: claimed },
+          currency: next,
         },
         select: { currency: true },
       });
 
-      return { claimed, currency: updated.currency, starsStored: 0 };
+      return { claimed: granted, currency: updated.currency, starsStored };
     });
 
     return NextResponse.json({ ok: true, ...result });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { cappedCurrencyIncrement } from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
 import {
   parseRewardEventId,
@@ -95,10 +96,18 @@ export async function POST(request: Request) {
         tx,
         { userId: session.user.id, gameId: "yanmar", eventId },
         async () => {
+          const current = await tx.user.findUnique({
+            where: { id: session.user.id },
+            select: { currency: true },
+          });
+          const { next, granted } = cappedCurrencyIncrement(
+            current?.currency ?? 0,
+            stars,
+          );
           const user = await tx.user.update({
             where: { id: session.user.id },
             data: {
-              ...(stars > 0 ? { currency: { increment: stars } } : {}),
+              ...(granted > 0 ? { currency: next } : {}),
               ...(xp > 0 ? { totalXp: { increment: xp } } : {}),
               ...(enhanceCores > 0
                 ? { enhanceCores: { increment: enhanceCores } }
@@ -128,7 +137,7 @@ export async function POST(request: Request) {
               userId: session.user.id,
               gameId: "yanmar",
               type: "STAR",
-              amount: stars,
+              amount: granted,
               metadata: {
                 eventId,
                 xp,
@@ -148,7 +157,7 @@ export async function POST(request: Request) {
             enhanceCores: user.enhanceCores,
             gachaTicketsStandard: user.gachaTicketsStandard,
             gachaTicketsPremium: user.gachaTicketsPremium,
-            stars,
+            stars: granted,
             xp,
             coresGranted: enhanceCores,
             standardTicketsGranted: gachaTicketsStandard,
