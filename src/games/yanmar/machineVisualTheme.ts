@@ -246,8 +246,8 @@ export function createChassisModelSideBrandTexture(modelPlate: string): {
   if (typeof document === "undefined" || !modelPlate) return null;
 
   const scale = 6;
-  const baseWidth = 720;
-  const baseHeight = 200;
+  const baseWidth = 780;
+  const baseHeight = 240;
   const canvas = document.createElement("canvas");
   canvas.width = baseWidth * scale;
   canvas.height = baseHeight * scale;
@@ -262,13 +262,16 @@ export function createChassisModelSideBrandTexture(modelPlate: string): {
   const fontStack =
     'Arial Black, Impact, "Helvetica Neue", Arial, sans-serif';
   // Keep long plates (ViO35-7A-CJR) readable without clipping.
-  const fontSize = Math.min(92, Math.max(54, Math.floor(640 / modelPlate.length)));
+  const fontSize = Math.min(
+    130,
+    Math.max(78, Math.floor(820 / modelPlate.length)),
+  );
   ctx.font = `900 ${fontSize}px ${fontStack}`;
   ctx.lineJoin = "round";
   ctx.strokeStyle = "#0b0f14";
-  ctx.lineWidth = Math.max(7, fontSize * 0.11);
+  ctx.lineWidth = Math.max(9, fontSize * 0.12);
   ctx.strokeText(modelPlate, baseWidth / 2, baseHeight / 2 + 4);
-  const fill = ctx.createLinearGradient(0, 40, 0, baseHeight - 40);
+  const fill = ctx.createLinearGradient(0, 48, 0, baseHeight - 48);
   fill.addColorStop(0, "#ffffff");
   fill.addColorStop(0.55, "#f3f6f8");
   fill.addColorStop(1, "#c8d2da");

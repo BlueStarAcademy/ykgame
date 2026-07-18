@@ -48,8 +48,9 @@ function worldToMinimap(
   const nx = (x - bounds.minX) / (bounds.maxX - bounds.minX);
   const nz = (z - bounds.minZ) / (bounds.maxZ - bounds.minZ);
   return {
-    px: pad + nx * inner,
-    // Flip Z so world +Z (north) is toward the top of the minimap (12 o'clock).
+    // Flip X+Z together (180° map rotation) so north stays at 12 o'clock
+    // without mirroring turn direction after the north-up correction.
+    px: pad + (1 - nx) * inner,
     py: pad + (1 - nz) * inner,
   };
 }
@@ -375,10 +376,22 @@ export function ExcavatorMinimap({
       }
 
       const player = worldToMinimap(sim.posX, sim.posZ, bounds, size, pad);
-      const facing = sim.heading + sim.swing;
-      const dirX = Math.sin(facing);
-      // Canvas Y grows downward; negate so heading 0 (+Z north) points up.
-      const dirY = -Math.cos(facing);
+      // Chassis travel heading (not cabin swing) — "내가 가는 방향".
+      // Project a nose point through the same map transform so the arrow
+      // stays consistent after the north-up Z flip.
+      const facing = sim.heading;
+      const nose = worldToMinimap(
+        sim.posX + Math.sin(facing) * 2,
+        sim.posZ + Math.cos(facing) * 2,
+        bounds,
+        size,
+        pad,
+      );
+      let dirX = nose.px - player.px;
+      let dirY = nose.py - player.py;
+      const dirLen = Math.hypot(dirX, dirY) || 1;
+      dirX /= dirLen;
+      dirY /= dirLen;
       const nx = -dirY;
       const ny = dirX;
       const markerScale = size / DEFAULT_DISPLAY_SIZE;

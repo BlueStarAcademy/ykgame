@@ -227,10 +227,11 @@ export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
     pointsIcon: "/images/yanmar/2d/workshop-coin-hill.svg",
     minMapTier: 3,
     sign: {
-      x: SITE_LAYOUT.hill[0] + 16,
-      z: SITE_LAYOUT.hill[1] - 8,
+      // Keep clear of the haul-truck ↔ stone-zone dump path (truck is SE at 42,100).
+      x: SITE_LAYOUT.hill[0] - 18,
+      z: SITE_LAYOUT.hill[1] + 10,
       radius: 3.2,
-      rotationY: Math.PI * 0.35,
+      rotationY: Math.PI * 0.65,
     },
     promptTitle: "돌 하역장",
     promptAction: "관리하기",

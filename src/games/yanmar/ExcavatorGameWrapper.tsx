@@ -5156,42 +5156,6 @@ export function ExcavatorGameWrapper({
         {mode !== "intro" &&
         mode !== "gameReady" &&
         mode !== "ride" &&
-        nearRepairTent &&
-        !showRepairPanel ? (
-          <div className="pointer-events-auto absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2">
-            <button
-              type="button"
-              className="yanmar-repair-prompt-btn"
-              onClick={() => {
-                setShowQuestPanel(false);
-                setShowShopPanel(false);
-                setShowEquipmentUpgrade(false);
-                setShowProfileModal(false);
-                setShowWorkshopPanel(false);
-                setShowMonumentPanel(false);
-                setShowRepairPanel(true);
-              }}
-              aria-label="정비소 열기"
-            >
-              <span className="yanmar-repair-prompt-media" aria-hidden>
-                <img
-                  className="yanmar-repair-prompt-icon"
-                  src="/images/yanmar/2d/cockpit/repair-tent-premium.png?v=2"
-                  alt=""
-                  draggable={false}
-                />
-              </span>
-              <span className="yanmar-repair-prompt-copy">
-                <span className="yanmar-repair-prompt-eyebrow">정비소</span>
-                <span className="yanmar-repair-prompt-label">정비하기</span>
-              </span>
-            </button>
-          </div>
-        ) : null}
-
-        {mode !== "intro" &&
-        mode !== "gameReady" &&
-        mode !== "ride" &&
         nearMonument &&
         !showMonumentPanel &&
         !nearRepairTent &&
@@ -5261,41 +5225,6 @@ export function ExcavatorGameWrapper({
           </div>
         ) : null}
 
-        {mode !== "intro" &&
-        mode !== "gameReady" &&
-        mode !== "ride" &&
-        nearWorkshopId &&
-        !showWorkshopPanel &&
-        !nearRepairTent &&
-        !nearMonument ? (
-          <div className="pointer-events-auto absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2">
-            <button
-              type="button"
-              className="yanmar-repair-prompt-btn"
-              onClick={() => {
-                setShowQuestPanel(false);
-                setShowShopPanel(false);
-                setShowEquipmentUpgrade(false);
-                setShowProfileModal(false);
-                setShowRepairPanel(false);
-                setActiveWorkshopId(nearWorkshopId);
-                setShowWorkshopPanel(true);
-                void loadWorkshopState();
-              }}
-              aria-label={`${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기`}
-            >
-              <span className="yanmar-repair-prompt-copy">
-                <span className="yanmar-repair-prompt-eyebrow">
-                  {WORKSHOP_DEFS[nearWorkshopId].promptTitle}
-                </span>
-                <span className="yanmar-repair-prompt-label">
-                  {WORKSHOP_DEFS[nearWorkshopId].promptAction}
-                </span>
-              </span>
-            </button>
-          </div>
-        ) : null}
-
         {mode === "ride" ? (
           <div className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 whitespace-nowrap rounded-xl border border-sky-200/35 bg-sky-950/75 px-3 py-1.5 text-[11px] font-black text-sky-100 shadow-lg backdrop-blur-sm">
             탑승 체험 · 실제 조작 시뮬레이터
@@ -5303,11 +5232,11 @@ export function ExcavatorGameWrapper({
         ) : null}
 
         {mode !== "intro" && mode !== "gameReady" && mode !== "ride" ? (
-          <div className="absolute left-1 top-2 z-50 flex flex-col items-start gap-1.5">
+          <div className="absolute left-1 top-2 z-50 flex max-w-[calc(100%-7rem)] flex-col items-start gap-1.5">
             {!questsDisabled ? (
               <>
-                <div className="pointer-events-auto flex flex-col items-start gap-1.5">
-                  <div className="flex items-start gap-1.5">
+                <div className="pointer-events-auto flex max-w-full flex-col items-start gap-1.5">
+                  <div className="flex max-w-full flex-wrap items-start gap-1.5">
                     <button
                       type="button"
                       className={`yanmar-quest-button yanmar-aux-button touch-none active:scale-95${
@@ -5389,6 +5318,66 @@ export function ExcavatorGameWrapper({
                       />
                       <span className="yanmar-shop-button-label">상점</span>
                     </button>
+                    {nearRepairTent && !showRepairPanel ? (
+                      <button
+                        type="button"
+                        className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                        onClick={() => {
+                          setShowQuestPanel(false);
+                          setShowShopPanel(false);
+                          setShowEquipmentUpgrade(false);
+                          setShowProfileModal(false);
+                          setShowWorkshopPanel(false);
+                          setShowMonumentPanel(false);
+                          setShowRepairPanel(true);
+                        }}
+                        aria-label="정비소 열기"
+                      >
+                        <img
+                          className="yanmar-site-prompt-hud-icon"
+                          src="/images/yanmar/2d/cockpit/repair-tent-premium.png?v=2"
+                          alt=""
+                          draggable={false}
+                        />
+                        <span className="yanmar-site-prompt-hud-copy">
+                          <span className="yanmar-site-prompt-hud-eyebrow">
+                            정비소
+                          </span>
+                          <span className="yanmar-site-prompt-hud-label">
+                            정비하기
+                          </span>
+                        </span>
+                      </button>
+                    ) : null}
+                    {nearWorkshopId &&
+                    !showWorkshopPanel &&
+                    !nearRepairTent &&
+                    !nearMonument ? (
+                      <button
+                        type="button"
+                        className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                        onClick={() => {
+                          setShowQuestPanel(false);
+                          setShowShopPanel(false);
+                          setShowEquipmentUpgrade(false);
+                          setShowProfileModal(false);
+                          setShowRepairPanel(false);
+                          setActiveWorkshopId(nearWorkshopId);
+                          setShowWorkshopPanel(true);
+                          void loadWorkshopState();
+                        }}
+                        aria-label={`${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기`}
+                      >
+                        <span className="yanmar-site-prompt-hud-copy">
+                          <span className="yanmar-site-prompt-hud-eyebrow">
+                            {WORKSHOP_DEFS[nearWorkshopId].promptTitle}
+                          </span>
+                          <span className="yanmar-site-prompt-hud-label">
+                            {WORKSHOP_DEFS[nearWorkshopId].promptAction}
+                          </span>
+                        </span>
+                      </button>
+                    ) : null}
                   </div>
                   {showMissionQuest ? (
                     <div className="w-[9rem]">
@@ -5443,7 +5432,7 @@ export function ExcavatorGameWrapper({
               </>
             ) : null}
             {questsDisabled ? (
-              <div className="pointer-events-auto flex items-start gap-1.5">
+              <div className="pointer-events-auto flex max-w-full flex-wrap items-start gap-1.5">
                 <button
                   type="button"
                   className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
@@ -5472,6 +5461,60 @@ export function ExcavatorGameWrapper({
                 >
                   튜토리얼
                 </button>
+                {nearRepairTent && !showRepairPanel ? (
+                  <button
+                    type="button"
+                    className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                    onClick={() => {
+                      setShowEquipmentUpgrade(false);
+                      setShowWorkshopPanel(false);
+                      setShowMonumentPanel(false);
+                      setShowRepairPanel(true);
+                    }}
+                    aria-label="정비소 열기"
+                  >
+                    <img
+                      className="yanmar-site-prompt-hud-icon"
+                      src="/images/yanmar/2d/cockpit/repair-tent-premium.png?v=2"
+                      alt=""
+                      draggable={false}
+                    />
+                    <span className="yanmar-site-prompt-hud-copy">
+                      <span className="yanmar-site-prompt-hud-eyebrow">
+                        정비소
+                      </span>
+                      <span className="yanmar-site-prompt-hud-label">
+                        정비하기
+                      </span>
+                    </span>
+                  </button>
+                ) : null}
+                {nearWorkshopId &&
+                !showWorkshopPanel &&
+                !nearRepairTent &&
+                !nearMonument ? (
+                  <button
+                    type="button"
+                    className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                    onClick={() => {
+                      setShowEquipmentUpgrade(false);
+                      setShowRepairPanel(false);
+                      setActiveWorkshopId(nearWorkshopId);
+                      setShowWorkshopPanel(true);
+                      void loadWorkshopState();
+                    }}
+                    aria-label={`${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기`}
+                  >
+                    <span className="yanmar-site-prompt-hud-copy">
+                      <span className="yanmar-site-prompt-hud-eyebrow">
+                        {WORKSHOP_DEFS[nearWorkshopId].promptTitle}
+                      </span>
+                      <span className="yanmar-site-prompt-hud-label">
+                        {WORKSHOP_DEFS[nearWorkshopId].promptAction}
+                      </span>
+                    </span>
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>

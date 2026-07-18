@@ -13,6 +13,7 @@ import {
   updateDigZoneRespawns,
   fastForwardHaulTruckState,
   HAUL_TRUCK_COOLDOWN_SEC,
+  normalizeCrashZone,
   type DigZone,
   type CrashZone,
   type HillZone,
@@ -230,10 +231,10 @@ export function saveYanmarGameSession(
       haulTruckCooldownSec: snapshot.haulTruckCooldownSec,
       digZones: cloneDigZones(snapshot.digZones),
       crashZone: snapshot.crashZone
-        ? {
+        ? normalizeCrashZone({
             ...snapshot.crashZone,
             tiles: snapshot.crashZone.tiles.map((tile) => ({ ...tile })),
-          }
+          })
         : null,
       hillZone: snapshot.hillZone ? normalizeHillZone(snapshot.hillZone) : null,
       mapTier: snapshot.mapTier,
@@ -299,10 +300,10 @@ export function loadYanmarGameSession(
       haulTruckCooldownSec,
       digZones: cloneDigZones(parsed.digZones),
       crashZone: parsed.crashZone
-        ? {
+        ? normalizeCrashZone({
             ...parsed.crashZone,
             tiles: parsed.crashZone.tiles.map((tile) => ({ ...tile })),
-          }
+          })
         : null,
       hillZone,
       heights: [...parsed.heights],
@@ -331,10 +332,10 @@ export function applyGameSessionTerrain(
   const terrain = createTerrain(-48, -48, true, levelForTier);
   terrain.digZones = cloneDigZones(snapshot.digZones);
   terrain.crashZone = snapshot.crashZone
-    ? {
+    ? normalizeCrashZone({
         ...snapshot.crashZone,
         tiles: snapshot.crashZone.tiles.map((tile) => ({ ...tile })),
-      }
+      })
     : null;
   terrain.hillZone = snapshot.hillZone
     ? normalizeHillZone(snapshot.hillZone)

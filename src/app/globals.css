@@ -458,6 +458,82 @@ body {
   text-shadow: 0 0.08rem 0.16rem rgba(0, 0, 0, 0.55);
 }
 
+.yanmar-site-prompt-hud-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.14rem;
+  width: max-content;
+  min-width: 5.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  padding: 0.28rem 0.62rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(245, 215, 142, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 34%),
+    linear-gradient(165deg, rgba(72, 42, 22, 0.96), rgba(24, 16, 10, 0.98));
+  box-shadow:
+    0 0.35rem 0.9rem rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(139, 30, 30, 0.28) inset;
+  color: #f8e7b8;
+  cursor: pointer;
+  overflow: visible;
+  animation:
+    yanmar-repair-prompt-in 0.28s ease-out,
+    yanmar-repair-prompt-glow 2.4s ease-in-out 0.28s infinite;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 120ms ease;
+}
+
+.yanmar-site-prompt-hud-btn:hover {
+  border-color: rgba(255, 230, 160, 0.92);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 34%),
+    linear-gradient(165deg, rgba(88, 52, 24, 0.98), rgba(32, 20, 12, 0.99));
+}
+
+.yanmar-site-prompt-hud-btn:active {
+  transform: scale(0.96);
+}
+
+.yanmar-site-prompt-hud-icon {
+  display: none;
+}
+
+.yanmar-site-prompt-hud-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+  line-height: 1;
+  overflow: visible;
+}
+
+.yanmar-site-prompt-hud-eyebrow {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: rgba(248, 231, 184, 0.82);
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.yanmar-site-prompt-hud-label {
+  font-size: 0.84rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #fff6d6;
+  text-shadow: 0 0.06rem 0.12rem rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 @keyframes yanmar-tutorial-flash-pop {
   0% {
     opacity: 0;

@@ -623,6 +623,37 @@ export function isCrashZoneFull(zone: CrashZone | null | undefined): boolean {
   return zone.tiles.every((tile) => tile.active && tile.hp >= tile.maxHp);
 }
 
+/**
+ * Migrate persisted crash tiles onto the current `CRASH_TILE_MAX_HP`.
+ * Preserves remaining HP ratio so a balance bump (e.g. 1000→2000) applies to
+ * restored sessions instead of keeping the old maxHp forever.
+ */
+export function normalizeCrashZone(zone: CrashZone): CrashZone {
+  return {
+    ...zone,
+    tiles: zone.tiles.map((tile) => {
+      const prevMax =
+        typeof tile.maxHp === "number" &&
+        Number.isFinite(tile.maxHp) &&
+        tile.maxHp > 0
+          ? tile.maxHp
+          : CRASH_TILE_MAX_HP;
+      const prevHp =
+        typeof tile.hp === "number" && Number.isFinite(tile.hp)
+          ? tile.hp
+          : prevMax;
+      const ratio = tile.active
+        ? Math.max(0, Math.min(1, prevHp / prevMax))
+        : 0;
+      return {
+        ...tile,
+        maxHp: CRASH_TILE_MAX_HP,
+        hp: tile.active ? Math.round(ratio * CRASH_TILE_MAX_HP) : 0,
+      };
+    }),
+  };
+}
+
 export function isHillZoneFull(zone: HillZone | null | undefined): boolean {
   if (!zone?.active || zone.boulders.length === 0) return false;
   return zone.boulders.every(

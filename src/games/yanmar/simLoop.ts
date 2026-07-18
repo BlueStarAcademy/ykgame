@@ -169,6 +169,8 @@ export interface SimLoopRuntime {
   attachmentActionCooldown: number;
   breakerHitCount: number;
   warningCooldown: number;
+  /** Latches zone/use warnings until the triggering condition clears. */
+  warningLatchKey: string | null;
   grappleGrip: GrappleGripRuntime;
   /**
    * 집게가 70% 이상 열린 채 닫기를 시작하면 true.
@@ -202,6 +204,7 @@ export function createSimLoopRuntime(): SimLoopRuntime {
     attachmentActionCooldown: 0,
     breakerHitCount: 0,
     warningCooldown: 0,
+    warningLatchKey: null,
     grappleGrip: createGrappleGripRuntime(),
     grappleGrabArmed: false,
     lastSystemsWallMs: 0,
@@ -1040,10 +1043,23 @@ export function tickExcavatorSim(params: SimTickParams) {
       : 90;
   const breakerAngleReady =
     breakerGroundAngle >= MIN_BREAKER_GROUND_ANGLE_DEG;
-  const warnAttachment = (message?: string) => {
-    if (!message || runtime.warningCooldown > 0) return;
+  const warnAttachment = (message?: string, latchKey?: string) => {
+    if (!message) return;
+    if (latchKey) {
+      // Show once while the invalid condition is held; clear when it ends.
+      if (runtime.warningLatchKey === latchKey) return;
+      runtime.warningLatchKey = latchKey;
+      onAttachmentWarning(message);
+      return;
+    }
+    if (runtime.warningCooldown > 0) return;
     runtime.warningCooldown = 3;
     onAttachmentWarning(message);
+  };
+  const clearWarningLatch = (latchKey: string) => {
+    if (runtime.warningLatchKey === latchKey) {
+      runtime.warningLatchKey = null;
+    }
   };
 
   if (
@@ -1052,34 +1068,43 @@ export function tickExcavatorSim(params: SimTickParams) {
   ) {
     const permission = checkAttachmentUse("breaker", toolZone, "strike");
     if (!permission.allowed) {
-      if (toolTouchesGround) warnAttachment(permission.message);
-    } else if (toolTouchesGround && !breakerAngleReady) {
-      warnAttachment("브레이커를 수직에 가깝게 세우세요.");
-    } else if (toolTouchesGround && runtime.attachmentActionCooldown <= 0) {
-      const tile = breakerTipContact?.tile ?? null;
-      if (tile?.active) {
-        runtime.breakerHitCount += 1;
-        let hitDamage = rollYanmarBreakerDamage(stats.breakerDamage, {
-          bonusOnly: true,
-        });
-        const every3 = stats.breakerEvery3HitMult ?? 1;
-        if (every3 > 1 && runtime.breakerHitCount % 3 === 0) {
-          hitDamage = Math.round(hitDamage * every3);
-        }
-        const result = damageCrashTile(terrain, tile.id, hitDamage);
-        // Hold-to-hammer: rapid ticks while the foot pedal stays down.
-        runtime.attachmentActionCooldown = 0.11;
-        runtime.digDust.active = true;
-        runtime.digDust.x = toolTip.x;
-        runtime.digDust.y = toolGround + 0.08;
-        runtime.digDust.z = toolTip.z;
-        if (result) {
-          fb.crashHitTick += 1;
-          fb.crashHitDamage = hitDamage;
-          if (result.destroyed) onCrashTileDestroyed(tile.id);
+      if (toolTouchesGround) {
+        warnAttachment(permission.message, "breaker-zone");
+      } else {
+        clearWarningLatch("breaker-zone");
+      }
+    } else {
+      clearWarningLatch("breaker-zone");
+      if (toolTouchesGround && !breakerAngleReady) {
+        warnAttachment("브레이커를 수직에 가깝게 세우세요.");
+      } else if (toolTouchesGround && runtime.attachmentActionCooldown <= 0) {
+        const tile = breakerTipContact?.tile ?? null;
+        if (tile?.active) {
+          runtime.breakerHitCount += 1;
+          let hitDamage = rollYanmarBreakerDamage(stats.breakerDamage, {
+            bonusOnly: true,
+          });
+          const every3 = stats.breakerEvery3HitMult ?? 1;
+          if (every3 > 1 && runtime.breakerHitCount % 3 === 0) {
+            hitDamage = Math.round(hitDamage * every3);
+          }
+          const result = damageCrashTile(terrain, tile.id, hitDamage);
+          // Hold-to-hammer: rapid ticks while the foot pedal stays down.
+          runtime.attachmentActionCooldown = 0.11;
+          runtime.digDust.active = true;
+          runtime.digDust.x = toolTip.x;
+          runtime.digDust.y = toolGround + 0.08;
+          runtime.digDust.z = toolTip.z;
+          if (result) {
+            fb.crashHitTick += 1;
+            fb.crashHitDamage = hitDamage;
+            if (result.destroyed) onCrashTileDestroyed(tile.id);
+          }
         }
       }
     }
+  } else {
+    clearWarningLatch("breaker-zone");
   }
 
   const grapplePedal =
@@ -1123,7 +1148,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     const canGrabHere = permission.allowed || wrappableRock != null;
 
     if (grapplePedal !== 0 && !canGrabHere && toolTouchesGround) {
-      warnAttachment(permission.message);
+      warnAttachment(permission.message, "grapple-zone");
+    } else {
+      clearWarningLatch("grapple-zone");
     }
 
     if (canGrabHere && runtime.attachmentActionCooldown <= 0) {
@@ -1237,6 +1264,8 @@ export function tickExcavatorSim(params: SimTickParams) {
         resetGrappleGrip(runtime.grappleGrip);
       }
     }
+  } else {
+    clearWarningLatch("grapple-zone");
   }
 
   // 밀착 확정 후, 붐을 들어 클램프가 충분히 올라갔을 때만 성공/실패 판정
@@ -1617,7 +1646,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     !inZone
   ) {
     const permission = checkAttachmentUse("bucket", toolZone, "dig");
-    warnAttachment(permission.message);
+    warnAttachment(permission.message, "bucket-dig-zone");
+  } else {
+    clearWarningLatch("bucket-dig-zone");
   }
 
   if (
@@ -1756,7 +1787,9 @@ export function tickExcavatorSim(params: SimTickParams) {
       getZoneAt(bucketMouthCenter.x, bucketMouthCenter.z, terrain),
       "dump",
     );
-    warnAttachment(permission.message);
+    warnAttachment(permission.message, "bucket-dump-zone");
+  } else {
+    clearWarningLatch("bucket-dump-zone");
   }
   if (
     sim.attachmentType === "bucket" &&

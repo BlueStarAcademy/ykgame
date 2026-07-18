@@ -35,12 +35,31 @@ const LABELS: Record<AttachmentType, string> = {
   grapple: "집게",
 };
 
+/** 주격 조사: 받침 유무에 따라 은/는 */
+function topicParticle(label: string): "은" | "는" {
+  if (label === "버켓") return "은";
+  return "는";
+}
+
+/** 목적격 조사: 을/를 */
+function objectParticle(label: string): "을" | "를" {
+  if (label === "버켓") return "을";
+  return "를";
+}
+
 const ZONE_LABELS: Record<Exclude<SiteZoneKind, "neutral">, string> = {
-  dig: "Dig",
-  crash: "Crash",
-  hill: "Stone",
-  dump: "Dump",
+  dig: "굴착",
+  crash: "파쇄",
+  hill: "석재",
+  dump: "하역",
 };
+
+const ATTACHMENT_ZONE: Record<AttachmentType, Exclude<SiteZoneKind, "neutral">> =
+  {
+    bucket: "dig",
+    breaker: "crash",
+    grapple: "hill",
+  };
 
 export function checkAttachmentUse(
   attachment: AttachmentType,
@@ -53,7 +72,7 @@ export function checkAttachmentUse(
       allowed: false,
       message:
         attachment === "bucket"
-          ? "하역은 Dump 지역에서만 가능합니다."
+          ? "하역은 하역 지역에서만 가능합니다."
           : "현재 부착물로는 하역할 수 없습니다. 버켓으로 전환하세요.",
     };
   }
@@ -71,15 +90,17 @@ export function checkAttachmentUse(
   if (expected === attachment) return { allowed: true };
 
   if (expected) {
+    const tool = LABELS[expected];
     return {
       allowed: false,
-      message: `${ZONE_LABELS[zone as Exclude<SiteZoneKind, "neutral">]} 지역에서는 ${LABELS[expected]}을 사용하세요.`,
+      message: `${ZONE_LABELS[zone as Exclude<SiteZoneKind, "neutral">]} 지역에서는 ${tool}${objectParticle(tool)} 사용하세요.`,
     };
   }
 
-  const target = attachment === "bucket" ? "Dig" : attachment === "breaker" ? "Crash" : "Stone";
+  const label = LABELS[attachment];
+  const zoneLabel = ZONE_LABELS[ATTACHMENT_ZONE[attachment]];
   return {
     allowed: false,
-    message: `${LABELS[attachment]}은 ${target} 지역에서만 사용할 수 있습니다.`,
+    message: `${label}${topicParticle(label)} ${zoneLabel} 지역에서만 사용할 수 있습니다.`,
   };
 }

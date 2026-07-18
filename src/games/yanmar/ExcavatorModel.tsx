@@ -974,8 +974,8 @@ function EnclosedCab({
   );
   useLayoutEffect(() => () => sideBrand?.texture.dispose(), [sideBrand]);
   const plateWidth = Math.min(
-    sideSpanX * 0.85,
-    Math.max(0.5, modelPlate.length * 0.058),
+    sideSpanX * 0.98,
+    Math.max(0.72, modelPlate.length * 0.085),
   );
   const plateHeight = sideBrand ? plateWidth / sideBrand.aspect : 0.09;
 
@@ -1370,8 +1370,8 @@ function UpperHood({
   useLayoutEffect(() => () => sideBrand?.texture.dispose(), [sideBrand]);
 
   const plateWidth = Math.min(
-    1.12,
-    Math.max(0.55, visual.modelPlate.length * 0.075),
+    1.35,
+    Math.max(0.78, visual.modelPlate.length * 0.11),
   );
   const plateHeight = sideBrand
     ? plateWidth / sideBrand.aspect
