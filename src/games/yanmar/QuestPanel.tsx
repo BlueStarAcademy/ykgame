@@ -143,13 +143,16 @@ function QuestRewardDisplay({
   }
   if (layout === "grid") {
     return (
-      <span className="yanmar-quest-reward-grid">
+      <div className="flex w-full flex-wrap items-center justify-center gap-x-1 gap-y-1.5">
         {parts.map((part) => (
-          <span key={part.key} className="yanmar-quest-reward-cell">
+          <div
+            key={part.key}
+            className="flex w-[32%] min-w-0 items-center justify-center gap-1 text-[10px] font-extrabold leading-none text-amber-200/90"
+          >
             {part.node}
-          </span>
+          </div>
         ))}
-      </span>
+      </div>
     );
   }
   return (

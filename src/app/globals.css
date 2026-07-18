@@ -2479,8 +2479,8 @@ body {
 
 .yanmar-quest-reward-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.28rem 0.55rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem 0.4rem;
   width: 100%;
 }
 
@@ -9839,6 +9839,15 @@ button.yanmar-gear-icon-cell {
   letter-spacing: 0.02em;
 }
 
+.yanmar-gear-equip-level {
+  color: inherit;
+  font-weight: 800;
+}
+
+.yanmar-gear-equip-level.is-locked {
+  color: #f87171;
+}
+
 .yanmar-gear-mgr-main {
   display: flex;
   align-items: center;
@@ -9937,6 +9946,7 @@ button.yanmar-gear-icon-cell {
   display: flex;
   flex-shrink: 0;
   align-items: center;
+  align-self: flex-end;
   margin-left: auto;
   padding-left: 0.35rem;
 }

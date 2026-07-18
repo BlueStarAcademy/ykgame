@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
 import {
+  EQUIP_LEVEL_BY_GRADE,
   GEAR_INVENTORY_BASE,
   GEAR_INVENTORY_EXPAND_STEP,
   GEAR_SLOTS,
@@ -14,6 +15,7 @@ import {
   SUB_OPTION_POOL,
   SYNTH_NEXT_GRADE,
   SYNTH_UPGRADE_CHANCE,
+  canEquipGearAtLevel,
   getGearInventoryExpandCost,
   type GearSlot,
   type ItemGrade,
@@ -128,6 +130,7 @@ interface GearPanelProps {
   expandCost?: number | null;
   busy?: boolean;
   embedded?: boolean;
+  playerLevel?: number;
   activeChassisId?: ChassisModelId | string;
   equipmentStats?: YanmarEquipmentStats | null;
   onEquip: (itemId: string) => void | Promise<void>;
@@ -185,6 +188,24 @@ function gradeTextClass(grade: ItemGrade) {
   }
 }
 
+function EquipLevelText({
+  grade,
+  playerLevel,
+}: {
+  grade: ItemGrade;
+  playerLevel: number;
+}) {
+  const required = EQUIP_LEVEL_BY_GRADE[grade];
+  const locked = !canEquipGearAtLevel(grade, playerLevel);
+  return (
+    <span
+      className={`yanmar-gear-equip-level${locked ? " is-locked" : ""}`}
+    >
+      레벨제한 {required}
+    </span>
+  );
+}
+
 function formatMain(item: GearPanelItem) {
   const def = MAIN_OPTION_BY_SLOT[item.slot];
   const label = item.mainLabel ?? def.label;
@@ -216,6 +237,7 @@ function GearBubbleCard({
   footer,
   equipAction,
   highlight,
+  playerLevel = 1,
   onZoom,
 }: {
   title: string;
@@ -225,6 +247,7 @@ function GearBubbleCard({
   footer?: ReactNode;
   equipAction?: ReactNode;
   highlight?: boolean;
+  playerLevel?: number;
   onZoom?: (item: GearPanelItem) => void;
 }) {
   if (!item) {
@@ -281,6 +304,8 @@ function GearBubbleCard({
           </p>
           <p className="yanmar-gear-mgr-grade">
             {GEAR_SLOT_LABEL[item.slot]}
+            {" · "}
+            <EquipLevelText grade={item.grade} playerLevel={playerLevel} />
             {item.equippedSlot ? " · 장착중" : ""}
           </p>
           <p className="yanmar-gear-mgr-main">
@@ -340,6 +365,7 @@ export function GearPanel({
   expandCost = getGearInventoryExpandCost(GEAR_INVENTORY_BASE),
   busy,
   embedded,
+  playerLevel = 1,
   activeChassisId = "ViO17_1",
   equipmentStats: _equipmentStats = null,
   onEquip,
@@ -729,25 +755,35 @@ export function GearPanel({
         .map((s) => GEAR_SLOT_LABEL[s])
         .join(", ");
 
-  const equipButton = (item: GearPanelItem) =>
-    item.equippedSlot ? (
-      <button
-        type="button"
-        className="yanmar-gear-btn yanmar-gear-btn--unequip yanmar-gear-btn--equip-side"
-        disabled={busy}
-        onClick={() => {
-          void onUnequip(item.id);
-          closeBubble();
-        }}
-      >
-        해제
-      </button>
-    ) : (
+  const equipButton = (item: GearPanelItem) => {
+    if (item.equippedSlot) {
+      return (
+        <button
+          type="button"
+          className="yanmar-gear-btn yanmar-gear-btn--unequip yanmar-gear-btn--equip-side"
+          disabled={busy}
+          onClick={() => {
+            void onUnequip(item.id);
+            closeBubble();
+          }}
+        >
+          해제
+        </button>
+      );
+    }
+    const levelLocked = !canEquipGearAtLevel(item.grade, playerLevel);
+    return (
       <button
         type="button"
         className="yanmar-gear-btn yanmar-gear-btn--equip yanmar-gear-btn--equip-side"
-        disabled={busy}
+        disabled={busy || levelLocked}
+        title={
+          levelLocked
+            ? `레벨 ${EQUIP_LEVEL_BY_GRADE[item.grade]} 이상부터 장착 가능`
+            : undefined
+        }
         onClick={() => {
+          if (levelLocked) return;
           void onEquip(item.id);
           closeBubble();
         }}
@@ -755,6 +791,7 @@ export function GearPanel({
         장착
       </button>
     );
+  };
 
   const actionButtons = (item: GearPanelItem) => (
     <div className="yanmar-gear-mgr-actions yanmar-gear-mgr-actions--four">
@@ -1078,6 +1115,7 @@ export function GearPanel({
                   title="장비 정보"
                   item={bubbleItem}
                   highlight
+                  playerLevel={playerLevel}
                   onZoom={setArtPreview}
                   equipAction={bubbleItem ? equipButton(bubbleItem) : null}
                 />
@@ -1090,6 +1128,7 @@ export function GearPanel({
                     title="장착 중"
                     item={bubbleEquipped}
                     emptyLabel={`${GEAR_SLOT_LABEL[bubble.slot]} 슬롯 비어 있음`}
+                    playerLevel={playerLevel}
                     onZoom={setArtPreview}
                     equipAction={
                       bubbleEquipped ? equipButton(bubbleEquipped) : null
@@ -1099,6 +1138,7 @@ export function GearPanel({
                     title="선택"
                     item={bubbleItem}
                     highlight
+                    playerLevel={playerLevel}
                     onZoom={setArtPreview}
                     equipAction={bubbleItem ? equipButton(bubbleItem) : null}
                     compareAgainst={
@@ -1149,6 +1189,11 @@ export function GearPanel({
             <p className="yanmar-gear-mgr-grade">
               [{ITEM_GRADE_LABEL[artPreview.grade]}] ·{" "}
               {GEAR_SLOT_LABEL[artPreview.slot]}
+              {" · "}
+              <EquipLevelText
+                grade={artPreview.grade}
+                playerLevel={playerLevel}
+              />
             </p>
             <button
               type="button"
@@ -1231,6 +1276,11 @@ export function GearPanel({
                 >
                   [{ITEM_GRADE_LABEL[enhanceItem.grade]}] ·{" "}
                   {GEAR_SLOT_LABEL[enhanceItem.slot]}
+                  {" · "}
+                  <EquipLevelText
+                    grade={enhanceItem.grade}
+                    playerLevel={playerLevel}
+                  />
                 </p>
                 <p className="yanmar-gear-mgr-main">
                   <span className="yanmar-gear-mgr-attr-main">

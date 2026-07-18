@@ -4672,6 +4672,7 @@ export function ExcavatorGameWrapper({
           inventorySlots={gearInventorySlots}
           expandCost={gearExpandCost}
           busy={gearBusy}
+          playerLevel={getPlayerLevelProgress(totalXp).level}
           activeChassisId={activeChassisId}
           equipmentStats={equipmentStats}
           onEquip={(id) => void runGearAction("equip", id)}

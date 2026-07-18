@@ -27,6 +27,22 @@ export const ITEM_GRADE_LABEL: Record<ItemGrade, string> = {
   MASTER: "마스터",
 };
 
+/** 등급별 장착 가능 플레이어 레벨 */
+export const EQUIP_LEVEL_BY_GRADE: Record<ItemGrade, number> = {
+  NORMAL: 1,
+  ENHANCED: 10,
+  PRECISION: 15,
+  MASTER: 20,
+};
+
+export function getGearEquipLevel(grade: ItemGrade): number {
+  return EQUIP_LEVEL_BY_GRADE[grade];
+}
+
+export function canEquipGearAtLevel(grade: ItemGrade, playerLevel: number): boolean {
+  return playerLevel >= EQUIP_LEVEL_BY_GRADE[grade];
+}
+
 export const ITEM_GRADE_PREFIX: Record<ItemGrade, string> = {
   NORMAL: "평범한",
   ENHANCED: "개량된",

@@ -19,12 +19,14 @@ import {
   type MasterOptionInst,
 } from "@/games/yanmar/gearGenerate";
 import {
+  EQUIP_LEVEL_BY_GRADE,
   GEAR_INVENTORY_BASE,
   GEAR_INVENTORY_EXPAND_STEP,
   GEAR_INVENTORY_MAX,
   GEAR_SLOTS,
   ITEM_GRADE_LABEL,
   SELL_STARS_BY_GRADE,
+  canEquipGearAtLevel,
   clampGearInventorySlots,
   getGearInventoryExpandCost,
   rollSynthesizeResultGrade,
@@ -33,6 +35,7 @@ import {
 } from "@/games/yanmar/gearCatalog";
 import { loadUserFinalStats } from "@/games/yanmar/gearService";
 import { asJson } from "@/games/yanmar/jsonCompat";
+import { getPlayerLevelProgress } from "@/lib/playerLevel";
 
 function toData(item: {
   slot: string;
@@ -220,6 +223,17 @@ export async function POST(req: Request) {
         const slot = (body.slot ?? item.slot) as GearSlot;
         if (!GEAR_SLOTS.includes(slot) || slot !== item.slot) {
           throw new Error("SLOT_MISMATCH");
+        }
+        const grade = item.grade as ItemGrade;
+        const user = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { totalXp: true },
+        });
+        const playerLevel = getPlayerLevelProgress(user?.totalXp ?? 0).level;
+        if (!canEquipGearAtLevel(grade, playerLevel)) {
+          throw new Error(
+            `LEVEL_REQUIRED:${EQUIP_LEVEL_BY_GRADE[grade]}`,
+          );
         }
         await tx.gearItem.updateMany({
           where: {
