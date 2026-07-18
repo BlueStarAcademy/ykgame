@@ -437,3 +437,32 @@ export const REPAIR_TENT = {
   /** Yaw so the bay-door facade faces the worksite / spawn approach. */
   rotationY: Math.atan2(27, 20),
 } as const;
+
+/** 장비 판매 시 등급별 스타 환급. */
+export const SELL_STARS_BY_GRADE: Record<ItemGrade, number> = {
+  NORMAL: 5,
+  ENHANCED: 10,
+  PRECISION: 20,
+  MASTER: 100,
+};
+
+/** 합성 시 한 단계 상위 등급이 나올 확률 (나머지는 동일 등급). 마스터는 0. */
+export const SYNTH_UPGRADE_CHANCE: Record<ItemGrade, number> = {
+  NORMAL: 0.5,
+  ENHANCED: 0.3,
+  PRECISION: 0.1,
+  MASTER: 0,
+};
+
+export const SYNTH_NEXT_GRADE: Record<ItemGrade, ItemGrade | null> = {
+  NORMAL: "ENHANCED",
+  ENHANCED: "PRECISION",
+  PRECISION: "MASTER",
+  MASTER: null,
+};
+
+export function rollSynthesizeResultGrade(inputGrade: ItemGrade): ItemGrade {
+  const next = SYNTH_NEXT_GRADE[inputGrade];
+  if (!next) return inputGrade;
+  return Math.random() < SYNTH_UPGRADE_CHANCE[inputGrade] ? next : inputGrade;
+}

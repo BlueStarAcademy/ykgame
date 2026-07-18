@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo } from "react";
+import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
+import { YK_GEONGI_LOGO } from "@/lib/brand-assets";
+import { configureYkGeongiLogoTexture } from "./machineVisualTheme";
 import { REPAIR_TENT } from "./gearCatalog";
 
 const COLORS = {
@@ -19,77 +22,6 @@ const COLORS = {
   lamp: "#1a1d22",
   lampHead: "#2a2e35",
 } as const;
-
-/** Building-face sign: Y red / K blue / 건기 blue with white outline (photo match). */
-function createRepairShopSignTexture() {
-  if (typeof document === "undefined") return null;
-
-  const scale = 4;
-  const w = 640;
-  const h = 180;
-  const canvas = document.createElement("canvas");
-  canvas.width = w * scale;
-  canvas.height = h * scale;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-
-  ctx.scale(scale, scale);
-  ctx.clearRect(0, 0, w, h);
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  ctx.miterLimit = 2;
-
-  const latinFont = '"Arial Black", Arial, sans-serif';
-  const koreanFont =
-    '"Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
-
-  const strokeFill = (
-    text: string,
-    x: number,
-    y: number,
-    font: string,
-    fill: string,
-    strokeW: number,
-  ) => {
-    ctx.font = font;
-    ctx.lineWidth = strokeW + 4;
-    ctx.strokeStyle = "rgba(20,28,34,0.55)";
-    ctx.strokeText(text, x, y);
-    ctx.lineWidth = strokeW;
-    ctx.strokeStyle = "#ffffff";
-    ctx.strokeText(text, x, y);
-    ctx.fillStyle = fill;
-    ctx.fillText(text, x, y);
-  };
-
-  const letterSize = 110;
-  const geongiSize = 100;
-  ctx.font = `900 ${letterSize}px ${latinFont}`;
-  const yW = ctx.measureText("Y").width;
-  const kW = ctx.measureText("K").width;
-  ctx.font = `900 ${geongiSize}px ${koreanFont}`;
-  const geongiW = ctx.measureText("건기").width;
-  const gap = 8;
-  const total = yW + kW + gap + geongiW;
-  let x = (w - total) / 2;
-  const cy = h / 2 + 4;
-
-  strokeFill("Y", x + yW / 2, cy, `900 ${letterSize}px ${latinFont}`, "#e3262e", 7);
-  x += yW;
-  strokeFill("K", x + kW / 2, cy, `900 ${letterSize}px ${latinFont}`, "#1e6bb8", 7);
-  x += kW + gap;
-  strokeFill("건기", x + geongiW / 2, cy, `900 ${geongiSize}px ${koreanFont}`, "#1e6bb8", 6);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.generateMipmaps = false;
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.anisotropy = 8;
-  texture.needsUpdate = true;
-  return texture;
-}
 
 function createCorrugatedMetalTexture() {
   if (typeof document === "undefined") return null;
@@ -133,8 +65,11 @@ export function RepairTent({
   radius?: number;
   rotationY?: number;
 }) {
-  const signTexture = useMemo(() => createRepairShopSignTexture(), []);
+  const signTexture = useLoader(THREE.TextureLoader, YK_GEONGI_LOGO.black);
   const metalTexture = useMemo(() => createCorrugatedMetalTexture(), []);
+  useLayoutEffect(() => {
+    configureYkGeongiLogoTexture(signTexture);
+  }, [signTexture]);
 
   const bayCount = 5;
   const bayWidth = 3.6;
@@ -329,11 +264,11 @@ export function RepairTent({
           <meshStandardMaterial color="#d8dce0" roughness={0.55} metalness={0.25} />
         </mesh>
         <mesh position={[0, 0, 0.02]}>
-          <planeGeometry args={[6.8, 1.45]} />
+          <planeGeometry args={[6.4, 6.4 / YK_GEONGI_LOGO.aspect]} />
           <meshBasicMaterial
-            map={signTexture ?? undefined}
-            color={signTexture ? "#ffffff" : "#1e6bb8"}
+            map={signTexture}
             transparent
+            alphaTest={0.1}
             toneMapped={false}
           />
         </mesh>

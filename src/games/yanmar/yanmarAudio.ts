@@ -1,4 +1,25 @@
-import type { HornId } from "./soundSettings";
+import {
+  bgmVolumeToGain,
+  volumeToGain,
+  type HornId,
+  type SoundSettings,
+} from "./soundSettings";
+import {
+  getSoundSettings,
+  subscribeSoundSettings,
+} from "./soundSettingsStore";
+import {
+  isPageAudioSealed,
+  registerPageAudioHooks,
+} from "@/lib/pageAudioLifecycle";
+import {
+  getSharedIngameBgmAudio,
+  killAllSiteLegendBgms,
+  setSharedIngameBgmAudio,
+  silenceHtmlAudio,
+  trackSiteLegendBgm,
+  unloadHtmlAudio,
+} from "@/lib/siteLegendBgmRegistry";
 
 const SOUND_BASE = "/sounds/yanmar";
 
@@ -10,15 +31,40 @@ const HORN_SRC: Record<HornId, string> = {
 };
 
 const BREAKER_SRC = `${SOUND_BASE}/breaker.wav`;
+const INGAME_BGM_SRC = "/sounds/site-legend/ingame-bgm.wav";
+const HORN_BASE_VOLUME = 0.88;
+const BREAKER_BASE_GAIN = 0.92;
 /** Ignore brief contact flicker so the loop does not restart mid-strike. */
 const BREAKER_STOP_GRACE_MS = 120;
+
+const GLOBAL_CTRL = "__ykYanmarAudioCtrl";
+
+type GlobalBag = typeof globalThis & {
+  [GLOBAL_CTRL]?: YanmarAudioController;
+};
+
+function bag(): GlobalBag {
+  return globalThis as GlobalBag;
+}
 
 class YanmarAudioController {
   private hornCache = new Map<HornId, HTMLAudioElement>();
   private hornId: HornId = 1;
   private unlocked = false;
   private sfxEnabled = true;
+  private breakerSfxEnabled = true;
   private bgmEnabled = true;
+  private bgmVolume = 28;
+  private sfxVolume = 85;
+  private active = false;
+  private bgm: HTMLAudioElement | null = null;
+  private bgmGestureBound = false;
+  private storeSubscribed = false;
+  private readonly onBgmGesture = () => {
+    if (isPageAudioSealed()) return;
+    if (!this.active || !this.bgmEnabled) return;
+    this.startBgm();
+  };
   private breakerWanted = false;
   private audioCtx: AudioContext | null = null;
   private breakerBuffer: AudioBuffer | null = null;
@@ -26,38 +72,172 @@ class YanmarAudioController {
   private breakerSource: AudioBufferSourceNode | null = null;
   private breakerGain: GainNode | null = null;
   private breakerStopTimer: ReturnType<typeof setTimeout> | null = null;
+  private lifecycleBound = false;
+
+  private ensureStoreSubscription() {
+    if (typeof window === "undefined" || this.storeSubscribed) return;
+    this.storeSubscribed = true;
+    this.bindLifecycle();
+    this.applySettings(getSoundSettings());
+    subscribeSoundSettings((settings) => {
+      this.applySettings(settings);
+    });
+  }
+
+  private bindLifecycle() {
+    if (this.lifecycleBound) return;
+    this.lifecycleBound = true;
+    registerPageAudioHooks("yanmar-audio", {
+      pause: () => {
+        this.breakerWanted = false;
+        this.stopBreakerImmediate();
+        this.stopBgm(false);
+        this.unbindBgmGesture();
+        if (this.audioCtx && this.audioCtx.state === "running") {
+          void this.audioCtx.suspend().catch(() => undefined);
+        }
+      },
+      resume: () => {
+        if (isPageAudioSealed()) return;
+        if (document.visibilityState !== "visible") return;
+        if (this.audioCtx && this.audioCtx.state === "suspended") {
+          void this.audioCtx.resume().catch(() => undefined);
+        }
+        if (this.active) this.syncBgm();
+      },
+      exit: () => {
+        this.breakerWanted = false;
+        this.stopBreakerImmediate();
+        this.unbindBgmGesture();
+        this.bgm = null;
+        if (this.audioCtx) {
+          void this.audioCtx.close().catch(() => undefined);
+          this.audioCtx = null;
+          this.breakerBuffer = null;
+          this.breakerBufferLoading = null;
+          this.breakerGain = null;
+        }
+        for (const audio of this.hornCache.values()) {
+          try {
+            audio.pause();
+            audio.src = "";
+          } catch {
+            // ignore
+          }
+        }
+        this.hornCache.clear();
+      },
+    });
+  }
+
+  private applySettings(settings: SoundSettings) {
+    this.bgmEnabled = settings.bgmEnabled;
+    this.bgmVolume = settings.bgmVolume;
+    this.sfxEnabled = settings.sfxEnabled;
+    this.sfxVolume = settings.sfxVolume;
+    this.breakerSfxEnabled = settings.breakerSfxEnabled;
+    this.hornId = settings.hornId;
+    this.applyBreakerGain();
+    this.applyHornVolumes();
+    this.syncBreakerPlayback();
+    if (!this.bgmEnabled) {
+      this.unbindBgmGesture();
+      this.stopBgm(true);
+      this.bgm = null;
+      return;
+    }
+    this.applyBgmVolume();
+    this.syncBgm();
+  }
 
   setActive(active: boolean) {
-    // Future BGM: if (active && this.bgmEnabled) startBgm(); else stopBgm();
+    this.ensureStoreSubscription();
+    if (this.active === active) {
+      if (active) this.syncBgm();
+      return;
+    }
+    this.active = active;
     if (!active) {
       this.breakerWanted = false;
       this.stopBreakerImmediate();
+      this.stopBgm(false);
+      this.unbindBgmGesture();
+      return;
     }
+    this.applySettings(getSoundSettings());
+    this.syncBgm();
   }
 
   setBgmEnabled(enabled: boolean) {
     this.bgmEnabled = enabled;
-    // Future: start/stop BGM here when assets are wired (respect this.bgmEnabled).
+    this.syncBgm();
+  }
+
+  setBgmVolume(volume0to100: number) {
+    this.bgmVolume = Math.max(0, Math.min(100, Math.round(volume0to100)));
+    this.applyBgmVolume();
   }
 
   setSfxEnabled(enabled: boolean) {
     this.sfxEnabled = enabled;
-    if (!enabled) {
-      this.breakerWanted = false;
-      this.stopBreakerImmediate();
-    } else if (this.breakerWanted) {
-      void this.startBreaker();
-    }
+    this.syncBreakerPlayback();
+  }
+
+  setSfxVolume(volume0to100: number) {
+    this.sfxVolume = Math.max(0, Math.min(100, Math.round(volume0to100)));
+    this.applyBreakerGain();
+    this.applyHornVolumes();
+  }
+
+  setBreakerSfxEnabled(enabled: boolean) {
+    this.breakerSfxEnabled = enabled;
+    this.syncBreakerPlayback();
   }
 
   setHornId(hornId: HornId) {
     this.hornId = hornId;
   }
 
+  private canPlayBreaker() {
+    return this.sfxEnabled && this.breakerSfxEnabled;
+  }
+
+  private syncBreakerPlayback() {
+    if (!this.canPlayBreaker()) {
+      this.stopBreakerImmediate();
+      return;
+    }
+    if (this.breakerWanted) {
+      void this.startBreaker();
+    }
+  }
+
+  private applyBgmVolume() {
+    if (this.bgm) {
+      this.bgm.volume = bgmVolumeToGain(this.bgmVolume);
+    }
+  }
+
+  private applyBreakerGain() {
+    if (this.breakerGain) {
+      this.breakerGain.gain.value =
+        BREAKER_BASE_GAIN * volumeToGain(this.sfxVolume);
+    }
+  }
+
+  private applyHornVolumes() {
+    const volume = HORN_BASE_VOLUME * volumeToGain(this.sfxVolume);
+    for (const audio of this.hornCache.values()) {
+      audio.volume = volume;
+    }
+  }
+
   /** Call from a user gesture so subsequent playback can start. */
   unlock() {
     if (typeof window === "undefined") return;
+    this.ensureStoreSubscription();
     void this.ensureAudioContext();
+    this.syncBgm();
     if (this.unlocked) return;
     const probe = new Audio(HORN_SRC[this.hornId]);
     probe.volume = 0;
@@ -68,21 +248,108 @@ class YanmarAudioController {
         probe.src = "";
         this.unlocked = true;
         void this.ensureBreakerBuffer();
+        this.syncBgm();
       })
       .catch(() => {
         probe.src = "";
       });
   }
 
+  private ensureBgm() {
+    if (typeof window === "undefined") return null;
+    const shared = getSharedIngameBgmAudio();
+    if (shared?.src) {
+      this.bgm = shared;
+      trackSiteLegendBgm(shared);
+      return shared;
+    }
+    if (shared) setSharedIngameBgmAudio(null);
+    if (this.bgm?.src) {
+      setSharedIngameBgmAudio(this.bgm);
+      return this.bgm;
+    }
+    const audio = new Audio(INGAME_BGM_SRC);
+    audio.loop = true;
+    audio.preload = "auto";
+    audio.volume = bgmVolumeToGain(this.bgmVolume);
+    this.bgm = audio;
+    setSharedIngameBgmAudio(audio);
+    return audio;
+  }
+
+  private syncBgm() {
+    if (isPageAudioSealed()) {
+      this.stopBgm(false);
+      this.unbindBgmGesture();
+      return;
+    }
+    if (this.active && this.bgmEnabled) {
+      this.startBgm();
+      this.bindBgmGesture();
+    } else {
+      this.stopBgm(true);
+      this.unbindBgmGesture();
+    }
+  }
+
+  private bindBgmGesture() {
+    if (typeof window === "undefined" || this.bgmGestureBound) return;
+    window.addEventListener("pointerdown", this.onBgmGesture, { passive: true });
+    window.addEventListener("keydown", this.onBgmGesture);
+    this.bgmGestureBound = true;
+  }
+
+  private unbindBgmGesture() {
+    if (typeof window === "undefined" || !this.bgmGestureBound) return;
+    window.removeEventListener("pointerdown", this.onBgmGesture);
+    window.removeEventListener("keydown", this.onBgmGesture);
+    this.bgmGestureBound = false;
+  }
+
+  private startBgm() {
+    if (isPageAudioSealed() || !this.active || !this.bgmEnabled) return;
+    const audio = this.ensureBgm();
+    if (!audio) return;
+    this.applyBgmVolume();
+    audio.muted = false;
+    if (!audio.paused) return;
+    void audio
+      .play()
+      .then(() => {
+        if (isPageAudioSealed() || !this.active || !this.bgmEnabled) {
+          silenceHtmlAudio(audio);
+          return;
+        }
+        this.unlocked = true;
+        this.unbindBgmGesture();
+      })
+      .catch(() => {
+        /* autoplay blocked until gesture / unlock() */
+      });
+  }
+
+  private stopBgm(reset = true) {
+    const audio = this.bgm ?? getSharedIngameBgmAudio();
+    if (!audio) return;
+    if (reset) {
+      unloadHtmlAudio(audio);
+      setSharedIngameBgmAudio(null);
+      this.bgm = null;
+      return;
+    }
+    silenceHtmlAudio(audio);
+  }
+
   playHorn(hornId: HornId = this.hornId) {
     if (typeof window === "undefined") return;
+    if (!this.sfxEnabled) return;
     let audio = this.hornCache.get(hornId);
     if (!audio) {
       audio = new Audio(HORN_SRC[hornId]);
       audio.preload = "auto";
-      audio.volume = 0.7;
       this.hornCache.set(hornId, audio);
     }
+    audio.volume = HORN_BASE_VOLUME * volumeToGain(this.sfxVolume);
     try {
       audio.currentTime = 0;
       void audio.play().then(() => {
@@ -103,7 +370,7 @@ class YanmarAudioController {
       this.clearBreakerStopTimer();
       if (this.breakerWanted && this.breakerSource) return;
       this.breakerWanted = true;
-      if (!this.sfxEnabled) return;
+      if (!this.canPlayBreaker()) return;
       void this.startBreaker();
       return;
     }
@@ -159,11 +426,11 @@ class YanmarAudioController {
   private async startBreaker() {
     const ctx = await this.ensureAudioContext();
     const buffer = await this.ensureBreakerBuffer();
-    if (!ctx || !buffer || !this.breakerWanted || !this.sfxEnabled) return;
+    if (!ctx || !buffer || !this.breakerWanted || !this.canPlayBreaker()) return;
     if (this.breakerSource) return;
 
     const gain = ctx.createGain();
-    gain.gain.value = 0.75;
+    gain.gain.value = BREAKER_BASE_GAIN * volumeToGain(this.sfxVolume);
     gain.connect(ctx.destination);
 
     const source = ctx.createBufferSource();
@@ -234,9 +501,22 @@ class YanmarAudioController {
     }
   }
 
-  dispose() {
+  /** Soft teardown when leaving a play session — keeps decoded buffers for next run. */
+  deactivate() {
+    this.active = false;
     this.breakerWanted = false;
     this.stopBreakerImmediate();
+    this.stopBgm(true);
+    this.unbindBgmGesture();
+  }
+
+  dispose() {
+    this.deactivate();
+    if (this.bgm) {
+      unloadHtmlAudio(this.bgm);
+      setSharedIngameBgmAudio(null);
+      this.bgm = null;
+    }
     this.breakerBuffer = null;
     this.breakerBufferLoading = null;
     if (this.audioCtx) {
@@ -251,4 +531,12 @@ class YanmarAudioController {
   }
 }
 
-export const yanmarAudio = new YanmarAudioController();
+function getYanmarAudio(): YanmarAudioController {
+  const g = bag();
+  if (!g[GLOBAL_CTRL]) {
+    g[GLOBAL_CTRL] = new YanmarAudioController();
+  }
+  return g[GLOBAL_CTRL];
+}
+
+export const yanmarAudio = getYanmarAudio();

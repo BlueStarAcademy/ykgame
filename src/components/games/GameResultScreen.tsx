@@ -8,7 +8,9 @@ import type { GameId } from "@/lib/games";
 import { getGameById, calculateStars } from "@/lib/games";
 import type { GameResult } from "@/games/shared/types";
 import { commitYanmarGameSessionScore } from "@/games/yanmar/gameSessionPersistence";
+import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
 import { RankingBoard } from "./RankingBoard";
+import { RankBadge } from "./RankBadge";
 
 interface RankingEntry {
   rank: number;
@@ -24,13 +26,6 @@ interface GameResultScreenProps {
   onStay?: () => void;
   onExit?: () => void;
   onScoreSaved?: (score: number) => void;
-}
-
-function medal(rank: number) {
-  if (rank === 1) return "🥇";
-  if (rank === 2) return "🥈";
-  if (rank === 3) return "🥉";
-  return `${rank}`;
 }
 
 function getDurableScoreSessionId(
@@ -82,6 +77,8 @@ export function GameResultScreen({
   const scoreSessionIdRef = useRef<string | null>(null);
   const updateRef = useRef(update);
   const onScoreSavedRef = useRef(onScoreSaved);
+
+  useRegisterInGameBackDismiss(Boolean(onExit), onExit);
 
   useEffect(() => {
     updateRef.current = update;
@@ -203,6 +200,189 @@ export function GameResultScreen({
   const yRankingRows = rankings.slice(0, 10);
   const yanmarDisplayScore =
     myTotalScore ?? result.arcadeScore ?? 0;
+  const accent = game?.color ?? "#E53935";
+  const accentDeep = game?.headerColor ?? "#C62828";
+
+  const actionButtons = (
+    <div className="flex gap-2">
+      {isYanmar && onStay ? (
+        <button
+          type="button"
+          onClick={onStay}
+          disabled={savePending}
+          className="flex-1 rounded-xl border border-white/10 bg-white/10 py-3 text-center text-sm font-bold text-white hover:bg-white/15 disabled:cursor-wait disabled:opacity-50"
+        >
+          머무르기
+        </button>
+      ) : onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300"
+        >
+          재시도
+        </button>
+      ) : (
+        <Link
+          href={isYanmar ? "/home" : `/games/${gameId}`}
+          className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300"
+        >
+          재시도
+        </Link>
+      )}
+      {onExit ? (
+        <button
+          type="button"
+          onClick={onExit}
+          disabled={savePending}
+          className="flex-1 rounded-xl py-3 text-center text-sm font-bold text-white shadow-lg hover:brightness-110 disabled:cursor-wait disabled:opacity-50"
+          style={{ backgroundColor: accent }}
+        >
+          {homeLabel}
+        </button>
+      ) : (
+        <Link
+          href={isRide ? "/ride" : "/home"}
+          className="flex-1 rounded-xl py-3 text-center text-sm font-bold text-white shadow-lg hover:brightness-110"
+          style={{ backgroundColor: accent }}
+        >
+          {homeLabel}
+        </Link>
+      )}
+    </div>
+  );
+
+  const saveStatus = !saved ? (
+    <p
+      className={`mt-2 text-center text-[11px] font-semibold ${
+        saveFailed ? "text-red-300" : "text-white/45"
+      }`}
+    >
+      {saveFailed
+        ? "점수를 저장하지 못했습니다. 나중에 다시 시도해 주세요."
+        : "점수 저장 중..."}
+    </p>
+  ) : null;
+
+  /** Fixed-size in-game result modal (save & exit). */
+  const yanmarResultModal = (
+    <div
+      className="flex h-[min(34rem,calc(100dvh-2rem))] w-[min(22rem,calc(100vw-2rem))] shrink-0 flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#121820] shadow-[0_24px_64px_rgba(0,0,0,0.55)]"
+      onClick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="yanmar-result-title"
+    >
+      <header
+        className="relative shrink-0 px-5 pb-4 pt-5 text-center"
+        style={{
+          background: `linear-gradient(180deg, ${accentDeep} 0%, #121820 100%)`,
+        }}
+      >
+        <p className="text-[10px] font-bold tracking-[0.18em] text-white/55 uppercase">
+          {game?.brandEn ?? "SITE LEGEND"}
+        </p>
+        <h2
+          id="yanmar-result-title"
+          className="mt-1 text-xl font-black tracking-tight text-white"
+        >
+          {title}
+        </h2>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-1">
+        <div className="shrink-0 rounded-xl border border-white/8 bg-white/[0.04] px-4 py-4 text-center">
+          <p className="text-[11px] font-semibold text-white/50">
+            {isRide
+              ? "탑승 체험"
+              : result.mode === "game"
+                ? "누적 점수"
+                : "연습 점수"}
+          </p>
+          <p className="mt-1 text-[2rem] font-black leading-none tabular-nums tracking-tight text-white">
+            {isRide
+              ? "완료"
+              : result.mode === "game"
+                ? yanmarDisplayScore.toLocaleString()
+                : (result.arcadeScore ?? 0).toLocaleString()}
+          </p>
+          <p className="mt-2 text-[11px] font-medium text-white/45">
+            플레이 {result.playTime}초
+            {result.timeLeft > 0 ? ` · 남은 ${result.timeLeft}초` : ""}
+            {result.mode === "game" && myRank ? ` · 시즌 #${myRank}` : ""}
+          </p>
+          {result.mode === "practice" ? (
+            <p className="mt-2 text-[10px] font-medium text-white/35">
+              연습 운행 결과는 랭킹에 저장되지 않습니다.
+            </p>
+          ) : null}
+        </div>
+
+        {result.mode === "game" ? (
+          <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/8 bg-black/25">
+            <div className="flex shrink-0 items-center justify-between border-b border-white/8 px-3 py-2">
+              <h3 className="text-[11px] font-bold text-white/70">누적 점수 Top 10</h3>
+              <span className="text-[10px] font-semibold text-white/40">시즌</span>
+            </div>
+
+            <div
+              className="mx-2 mt-2 shrink-0 rounded-lg px-3 py-2"
+              style={{ backgroundColor: `${accent}22`, border: `1px solid ${accent}55` }}
+            >
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span className="font-bold text-white">
+                  나의 순위 {myRank ? `#${myRank}` : "—"}
+                </span>
+                <span className="shrink-0 font-black tabular-nums text-white">
+                  {yanmarDisplayScore.toLocaleString()}점
+                </span>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 [-webkit-overflow-scrolling:touch]">
+              {yRankingRows.length === 0 ? (
+                <p className="px-2 py-6 text-center text-[11px] text-white/35">
+                  {savePending ? "랭킹 불러오는 중..." : "랭킹 데이터 없음"}
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {yRankingRows.map((r) => {
+                    const isMe = r.rank === myRank;
+                    return (
+                      <li
+                        key={r.rank}
+                        className={`flex items-center justify-between rounded-lg px-2.5 py-2 text-[12px] ${
+                          isMe
+                            ? "bg-white/12 font-bold text-white"
+                            : "text-white/75"
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-center gap-2 truncate">
+                          <RankBadge rank={r.rank} size="sm" tone="dark" />
+                          <span className="truncate">{r.nickname}</span>
+                        </span>
+                        <span className="shrink-0 tabular-nums text-white/90">
+                          {r.score.toLocaleString()}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 min-h-0 flex-1" />
+        )}
+
+        <div className="mt-3 shrink-0">
+          {actionButtons}
+          {saveStatus}
+        </div>
+      </div>
+    </div>
+  );
+
   const resultCard = (
     <div
       className="mx-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-lg"
@@ -210,117 +390,61 @@ export function GameResultScreen({
       role="dialog"
       aria-modal="true"
     >
-      <h2 className="text-center text-xl font-bold" style={{ color: game?.color }}>
+      <h2 className="text-center text-xl font-bold" style={{ color: accent }}>
         {title}
       </h2>
       <p className="mt-1 text-center text-sm text-gray-500">{game?.brandEn}</p>
 
       <div className="my-6 text-center">
-        {!isYanmar ? (
-          <p className="text-4xl text-yellow-400">
-            {"★".repeat(stars)}
-            {"☆".repeat(3 - stars)}
-          </p>
-        ) : null}
-        <p className="mt-2 text-2xl font-bold text-gray-800">
-          {isRide
-            ? "탑승 체험 완료"
-            : isYanmarArcade
-              ? result.mode === "game"
-                ? `누적 점수 ${yanmarDisplayScore.toLocaleString()}`
-                : `연습 점수 ${(result.arcadeScore ?? 0).toLocaleString()}`
-            : `${result.progress}%`}
+        <p className="text-4xl text-yellow-400">
+          {"★".repeat(stars)}
+          {"☆".repeat(3 - stars)}
         </p>
+        <p className="mt-2 text-2xl font-bold text-gray-800">{result.progress}%</p>
         <p className="text-sm text-gray-500">
           플레이 시간 {result.playTime}초
           {result.timeLeft > 0 ? ` · 남은 시간 ${result.timeLeft}초` : ""}
         </p>
-        {!isYanmar && saved && stars > 0 && (
+        {saved && stars > 0 && (
           <p className="mt-2 text-sm text-green-600">⭐ {stars}별 획득!</p>
         )}
         {result.mode === "game" && saved && myRank && (
           <p className="mt-1 text-sm text-blue-600">시즌 순위 #{myRank}</p>
         )}
-        {isYanmar && result.mode === "practice" && (
-          <p className="mt-2 text-xs text-gray-400">연습 운행 결과는 랭킹에 저장되지 않습니다.</p>
-        )}
       </div>
 
-      {!isYanmar || result.mode === "game" ? (
-        <div className="mb-4 rounded-xl bg-gray-50 p-4">
+      <div className="mb-4 rounded-xl bg-gray-50 p-4">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-gray-700">
-            {isYanmar ? "누적 점수 Top 10" : "이번 달 Top 10"}
-          </h3>
-          {!isYanmar ? (
-            <button
-              onClick={() => setShowRanking(true)}
-              className="text-xs font-medium text-blue-600 hover:underline"
-            >
-              전체 보기
-            </button>
-          ) : null}
+          <h3 className="text-sm font-bold text-gray-700">이번 달 Top 10</h3>
+          <button
+            type="button"
+            onClick={() => setShowRanking(true)}
+            className="text-xs font-medium text-blue-600 hover:underline"
+          >
+            전체 보기
+          </button>
         </div>
-        {isYanmar ? (
-          <>
-            <div className="mb-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-blue-800">
-                  나의 순위 {myRank ? `#${myRank}` : "기록 없음"}
-                </span>
-                <span className="shrink-0 font-black text-blue-900">
-                  {yanmarDisplayScore.toLocaleString()}점
-                </span>
-              </div>
-            </div>
-            {yRankingRows.length === 0 ? (
-              <p className="text-xs text-gray-400">랭킹 데이터 없음</p>
-            ) : (
-              <ul className="h-[10.75rem] space-y-1.5 overflow-y-auto pr-1 [-webkit-overflow-scrolling:touch]">
-                {yRankingRows.map((r) => (
-                  <li
-                    key={r.rank}
-                    className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
-                      r.rank === myRank ? "bg-blue-100 text-blue-900" : "bg-white text-gray-700"
-                    }`}
-                  >
-                    <span className="min-w-0 truncate">
-                      {medal(r.rank)} {r.nickname}
-                    </span>
-                    <span className="shrink-0 font-semibold">{r.score.toLocaleString()}점</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        ) : rankings.length === 0 ? (
+        {rankings.length === 0 ? (
           <p className="text-xs text-gray-400">랭킹 데이터 없음</p>
         ) : (
           <ul className="space-y-1">
             {rankings.slice(0, 5).map((r) => (
-              <li key={r.rank} className="flex justify-between text-sm">
-                <span>
-                  {medal(r.rank)} {r.nickname}
+              <li key={r.rank} className="flex items-center justify-between gap-2 text-sm">
+                <span className="flex min-w-0 items-center gap-2 truncate">
+                  <RankBadge rank={r.rank} size="sm" tone="light" />
+                  <span className="truncate">{r.nickname}</span>
                 </span>
-                <span className="text-gray-600">{r.score}점</span>
+                <span className="shrink-0 text-gray-600">{r.score}점</span>
               </li>
             ))}
           </ul>
         )}
-        </div>
-      ) : null}
+      </div>
 
       <div className="flex gap-2">
-        {isYanmar && onStay ? (
+        {onRetry ? (
           <button
-            onClick={onStay}
-            disabled={savePending}
-            className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300 disabled:cursor-wait disabled:opacity-50"
-          >
-            머무르기
-          </button>
-        ) : onRetry ? (
-          <button
+            type="button"
             onClick={onRetry}
             className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300"
           >
@@ -328,7 +452,7 @@ export function GameResultScreen({
           </button>
         ) : (
           <Link
-            href={isYanmar ? "/home" : `/games/${gameId}`}
+            href={`/games/${gameId}`}
             className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300"
           >
             재시도
@@ -338,17 +462,16 @@ export function GameResultScreen({
           <button
             type="button"
             onClick={onExit}
-            disabled={savePending}
-            className="flex-1 rounded-lg py-3 text-center font-medium text-white hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
-            style={{ backgroundColor: game?.color }}
+            className="flex-1 rounded-lg py-3 text-center font-medium text-white hover:opacity-90"
+            style={{ backgroundColor: accent }}
           >
             {homeLabel}
           </button>
         ) : (
           <Link
-            href={isRide ? "/ride" : "/home"}
+            href="/home"
             className="flex-1 rounded-lg py-3 text-center font-medium text-white hover:opacity-90"
-            style={{ backgroundColor: game?.color }}
+            style={{ backgroundColor: accent }}
           >
             {homeLabel}
           </Link>
@@ -368,10 +491,10 @@ export function GameResultScreen({
     return createPortal(
       <>
         <div
-          className="fixed inset-0 z-[320] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[320] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[3px]"
           onClick={onStay}
         >
-          {resultCard}
+          {yanmarResultModal}
         </div>
 
         <RankingBoard

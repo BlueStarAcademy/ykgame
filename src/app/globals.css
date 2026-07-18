@@ -4634,6 +4634,1033 @@ html.pwa-mode .pwa-auth-page {
   background: transparent;
 }
 
+.site-legend-auth-page {
+  position: relative;
+  display: flex;
+  height: 100dvh;
+  min-height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  padding: 0;
+  background: #0b1220;
+}
+
+html.pwa-mode .site-legend-auth-page {
+  min-height: 100%;
+  height: 100%;
+}
+
+/* ── Site Legend auth splash / login panels ── */
+.site-legend-auth {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  flex: 1;
+  overflow: hidden;
+  color: #fff;
+  /* Bust stale Turbopack CSS chunk that dropped site-legend rules */
+  --site-legend-bg-bust: 13;
+}
+
+html.pwa-mode .site-legend-auth {
+  min-height: 100%;
+  height: 100%;
+}
+
+.site-legend-auth-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background-color: #0b1220;
+  background-image: url("/images/site-legend/splash-bg.png?v=13");
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+
+.site-legend-auth-bg-img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  /* Full-bleed: fill viewport, no header/footer letterbox bands */
+  object-fit: cover;
+  object-position: center center;
+  user-select: none;
+  pointer-events: none;
+}
+
+.site-legend-auth-bg-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(8, 14, 28, 0.18) 0%, rgba(8, 14, 28, 0.04) 30%, rgba(8, 14, 28, 0.08) 60%, rgba(8, 14, 28, 0.42) 100%),
+    radial-gradient(120% 50% at 50% 100%, rgba(0, 0, 0, 0.35), transparent 72%);
+  pointer-events: none;
+}
+
+.site-legend-auth-frame {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding:
+    max(0.75rem, env(safe-area-inset-top))
+    0
+    0;
+}
+
+.site-legend-auth-frame > .site-legend-auth-title-wrap,
+.site-legend-auth-frame > .site-legend-auth-track {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.site-legend-auth-title-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 0.35rem 0.5rem 0.25rem;
+  animation: site-legend-title-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.site-legend-auth-title {
+  width: min(88vw, 26rem);
+  height: auto;
+  max-height: 28dvh;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
+  user-select: none;
+  pointer-events: none;
+}
+
+.site-legend-auth-track {
+  display: flex;
+  width: 200%;
+  min-height: 0;
+  flex: 1;
+  transform: translate3d(0, 0, 0);
+  transition: transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.site-legend-auth-track.is-login {
+  transform: translate3d(-50%, 0, 0);
+}
+
+.site-legend-auth-panel {
+  display: flex;
+  width: 50%;
+  min-height: 0;
+  flex-direction: column;
+  padding: 0 0.15rem;
+}
+
+.site-legend-auth-panel-splash {
+  justify-content: flex-end;
+  padding-bottom: 0.85rem;
+}
+
+.site-legend-legal-footer {
+  position: relative;
+  z-index: 2;
+  margin-top: auto;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0.7rem 0.85rem max(0.75rem, env(safe-area-inset-bottom));
+  text-align: center;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.site-legend-legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem 1.1rem;
+  margin-bottom: 0.35rem;
+}
+
+.site-legend-legal-links button {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  padding: 0.1rem 0;
+  word-break: keep-all;
+}
+
+.site-legend-legal-links button:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.site-legend-legal-meta {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.62rem;
+  font-weight: 500;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+.site-legend-legal-copy {
+  margin-top: 0.2rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.58rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.site-legend-legal-modal {
+  display: flex;
+  max-height: inherit;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.site-legend-legal-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.9rem 1rem 0.75rem;
+}
+
+.site-legend-legal-modal-head h2 {
+  font-size: 1.02rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.site-legend-legal-modal-head button {
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+}
+
+.site-legend-legal-modal-body {
+  min-height: 0;
+  max-height: min(70dvh, 32rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.9rem 1rem 1.1rem;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.55;
+  word-break: keep-all;
+  white-space: pre-wrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.site-legend-legal-modal-body p {
+  margin: 0;
+}
+
+@media (max-width: 380px) {
+  .site-legend-legal-links {
+    gap: 0.25rem 0.4rem;
+  }
+
+  .site-legend-legal-links button {
+    font-size: 0.66rem;
+  }
+
+  .site-legend-legal-meta {
+    font-size: 0.58rem;
+  }
+}
+
+.site-legend-auth-actions {
+  display: flex;
+  width: min(100%, 21.5rem);
+  margin: 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  animation: site-legend-actions-in 800ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.site-legend-switch-account {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(255, 215, 106, 0.55);
+  padding: 0.15rem 0.35rem;
+}
+
+.site-legend-switch-account:hover {
+  color: #ffe39a;
+  text-decoration-color: #ffe39a;
+}
+
+.site-legend-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 0;
+  cursor: pointer;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  transition: transform 160ms ease, filter 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.site-legend-btn:active {
+  transform: translateY(1px) scale(0.985);
+}
+
+.site-legend-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.site-legend-btn-primary,
+.site-legend-btn-login {
+  min-height: 3.55rem;
+  padding: 0.9rem 1.6rem;
+  overflow: hidden;
+  border-radius: 0.95rem;
+  color: #211607;
+  font-size: 1.18rem;
+  letter-spacing: 0.02em;
+  background:
+    linear-gradient(180deg, #fff1b0 0%, #f0c245 38%, #c88912 78%, #9a6410 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 230, 150, 0.35),
+    0 12px 28px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    inset 0 -3px 0 rgba(110, 62, 0, 0.35);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.site-legend-btn-primary {
+  width: 86%;
+  max-width: 18rem;
+}
+
+.site-legend-btn-login {
+  width: 100%;
+}
+
+.site-legend-btn-primary::before,
+.site-legend-btn-login::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 236, 170, 0.35);
+  pointer-events: none;
+}
+
+.site-legend-btn-primary-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 18%,
+    rgba(255, 255, 255, 0.35) 42%,
+    transparent 58%
+  );
+  opacity: 0.55;
+  pointer-events: none;
+  transform: translateX(-30%);
+}
+
+.site-legend-btn-primary-label,
+.site-legend-btn-login {
+  position: relative;
+  z-index: 1;
+}
+
+.site-legend-btn-primary:hover,
+.site-legend-btn-login:hover {
+  filter: brightness(1.06);
+  box-shadow:
+    0 0 0 1px rgba(255, 230, 150, 0.45),
+    0 14px 30px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -3px 0 rgba(110, 62, 0, 0.35);
+}
+
+.site-legend-btn-settings {
+  width: min(100%, 11.8rem);
+  min-height: 2.7rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: 0.85rem;
+  color: #f4f7ff;
+  font-size: 0.96rem;
+  background:
+    linear-gradient(180deg, #3a5378 0%, #24385a 48%, #15253d 100%);
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 88, 0.42),
+    0 10px 22px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.28);
+}
+
+.site-legend-btn-settings-inner {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.site-legend-btn-settings:hover {
+  filter: brightness(1.08);
+}
+
+.site-legend-btn-gear {
+  font-size: 1.05rem;
+  line-height: 1;
+  color: #ffd76a;
+}
+
+.site-legend-btn-logout-icon {
+  display: block;
+  flex-shrink: 0;
+  color: #ffd4c8;
+}
+
+.site-legend-btn-logout {
+  color: #fff5f3;
+  background:
+    linear-gradient(180deg, #c45a4a 0%, #9e3228 48%, #6f1c18 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 180, 150, 0.35),
+    0 10px 22px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -2px 0 rgba(60, 10, 8, 0.4);
+}
+
+.site-legend-btn-logout:hover {
+  filter: brightness(1.08);
+}
+
+.site-legend-auth.is-login-panel .site-legend-auth-title {
+  max-height: 16dvh;
+}
+
+.site-legend-auth.is-login-panel .site-legend-auth-title-wrap {
+  padding-top: 0.15rem;
+  padding-bottom: 0;
+}
+
+.site-legend-auth-panel-login {
+  justify-content: center;
+  padding: 0 1rem 0.75rem;
+}
+
+.site-legend-login-card {
+  position: relative;
+  display: flex;
+  width: min(100%, 22.5rem);
+  margin: 0 auto;
+  flex-direction: column;
+  overflow: visible;
+  border: 1px solid rgba(212, 175, 88, 0.38);
+  border-radius: 1rem;
+  background:
+    linear-gradient(165deg, rgba(28, 36, 52, 0.94) 0%, rgba(12, 16, 26, 0.96) 100%);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 0.85rem 0.9rem 0.9rem;
+}
+
+.site-legend-login-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #e2b34a 20%, #fff1b0 50%, #e2b34a 80%, transparent);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.site-legend-login-form {
+  overflow: visible;
+}
+
+.site-legend-login-heading {
+  margin-bottom: 0.65rem;
+  text-align: center;
+}
+
+.site-legend-login-heading h1 {
+  font-size: 1.12rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #ffe39a;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.site-legend-login-heading p {
+  margin-top: 0.15rem;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.74rem;
+}
+
+.site-legend-login-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.site-legend-login-label {
+  display: block;
+  margin-bottom: 0.22rem;
+  color: #f0d48a;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.site-legend-login-input {
+  width: 100%;
+  border: 1px solid rgba(212, 175, 88, 0.28);
+  border-radius: 0.7rem;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  outline: none;
+  padding: 0.62rem 0.8rem;
+  font-size: 0.92rem;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+.site-legend-login-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.site-legend-login-input:focus {
+  border-color: rgba(242, 194, 58, 0.75);
+  box-shadow:
+    0 0 0 3px rgba(242, 194, 58, 0.16),
+    inset 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+.site-legend-login-checks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.35rem;
+  font-size: 0.72rem;
+}
+
+.site-legend-login-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.site-legend-login-check input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.site-legend-check-box {
+  display: inline-flex;
+  width: 0.95rem;
+  height: 0.95rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(212, 175, 88, 0.55);
+  border-radius: 0.25rem;
+  background: rgba(0, 0, 0, 0.35);
+  color: transparent;
+  font-size: 0.65rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+.site-legend-login-check input:checked + .site-legend-check-box {
+  color: #1a1408;
+  background: linear-gradient(180deg, #ffe48a, #d9a41d);
+  border-color: #e2b34a;
+}
+
+.site-legend-login-error {
+  color: #ff9b9b;
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.site-legend-login-success {
+  margin: 0 0 0.35rem;
+  text-align: center;
+  color: #9dffa8;
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.site-legend-login-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #ffd76a;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.site-legend-btn-login {
+  min-height: 2.85rem !important;
+  padding: 0.7rem 1.2rem !important;
+  font-size: 1.02rem !important;
+}
+
+.site-legend-login-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.55rem 0 0.45rem;
+  color: rgba(255, 215, 106, 0.55);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.site-legend-login-divider::before,
+.site-legend-login-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 88, 0.45), transparent);
+}
+
+.site-legend-login-oauth {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.site-legend-oauth {
+  width: 100%;
+  border-radius: 0.7rem;
+  padding: 0.58rem 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.site-legend-oauth-kakao {
+  border: 0;
+  background: linear-gradient(180deg, #ffe566, #fee500);
+  color: #3c1e1e;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.site-legend-oauth-google {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.site-legend-login-footer {
+  margin-top: 0.55rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.72rem;
+}
+
+.site-legend-settings {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.site-legend-settings-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.site-legend-settings-sheet {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 26rem);
+  margin: 0 0.75rem max(0.75rem, env(safe-area-inset-bottom));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1.1rem;
+  background: linear-gradient(180deg, #1b2740 0%, #121a2b 100%);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+  padding: 0.95rem 1rem 1.05rem;
+  animation: site-legend-sheet-in 280ms ease both;
+}
+
+.site-legend-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.7rem;
+}
+
+.site-legend-settings-head h2 {
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.site-legend-settings-head button {
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.7rem;
+}
+
+.site-legend-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-legend-settings-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.7rem 0.8rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.site-legend-settings-note {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+@keyframes site-legend-title-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes site-legend-actions-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes site-legend-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.site-legend-home-page {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  flex: 1;
+  overflow: hidden;
+  background: #0b1220;
+}
+
+html.pwa-mode .site-legend-home-page {
+  min-height: 100%;
+  height: 100%;
+}
+
+.site-legend-home {
+  min-height: 100%;
+  height: 100%;
+}
+
+.site-legend-home-main {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 0 0.85rem;
+}
+
+.site-legend-auth-panel-splash .site-legend-auth-actions {
+  margin-top: auto;
+  padding-bottom: 0.15rem;
+}
+
+.site-legend-entry-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 280;
+}
+
+.site-legend-entry-loading {
+  display: flex;
+  width: min(100%, 21.5rem);
+  margin: auto auto 1.25rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  padding: 1.1rem 1rem 1.35rem;
+  animation: site-legend-actions-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.site-legend-entry-loading-spinner {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  border-top-color: #ffd76a;
+  animation: site-legend-entry-spin 0.85s linear infinite;
+}
+
+.site-legend-entry-loading-text {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+@keyframes site-legend-entry-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.site-legend-settings-badge {
+  position: absolute;
+  top: -0.2rem;
+  right: 0.55rem;
+  display: inline-flex;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+
+.site-legend-btn-settings {
+  position: relative;
+}
+
+.site-legend-auth-title {
+  background: transparent;
+}
+
+.game-lobby-hero-site-legend {
+  position: relative;
+  overflow: hidden;
+  background: #0b1220 !important;
+  min-height: 9.5rem;
+}
+
+.game-lobby-hero-site-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 40%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.game-lobby-hero-site-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(8, 12, 22, 0.72) 0%, rgba(8, 12, 22, 0.28) 55%, rgba(8, 12, 22, 0.45) 100%),
+    linear-gradient(180deg, rgba(8, 12, 22, 0.2) 0%, rgba(8, 12, 22, 0.55) 100%);
+  pointer-events: none;
+}
+
+.game-lobby-hero-site-legend .game-lobby-hero-top,
+.game-lobby-hero-site-legend .game-lobby-hero-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.game-lobby-hero-site-inner {
+  align-items: center;
+}
+
+.game-lobby-hero-site-copy {
+  gap: 0.15rem;
+}
+
+.game-lobby-hero-site-title {
+  width: min(100%, 12.5rem);
+  height: auto;
+  margin-bottom: 0.15rem;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+  user-select: none;
+}
+
+.game-lobby-hero-site-legend .game-lobby-brand,
+.game-lobby-hero-site-legend .game-lobby-title {
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.game-lobby-menu-hint {
+  margin: auto 0.75rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.72);
+  color: #475569;
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.45;
+  padding: 1rem 1.05rem;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.yanmar-info-modal {
+  display: flex;
+  max-height: inherit;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.yanmar-info-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.9rem 1rem 0.75rem;
+}
+
+.yanmar-info-modal-head h2 {
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.yanmar-info-modal-head button {
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+}
+
+.yanmar-info-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.85rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.yanmar-info-guide-grid,
+.yanmar-info-reward-grid {
+  margin: 0;
+}
+
+.yanmar-info-guide-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.yanmar-info-guide-card .game-lobby-guide-card-title {
+  color: #fff;
+}
+
+.yanmar-info-guide-card .game-lobby-guide-card-desc {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.yanmar-info-reward-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.yanmar-info-reward-card .game-lobby-reward-label,
+.yanmar-info-reward-card .game-lobby-reward-desc {
+  color: inherit;
+}
+
+.yanmar-info-reward-card .game-lobby-reward-desc {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+@media (max-height: 700px) {
+  .site-legend-auth-title {
+    max-height: 22dvh;
+  }
+
+  .site-legend-auth.is-login-panel .site-legend-auth-title {
+    max-height: 12dvh;
+  }
+}
+
 html.pwa-mode .pwa-shell {
   -webkit-overflow-scrolling: touch;
   /* inset-0 대신 Visual Viewport 동기화 높이 사용 (iOS Safari 탭 브라우저 크롬 대응) */
@@ -4735,8 +5762,7 @@ html.pwa-mode [contenteditable="true"] {
 }
 
 .landing-logo {
-  background: linear-gradient(145deg, #ef5350 0%, #c62828 50%, #b71c1c 100%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: block;
 }
 
 .landing-cta-ride {
@@ -7727,6 +8753,27 @@ button.yanmar-gear-icon-cell {
   text-align: center;
 }
 
+.yanmar-gear-icon-cell-check {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: rgba(15, 23, 42, 0.48);
+  color: #bbf7d0;
+  font-size: 1.15rem;
+  font-weight: 900;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.yanmar-gear-icon-cell.is-checked {
+  outline: 2px solid rgba(74, 222, 128, 0.85);
+  outline-offset: 1px;
+}
+
 .yanmar-gear-icon-cell.is-purchase {
   flex-direction: column;
   gap: 0.12rem;
@@ -8239,6 +9286,30 @@ button.yanmar-gear-icon-cell {
   flex-shrink: 0;
 }
 
+.yanmar-gear-mgr-actions--four {
+  gap: 0.28rem;
+}
+
+.yanmar-gear-mgr-actions--four > .yanmar-gear-btn {
+  padding: 0.48rem 0.2rem;
+  font-size: 0.68rem;
+  letter-spacing: 0;
+}
+
+.yanmar-gear-mgr-detail-equip {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  margin-left: auto;
+  padding-left: 0.35rem;
+}
+
+.yanmar-gear-btn--equip-side {
+  min-width: 3.4rem;
+  padding: 0.55rem 0.55rem;
+  font-size: 0.72rem;
+}
+
 .yanmar-gear-mgr-actions > .yanmar-gear-btn {
   flex: 1 1 0;
   min-width: 0;
@@ -8340,6 +9411,215 @@ button.yanmar-gear-icon-cell {
   background:
     linear-gradient(180deg, rgba(252, 165, 165, 0.18), transparent 40%),
     linear-gradient(180deg, #dc2626, #9f1239 70%, #7f1d1d);
+}
+
+.yanmar-gear-btn--synth {
+  border-color: rgba(167, 139, 250, 0.5);
+  background:
+    linear-gradient(180deg, rgba(196, 181, 253, 0.22), transparent 40%),
+    linear-gradient(180deg, #7c3aed, #5b21b6 70%, #4c1d95);
+}
+
+.yanmar-gear-btn--vend {
+  border-color: rgba(52, 211, 153, 0.45);
+  background:
+    linear-gradient(180deg, rgba(110, 231, 183, 0.2), transparent 40%),
+    linear-gradient(180deg, #059669, #047857 70%, #065f46);
+}
+
+.yanmar-gear-synth-card {
+  max-width: min(22rem, 100%);
+  width: min(100%, 22rem) !important;
+  max-height: min(88dvh, 36rem);
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.yanmar-gear-synth-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+  margin: 0.75rem 0 0.45rem;
+  flex-shrink: 0;
+}
+
+.yanmar-gear-synth-slot {
+  display: flex;
+  min-height: 4.2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(196, 181, 253, 0.45);
+  border-radius: 0.65rem;
+  background: rgba(15, 10, 30, 0.45);
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 1.1rem;
+  font-weight: 900;
+  cursor: pointer;
+  padding: 0.35rem;
+}
+
+.yanmar-gear-synth-slot.is-filled {
+  border-style: solid;
+  border-color: rgba(167, 139, 250, 0.55);
+  background: rgba(76, 29, 149, 0.28);
+}
+
+.yanmar-gear-synth-hint {
+  margin: 0 0 0.55rem;
+  color: rgba(226, 232, 240, 0.72);
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.45;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.yanmar-gear-synth-odds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.45rem;
+  margin: 0 0 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(253, 224, 71, 0.35);
+  background:
+    linear-gradient(180deg, rgba(253, 224, 71, 0.12), transparent 70%),
+    rgba(12, 10, 22, 0.72);
+  flex-shrink: 0;
+}
+
+.yanmar-gear-synth-odds-part {
+  font-size: 1.02rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.yanmar-gear-synth-odds-sep {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.yanmar-gear-synth-viewer {
+  margin: 0 0 0.55rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(8, 10, 18, 0.72);
+  flex-shrink: 0;
+  min-height: 5.2rem;
+}
+
+.yanmar-gear-synth-viewer-body {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.yanmar-gear-synth-viewer-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.yanmar-gear-synth-viewer-label {
+  margin: 0 0 0.15rem;
+  color: rgba(226, 232, 240, 0.55);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.yanmar-gear-synth-viewer-subs {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.yanmar-gear-synth-viewer-master {
+  margin: 0.2rem 0 0;
+  color: #67e8f9;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.yanmar-gear-synth-viewer-empty {
+  margin: 0.85rem 0;
+  text-align: center;
+  color: rgba(226, 232, 240, 0.45);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.yanmar-gear-synth-inv {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  margin-bottom: 0.65rem;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  border-radius: 0.7rem;
+  background: rgba(8, 6, 18, 0.55);
+  overflow: hidden;
+}
+
+.yanmar-gear-synth-inv-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.2);
+  color: rgba(237, 233, 254, 0.88);
+  font-size: 0.72rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.yanmar-gear-synth-inv-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-contain: contain;
+  padding: 0.45rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.yanmar-gear-synth-inv-grid {
+  min-height: 7.5rem;
+}
+
+.yanmar-gear-synth-inv-empty {
+  grid-column: 1 / -1;
+  margin: 0.75rem 0;
+  text-align: center;
+  color: rgba(226, 232, 240, 0.55);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.yanmar-gear-synth-card .yanmar-gear-confirm-eyebrow,
+.yanmar-gear-synth-card h3 {
+  text-align: center;
+}
+
+.yanmar-gear-synth-card .yanmar-gear-confirm-actions {
+  flex-shrink: 0;
+}
+
+.yanmar-gear-synth-upgraded {
+  margin: 0.2rem 0 0;
+  color: #fde68a;
+  font-size: 0.78rem;
+  font-weight: 900;
 }
 
 .yanmar-gear-actions button {

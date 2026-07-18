@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { YkGeongiLogo } from "@/components/brand/YkGeongiLogo";
 import { GAMES } from "@/lib/games";
 import { COMPANY, EXPERIENCE_STEPS } from "@/lib/landing-content";
 import { LandingEquipmentCard } from "./LandingEquipmentCard";
@@ -22,9 +23,11 @@ export function LandingPage({ rideHref, gameHref }: LandingPageProps) {
       <div className="relative z-10 mx-auto w-full max-w-lg shrink-0 px-3 pt-3 pb-2">
         <header className="flex flex-col items-center text-center">
           <div className="flex items-center justify-center gap-2.5">
-            <div className="landing-logo flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-base font-black tracking-tighter text-white">
-              YK
-            </div>
+            <YkGeongiLogo
+              variant="black"
+              priority
+              className="landing-logo h-9 w-auto max-w-[9.5rem] object-contain object-left"
+            />
             <h1 className="text-lg font-bold leading-tight tracking-tight text-gray-900">
               중장비 체험존
             </h1>

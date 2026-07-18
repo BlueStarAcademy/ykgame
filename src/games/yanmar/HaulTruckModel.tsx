@@ -1,9 +1,10 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useLayoutEffect, useRef } from "react";
+import { useFrame, useLoader } from "@react-three/fiber";
 import { RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
+import { YK_GEONGI_LOGO } from "@/lib/brand-assets";
 import {
   HAUL_TRUCK_ARRIVE_SEC,
   HAUL_TRUCK_DEPART_SEC,
@@ -15,7 +16,7 @@ import {
   HAUL_TRUCK_LANE_END_OFFSET,
 } from "./haulTruckLane";
 import {
-  createYkGeongiWhiteTextTexture,
+  configureYkGeongiLogoTexture,
   YANMAR_MACHINE_COLORS as COLORS,
   YANMAR_MACHINE_MATERIALS as MATERIALS,
 } from "./machineVisualTheme";
@@ -188,8 +189,10 @@ export function HaulTruckModel({
   rockCount?: number;
 }) {
   const groupRef = useRef<THREE.Group>(null);
-  const ykMark = useMemo(() => createYkGeongiWhiteTextTexture(), []);
-  useLayoutEffect(() => () => ykMark?.dispose(), [ykMark]);
+  const ykMark = useLoader(THREE.TextureLoader, YK_GEONGI_LOGO.white);
+  useLayoutEffect(() => {
+    configureYkGeongiLogoTexture(ykMark);
+  }, [ykMark]);
 
   useFrame(() => {
     const group = groupRef.current;
@@ -255,7 +258,7 @@ export function HaulTruckModel({
                 rotation={[0, side > 0 ? 0 : Math.PI, 0]}
                 renderOrder={18}
               >
-                <planeGeometry args={[2.05, 0.64]} />
+                <planeGeometry args={[2.05, 2.05 / YK_GEONGI_LOGO.aspect]} />
                 <meshBasicMaterial
                   map={ykMark}
                   transparent

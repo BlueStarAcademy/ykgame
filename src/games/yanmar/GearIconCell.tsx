@@ -15,6 +15,8 @@ interface GearIconCellProps {
   empty?: boolean;
   selected?: boolean;
   equipped?: boolean;
+  /** 합성 슬롯 등에 선택된 상태 — 체크 표시 */
+  checked?: boolean;
   purchase?: boolean;
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
@@ -37,6 +39,7 @@ export function GearIconCell({
   empty = false,
   selected = false,
   equipped = false,
+  checked = false,
   purchase = false,
   size = "md",
   className = "",
@@ -58,9 +61,9 @@ export function GearIconCell({
         : "빈 슬롯");
   const classNames = `yanmar-gear-icon-cell ${SIZE_CLASS[size]} ${frame}${
     selected ? " is-selected" : ""
-  }${equipped ? " is-equipped" : ""}${purchase ? " is-purchase" : ""}${
-    empty && !purchase ? " is-empty" : ""
-  }${className ? ` ${className}` : ""}`;
+  }${equipped ? " is-equipped" : ""}${checked ? " is-checked" : ""}${
+    purchase ? " is-purchase" : ""
+  }${empty && !purchase ? " is-empty" : ""}${className ? ` ${className}` : ""}`;
 
   let content: ReactNode = null;
   if (purchase) {
@@ -102,6 +105,11 @@ export function GearIconCell({
         {equipped ? (
           <span className="yanmar-gear-icon-cell-e" aria-hidden>
             E
+          </span>
+        ) : null}
+        {checked ? (
+          <span className="yanmar-gear-icon-cell-check" aria-hidden>
+            ✓
           </span>
         ) : null}
       </>

@@ -120,12 +120,16 @@ export const YANMAR_MACHINE_MATERIALS = {
   },
 } as const;
 
-export function createYkGeongiMarkTexture(displayText?: string) {
+/** White number-plate face with official YK건기 mark (black "건기") + phone line. */
+export function createYkGeongiNumberPlateTexture(
+  logo: CanvasImageSource,
+  displayText: string,
+) {
   if (typeof document === "undefined") return null;
 
   const canvas = document.createElement("canvas");
-  canvas.width = displayText ? 1600 : 1200;
-  canvas.height = displayText ? 560 : 420;
+  canvas.width = 1600;
+  canvas.height = 560;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
@@ -144,228 +148,74 @@ export function createYkGeongiMarkTexture(displayText?: string) {
     ctx.closePath();
   };
 
-  const finishTexture = () => {
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.generateMipmaps = false;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.anisotropy = 16;
-    texture.needsUpdate = true;
-    return texture;
-  };
-
-  if (displayText) {
-    const w = canvas.width;
-    const h = canvas.height;
-    const metal = ctx.createLinearGradient(0, 0, 0, h);
-    metal.addColorStop(0, "#f8fbfd");
-    metal.addColorStop(0.28, "#8b9aa6");
-    metal.addColorStop(0.5, "#e8eef2");
-    metal.addColorStop(0.72, "#6d7d89");
-    metal.addColorStop(1, "#dce5ea");
-    roundedRect(16, 16, w - 32, h - 32, 72);
-    ctx.fillStyle = metal;
-    ctx.fill();
-
-    const numberPlateFace = ctx.createLinearGradient(0, 40, 0, h - 40);
-    numberPlateFace.addColorStop(0, "#ffffff");
-    numberPlateFace.addColorStop(0.55, "#f7f9fa");
-    numberPlateFace.addColorStop(1, "#e8edf0");
-    roundedRect(40, 40, w - 80, h - 80, 56);
-    ctx.fillStyle = numberPlateFace;
-    ctx.fill();
-    ctx.lineWidth = 7;
-    ctx.strokeStyle = "#b8c0c6";
-    ctx.stroke();
-
-    roundedRect(62, 62, w - 124, h - 124, 42);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "#d5dce1";
-    ctx.stroke();
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.lineJoin = "round";
-    ctx.miterLimit = 2;
-
-    const cx = w / 2;
-    const brandY = Math.round(h * 0.3);
-    const numberY = Math.round(h * 0.66);
-    const latinFont = '"Arial Black", Arial, sans-serif';
-    const koreanFont =
-      '"Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
-
-    // Top line — YK건기
-    const brandSize = 118;
-    ctx.font = `900 ${brandSize}px ${latinFont}`;
-    const yW = ctx.measureText("Y").width;
-    const kW = ctx.measureText("K").width;
-    ctx.font = `900 ${brandSize}px ${koreanFont}`;
-    const geongiW = ctx.measureText("건기").width;
-    const brandGap = 14;
-    const brandTotal = yW + kW + brandGap + geongiW;
-    let brandX = cx - brandTotal / 2;
-
-    ctx.shadowColor = "rgba(0,0,0,0.14)";
-    ctx.shadowBlur = 2;
-    ctx.shadowOffsetY = 1;
-
-    ctx.font = `900 ${brandSize}px ${latinFont}`;
-    ctx.fillStyle = "#1565c0";
-    ctx.fillText("Y", brandX + yW / 2, brandY);
-    brandX += yW;
-    ctx.fillStyle = "#c62828";
-    ctx.fillText("K", brandX + kW / 2, brandY);
-    brandX += kW + brandGap;
-
-    ctx.font = `900 ${brandSize}px ${koreanFont}`;
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = "rgba(20, 28, 34, 0.22)";
-    ctx.strokeText("건기", brandX + geongiW / 2, brandY);
-    ctx.fillStyle = "#141b21";
-    ctx.fillText("건기", brandX + geongiW / 2, brandY);
-
-    const divider = ctx.createLinearGradient(w * 0.1, 0, w * 0.9, 0);
-    divider.addColorStop(0, "rgba(120,130,138,0)");
-    divider.addColorStop(0.5, "rgba(120,130,138,0.5)");
-    divider.addColorStop(1, "rgba(120,130,138,0)");
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.fillStyle = divider;
-    ctx.fillRect(w * 0.12, h * 0.46, w * 0.76, 4);
-
-    // Bottom line — plate number
-    let fontSize = 210;
-    do {
-      ctx.font = `900 ${fontSize}px ${latinFont}`;
-      fontSize -= 4;
-    } while (ctx.measureText(displayText).width > w * 0.82 && fontSize > 120);
-    ctx.shadowColor = "rgba(0,0,0,0.18)";
-    ctx.shadowBlur = 3;
-    ctx.shadowOffsetY = 2;
-    ctx.fillStyle = "#2a3238";
-    ctx.fillText(displayText, cx, numberY);
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-
-    return finishTexture();
-  }
-
-  const metal = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  const w = canvas.width;
+  const h = canvas.height;
+  const metal = ctx.createLinearGradient(0, 0, 0, h);
   metal.addColorStop(0, "#f8fbfd");
   metal.addColorStop(0.28, "#8b9aa6");
   metal.addColorStop(0.5, "#e8eef2");
   metal.addColorStop(0.72, "#6d7d89");
   metal.addColorStop(1, "#dce5ea");
-  roundedRect(12, 12, 1176, 396, 62);
+  roundedRect(16, 16, w - 32, h - 32, 72);
   ctx.fillStyle = metal;
   ctx.fill();
 
-  const face = ctx.createLinearGradient(0, 28, 0, 392);
-  face.addColorStop(0, "#202d37");
-  face.addColorStop(0.45, "#111a21");
-  face.addColorStop(1, "#080d12");
-  roundedRect(30, 30, 1140, 360, 48);
-  ctx.fillStyle = face;
+  const numberPlateFace = ctx.createLinearGradient(0, 40, 0, h - 40);
+  numberPlateFace.addColorStop(0, "#ffffff");
+  numberPlateFace.addColorStop(0.55, "#f7f9fa");
+  numberPlateFace.addColorStop(1, "#e8edf0");
+  roundedRect(40, 40, w - 80, h - 80, 56);
+  ctx.fillStyle = numberPlateFace;
   ctx.fill();
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "rgba(255,255,255,0.42)";
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = "#b8c0c6";
   ctx.stroke();
 
-  const shine = ctx.createLinearGradient(0, 55, 0, 180);
-  shine.addColorStop(0, "rgba(255,255,255,0.2)");
-  shine.addColorStop(1, "rgba(255,255,255,0)");
-  roundedRect(52, 52, 1096, 132, 32);
-  ctx.fillStyle = shine;
-  ctx.fill();
-
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-
-  ctx.font = '900 210px "Arial Black", Arial, sans-serif';
-  ctx.lineWidth = 7;
-  ctx.strokeStyle = "rgba(255,255,255,0.92)";
-  ctx.fillStyle = "#1976d2";
-  ctx.strokeText("Y", 202, 210);
-  ctx.fillText("Y", 202, 210);
-  ctx.fillStyle = "#e3262e";
-  ctx.strokeText("K", 348, 210);
-  ctx.fillText("K", 348, 210);
-
-  const divider = ctx.createLinearGradient(0, 90, 0, 330);
-  divider.addColorStop(0, "rgba(255,255,255,0)");
-  divider.addColorStop(0.5, "#dce5ea");
-  divider.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = divider;
-  ctx.fillRect(488, 82, 4, 256);
-
-  ctx.font = '900 168px "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
+  roundedRect(62, 62, w - 124, h - 124, 42);
   ctx.lineWidth = 3;
-  ctx.strokeStyle = "rgba(0,0,0,0.6)";
-  ctx.fillStyle = "#f7fafc";
-  ctx.strokeText("건기", 790, 190);
-  ctx.fillText("건기", 790, 190);
-  ctx.font = '700 35px Arial, "Helvetica Neue", sans-serif';
-  ctx.fillStyle = "#aebbc5";
-  ctx.fillText("HEAVY EQUIPMENT", 790, 305);
+  ctx.strokeStyle = "#d5dce1";
+  ctx.stroke();
 
-  return finishTexture();
-}
+  const cx = w / 2;
+  const brandY = Math.round(h * 0.28);
+  const numberY = Math.round(h * 0.66);
+  const logoMaxW = w * 0.62;
+  const logoMaxH = h * 0.28;
+  const logoW =
+    "width" in logo && typeof logo.width === "number" && logo.width > 0
+      ? logo.width
+      : 1024;
+  const logoH =
+    "height" in logo && typeof logo.height === "number" && logo.height > 0
+      ? logo.height
+      : 258;
+  const logoScale = Math.min(logoMaxW / logoW, logoMaxH / logoH);
+  const drawW = logoW * logoScale;
+  const drawH = logoH * logoScale;
+  ctx.drawImage(logo, cx - drawW / 2, brandY - drawH / 2, drawW, drawH);
 
-export function createYkGeongiWhiteTextTexture() {
-  if (typeof document === "undefined") return null;
+  const divider = ctx.createLinearGradient(w * 0.1, 0, w * 0.9, 0);
+  divider.addColorStop(0, "rgba(120,130,138,0)");
+  divider.addColorStop(0.5, "rgba(120,130,138,0.5)");
+  divider.addColorStop(1, "rgba(120,130,138,0)");
+  ctx.fillStyle = divider;
+  ctx.fillRect(w * 0.12, h * 0.46, w * 0.76, 4);
 
-  const scale = 4;
-  const baseWidth = 512;
-  const baseHeight = 160;
-  const canvas = document.createElement("canvas");
-  canvas.width = baseWidth * scale;
-  canvas.height = baseHeight * scale;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-
-  ctx.scale(scale, scale);
-  ctx.clearRect(0, 0, baseWidth, baseHeight);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  ctx.miterLimit = 2;
-  ctx.shadowColor = "rgba(0,0,0,0.72)";
+  const latinFont = '"Arial Black", Arial, sans-serif';
+  let fontSize = 210;
+  do {
+    ctx.font = `900 ${fontSize}px ${latinFont}`;
+    fontSize -= 4;
+  } while (ctx.measureText(displayText).width > w * 0.82 && fontSize > 120);
+  ctx.shadowColor = "rgba(0,0,0,0.18)";
   ctx.shadowBlur = 3;
   ctx.shadowOffsetY = 2;
-
-  const latinFont = '"Arial Black", Arial, sans-serif';
-  const koreanFont =
-    '"Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
-  const letterSize = 84;
-  const geongiSize = 78;
-
-  const drawBrandLetter = (letter: string, x: number, y: number, color: string) => {
-    ctx.font = `900 ${letterSize}px ${latinFont}`;
-    ctx.lineWidth = 11;
-    ctx.strokeStyle = "rgba(15,23,42,0.92)";
-    ctx.strokeText(letter, x, y);
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = "#ffffff";
-    ctx.strokeText(letter, x, y);
-    ctx.fillStyle = color;
-    ctx.fillText(letter, x, y);
-  };
-
-  const drawGeongi = (x: number, y: number) => {
-    ctx.font = `900 ${geongiSize}px ${koreanFont}`;
-    ctx.lineWidth = 10;
-    ctx.strokeStyle = "rgba(15,23,42,0.96)";
-    ctx.strokeText("건기", x, y);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText("건기", x, y);
-  };
-
-  drawBrandLetter("Y", 150, 82, "#1976d2");
-  drawBrandLetter("K", 220, 82, "#e3262e");
-  drawGeongi(350, 82);
+  ctx.fillStyle = "#2a3238";
+  ctx.fillText(displayText, cx, numberY);
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -375,6 +225,17 @@ export function createYkGeongiWhiteTextTexture() {
   texture.anisotropy = 16;
   texture.needsUpdate = true;
   return texture;
+}
+
+/** Configure a loaded YK건기 WebP logo for transparent decals. */
+export function configureYkGeongiLogoTexture(texture: THREE.Texture) {
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.anisotropy = 16;
+  texture.premultiplyAlpha = false;
+  texture.needsUpdate = true;
 }
 
 /** Upper-body side model mark (e.g. ViO17-1, SV100-7). */

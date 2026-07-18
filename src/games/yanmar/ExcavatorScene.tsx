@@ -6,6 +6,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { Billboard, ContactShadows, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
+import { YK_GEONGI_LOGO } from "@/lib/brand-assets";
 import type { AuxiliaryControlState, ExcavatorControlState, ControlMask, HydraulicVelocity } from "./controls";
 import { DEFAULT_BOOM_SWING } from "./controls";
 import { ExcavatorBucket } from "./ExcavatorBucket";
@@ -19,7 +20,11 @@ import {
   SWING_PIVOT_X,
 } from "./ExcavatorModel";
 import { PremiumDumpTruckModel } from "./DumpTruckModel";
-import { getDozerBladeReach, YANMAR_MACHINE_RIG } from "./machineVisualTheme";
+import {
+  configureYkGeongiLogoTexture,
+  getDozerBladeReach,
+  YANMAR_MACHINE_RIG,
+} from "./machineVisualTheme";
 import { getChassisVisualProfile } from "./chassisVisualConfig";
 import { yanmarAudio } from "./yanmarAudio";
 import {
@@ -140,6 +145,8 @@ interface ExcavatorSceneProps {
   endedRef?: React.RefObject<boolean>;
   /** Active chassis model — drives cab style / body scale */
   activeChassisId?: string;
+  /** Fired once after Suspense loaders resolve and the first frames paint. */
+  onSceneReady?: () => void;
 }
 
 function TerrainMesh({
@@ -647,7 +654,7 @@ function LinkPin({
 }
 
 const YANMAR_LOGO_ASPECT = 512 / 62;
-const YK_LABEL_ASPECT = 512 / 160;
+const YK_LABEL_ASPECT = YK_GEONGI_LOGO.aspect;
 const YANMAR_LOGO_WIDTH = 1.24;
 const REAR_BODY_PANEL_X = -1.715;
 const REAR_BODY_PANEL_Z = -0.36;
@@ -672,66 +679,6 @@ function configureDecalTexture(texture: THREE.Texture, anisotropy = 16) {
 
 function logoHeightForWidth(width: number, aspect: number) {
   return width / aspect;
-}
-
-function createYkGeongiLabelTexture(orientation: "horizontal" | "vertical" = "horizontal") {
-  if (typeof document === "undefined") return null;
-
-  const scale = 6;
-  const horizontal = orientation === "horizontal";
-  const baseWidth = horizontal ? 512 : 168;
-  const baseHeight = horizontal ? 160 : 420;
-  const canvas = document.createElement("canvas");
-  canvas.width = baseWidth * scale;
-  canvas.height = baseHeight * scale;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-
-  ctx.scale(scale, scale);
-  ctx.clearRect(0, 0, baseWidth, baseHeight);
-  ctx.font = '900 84px "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  ctx.shadowColor = "rgba(0,0,0,0.72)";
-  ctx.shadowBlur = 3;
-  ctx.shadowOffsetY = 2;
-
-  const drawGeongi = (x: number, y: number) => {
-    ctx.lineWidth = 10;
-    ctx.strokeStyle = "rgba(15,23,42,0.96)";
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeText("건기", x, y);
-    ctx.fillText("건기", x, y);
-  };
-
-  const drawBrandLetter = (letter: string, x: number, y: number, color: string) => {
-    ctx.lineWidth = 11;
-    ctx.strokeStyle = "rgba(15,23,42,0.92)";
-    ctx.strokeText(letter, x, y);
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = "#ffffff";
-    ctx.strokeText(letter, x, y);
-    ctx.fillStyle = color;
-    ctx.fillText(letter, x, y);
-  };
-
-  if (horizontal) {
-    drawBrandLetter("Y", 150, 82, "#1976d2");
-    drawBrandLetter("K", 220, 82, "#e3262e");
-    drawGeongi(350, 82);
-  } else {
-    drawBrandLetter("Y", baseWidth / 2, 96, "#1976d2");
-    drawBrandLetter("K", baseWidth / 2, 178, "#e3262e");
-    drawGeongi(baseWidth / 2, 268);
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  configureDecalTexture(texture);
-  texture.generateMipmaps = true;
-  texture.minFilter = THREE.LinearMipmapLinearFilter;
-  return texture;
 }
 
 function createYanmarRearLabelTexture() {
@@ -1480,16 +1427,17 @@ function BodyBrandDecal({
 }
 
 function RearBodyBrandMarks() {
-  const [ykLogo, setYkLogo] = useState<THREE.Texture | null>(null);
+  const ykLogo = useLoader(THREE.TextureLoader, YK_GEONGI_LOGO.white);
   const [yanmarLogo, setYanmarLogo] = useState<THREE.Texture | null>(null);
 
   useLayoutEffect(() => {
-    const ykTexture = createYkGeongiLabelTexture("horizontal");
+    configureYkGeongiLogoTexture(ykLogo);
+  }, [ykLogo]);
+
+  useLayoutEffect(() => {
     const yanmarTexture = createYanmarRearLabelTexture();
-    if (ykTexture) setYkLogo(ykTexture);
     if (yanmarTexture) setYanmarLogo(yanmarTexture);
     return () => {
-      ykTexture?.dispose();
       yanmarTexture?.dispose();
     };
   }, []);
@@ -1839,18 +1787,15 @@ function ExcavatorArm({
   const tipRef = useRef<THREE.Mesh>(null);
   const bladeRef = useRef<THREE.Group>(null);
   const yanmarLogo = useLoader(THREE.TextureLoader, "/images/yanmar/yanmar-logo-white.png");
-  const [ykBoomLogo, setYkBoomLogo] = useState<THREE.Texture | null>(null);
+  const ykBoomLogo = useLoader(THREE.TextureLoader, YK_GEONGI_LOGO.white);
 
   useLayoutEffect(() => {
     configureDecalTexture(yanmarLogo);
   }, [yanmarLogo]);
 
   useLayoutEffect(() => {
-    const texture = createYkGeongiLabelTexture("horizontal");
-    if (!texture) return;
-    setYkBoomLogo(texture);
-    return () => texture.dispose();
-  }, []);
+    configureYkGeongiLogoTexture(ykBoomLogo);
+  }, [ykBoomLogo]);
 
   const boomLen = YANMAR_MACHINE_RIG.boomLength;
   const armLen = YANMAR_MACHINE_RIG.armLength;
@@ -2118,7 +2063,7 @@ function ExcavatorArm({
         <group ref={machineBodyRef} visible={cameraMode !== 3}>
           <PremiumExcavatorBody
             velRef={velRef}
-            ykLogo={ykBoomLogo ?? undefined}
+            ykLogo={ykBoomLogo}
             upperBodyRef={upperBodyYawRef}
             chassisId={activeChassisId}
           />
@@ -2165,7 +2110,7 @@ function ExcavatorArm({
             length={boomLen}
             height={0.42 * boomThickness}
             sideDepth={0.155 * boomThickness}
-            logo={ykBoomLogo ?? undefined}
+            logo={ykBoomLogo}
             logoWidth={0.96}
             logoHeight={logoHeightForWidth(0.96, YK_LABEL_ASPECT)}
             logoX={boomLen * 0.48}
@@ -3951,6 +3896,25 @@ function AuxiliarySceneEffects({
   return null;
 }
 
+/**
+ * Mounts only after Canvas Suspense resolves (all useLoader textures ready).
+ * Waits several rendered frames so ContactShadows / first paint complete before reveal.
+ */
+function SceneReadySignal({ onReady }: { onReady?: () => void }) {
+  const firedRef = useRef(false);
+  const framesRef = useRef(0);
+
+  useFrame(() => {
+    if (firedRef.current || !onReady) return;
+    framesRef.current += 1;
+    if (framesRef.current < 8) return;
+    firedRef.current = true;
+    queueMicrotask(() => onReady());
+  });
+
+  return null;
+}
+
 function SceneContent(props: ExcavatorSceneProps) {
   const terrainRevision = props.terrainRevision ?? 0;
   return (
@@ -4047,6 +4011,7 @@ function SceneContent(props: ExcavatorSceneProps) {
         terrainRef={props.terrainRef}
       />
       <SimLoop {...props} />
+      <SceneReadySignal onReady={props.onSceneReady} />
     </>
   );
 }
@@ -4078,10 +4043,24 @@ export function ExcavatorScene(props: ExcavatorSceneProps) {
           event.preventDefault();
           if (recoveringRef.current) return;
           recoveringRef.current = true;
-          window.setTimeout(() => {
+          // Prefer browser restore; only remount Canvas if context never comes back.
+          const fallback = window.setTimeout(() => {
             setGlRecoveryKey((key) => key + 1);
             recoveringRef.current = false;
-          }, 50);
+          }, 1200);
+          const onRestored = () => {
+            window.clearTimeout(fallback);
+            recoveringRef.current = false;
+            canvas.removeEventListener("webglcontextrestored", onRestored);
+            try {
+              gl.setSize(canvas.clientWidth, canvas.clientHeight, false);
+            } catch {
+              // ignore
+            }
+          };
+          canvas.addEventListener("webglcontextrestored", onRestored, {
+            once: true,
+          });
         };
         canvas.addEventListener("webglcontextlost", onContextLost, false);
       }}

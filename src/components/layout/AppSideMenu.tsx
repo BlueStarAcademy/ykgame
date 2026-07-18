@@ -100,8 +100,13 @@ export function AppSideMenu({
         setPanelPos({ top: 56, right: 12 });
         return;
       }
+      const estimatedPanelHeight = 320;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const placeAbove = spaceBelow < estimatedPanelHeight + 12;
       setPanelPos({
-        top: rect.bottom + 6,
+        top: placeAbove
+          ? Math.max(8, rect.top - estimatedPanelHeight - 6)
+          : rect.bottom + 6,
         right: Math.max(8, window.innerWidth - rect.right),
       });
     };

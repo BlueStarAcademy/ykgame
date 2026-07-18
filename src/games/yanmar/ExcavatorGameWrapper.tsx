@@ -20,6 +20,7 @@ import {
 } from "@/components/games/GameImmersiveOverlay";
 import { LandingPromoPopup } from "@/components/landing/LandingPromoPopup";
 import { StarAmount } from "@/components/StarAmount";
+import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
 import type { GameResult } from "@/games/shared/types";
 import { getMissionConfig } from "@/games/registry";
 import type { AuxiliaryControlState, ControlMask, ExcavatorControlState } from "./controls";
@@ -64,13 +65,8 @@ import { ExcavatorMinimap } from "./ExcavatorMinimap";
 import { GrappleGripGauge } from "./DigHintPanel";
 import { DumpHintPanel } from "./DumpHintPanel";
 import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
-import {
-  loadSoundSettings,
-  saveSoundSettings,
-  DEFAULT_SOUND_SETTINGS,
-  type HornId,
-  type SoundSettings,
-} from "./soundSettings";
+import { type HornId } from "./soundSettings";
+import { useSoundSettings } from "./useSoundSettings";
 import { yanmarAudio } from "./yanmarAudio";
 import { QuestPanel } from "./QuestPanel";
 import { ShopPanel } from "./ShopPanel";
@@ -231,10 +227,14 @@ interface ExcavatorGameWrapperProps {
   scoreCommit?: { id: number; score: number } | null;
   immersive?: boolean;
   initialPlayMode?: "practice" | "game" | "ride";
+  onShowGuide?: () => void;
+  onShowRewards?: () => void;
   onShowRanking?: () => void;
   onRequestExit?: () => void;
   /** Season total before this session; HUD shows base + session score in game mode. */
   seasonScoreBase?: number;
+  /** Fired once when the 3D scene assets are loaded and the first frames have painted. */
+  onReady?: () => void;
 }
 
 type DumpRewardApiEvent =
@@ -271,6 +271,8 @@ function TutorialSelectModal({
   onSelect: (index: number) => void;
   onFreePlay: () => void;
 }) {
+  useRegisterInGameBackDismiss(open, onClose);
+
   if (!open) return null;
 
   return (
@@ -707,14 +709,18 @@ export function ExcavatorGameWrapper({
   scoreCommit = null,
   immersive = false,
   initialPlayMode,
+  onShowGuide,
+  onShowRewards,
   onShowRanking,
   onRequestExit,
   seasonScoreBase = 0,
+  onReady,
 }: ExcavatorGameWrapperProps) {
   const config = getMissionConfig("yanmar");
   const { data: session, status: sessionStatus, update } = useSession();
   const defaultEquipmentStats = defaultFinalStats();
   const [mode, setMode] = useState<GameMode>("intro");
+  const [audioArmed, setAudioArmed] = useState(false);
   const [tutorialIndex, setTutorialIndex] = useState(0);
   const [input, setInput] = useState<ExcavatorControlState>({
     left: { x: 0, y: 0 },
@@ -799,8 +805,7 @@ export function ExcavatorGameWrapper({
   const tutorialUiPauseUntilRef = useRef(0);
   const tutorialCelebratedPhaseRef = useRef(-1);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-  const [soundSettings, setSoundSettings] =
-    useState<SoundSettings>(DEFAULT_SOUND_SETTINGS);
+  const [soundSettings, updateSoundSettings] = useSoundSettings();
   const [showMinimap, setShowMinimap] = useState(true);
   const [showMissionQuest, setShowMissionQuest] = useState(true);
   const [showTutorialMenu, setShowTutorialMenu] = useState(false);
@@ -857,7 +862,6 @@ export function ExcavatorGameWrapper({
     grappleLiftTick: 0,
     ready: false,
   });
-  const [showTouchZones, setShowTouchZones] = useState(false);
   const [showEquipmentUpgrade, setShowEquipmentUpgrade] = useState(false);
   const [headerHudReady, setHeaderHudReady] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>(
@@ -934,6 +938,12 @@ export function ExcavatorGameWrapper({
     equipmentStatsRef.current = effective;
     setEquipmentStats(effective);
   }, []);
+  const publishEquipmentStatsRef = useRef(publishEquipmentStats);
+  publishEquipmentStatsRef.current = publishEquipmentStats;
+  /** Entry overlay stays until gear + scene are both ready. */
+  const equipmentReadyRef = useRef(false);
+  const sceneReadyRef = useRef(false);
+  const tryNotifyEntryReadyRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     publishEquipmentStats(baseEquipmentStatsRef.current);
@@ -1642,6 +1652,8 @@ export function ExcavatorGameWrapper({
     },
     [enqueueUnlockNotices, showLevelUpToast],
   );
+  const applyTotalXpRef = useRef(applyTotalXp);
+  applyTotalXpRef.current = applyTotalXp;
 
   const syncSessionBalances = useCallback(
     (
@@ -1861,34 +1873,9 @@ export function ExcavatorGameWrapper({
     pushQuestProgress("horn", 1);
   }, [pushQuestProgress]);
 
-  const updateSoundSettings = useCallback(
-    (patch: Partial<SoundSettings> | ((prev: SoundSettings) => SoundSettings)) => {
-      setSoundSettings((prev) => {
-        const next = typeof patch === "function" ? patch(prev) : { ...prev, ...patch };
-        saveSoundSettings(next);
-        return next;
-      });
-    },
-    [],
-  );
-
   useEffect(() => {
-    setSoundSettings(loadSoundSettings());
-  }, []);
-
-  useEffect(() => {
-    yanmarAudio.setHornId(soundSettings.hornId);
-    yanmarAudio.setBgmEnabled(soundSettings.bgmEnabled);
-    yanmarAudio.setSfxEnabled(soundSettings.sfxEnabled);
-  }, [soundSettings]);
-
-  useEffect(() => {
-    const active = mode !== "intro";
-    yanmarAudio.setActive(active);
-    return () => {
-      yanmarAudio.setActive(false);
-    };
-  }, [mode]);
+    yanmarAudio.setActive(mode !== "intro" && audioArmed);
+  }, [mode, audioArmed]);
 
   useEffect(() => {
     if (!showSettingsMenu) return;
@@ -1897,7 +1884,9 @@ export function ExcavatorGameWrapper({
 
   useEffect(() => {
     return () => {
-      yanmarAudio.dispose();
+      // Soft stop only — hard dispose would force a second BGM/WebGL boot on remount
+      // (React Strict Mode / fast re-entry).
+      yanmarAudio.deactivate();
     };
   }, []);
 
@@ -1924,7 +1913,7 @@ export function ExcavatorGameWrapper({
       if (!res.ok) return;
       const data = await res.json();
       if (data.stats) {
-        publishEquipmentStats(data.stats);
+        publishEquipmentStatsRef.current(data.stats);
       }
       if (Array.isArray(data.items)) {
         setGearItems(data.items);
@@ -1981,15 +1970,18 @@ export function ExcavatorGameWrapper({
         }
       }
       if (typeof data.totalXp === "number") {
-        applyTotalXp(data.totalXp);
+        applyTotalXpRef.current(data.totalXp);
       }
       if (data.migration?.migrated && data.migration.refundStars > 0) {
         // optional toast — migration refund applied server-side
       }
     } catch {
       // Equipment data is optional for unauthenticated previews.
+    } finally {
+      equipmentReadyRef.current = true;
+      tryNotifyEntryReadyRef.current();
     }
-  }, [applyTotalXp, publishEquipmentStats]);
+  }, []);
 
   useEffect(() => {
     if (!repairBuffExpiresAt) return;
@@ -2113,6 +2105,75 @@ export function ExcavatorGameWrapper({
         }
         await loadEquipment();
         return data as Record<string, unknown>;
+      } finally {
+        setGearBusy(false);
+      }
+    },
+    [loadEquipment, publishEquipmentStats],
+  );
+
+  const runGearSynthesize = useCallback(
+    async (itemIds: [string, string, string]) => {
+      setGearBusy(true);
+      try {
+        const res = await fetch("/api/gear/yanmar/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "synthesize", itemIds }),
+        });
+        const data = await res.json();
+        if (!res.ok) return null;
+        if (data.stats) {
+          publishEquipmentStats(data.stats);
+        }
+        if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
+          setCurrency(data.currency);
+          setPreviewStars(data.currency);
+        }
+        if (typeof data.enhanceCores === "number") {
+          setEnhanceCores(data.enhanceCores);
+        }
+        await loadEquipment();
+        const created = data.item as {
+          id: string;
+          slot: GearSlot;
+          grade: ItemGrade;
+          enhanceLevel: number;
+          failBonus: number;
+          mainOption: GearPanelItem["mainOption"];
+          subOptions: GearPanelItem["subOptions"];
+          masterOption: GearPanelItem["masterOption"];
+          nameSnapshot: string;
+          durability: number;
+          durabilityMax: number;
+        } | null;
+        if (!created?.id) return null;
+        const slot = created.slot;
+        const grade = created.grade;
+        return {
+          item: {
+            id: created.id,
+            slot,
+            slotLabel: GEAR_SLOT_LABEL[slot],
+            grade,
+            gradeLabel: ITEM_GRADE_LABEL[grade],
+            enhanceLevel: created.enhanceLevel ?? 0,
+            failBonus: created.failBonus ?? 0,
+            mainOption: created.mainOption ?? { key: "strength", value: 0 },
+            subOptions: Array.isArray(created.subOptions)
+              ? created.subOptions
+              : [],
+            masterOption: created.masterOption ?? null,
+            nameSnapshot: created.nameSnapshot,
+            durability: created.durability,
+            durabilityMax: created.durabilityMax,
+            equippedSlot: null,
+          } satisfies GearPanelItem,
+          resultGrade: (data.resultGrade as ItemGrade) ?? grade,
+          inputGrade: (data.inputGrade as ItemGrade) ?? grade,
+          upgraded: Boolean(data.upgraded),
+        };
       } finally {
         setGearBusy(false);
       }
@@ -2326,11 +2387,6 @@ export function ExcavatorGameWrapper({
     });
     setPreviewStars((prev) => (prev > 0 ? prev : sessionCurrency));
   }, [session?.user?.currency]);
-
-  useEffect(() => {
-    if (mode === "ride") return;
-    void loadEquipment();
-  }, [loadEquipment, mode]);
 
   useEffect(() => {
     setHeaderHudReady(true);
@@ -2597,10 +2653,9 @@ export function ExcavatorGameWrapper({
     );
     tutorialStepRef.current = null;
     setShowTutorialMenu(false);
-    setShowTouchZones(false);
     setShowEquipmentUpgrade(false);
     setMode("ride");
-  }, [resetYanmarSession, setMode, setShowTutorialMenu, setShowTouchZones]);
+  }, [resetYanmarSession, setMode, setShowTutorialMenu]);
 
   const enterPracticeMode = useCallback(() => {
     resetYanmarSession({ terrainLevel: PRACTICE_FULL_UNLOCK_LEVEL });
@@ -2616,7 +2671,6 @@ export function ExcavatorGameWrapper({
 
   const startGameDirect = useCallback(() => {
     tutorialStepRef.current = null;
-    setShowTouchZones(false);
     setShowTutorialMenu(false);
     endedRef.current = false;
     elapsedRef.current = 0;
@@ -2637,6 +2691,7 @@ export function ExcavatorGameWrapper({
       true,
       getPlayerLevelProgress(totalXpRef.current).level,
     );
+    setTerrainRevision((key) => key + 1);
     if (userId) {
       const truck = loadDumpTruckCooldown(userId);
       if (truck) {
@@ -2654,7 +2709,6 @@ export function ExcavatorGameWrapper({
     session?.user?.id,
     setHud,
     setMode,
-    setShowTouchZones,
     setShowTutorialMenu,
   ]);
 
@@ -2719,20 +2773,73 @@ export function ExcavatorGameWrapper({
 
   const initialPlayModeRef = useRef(initialPlayMode);
   const hasBootstrappedRef = useRef(false);
+  const readyNotifiedRef = useRef(false);
+  const readyTimerRef = useRef<number | null>(null);
+
+  const tryNotifyEntryReady = useCallback(() => {
+    if (readyNotifiedRef.current) return;
+    if (!equipmentReadyRef.current || !sceneReadyRef.current) return;
+    // Settle past late terrainRevision remounts / WebGL resize after boot.
+    if (readyTimerRef.current != null) {
+      window.clearTimeout(readyTimerRef.current);
+    }
+    readyTimerRef.current = window.setTimeout(() => {
+      readyTimerRef.current = null;
+      if (readyNotifiedRef.current) return;
+      if (!equipmentReadyRef.current || !sceneReadyRef.current) return;
+      readyNotifiedRef.current = true;
+      setAudioArmed(true);
+      yanmarAudio.unlock();
+      onReady?.();
+    }, 280);
+  }, [onReady]);
+  tryNotifyEntryReadyRef.current = tryNotifyEntryReady;
+
+  useEffect(() => {
+    initialPlayModeRef.current = initialPlayMode;
+  }, [initialPlayMode]);
+
+  useEffect(() => {
+    return () => {
+      if (readyTimerRef.current != null) {
+        window.clearTimeout(readyTimerRef.current);
+        readyTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleSceneReady = useCallback(() => {
+    sceneReadyRef.current = true;
+    tryNotifyEntryReady();
+  }, [tryNotifyEntryReady]);
 
   useEffect(() => {
     if (hasBootstrappedRef.current) return;
-    const bootMode = initialPlayModeRef.current;
+    const bootMode = initialPlayModeRef.current ?? initialPlayMode;
     if (!bootMode) return;
     hasBootstrappedRef.current = true;
     if (bootMode === "ride") {
+      // Ride skips gear bootstrap — don't block the entry overlay forever.
+      equipmentReadyRef.current = true;
       enterRideMode();
-    } else if (bootMode === "practice") {
-      enterPracticeMode();
-    } else {
-      startGameDirect();
+      tryNotifyEntryReady();
+      return;
     }
-  }, [enterRideMode, enterPracticeMode, startGameDirect]);
+    // 홈 「게임 시작」 및 game 모드는 무조건 게임모드 진입 (연습/튜토리얼 우회)
+    if (bootMode === "game") {
+      startGameDirect();
+      return;
+    }
+    if (bootMode === "practice") {
+      enterPracticeMode();
+    }
+  }, [
+    enterRideMode,
+    enterPracticeMode,
+    initialPlayMode,
+    startGameDirect,
+    tryNotifyEntryReady,
+  ]);
 
   const clearTutorialFlashTimers = useCallback(() => {
     for (const id of tutorialFlashTimersRef.current) {
@@ -4148,6 +4255,12 @@ export function ExcavatorGameWrapper({
             if (!data || typeof data.cores !== "number") return null;
             return { cores: data.cores as number };
           }}
+          onSell={async (id) => {
+            const data = await runGearAction("sell", id);
+            if (!data || typeof data.stars !== "number") return null;
+            return { stars: data.stars as number };
+          }}
+          onSynthesize={(itemIds) => runGearSynthesize(itemIds)}
           onExpandInventory={() => void handleExpandInventory()}
         />
         <PlayerProfileModal
@@ -4938,37 +5051,43 @@ export function ExcavatorGameWrapper({
           onOpenChange={setShowSettingsMenu}
           showMinimap={showMinimap}
           onToggleMinimap={() => setShowMinimap((v) => !v)}
-          showTouchZones={showTouchZones}
-          onToggleTouchZones={() => setShowTouchZones((v) => !v)}
-          touchZonesAvailable={mode !== "gameReady"}
           showMissionQuest={showMissionQuest}
           onToggleMissionQuest={() => setShowMissionQuest((v) => !v)}
           bgmEnabled={soundSettings.bgmEnabled}
           onToggleBgm={() => {
-            yanmarAudio.unlock();
-            updateSoundSettings((prev) => {
-              const bgmEnabled = !prev.bgmEnabled;
-              yanmarAudio.setBgmEnabled(bgmEnabled);
-              return { ...prev, bgmEnabled };
-            });
+            const bgmEnabled = !soundSettings.bgmEnabled;
+            updateSoundSettings({ bgmEnabled });
+            if (bgmEnabled) yanmarAudio.unlock();
+          }}
+          bgmVolume={soundSettings.bgmVolume}
+          onBgmVolumeChange={(bgmVolume) => {
+            updateSoundSettings({ bgmVolume });
           }}
           sfxEnabled={soundSettings.sfxEnabled}
           onToggleSfx={() => {
-            yanmarAudio.unlock();
-            updateSoundSettings((prev) => {
-              const sfxEnabled = !prev.sfxEnabled;
-              yanmarAudio.setSfxEnabled(sfxEnabled);
-              return { ...prev, sfxEnabled };
+            const sfxEnabled = !soundSettings.sfxEnabled;
+            updateSoundSettings({ sfxEnabled });
+            if (sfxEnabled) yanmarAudio.unlock();
+          }}
+          sfxVolume={soundSettings.sfxVolume}
+          onSfxVolumeChange={(sfxVolume) => {
+            updateSoundSettings({ sfxVolume });
+          }}
+          breakerSfxEnabled={soundSettings.breakerSfxEnabled}
+          onToggleBreakerSfx={() => {
+            updateSoundSettings({
+              breakerSfxEnabled: !soundSettings.breakerSfxEnabled,
             });
           }}
           hornId={soundSettings.hornId}
           onHornIdChange={(hornId: HornId) => {
-            yanmarAudio.unlock();
             updateSoundSettings({ hornId });
-            yanmarAudio.setHornId(hornId);
+            yanmarAudio.unlock();
             yanmarAudio.playHorn(hornId);
           }}
           onResetPosition={resetExcavatorPosition}
+          onShowGuide={onShowGuide}
+          onShowRewards={onShowRewards}
           onShowRanking={onShowRanking}
           onSaveAndExit={onRequestExit}
         />
@@ -5022,6 +5141,7 @@ export function ExcavatorGameWrapper({
               lookOffsetRef={lookOffsetRef}
               endedRef={endedRef}
               activeChassisId={String(activeChassisId)}
+              onSceneReady={handleSceneReady}
             />
           </div>
         )}
@@ -5080,7 +5200,7 @@ export function ExcavatorGameWrapper({
             executePoseDisabled={executePoseOnCooldown}
             allowed={allowed}
             tutorialStep={tutorialStep}
-            showTouchZones={showTouchZones}
+            showTouchZones={false}
             hornId={soundSettings.hornId}
             onHorn={handleHornQuest}
           />

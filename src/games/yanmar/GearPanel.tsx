@@ -10,7 +10,10 @@ import {
   GEAR_SLOT_LABEL,
   ITEM_GRADE_LABEL,
   MAIN_OPTION_BY_SLOT,
+  SELL_STARS_BY_GRADE,
   SUB_OPTION_POOL,
+  SYNTH_NEXT_GRADE,
+  SYNTH_UPGRADE_CHANCE,
   getGearInventoryExpandCost,
   type GearSlot,
   type ItemGrade,
@@ -104,6 +107,17 @@ export type DismantleActionResult = {
   cores: number;
 };
 
+export type SellActionResult = {
+  stars: number;
+};
+
+export type SynthesizeActionResult = {
+  item: GearPanelItem;
+  resultGrade: ItemGrade;
+  inputGrade: ItemGrade;
+  upgraded: boolean;
+};
+
 interface GearPanelProps {
   open: boolean;
   onClose: () => void;
@@ -126,6 +140,16 @@ interface GearPanelProps {
   ) =>
     | Promise<DismantleActionResult | null | void>
     | DismantleActionResult
+    | null
+    | void;
+  onSell: (
+    itemId: string,
+  ) => Promise<SellActionResult | null | void> | SellActionResult | null | void;
+  onSynthesize: (
+    itemIds: [string, string, string],
+  ) =>
+    | Promise<SynthesizeActionResult | null | void>
+    | SynthesizeActionResult
     | null
     | void;
   onExpandInventory?: () => void | Promise<void>;
@@ -190,6 +214,7 @@ function GearBubbleCard({
   emptyLabel,
   compareAgainst,
   footer,
+  equipAction,
   highlight,
   onZoom,
 }: {
@@ -198,6 +223,7 @@ function GearBubbleCard({
   emptyLabel?: string;
   compareAgainst?: GearPanelItem | null;
   footer?: ReactNode;
+  equipAction?: ReactNode;
   highlight?: boolean;
   onZoom?: (item: GearPanelItem) => void;
 }) {
@@ -272,6 +298,9 @@ function GearBubbleCard({
             ) : null}
           </p>
         </div>
+        {equipAction ? (
+          <div className="yanmar-gear-mgr-detail-equip">{equipAction}</div>
+        ) : null}
       </div>
       <ul className="yanmar-gear-mgr-attr-list">
         {item.subOptions.map((sub) => {
@@ -317,6 +346,8 @@ export function GearPanel({
   onUnequip,
   onEnhance,
   onDismantle,
+  onSell,
+  onSynthesize,
   onExpandInventory,
 }: GearPanelProps) {
   const [slotFilters, setSlotFilters] = useState<Record<GearSlot, boolean>>(
@@ -345,6 +376,25 @@ export function GearPanel({
     enhanceLevel: number;
     cores: number;
   } | null>(null);
+  const [pendingSellId, setPendingSellId] = useState<string | null>(null);
+  const [sellResult, setSellResult] = useState<{
+    nameSnapshot: string;
+    slot: GearSlot;
+    grade: ItemGrade;
+    enhanceLevel: number;
+    stars: number;
+  } | null>(null);
+  const [synthOpen, setSynthOpen] = useState(false);
+  const [synthGrade, setSynthGrade] = useState<ItemGrade | null>(null);
+  const [synthSlots, setSynthSlots] = useState<[string | null, string | null, string | null]>([
+    null,
+    null,
+    null,
+  ]);
+  const [synthResult, setSynthResult] = useState<SynthesizeActionResult | null>(
+    null,
+  );
+  const [synthFocusId, setSynthFocusId] = useState<string | null>(null);
   const [artPreview, setArtPreview] = useState<GearPanelItem | null>(null);
   const [expandConfirmOpen, setExpandConfirmOpen] = useState(false);
 
@@ -417,6 +467,13 @@ export function GearPanel({
       setEnhancePhase("idle");
       setEnhanceResult(null);
       setEnhanceProgress(0);
+      setSynthOpen(false);
+      setSynthGrade(null);
+      setSynthSlots([null, null, null]);
+      setSynthResult(null);
+      setSynthFocusId(null);
+      setPendingSellId(null);
+      setSellResult(null);
     }
   }, [open, embedded]);
 
@@ -436,6 +493,29 @@ export function GearPanel({
         pendingDismantle.enhanceLevel,
       )
     : 0;
+  const pendingSell = pendingSellId
+    ? (items.find((i) => i.id === pendingSellId) ?? null)
+    : null;
+  const sellStars = pendingSell
+    ? SELL_STARS_BY_GRADE[pendingSell.grade]
+    : 0;
+  const synthSlotItems = synthSlots.map((id) =>
+    id ? (items.find((i) => i.id === id) ?? null) : null,
+  );
+  const synthReadyCount = synthSlots.filter(Boolean).length;
+  const synthUpgradeChance = synthGrade
+    ? Math.round(SYNTH_UPGRADE_CHANCE[synthGrade] * 100)
+    : 0;
+  const synthNextGrade = synthGrade ? SYNTH_NEXT_GRADE[synthGrade] : null;
+  const synthInventoryItems = useMemo(() => {
+    if (!synthGrade) return [];
+    return items.filter(
+      (item) => item.grade === synthGrade && !item.equippedSlot,
+    );
+  }, [items, synthGrade]);
+  const synthFocusItem = synthFocusId
+    ? (items.find((i) => i.id === synthFocusId) ?? null)
+    : null;
 
   const enhanceGrade = enhanceItem?.grade ?? "NORMAL";
   const enhanceNextCost = enhanceItem
@@ -482,6 +562,52 @@ export function GearPanel({
   };
   const closeDismantleConfirm = () => setPendingDismantleId(null);
   const closeDismantleResult = () => setDismantleResult(null);
+  const closeSellConfirm = () => setPendingSellId(null);
+  const closeSellResult = () => setSellResult(null);
+
+  const closeSynth = () => {
+    setSynthOpen(false);
+    setSynthGrade(null);
+    setSynthSlots([null, null, null]);
+    setSynthResult(null);
+    setSynthFocusId(null);
+  };
+
+  const openSynth = (seedItem: GearPanelItem) => {
+    if (seedItem.equippedSlot) return;
+    setBubble(null);
+    setSynthResult(null);
+    setSynthGrade(seedItem.grade);
+    setSynthSlots([seedItem.id, null, null]);
+    setSynthFocusId(seedItem.id);
+    setSynthOpen(true);
+  };
+
+  const tryFillSynthSlot = (item: GearPanelItem) => {
+    if (!synthOpen || !synthGrade || synthResult) return false;
+    if (item.equippedSlot) return true;
+    if (item.grade !== synthGrade) return true;
+    setSynthFocusId(item.id);
+    if (synthSlots.includes(item.id)) {
+      setSynthSlots(
+        (prev) =>
+          prev.map((id) => (id === item.id ? null : id)) as [
+            string | null,
+            string | null,
+            string | null,
+          ],
+      );
+      return true;
+    }
+    const emptyIdx = synthSlots.findIndex((id) => id == null);
+    if (emptyIdx < 0) return true;
+    setSynthSlots((prev) => {
+      const next: [string | null, string | null, string | null] = [...prev];
+      next[emptyIdx] = item.id;
+      return next;
+    });
+    return true;
+  };
 
   async function confirmDismantle() {
     if (!pendingDismantle || busy) return;
@@ -502,6 +628,37 @@ export function GearPanel({
       enhanceLevel: snap.enhanceLevel,
       cores: result.cores,
     });
+  }
+
+  async function confirmSell() {
+    if (!pendingSell || busy) return;
+    const snap = {
+      id: pendingSell.id,
+      nameSnapshot: pendingSell.nameSnapshot,
+      slot: pendingSell.slot,
+      grade: pendingSell.grade,
+      enhanceLevel: pendingSell.enhanceLevel,
+    };
+    setPendingSellId(null);
+    const result = await onSell(snap.id);
+    if (!result || typeof result.stars !== "number") return;
+    setSellResult({
+      nameSnapshot: snap.nameSnapshot,
+      slot: snap.slot,
+      grade: snap.grade,
+      enhanceLevel: snap.enhanceLevel,
+      stars: result.stars,
+    });
+  }
+
+  async function confirmSynthesize() {
+    if (busy || !synthGrade) return;
+    const ids = synthSlots.filter((id): id is string => !!id);
+    if (ids.length !== 3) return;
+    const result = await onSynthesize(ids as [string, string, string]);
+    if (!result?.item) return;
+    setSynthSlots([null, null, null]);
+    setSynthResult(result);
   }
 
   const dismissEnhanceResult = () => {
@@ -572,33 +729,35 @@ export function GearPanel({
         .map((s) => GEAR_SLOT_LABEL[s])
         .join(", ");
 
+  const equipButton = (item: GearPanelItem) =>
+    item.equippedSlot ? (
+      <button
+        type="button"
+        className="yanmar-gear-btn yanmar-gear-btn--unequip yanmar-gear-btn--equip-side"
+        disabled={busy}
+        onClick={() => {
+          void onUnequip(item.id);
+          closeBubble();
+        }}
+      >
+        해제
+      </button>
+    ) : (
+      <button
+        type="button"
+        className="yanmar-gear-btn yanmar-gear-btn--equip yanmar-gear-btn--equip-side"
+        disabled={busy}
+        onClick={() => {
+          void onEquip(item.id);
+          closeBubble();
+        }}
+      >
+        장착
+      </button>
+    );
+
   const actionButtons = (item: GearPanelItem) => (
-    <div className="yanmar-gear-mgr-actions">
-      {item.equippedSlot ? (
-        <button
-          type="button"
-          className="yanmar-gear-btn yanmar-gear-btn--unequip"
-          disabled={busy}
-          onClick={() => {
-            void onUnequip(item.id);
-            closeBubble();
-          }}
-        >
-          해제
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="yanmar-gear-btn yanmar-gear-btn--equip"
-          disabled={busy}
-          onClick={() => {
-            void onEquip(item.id);
-            closeBubble();
-          }}
-        >
-          장착
-        </button>
-      )}
+    <div className="yanmar-gear-mgr-actions yanmar-gear-mgr-actions--four">
       <button
         type="button"
         className="yanmar-gear-btn yanmar-gear-btn--enhance"
@@ -611,6 +770,14 @@ export function GearPanel({
       </button>
       <button
         type="button"
+        className="yanmar-gear-btn yanmar-gear-btn--synth"
+        disabled={busy || !!item.equippedSlot}
+        onClick={() => openSynth(item)}
+      >
+        합성
+      </button>
+      <button
+        type="button"
         className="yanmar-gear-btn yanmar-gear-btn--sell"
         disabled={busy || !!item.equippedSlot}
         onClick={() => {
@@ -619,6 +786,17 @@ export function GearPanel({
         }}
       >
         분해
+      </button>
+      <button
+        type="button"
+        className="yanmar-gear-btn yanmar-gear-btn--vend"
+        disabled={busy || !!item.equippedSlot}
+        onClick={() => {
+          setPendingSellId(item.id);
+          closeBubble();
+        }}
+      >
+        판매
       </button>
     </div>
   );
@@ -795,14 +973,17 @@ export function GearPanel({
                   grade={item.grade}
                   enhanceLevel={item.enhanceLevel}
                   selected={
-                    !!bubble &&
-                    bubble.itemId === item.id &&
-                    (bubble.kind === "compare" || bubble.kind === "equipped")
+                    (!!bubble &&
+                      bubble.itemId === item.id &&
+                      (bubble.kind === "compare" ||
+                        bubble.kind === "equipped")) ||
+                    (synthOpen && synthSlots.includes(item.id))
                   }
                   equipped={!!item.equippedSlot}
                   size="md"
                   className="yanmar-gear-mgr-inv-cell"
                   onClick={() => {
+                    if (tryFillSynthSlot(item)) return;
                     if (item.equippedSlot) {
                       setBubble({
                         kind: "equipped",
@@ -898,6 +1079,7 @@ export function GearPanel({
                   item={bubbleItem}
                   highlight
                   onZoom={setArtPreview}
+                  equipAction={bubbleItem ? equipButton(bubbleItem) : null}
                 />
                 {bubbleItem ? actionButtons(bubbleItem) : null}
               </>
@@ -909,12 +1091,16 @@ export function GearPanel({
                     item={bubbleEquipped}
                     emptyLabel={`${GEAR_SLOT_LABEL[bubble.slot]} 슬롯 비어 있음`}
                     onZoom={setArtPreview}
+                    equipAction={
+                      bubbleEquipped ? equipButton(bubbleEquipped) : null
+                    }
                   />
                   <GearBubbleCard
                     title="선택"
                     item={bubbleItem}
                     highlight
                     onZoom={setArtPreview}
+                    equipAction={bubbleItem ? equipButton(bubbleItem) : null}
                     compareAgainst={
                       bubbleEquipped &&
                       bubbleItem &&
@@ -1459,6 +1645,419 @@ export function GearPanel({
                 확인
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingSell ? (
+        <div
+          className="yanmar-gear-confirm-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="yanmar-gear-sell-title"
+        >
+          <button
+            type="button"
+            className="yanmar-gear-confirm-backdrop"
+            aria-label="판매 확인 닫기"
+            disabled={busy}
+            onClick={closeSellConfirm}
+          />
+          <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--dismantle">
+            <p className="yanmar-gear-confirm-eyebrow">장비 판매</p>
+            <h3 id="yanmar-gear-sell-title">정말 판매할까요?</h3>
+            <div className="yanmar-gear-confirm-item">
+              <GearIconCell
+                slot={pendingSell.slot}
+                grade={pendingSell.grade}
+                enhanceLevel={pendingSell.enhanceLevel}
+                size="md"
+              />
+              <div className="yanmar-gear-confirm-item-meta">
+                <p
+                  className={`yanmar-gear-mgr-name ${gradeTextClass(
+                    pendingSell.grade,
+                  )}`}
+                >
+                  {pendingSell.nameSnapshot}
+                  {pendingSell.enhanceLevel > 0
+                    ? ` +${pendingSell.enhanceLevel}`
+                    : ""}
+                </p>
+                <p
+                  className={`yanmar-gear-mgr-grade ${gradeTextClass(
+                    pendingSell.grade,
+                  )}`}
+                >
+                  [{ITEM_GRADE_LABEL[pendingSell.grade]}] ·{" "}
+                  {GEAR_SLOT_LABEL[pendingSell.slot]}
+                </p>
+              </div>
+            </div>
+            <div className="yanmar-gear-confirm-reward">
+              <span className="yanmar-gear-confirm-reward-label">
+                예상 획득
+              </span>
+              <span className="yanmar-gear-confirm-reward-value">
+                <StarAmount value={sellStars} />
+              </span>
+            </div>
+            <p className="yanmar-gear-confirm-warn">
+              판매한 장비는 되돌릴 수 없습니다.
+            </p>
+            <div className="yanmar-gear-confirm-actions">
+              <button
+                type="button"
+                className="yanmar-gear-btn yanmar-gear-btn--unequip"
+                disabled={busy}
+                onClick={closeSellConfirm}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="yanmar-gear-btn yanmar-gear-btn--vend"
+                disabled={busy}
+                onClick={() => void confirmSell()}
+              >
+                판매하기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {sellResult ? (
+        <div
+          className="yanmar-gear-confirm-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="yanmar-gear-sell-done-title"
+        >
+          <button
+            type="button"
+            className="yanmar-gear-confirm-backdrop"
+            aria-label="판매 결과 닫기"
+            onClick={closeSellResult}
+          />
+          <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--done">
+            <p className="yanmar-gear-confirm-eyebrow">판매 완료</p>
+            <h3 id="yanmar-gear-sell-done-title">장비를 판매했습니다</h3>
+            <div className="yanmar-gear-confirm-item">
+              <GearIconCell
+                slot={sellResult.slot}
+                grade={sellResult.grade}
+                enhanceLevel={sellResult.enhanceLevel}
+                size="md"
+              />
+              <div className="yanmar-gear-confirm-item-meta">
+                <p
+                  className={`yanmar-gear-mgr-name ${gradeTextClass(
+                    sellResult.grade,
+                  )}`}
+                >
+                  {sellResult.nameSnapshot}
+                  {sellResult.enhanceLevel > 0
+                    ? ` +${sellResult.enhanceLevel}`
+                    : ""}
+                </p>
+                <p
+                  className={`yanmar-gear-mgr-grade ${gradeTextClass(
+                    sellResult.grade,
+                  )}`}
+                >
+                  [{ITEM_GRADE_LABEL[sellResult.grade]}] ·{" "}
+                  {GEAR_SLOT_LABEL[sellResult.slot]}
+                </p>
+              </div>
+            </div>
+            <div className="yanmar-gear-confirm-reward">
+              <span className="yanmar-gear-confirm-reward-label">획득</span>
+              <span className="yanmar-gear-confirm-reward-value">
+                <StarAmount value={sellResult.stars} />
+              </span>
+            </div>
+            <div className="yanmar-gear-confirm-actions yanmar-gear-confirm-actions--single">
+              <button
+                type="button"
+                className="yanmar-gear-btn yanmar-gear-btn--enhance"
+                onClick={closeSellResult}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {synthOpen ? (
+        <div
+          className="yanmar-gear-confirm-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="yanmar-gear-synth-title"
+        >
+          <button
+            type="button"
+            className="yanmar-gear-confirm-backdrop"
+            aria-label="합성 모달 닫기"
+            disabled={busy}
+            onClick={closeSynth}
+          />
+          <div className="yanmar-gear-confirm-card yanmar-gear-synth-card">
+            <p className="yanmar-gear-confirm-eyebrow">장비 합성</p>
+            <h3 id="yanmar-gear-synth-title">
+              {synthResult
+                ? "합성 완료"
+                : `${synthGrade ? ITEM_GRADE_LABEL[synthGrade] : ""} 장비 3개 합성`}
+            </h3>
+
+            {synthResult ? (
+              <>
+                <div className="yanmar-gear-confirm-item">
+                  <GearIconCell
+                    slot={synthResult.item.slot}
+                    grade={synthResult.item.grade}
+                    enhanceLevel={synthResult.item.enhanceLevel}
+                    size="md"
+                  />
+                  <div className="yanmar-gear-confirm-item-meta">
+                    <p
+                      className={`yanmar-gear-mgr-name ${gradeTextClass(
+                        synthResult.item.grade,
+                      )}`}
+                    >
+                      {synthResult.item.nameSnapshot}
+                    </p>
+                    <p
+                      className={`yanmar-gear-mgr-grade ${gradeTextClass(
+                        synthResult.item.grade,
+                      )}`}
+                    >
+                      [{ITEM_GRADE_LABEL[synthResult.item.grade]}] ·{" "}
+                      {GEAR_SLOT_LABEL[synthResult.item.slot]}
+                    </p>
+                    {synthResult.upgraded ? (
+                      <p className="yanmar-gear-synth-upgraded">등급 상승!</p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="yanmar-gear-confirm-actions yanmar-gear-confirm-actions--single">
+                  <button
+                    type="button"
+                    className="yanmar-gear-btn yanmar-gear-btn--enhance"
+                    onClick={closeSynth}
+                  >
+                    확인
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="yanmar-gear-synth-slots">
+                  {synthSlotItems.map((slotItem, idx) => (
+                    <button
+                      key={`synth-slot-${idx}`}
+                      type="button"
+                      className={`yanmar-gear-synth-slot${
+                        slotItem ? " is-filled" : ""
+                      }`}
+                      disabled={busy}
+                      onClick={() => {
+                        if (!slotItem) return;
+                        setSynthFocusId(slotItem.id);
+                        setSynthSlots((prev) => {
+                          const next: [
+                            string | null,
+                            string | null,
+                            string | null,
+                          ] = [...prev];
+                          next[idx] = null;
+                          return next;
+                        });
+                      }}
+                      title={
+                        slotItem
+                          ? "탭하여 슬롯 비우기"
+                          : "아래 인벤에서 동일 등급 장비 선택"
+                      }
+                    >
+                      {slotItem ? (
+                        <GearIconCell
+                          slot={slotItem.slot}
+                          grade={slotItem.grade}
+                          enhanceLevel={slotItem.enhanceLevel}
+                          size="sm"
+                          checked
+                        />
+                      ) : (
+                        <span>{idx + 1}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="yanmar-gear-synth-odds" aria-label="합성 확률">
+                  {synthGrade && synthNextGrade ? (
+                    <>
+                      <span
+                        className={`yanmar-gear-synth-odds-part ${gradeTextClass(
+                          synthGrade,
+                        )}`}
+                      >
+                        {ITEM_GRADE_LABEL[synthGrade]} {100 - synthUpgradeChance}%
+                      </span>
+                      <span className="yanmar-gear-synth-odds-sep" aria-hidden>
+                        /
+                      </span>
+                      <span
+                        className={`yanmar-gear-synth-odds-part ${gradeTextClass(
+                          synthNextGrade,
+                        )}`}
+                      >
+                        {ITEM_GRADE_LABEL[synthNextGrade]} {synthUpgradeChance}%
+                      </span>
+                    </>
+                  ) : synthGrade === "MASTER" ? (
+                    <span
+                      className={`yanmar-gear-synth-odds-part ${gradeTextClass(
+                        "MASTER",
+                      )}`}
+                    >
+                      마스터 100%
+                    </span>
+                  ) : null}
+                </div>
+                <div className="yanmar-gear-synth-viewer">
+                  {synthFocusItem ? (
+                    <div className="yanmar-gear-synth-viewer-body">
+                      <GearIconCell
+                        slot={synthFocusItem.slot}
+                        grade={synthFocusItem.grade}
+                        enhanceLevel={synthFocusItem.enhanceLevel}
+                        size="md"
+                        checked={synthSlots.includes(synthFocusItem.id)}
+                      />
+                      <div className="yanmar-gear-synth-viewer-meta">
+                        <p className="yanmar-gear-synth-viewer-label">선택 장비</p>
+                        <p
+                          className={`yanmar-gear-mgr-name ${gradeTextClass(
+                            synthFocusItem.grade,
+                          )}`}
+                        >
+                          {synthFocusItem.nameSnapshot}
+                          {synthFocusItem.enhanceLevel > 0
+                            ? ` +${synthFocusItem.enhanceLevel}`
+                            : ""}
+                        </p>
+                        <p
+                          className={`yanmar-gear-mgr-grade ${gradeTextClass(
+                            synthFocusItem.grade,
+                          )}`}
+                        >
+                          [{ITEM_GRADE_LABEL[synthFocusItem.grade]}] ·{" "}
+                          {GEAR_SLOT_LABEL[synthFocusItem.slot]}
+                        </p>
+                        <p className="yanmar-gear-mgr-main">
+                          <span className="yanmar-gear-mgr-attr-main">
+                            {formatMain(synthFocusItem)}
+                          </span>
+                        </p>
+                        {synthFocusItem.subOptions.length > 0 ? (
+                          <ul className="yanmar-gear-synth-viewer-subs">
+                            {synthFocusItem.subOptions.map((sub) => {
+                              const row = formatSub(sub);
+                              return (
+                                <li key={`${sub.key}-${sub.tier}-${sub.value}`}>
+                                  {row.text}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
+                        {synthFocusItem.masterOption ? (
+                          <p className="yanmar-gear-synth-viewer-master">
+                            마스터 {synthFocusItem.masterOption.label}
+                            {!synthFocusItem.masterOption.hideValue
+                              ? ` ${synthFocusItem.masterOption.value}${
+                                  synthFocusItem.masterOption.isPercent
+                                    ? "%"
+                                    : ""
+                                }`
+                              : ""}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="yanmar-gear-synth-viewer-empty">
+                      장비를 선택하면 정보가 표시됩니다
+                    </p>
+                  )}
+                </div>
+                <div className="yanmar-gear-synth-inv">
+                  <div className="yanmar-gear-synth-inv-bar">
+                    <span>
+                      {ITEM_GRADE_LABEL[synthGrade ?? "NORMAL"]} 인벤
+                    </span>
+                    <span className="yanmar-gear-mgr-cap">
+                      {synthReadyCount} / 3 선택
+                    </span>
+                  </div>
+                  <div className="yanmar-gear-synth-inv-scroll">
+                    <div className="yanmar-gear-mgr-inv-grid yanmar-gear-mgr-inv-grid--5 yanmar-gear-synth-inv-grid">
+                      {synthInventoryItems.length === 0 ? (
+                        <p className="yanmar-gear-synth-inv-empty">
+                          합성 가능한 장비가 없습니다.
+                        </p>
+                      ) : (
+                        synthInventoryItems.map((item) => {
+                          const inSlot = synthSlots.includes(item.id);
+                          return (
+                            <GearIconCell
+                              key={item.id}
+                              slot={item.slot}
+                              grade={item.grade}
+                              enhanceLevel={item.enhanceLevel}
+                              size="md"
+                              checked={inSlot}
+                              selected={inSlot}
+                              className="yanmar-gear-mgr-inv-cell"
+                              onClick={() => {
+                                if (busy) return;
+                                tryFillSynthSlot(item);
+                              }}
+                              title={`${item.nameSnapshot}${
+                                item.enhanceLevel > 0
+                                  ? ` +${item.enhanceLevel}`
+                                  : ""
+                              }${inSlot ? " (선택됨 · 다시 탭하면 해제)" : ""}`}
+                            />
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="yanmar-gear-confirm-actions">
+                  <button
+                    type="button"
+                    className="yanmar-gear-btn yanmar-gear-btn--unequip"
+                    disabled={busy}
+                    onClick={closeSynth}
+                  >
+                    닫기
+                  </button>
+                  <button
+                    type="button"
+                    className="yanmar-gear-btn yanmar-gear-btn--synth"
+                    disabled={busy || synthReadyCount !== 3}
+                    onClick={() => void confirmSynthesize()}
+                  >
+                    합성하기
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       ) : null}

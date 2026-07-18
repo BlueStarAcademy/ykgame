@@ -15,10 +15,13 @@ interface PhaserGameWrapperProps {
   scoreCommit?: { id: number; score: number } | null;
   immersive?: boolean;
   initialPlayMode?: "practice" | "game" | "ride";
+  onShowGuide?: () => void;
+  onShowRewards?: () => void;
   onShowRanking?: () => void;
   onRequestExit?: () => void;
   /** Prior season total (excluded from this session's arcadeScore). */
   seasonScoreBase?: number;
+  onReady?: () => void;
 }
 
 function PhaserMissionGame({ gameId, onEnd, immersive = false }: PhaserGameWrapperProps) {
@@ -108,9 +111,12 @@ export function PhaserGameWrapper({
   scoreCommit = null,
   immersive = false,
   initialPlayMode,
+  onShowGuide,
+  onShowRewards,
   onShowRanking,
   onRequestExit,
   seasonScoreBase = 0,
+  onReady,
 }: PhaserGameWrapperProps) {
   if (gameId === "yanmar") {
     return (
@@ -121,9 +127,12 @@ export function PhaserGameWrapper({
         scoreCommit={scoreCommit}
         immersive={immersive}
         initialPlayMode={initialPlayMode}
+        onShowGuide={onShowGuide}
+        onShowRewards={onShowRewards}
         onShowRanking={onShowRanking}
         onRequestExit={onRequestExit}
         seasonScoreBase={seasonScoreBase}
+        onReady={onReady}
       />
     );
   }

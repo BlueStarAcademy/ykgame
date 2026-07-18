@@ -7,11 +7,13 @@ import {
   applyEnhanceSuccess,
   canonicalizeMainOption,
   canonicalizeSubOptions,
+  createGearItem,
   getDismantleEnhanceCores,
   getEnhanceCost,
   getEnhanceCoreCost,
   getEnhanceFailBonusAdd,
   getEnhanceSuccessRate,
+  pickSlot,
   type GearItemData,
   type MainOptionInst,
   type MasterOptionInst,
@@ -21,8 +23,11 @@ import {
   GEAR_INVENTORY_EXPAND_STEP,
   GEAR_INVENTORY_MAX,
   GEAR_SLOTS,
+  ITEM_GRADE_LABEL,
+  SELL_STARS_BY_GRADE,
   clampGearInventorySlots,
   getGearInventoryExpandCost,
+  rollSynthesizeResultGrade,
   type GearSlot,
   type ItemGrade,
 } from "@/games/yanmar/gearCatalog";
@@ -62,13 +67,28 @@ function toData(item: {
   };
 }
 
+const ACTIONS = [
+  "equip",
+  "unequip",
+  "enhance",
+  "dismantle",
+  "expandInventory",
+  "synthesize",
+  "sell",
+] as const;
+
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { action?: string; itemId?: string; slot?: string };
+  let body: {
+    action?: string;
+    itemId?: string;
+    itemIds?: string[];
+    slot?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -76,12 +96,7 @@ export async function POST(req: Request) {
   }
 
   const action = body.action;
-  if (
-    !action ||
-    !["equip", "unequip", "enhance", "dismantle", "expandInventory"].includes(
-      action,
-    )
-  ) {
+  if (!action || !(ACTIONS as readonly string[]).includes(action)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
@@ -119,6 +134,77 @@ export async function POST(req: Request) {
           inventorySlots: clampGearInventorySlots(updated.gearInventorySlots),
           expandCost: getGearInventoryExpandCost(updated.gearInventorySlots),
           expandedBy: nextSlots - current,
+        };
+      }
+
+      if (action === "synthesize") {
+        const rawIds = Array.isArray(body.itemIds) ? body.itemIds : [];
+        const itemIds = [...new Set(rawIds.filter((id) => typeof id === "string" && id))];
+        if (itemIds.length !== 3) throw new Error("NEED_THREE");
+
+        const items = await tx.gearItem.findMany({
+          where: {
+            id: { in: itemIds },
+            userId: session.user.id,
+            gameId: "yanmar",
+          },
+        });
+        if (items.length !== 3) throw new Error("NOT_FOUND");
+        if (items.some((item) => item.equippedSlot)) throw new Error("EQUIPPED");
+
+        const grade = items[0]!.grade as ItemGrade;
+        if (items.some((item) => item.grade !== grade)) {
+          throw new Error("GRADE_MISMATCH");
+        }
+
+        await tx.gearItem.deleteMany({
+          where: {
+            id: { in: itemIds },
+            userId: session.user.id,
+            gameId: "yanmar",
+          },
+        });
+
+        const resultGrade = rollSynthesizeResultGrade(grade);
+        const slot = pickSlot();
+        const loadedBefore = await loadUserFinalStats(tx, session.user.id);
+        const durabilityMax = loadedBefore.stats.durabilityMaxPerPiece;
+        const data = createGearItem(slot, resultGrade, durabilityMax);
+        const created = await tx.gearItem.create({
+          data: {
+            userId: session.user.id,
+            gameId: "yanmar",
+            slot: data.slot,
+            grade: data.grade,
+            enhanceLevel: 0,
+            failBonus: 0,
+            mainOption: asJson(data.mainOption),
+            subOptions: asJson(data.subOptions),
+            masterOption: data.masterOption ? asJson(data.masterOption) : undefined,
+            nameSnapshot: data.nameSnapshot,
+            durability: data.durability,
+            durabilityMax: data.durabilityMax,
+            equippedSlot: null,
+          },
+        });
+        const user = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { currency: true, enhanceCores: true },
+        });
+        const loaded = await loadUserFinalStats(tx, session.user.id);
+        return {
+          ok: true,
+          item: {
+            ...created,
+            gradeLabel: ITEM_GRADE_LABEL[created.grade as ItemGrade],
+          },
+          consumedIds: itemIds,
+          resultGrade,
+          inputGrade: grade,
+          upgraded: resultGrade !== grade,
+          currency: user?.currency ?? 0,
+          enhanceCores: user?.enhanceCores ?? 0,
+          stats: loaded.stats,
         };
       }
 
@@ -247,6 +333,26 @@ export async function POST(req: Request) {
         };
       }
 
+      if (action === "sell") {
+        if (item.equippedSlot) throw new Error("EQUIPPED");
+        const grade = item.grade as ItemGrade;
+        const stars = SELL_STARS_BY_GRADE[grade];
+        await tx.gearItem.delete({ where: { id: item.id } });
+        const updatedUser = await tx.user.update({
+          where: { id: session.user.id },
+          data: { currency: { increment: stars } },
+          select: { currency: true, enhanceCores: true },
+        });
+        const loaded = await loadUserFinalStats(tx, session.user.id);
+        return {
+          ok: true,
+          stars,
+          currency: updatedUser.currency,
+          enhanceCores: updatedUser.enhanceCores,
+          stats: loaded.stats,
+        };
+      }
+
       // dismantle — 스타 환불 없음, 강화코어만
       if (item.equippedSlot) throw new Error("EQUIPPED");
       const cores = getDismantleEnhanceCores(
@@ -282,7 +388,9 @@ export async function POST(req: Request) {
             msg === "INSUFFICIENT_CORES" ||
             msg === "EQUIPPED" ||
             msg === "MAX_LEVEL" ||
-            msg === "MAX_SLOTS"
+            msg === "MAX_SLOTS" ||
+            msg === "NEED_THREE" ||
+            msg === "GRADE_MISMATCH"
           ? 400
           : 400;
     return NextResponse.json({ error: msg }, { status });

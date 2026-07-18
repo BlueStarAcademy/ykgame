@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GameId } from "@/lib/games";
 import { formatSeasonRemaining, getGameById } from "@/lib/games";
+import { RankBadge } from "@/components/games/RankBadge";
+import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
 
 export interface RankingEntry {
   rank: number;
@@ -34,13 +36,6 @@ interface RankingBoardProps {
   open: boolean;
   onClose: () => void;
   highlightNickname?: string;
-}
-
-function medal(rank: number) {
-  if (rank === 1) return "🥇";
-  if (rank === 2) return "🥈";
-  if (rank === 3) return "🥉";
-  return `${rank}`;
 }
 
 function formatTime(seconds: number) {
@@ -110,17 +105,7 @@ function RankingRow({
       }`}
     >
       <div className="flex min-w-0 items-center gap-2.5">
-        <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${
-            isMe
-              ? "bg-blue-100 text-blue-700"
-              : isTop3
-                ? "bg-amber-100 text-amber-800"
-                : "bg-slate-100 text-slate-600"
-          }`}
-        >
-          {entry.rank > 0 ? medal(entry.rank) : "-"}
-        </span>
+        <RankBadge rank={entry.rank} tone="light" />
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-slate-800">
             {entry.nickname}
@@ -299,6 +284,8 @@ export function RankingBoard({
   highlightNickname,
 }: RankingBoardProps) {
   const [mounted, setMounted] = useState(false);
+
+  useRegisterInGameBackDismiss(open, onClose);
 
   useEffect(() => {
     setMounted(true);

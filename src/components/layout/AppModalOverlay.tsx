@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
 
 interface AppModalOverlayProps {
   open: boolean;
@@ -23,6 +24,8 @@ export function AppModalOverlay({
   panelClassName = "",
   nested = false,
 }: AppModalOverlayProps) {
+  useRegisterInGameBackDismiss(open, onClose);
+
   useEffect(() => {
     if (!open) return;
 

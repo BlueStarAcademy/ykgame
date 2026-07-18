@@ -1,11 +1,12 @@
 "use client";
 
-import { useLayoutEffect, useMemo } from "react";
+import { useLayoutEffect } from "react";
 import { RoundedBox, Text } from "@react-three/drei";
+import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
+import { YK_GEONGI_LOGO } from "@/lib/brand-assets";
 import {
-  createYkGeongiMarkTexture,
-  createYkGeongiWhiteTextTexture,
+  configureYkGeongiLogoTexture,
   YANMAR_MACHINE_COLORS as COLOR,
   YANMAR_MACHINE_MATERIALS as MATERIAL,
 } from "./machineVisualTheme";
@@ -124,7 +125,7 @@ function DumpBed({ sideMark }: { sideMark: THREE.Texture | null }) {
               rotation={[0, side < 0 ? Math.PI : 0, 0]}
               renderOrder={18}
             >
-              <planeGeometry args={[1.48, 0.375]} />
+              <planeGeometry args={[1.48, 1.48 / YK_GEONGI_LOGO.aspect]} />
               <meshBasicMaterial
                 map={sideMark}
                 transparent
@@ -265,10 +266,11 @@ export function PremiumDumpTruckModel({
   exhaustRef: React.RefObject<THREE.Mesh | null>;
   wheelRefs: React.MutableRefObject<(THREE.Group | null)[]>;
 }) {
-  const ykMark = useMemo(() => createYkGeongiMarkTexture(), []);
-  const sideMark = useMemo(() => createYkGeongiWhiteTextTexture(), []);
-  useLayoutEffect(() => () => ykMark?.dispose(), [ykMark]);
-  useLayoutEffect(() => () => sideMark?.dispose(), [sideMark]);
+  const ykMark = useLoader(THREE.TextureLoader, YK_GEONGI_LOGO.white);
+  const sideMark = ykMark;
+  useLayoutEffect(() => {
+    configureYkGeongiLogoTexture(ykMark);
+  }, [ykMark]);
 
   return (
     <group ref={bodyRef} position={[0.3, DUMP_TRUCK_BODY_LOCAL_Y, 0]}>
@@ -287,7 +289,7 @@ export function PremiumDumpTruckModel({
       <TruckCab exhaustRef={exhaustRef} />
       {ykMark ? (
         <mesh position={[-3.475, 1.02, 0]} rotation={[0, -Math.PI / 2, 0]} renderOrder={18}>
-          <planeGeometry args={[1.92, 0.6]} />
+          <planeGeometry args={[1.92, 1.92 / YK_GEONGI_LOGO.aspect]} />
           <meshBasicMaterial
             map={ykMark}
             transparent

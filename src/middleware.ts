@@ -8,7 +8,7 @@ const { auth } = NextAuth({
   secret: resolveAuthSecret(),
 });
 
-const publicPaths = ["/login", "/signup", "/"];
+const publicPaths = ["/login", "/signup", "/", "/home"];
 const authPaths = ["/login", "/signup"];
 
 function redirectWithPwa(req: { nextUrl: URL }, path: string) {
@@ -33,7 +33,15 @@ export default auth((req) => {
   const isAdmin = pathname.startsWith("/admin");
 
   if (!isLoggedIn && !isPublic) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    const loginUrl = new URL("/login", req.url);
+    if (req.nextUrl.searchParams.get("pwa") === "1") {
+      loginUrl.searchParams.set("pwa", "1");
+    }
+    const callbackPath = `${req.nextUrl.pathname}${req.nextUrl.search}`;
+    if (callbackPath.startsWith("/") && !callbackPath.startsWith("//")) {
+      loginUrl.searchParams.set("callbackUrl", callbackPath);
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
   if (isLoggedIn && isAuthPage) {

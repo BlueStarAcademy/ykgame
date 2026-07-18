@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./LandingPromoPopup.module.css";
+import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
 
 export type PromoPopupSurface = "landing" | "ingame";
 
@@ -43,6 +44,8 @@ interface LandingPromoPopupProps {
 export function LandingPromoPopup({ surface = "landing" }: LandingPromoPopupProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  useRegisterInGameBackDismiss(open, () => setOpen(false));
 
   useEffect(() => {
     setMounted(true);

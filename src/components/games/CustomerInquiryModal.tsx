@@ -8,6 +8,7 @@ import {
   playerInquiryStatus,
   type InquiryStatusKey,
 } from "@/lib/inquiries";
+import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
 
 type TabId = "write" | "mine";
 
@@ -68,6 +69,8 @@ export function CustomerInquiryModal({
     if (!open || tab !== "mine") return;
     void loadInquiries();
   }, [open, tab, loadInquiries]);
+
+  useRegisterInGameBackDismiss(open, onClose);
 
   if (!open || typeof document === "undefined") return null;
 

@@ -1,9 +1,9 @@
-import { LoginForm } from "@/components/auth/LoginForm";
+import { SiteLegendAuthScreen } from "@/components/auth/SiteLegendAuthScreen";
 
 export default function LoginPage() {
   return (
-    <main className="pwa-auth-page flex min-h-[100dvh] items-center justify-center p-4">
-      <LoginForm />
+    <main className="pwa-auth-page site-legend-auth-page">
+      <SiteLegendAuthScreen />
     </main>
   );
 }

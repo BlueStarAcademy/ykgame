@@ -2,12 +2,13 @@
 
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { RoundedBox } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
+import { YK_GEONGI_LOGO } from "@/lib/brand-assets";
 import type { HydraulicVelocity } from "./controls";
 import {
   createChassisModelSideBrandTexture,
-  createYkGeongiMarkTexture,
+  createYkGeongiNumberPlateTexture,
   getCarbodyWidth,
   getDozerArmHalfWidth,
   getDozerBladeReach,
@@ -1494,10 +1495,12 @@ export function PremiumExcavatorBody({
   chassisId?: ChassisModelId | string;
 }) {
   const visual = getChassisVisualProfile(chassisId);
-  const rearYkPlate = useMemo(
-    () => createYkGeongiMarkTexture("1588-3806"),
-    [],
-  );
+  const ykBlackLogo = useLoader(THREE.TextureLoader, YK_GEONGI_LOGO.black);
+  const rearYkPlate = useMemo(() => {
+    const image = ykBlackLogo.image as CanvasImageSource | undefined;
+    if (!image) return null;
+    return createYkGeongiNumberPlateTexture(image, "1588-3806");
+  }, [ykBlackLogo]);
   useLayoutEffect(() => () => rearYkPlate?.dispose(), [rearYkPlate]);
   const trackScaleX = 0.58 * visual.trackWidth;
   const trackScaleZ = 0.82 * visual.trackWidth;
