@@ -134,7 +134,7 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/80 bg-white/90 shadow-[0_1px_12px_rgba(15,23,42,0.06)] backdrop-blur-md">
+      <header className="app-header fixed inset-x-0 top-0 z-50 border-b border-slate-200/80 bg-white/90 shadow-[0_1px_12px_rgba(15,23,42,0.06)] backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-lg items-center justify-between px-4">
           <div className="flex min-w-0 items-center gap-1.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">

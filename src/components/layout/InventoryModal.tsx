@@ -3,9 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
-import type { GearPanelItem } from "@/games/yanmar/GearPanel";
-import { SUB_OPTION_POOL } from "@/games/yanmar/gearCatalog";
-import { getEnhanceCost, getEnhanceCoreCost, getEnhanceSuccessRate } from "@/games/yanmar/gearGenerate";
 
 export interface InventoryCoupon {
   id: string;
@@ -15,8 +12,6 @@ export interface InventoryCoupon {
   expiresAt: string;
   usedAt: string | null;
 }
-
-type InventoryTab = "coupons" | "gear";
 
 function couponTitle(type: InventoryCoupon["type"]) {
   switch (type) {
@@ -234,48 +229,9 @@ export function InventoryModal({
 }: InventoryModalProps) {
   const { data: session } = useSession();
   const userId = session?.user?.id;
-  const [tab, setTab] = useState<InventoryTab>("coupons");
   const [coupons, setCoupons] = useState<InventoryCoupon[]>([]);
   const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [gearItems, setGearItems] = useState<GearPanelItem[]>([]);
-  const [gearCurrency, setGearCurrency] = useState(0);
-  const [gearCores, setGearCores] = useState(0);
-  const [selectedGearId, setSelectedGearId] = useState<string | null>(null);
-  const [gearLoading, setGearLoading] = useState(false);
-  const [gearBusy, setGearBusy] = useState(false);
-  const [gearError, setGearError] = useState<string | null>(null);
-
-  const loadGear = useCallback(async () => {
-    setGearLoading(true);
-    setGearError(null);
-    try {
-      const res = await fetch("/api/gear/yanmar");
-      if (res.status === 401) {
-        setGearItems([]);
-        setGearError("로그인 후 장비를 확인할 수 있습니다.");
-        return;
-      }
-      if (!res.ok) {
-        setGearItems([]);
-        setGearError("장비를 불러오지 못했습니다.");
-        return;
-      }
-      const data = await res.json();
-      const items = (Array.isArray(data.items) ? data.items : []) as GearPanelItem[];
-      setGearItems(items);
-      setGearCurrency(typeof data.currency === "number" ? data.currency : 0);
-      setGearCores(typeof data.enhanceCores === "number" ? data.enhanceCores : 0);
-      setSelectedGearId((prev) =>
-        prev && items.some((item) => item.id === prev) ? prev : (items[0]?.id ?? null),
-      );
-    } catch {
-      setGearItems([]);
-      setGearError("장비를 불러오지 못했습니다.");
-    } finally {
-      setGearLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -309,29 +265,6 @@ export function InventoryModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, userId]);
 
-  useEffect(() => {
-    if (!open || tab !== "gear") return;
-    void loadGear();
-  }, [open, tab, loadGear]);
-
-  const runGearAction = useCallback(
-    async (action: "equip" | "unequip" | "enhance" | "dismantle", itemId: string) => {
-      setGearBusy(true);
-      try {
-        const res = await fetch("/api/gear/yanmar/action", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, itemId }),
-        });
-        if (!res.ok) return;
-        await loadGear();
-      } finally {
-        setGearBusy(false);
-      }
-    },
-    [loadGear],
-  );
-
   if (!open) return null;
 
   const selectedCoupon =
@@ -342,27 +275,11 @@ export function InventoryModal({
   const selectedUsed = Boolean(selectedCoupon?.usedAt);
   const canShowBarcode = Boolean(selectedCoupon) && !selectedExpired && !selectedUsed;
 
-  const selectedGear =
-    gearItems.find((item) => item.id === selectedGearId) ?? gearItems[0] ?? null;
-  const nextEnhanceCost = selectedGear
-    ? getEnhanceCost(selectedGear.enhanceLevel + 1, selectedGear.grade)
-    : null;
-  const nextCoreCost = selectedGear
-    ? getEnhanceCoreCost(selectedGear.enhanceLevel + 1, selectedGear.grade)
-    : 0;
-  const enhanceRate = selectedGear
-    ? getEnhanceSuccessRate(
-        selectedGear.enhanceLevel + 1,
-        selectedGear.failBonus,
-        selectedGear.grade,
-      )
-    : 0;
-
   return (
     <AppModalOverlay open={open} onClose={onClose}>
       <div className="flex h-[min(82dvh,36rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl landscape:h-[min(90dvh,22rem)]">
         <div className="flex shrink-0 items-center justify-between bg-amber-500 px-4 py-3 text-white">
-          <h2 className="text-base font-black">인벤토리</h2>
+          <h2 className="text-base font-black">쿠폰함</h2>
           <button
             type="button"
             onClick={onClose}
@@ -372,260 +289,85 @@ export function InventoryModal({
           </button>
         </div>
 
-        <div className="flex shrink-0 gap-1 border-b border-gray-100 bg-gray-50 px-3 pt-2">
-          {(
-            [
-              ["coupons", "쿠폰"],
-              ["gear", "장비"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`rounded-t-lg px-3 py-2 text-xs font-bold transition ${
-                tab === id
-                  ? "bg-white text-amber-700 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {tab === "coupons" ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-            <div className="h-[7.25rem] shrink-0">
-              {loading ? (
-                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50">
-                  <p className="text-xs text-gray-400">불러오는 중...</p>
-                </div>
-              ) : !selectedCoupon ? (
-                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50">
-                  <p className="text-xs text-gray-400">쿠폰을 선택하세요</p>
-                </div>
-              ) : canShowBarcode ? (
-                <BarcodePreview code={selectedCoupon.barcodeCode} />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center rounded-xl border border-red-100 bg-red-50 px-3 text-center">
-                  <p className="text-xs font-black text-red-700">
-                    {selectedUsed ? "이미 사용된 쿠폰입니다" : "유효기간이 만료되었습니다"}
-                  </p>
-                  <p className="mt-1 text-[10px] text-red-500">
-                    바코드를 표시할 수 없습니다
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-hidden">
-              {loading ? null : coupons.length === 0 ? (
-                <p className="py-6 text-center text-xs text-gray-400">
-                  보유 쿠폰이 없습니다.
-                </p>
-              ) : (
-                <div className="h-full space-y-2 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
-                  {coupons.map((coupon) => {
-                    const selected = coupon.id === selectedCouponId;
-                    const expired = isCouponExpired(coupon.expiresAt);
-                    return (
-                      <button
-                        key={coupon.id}
-                        type="button"
-                        onClick={() => setSelectedCouponId(coupon.id)}
-                        className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
-                          selected
-                            ? "border-amber-300 bg-amber-50"
-                            : expired
-                              ? "border-gray-200 bg-gray-50 opacity-75 hover:bg-gray-100"
-                              : "border-gray-200 bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span
-                            className={`text-xs font-black ${
-                              expired ? "text-gray-500" : "text-gray-800"
-                            }`}
-                          >
-                            {couponTitle(coupon.type)}
-                          </span>
-                          <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
-                            {couponBadge(coupon)}
-                          </span>
-                        </div>
-                        <div className="mt-1.5 flex items-center justify-between gap-2">
-                          <p
-                            className={`text-[11px] font-semibold ${
-                              expired ? "text-red-600" : "text-gray-700"
-                            }`}
-                          >
-                            유효기간 {formatDate(coupon.expiresAt)}
-                          </p>
-                          <ExpiryBadge
-                            expiresAt={coupon.expiresAt}
-                            usedAt={coupon.usedAt}
-                          />
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-            <p className="shrink-0 text-[11px] font-semibold text-gray-500">
-              보유 스타 {gearCurrency.toLocaleString()} · 강화코어 {gearCores} · 장비{" "}
-              {gearItems.length}개
-            </p>
-            {gearLoading ? (
-              <p className="py-6 text-center text-xs text-gray-400">불러오는 중...</p>
-            ) : gearError ? (
-              <p className="py-6 text-center text-xs text-gray-400">{gearError}</p>
-            ) : gearItems.length === 0 ? (
-              <p className="py-6 text-center text-xs text-gray-400">
-                보유 장비가 없습니다.
-              </p>
+        <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+          <div className="h-[7.25rem] shrink-0">
+            {loading ? (
+              <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50">
+                <p className="text-xs text-gray-400">불러오는 중...</p>
+              </div>
+            ) : !selectedCoupon ? (
+              <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50">
+                <p className="text-xs text-gray-400">쿠폰을 선택하세요</p>
+              </div>
+            ) : canShowBarcode ? (
+              <BarcodePreview code={selectedCoupon.barcodeCode} />
             ) : (
-              <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="min-h-0 space-y-2 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
-                  {gearItems.map((item) => {
-                    const selected = item.id === selectedGear?.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setSelectedGearId(item.id)}
-                        className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
-                          selected
-                            ? "border-amber-300 bg-amber-50"
-                            : item.equippedSlot
-                              ? "border-amber-100 bg-amber-50/60 hover:bg-amber-50"
-                              : "border-gray-200 bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-black text-gray-800">
-                            {item.nameSnapshot}
-                            {item.enhanceLevel > 0 ? ` +${item.enhanceLevel}` : ""}
-                          </span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                            {item.gradeLabel}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-[11px] text-gray-600">
-                          {item.slotLabel}
-                          {item.equippedSlot ? " · 장착중" : ""} · 내구{" "}
-                          {Math.round(item.durability)}/{Math.round(item.durabilityMax)}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="min-h-0 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-3">
-                  {selectedGear ? (
-                    <>
-                      <h3 className="text-sm font-black text-gray-900">
-                        {selectedGear.nameSnapshot}
-                        {selectedGear.enhanceLevel > 0
-                          ? ` +${selectedGear.enhanceLevel}`
-                          : ""}
-                      </h3>
-                      <p className="mt-1 text-[11px] text-gray-600">
-                        {selectedGear.gradeLabel} · {selectedGear.slotLabel}
-                      </p>
-                      <p className="mt-2 text-[11px] font-semibold text-gray-700">
-                        내구 {Math.round(selectedGear.durability)} /{" "}
-                        {Math.round(selectedGear.durabilityMax)}
-                      </p>
-                      <p className="mt-1 text-[11px] text-gray-700">
-                        주옵션 {selectedGear.mainLabel ?? selectedGear.mainOption.key}:{" "}
-                        {Math.round(selectedGear.mainOption.value)}
-                      </p>
-                      {selectedGear.subOptions.length > 0 && (
-                        <ul className="mt-2 space-y-0.5 text-[11px] text-gray-600">
-                          {selectedGear.subOptions.map((sub) => {
-                            const unit = sub.isPercent ? "%" : "";
-                            const label =
-                              SUB_OPTION_POOL.find((d) => d.key === sub.key)
-                                ?.label ?? sub.key;
-                            return (
-                              <li key={`${sub.key}-${sub.tier}-${sub.value}-${unit}`}>
-                                {label} T{sub.tier}: +{Math.round(sub.value)}
-                                {unit} ({Math.round(sub.rollMin)}~
-                                {Math.round(sub.rollMax)})
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                      {selectedGear.masterOption && (
-                        <p className="mt-2 text-[11px] font-semibold text-amber-700">
-                          마스터: {selectedGear.masterOption.label}
-                          {!selectedGear.masterOption.hideValue &&
-                            ` ${selectedGear.masterOption.value}${
-                              selectedGear.masterOption.isPercent ? "%" : ""
-                            }`}
-                        </p>
-                      )}
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {selectedGear.equippedSlot ? (
-                          <button
-                            type="button"
-                            disabled={gearBusy}
-                            onClick={() => void runGearAction("unequip", selectedGear.id)}
-                            className="rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-bold text-gray-700 ring-1 ring-gray-200 disabled:opacity-50"
-                          >
-                            해제
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={gearBusy}
-                            onClick={() => void runGearAction("equip", selectedGear.id)}
-                            className="rounded-lg bg-amber-500 px-2.5 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
-                          >
-                            장착
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          disabled={
-                            gearBusy ||
-                            nextEnhanceCost == null ||
-                            gearCurrency < (nextEnhanceCost ?? 0) ||
-                            gearCores < nextCoreCost
-                          }
-                          onClick={() => void runGearAction("enhance", selectedGear.id)}
-                          className="rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-bold text-gray-700 ring-1 ring-gray-200 disabled:opacity-50"
-                        >
-                          강화
-                          {nextEnhanceCost != null
-                            ? ` (${nextEnhanceCost}★${
-                                nextCoreCost > 0 ? ` · 코어 ${nextCoreCost}` : ""
-                              } · ${Math.round(enhanceRate * 100)}%)`
-                            : " MAX"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={gearBusy || !!selectedGear.equippedSlot}
-                          onClick={() => void runGearAction("dismantle", selectedGear.id)}
-                          className="rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-bold text-red-600 ring-1 ring-red-100 disabled:opacity-50"
-                        >
-                          분해
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-xs text-gray-400">장비를 선택하세요</p>
-                  )}
-                </div>
+              <div className="flex h-full flex-col items-center justify-center rounded-xl border border-red-100 bg-red-50 px-3 text-center">
+                <p className="text-xs font-black text-red-700">
+                  {selectedUsed ? "이미 사용된 쿠폰입니다" : "유효기간이 만료되었습니다"}
+                </p>
+                <p className="mt-1 text-[10px] text-red-500">
+                  바코드를 표시할 수 없습니다
+                </p>
               </div>
             )}
           </div>
-        )}
+
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {loading ? null : coupons.length === 0 ? (
+              <p className="py-6 text-center text-xs text-gray-400">
+                보유 쿠폰이 없습니다.
+              </p>
+            ) : (
+              <div className="h-full space-y-2 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
+                {coupons.map((coupon) => {
+                  const selected = coupon.id === selectedCouponId;
+                  const expired = isCouponExpired(coupon.expiresAt);
+                  return (
+                    <button
+                      key={coupon.id}
+                      type="button"
+                      onClick={() => setSelectedCouponId(coupon.id)}
+                      className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
+                        selected
+                          ? "border-amber-300 bg-amber-50"
+                          : expired
+                            ? "border-gray-200 bg-gray-50 opacity-75 hover:bg-gray-100"
+                            : "border-gray-200 bg-white hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={`text-xs font-black ${
+                            expired ? "text-gray-500" : "text-gray-800"
+                          }`}
+                        >
+                          {couponTitle(coupon.type)}
+                        </span>
+                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                          {couponBadge(coupon)}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between gap-2">
+                        <p
+                          className={`text-[11px] font-semibold ${
+                            expired ? "text-red-600" : "text-gray-700"
+                          }`}
+                        >
+                          유효기간 {formatDate(coupon.expiresAt)}
+                        </p>
+                        <ExpiryBadge
+                          expiresAt={coupon.expiresAt}
+                          usedAt={coupon.usedAt}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </AppModalOverlay>
   );

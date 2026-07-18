@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface AppSideMenuProps {
   open: boolean;
@@ -27,7 +28,7 @@ interface MenuItemProps {
 }
 
 function MenuItem({ icon, label, badge, onClick, href, danger }: MenuItemProps) {
-  const className = `flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors ${
+  const className = `flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-colors ${
     danger
       ? "text-red-600 hover:bg-red-50"
       : "text-gray-800 hover:bg-gray-50"
@@ -77,14 +78,18 @@ export function AppSideMenu({
 }: AppSideMenuProps) {
   useEffect(() => {
     if (!open) return;
+
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
-    document.addEventListener("keydown", handleKeyDown);
+
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
     return () => {
+      document.body.style.overflow = prevOverflow;
       document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
     };
   }, [open, onClose]);
 
@@ -93,41 +98,41 @@ export function AppSideMenu({
     action();
   }
 
-  return (
-    <div
-      className={`fixed inset-0 z-[300] transition-opacity duration-300 ${
-        open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-      }`}
-      aria-hidden={!open}
-    >
-      <button
-        type="button"
-        aria-label="메뉴 닫기"
-        onClick={onClose}
-        className="absolute inset-0 bg-black/50"
-      />
+  if (!open || typeof document === "undefined") return null;
 
-      <aside
-        className={`absolute inset-y-0 right-0 flex w-72 max-w-[85vw] flex-col bg-white shadow-2xl transition-transform duration-300 ease-out ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/55 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-[min(100%,18rem)] overflow-hidden rounded-2xl bg-white shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-label="메뉴"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-gray-100 px-5 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+        <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3.5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
               {nickname.charAt(0)}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-base font-bold text-gray-900">{nickname}</p>
-              <p className="text-xs text-gray-400">메뉴</p>
+              <p className="truncate text-sm font-bold text-gray-900">{nickname}</p>
+              <p className="text-[11px] text-gray-400">메뉴</p>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-600 hover:bg-gray-200"
+            aria-label="메뉴 닫기"
+          >
+            닫기
+          </button>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        <nav className="space-y-0.5 p-2">
           <MenuItem
             icon="📬"
             label="우편함"
@@ -151,16 +156,11 @@ export function AppSideMenu({
             onClick={() => handleMenuAction(onOpenSettings)}
           />
           {isAdmin ? (
-            <MenuItem
-              icon="🛠️"
-              label="관리"
-              href="/admin"
-              onClick={onClose}
-            />
+            <MenuItem icon="🛠️" label="관리" href="/admin" onClick={onClose} />
           ) : null}
         </nav>
 
-        <div className="border-t border-gray-100 p-3">
+        <div className="border-t border-gray-100 p-2">
           <MenuItem
             icon="🚪"
             label="로그아웃"
@@ -171,7 +171,8 @@ export function AppSideMenu({
             }}
           />
         </div>
-      </aside>
-    </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

@@ -18,10 +18,10 @@ export function AppShell({
   hideFooter = false,
 }: AppShellProps) {
   return (
-    <div className="flex min-h-dvh flex-col bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,#e8eef5_0%,#f1f5f9_45%,#eef2f7_100%)]">
+    <div className="app-shell flex min-h-dvh flex-col bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,#e8eef5_0%,#f1f5f9_45%,#eef2f7_100%)]">
       <AppHeader nickname={nickname} currency={currency} role={role} />
       <main
-        className={`mx-auto flex h-0 min-h-0 w-full max-w-lg flex-1 flex-col overflow-hidden px-4 pt-[4.5rem] ${
+        className={`app-shell-main mx-auto flex h-0 min-h-0 w-full max-w-lg flex-1 flex-col overflow-hidden px-4 pt-[4.5rem] ${
           hideFooter ? "pb-2" : "pb-16"
         }`}
       >
