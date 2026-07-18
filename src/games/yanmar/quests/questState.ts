@@ -1,10 +1,13 @@
 import {
+  DAILY_ALL_COMPLETE_QUEST_ID,
+  DAILY_MISSION_CLEAR_QUEST_ID,
   DAILY_QUEST_DEFS,
   MISSION_DIFFICULTY_REWARDS,
   QUEST_MISSIONS_PER_DAY,
   REPEAT_QUEST_DEFS,
   buildMissionTasks,
   getMissionLevelBand,
+  isMetaDailyQuest,
   rollDailyQuestTarget,
   rollMissionDifficulty,
   type MissionLevelBand,
@@ -112,9 +115,62 @@ function createMissionRounds(band: MissionLevelBand): MissionRound[] {
   });
 }
 
+/** 메타 일일(모두 완료·미션 N회) 진행도를 현재 상태에서 다시 맞춘다 */
+function syncMetaDailyQuests(state: YanmarQuestState): YanmarQuestState {
+  const nonMeta = state.daily.filter((item) => {
+    const def = DAILY_QUEST_DEFS.find((entry) => entry.id === item.id);
+    return def ? !isMetaDailyQuest(def) : !isMetaDailyQuest({ id: item.id });
+  });
+  const allTarget = Math.max(1, nonMeta.length);
+  const allProgress = nonMeta.filter((item) => item.completed).length;
+  const missionProgress = Math.max(
+    0,
+    Math.min(QUEST_MISSIONS_PER_DAY, state.missionsCleared),
+  );
+
+  let changed = false;
+  const daily = state.daily.map((item) => {
+    if (item.claimed) return item;
+
+    if (item.id === DAILY_ALL_COMPLETE_QUEST_ID) {
+      const progress = Math.min(allTarget, allProgress);
+      const completed = nonMeta.length > 0 && allProgress >= nonMeta.length;
+      if (
+        item.target === allTarget &&
+        item.progress === progress &&
+        item.completed === completed
+      ) {
+        return item;
+      }
+      changed = true;
+      return { ...item, target: allTarget, progress, completed };
+    }
+
+    if (item.id === DAILY_MISSION_CLEAR_QUEST_ID) {
+      const target = QUEST_MISSIONS_PER_DAY;
+      const progress = missionProgress;
+      const completed = progress >= target;
+      if (
+        item.target === target &&
+        item.progress === progress &&
+        item.completed === completed
+      ) {
+        return item;
+      }
+      changed = true;
+      return { ...item, target, progress, completed };
+    }
+
+    return item;
+  });
+
+  if (!changed) return state;
+  return { ...state, daily };
+}
+
 export function createQuestState(ownerId: string, level: number): YanmarQuestState {
   const band = getMissionLevelBand(level);
-  return {
+  return syncMetaDailyQuests({
     version: QUEST_STATE_VERSION,
     dayKey: getQuestDayKey(),
     ownerId,
@@ -123,7 +179,7 @@ export function createQuestState(ownerId: string, level: number): YanmarQuestSta
     repeat: createRepeatProgress(level),
     missions: createMissionRounds(band),
     missionsCleared: 0,
-  };
+  });
 }
 
 function isValidState(value: unknown): value is YanmarQuestState {
@@ -194,7 +250,7 @@ export function loadQuestState(ownerId: string, level: number): YanmarQuestState
       !Array.isArray(parsed.missions) ||
       parsed.missions.length !== QUEST_MISSIONS_PER_DAY;
 
-    return {
+    return syncMetaDailyQuests({
       ...parsed,
       version: QUEST_STATE_VERSION,
       levelBand: parsed.levelBand ?? band,
@@ -213,7 +269,7 @@ export function loadQuestState(ownerId: string, level: number): YanmarQuestState
                 parsed.missions.filter((m) => m.claimed).length,
             ),
           ),
-    };
+    });
   } catch {
     return createQuestState(ownerId, level);
   }
@@ -304,7 +360,7 @@ export function applyQuestProgress(
   }
 
   if (!changed) return state;
-  return { ...state, daily, missions, repeat };
+  return syncMetaDailyQuests({ ...state, daily, missions, repeat });
 }
 
 export function claimDailyQuest(
@@ -318,12 +374,12 @@ export function claimDailyQuest(
 
   return {
     reward: def.reward,
-    state: {
+    state: syncMetaDailyQuests({
       ...state,
       daily: state.daily.map((entry) =>
         entry.id === questId ? { ...entry, claimed: true } : entry,
       ),
-    },
+    }),
   };
 }
 
@@ -370,11 +426,11 @@ export function claimCurrentMission(
   return {
     reward,
     roundIndex: round.index,
-    state: {
+    state: syncMetaDailyQuests({
       ...state,
       missions,
       missionsCleared: Math.min(QUEST_MISSIONS_PER_DAY, state.missionsCleared + 1),
-    },
+    }),
   };
 }
 

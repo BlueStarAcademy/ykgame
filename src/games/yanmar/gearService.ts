@@ -88,16 +88,47 @@ export async function loadUserFinalStats(
   userId: string,
   gameId = "yanmar",
 ) {
-  const [loadout, items, repair, user, workshopRows] = await Promise.all([
-    tx.userChassisLoadout.findUnique({ where: { userId_gameId: { userId, gameId } } }),
-    tx.gearItem.findMany({ where: { userId, gameId } }),
-    tx.userRepairState.findUnique({ where: { userId_gameId: { userId, gameId } } }),
-    tx.user.findUnique({ where: { id: userId }, select: { totalXp: true } }),
-    tx.userWorkshopUpgrade.findMany({
+  // Interactive transactions share one connection — never Promise.all on tx.
+  const supportsParallel = typeof (tx as PrismaClient).$transaction === "function";
+
+  let loadout: Awaited<ReturnType<typeof tx.userChassisLoadout.findUnique>>;
+  let items: Awaited<ReturnType<typeof tx.gearItem.findMany>>;
+  let repair: Awaited<ReturnType<typeof tx.userRepairState.findUnique>>;
+  let user: { totalXp: number } | null;
+  let workshopRows: { workshopId: string; upgradeKey: string; level: number }[];
+
+  if (supportsParallel) {
+    [loadout, items, repair, user, workshopRows] = await Promise.all([
+      tx.userChassisLoadout.findUnique({
+        where: { userId_gameId: { userId, gameId } },
+      }),
+      tx.gearItem.findMany({ where: { userId, gameId } }),
+      tx.userRepairState.findUnique({
+        where: { userId_gameId: { userId, gameId } },
+      }),
+      tx.user.findUnique({ where: { id: userId }, select: { totalXp: true } }),
+      tx.userWorkshopUpgrade.findMany({
+        where: { userId },
+        select: { workshopId: true, upgradeKey: true, level: true },
+      }),
+    ]);
+  } else {
+    loadout = await tx.userChassisLoadout.findUnique({
+      where: { userId_gameId: { userId, gameId } },
+    });
+    items = await tx.gearItem.findMany({ where: { userId, gameId } });
+    repair = await tx.userRepairState.findUnique({
+      where: { userId_gameId: { userId, gameId } },
+    });
+    user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { totalXp: true },
+    });
+    workshopRows = await tx.userWorkshopUpgrade.findMany({
       where: { userId },
       select: { workshopId: true, upgradeKey: true, level: true },
-    }),
-  ]);
+    });
+  }
 
   let repairBuff: "NONE" | "SMALL" | "LARGE" = "NONE";
   if (
@@ -240,11 +271,13 @@ export async function tryWorkGearDrop(
     gameId,
   );
   const scopedLuck =
-    trigger === "breaker"
-      ? workshopLuckyDropBonus(workshopById.crash.lucky_drop ?? 0)
-      : trigger === "hillDump"
-        ? workshopLuckyDropBonus(workshopById.hill.lucky_drop ?? 0)
-        : 0;
+    trigger === "soilDump" || trigger === "dumpTruckFull"
+      ? workshopLuckyDropBonus(workshopById.dump.lucky_drop ?? 0)
+      : trigger === "breaker"
+        ? workshopLuckyDropBonus(workshopById.crash.lucky_drop ?? 0)
+        : trigger === "hillDump" || trigger === "haulTruckFull"
+          ? workshopLuckyDropBonus(workshopById.hill.lucky_drop ?? 0)
+          : 0;
   const chance = workDropChance(trigger, stats.activeMasters, scopedLuck);
   if (Math.random() >= chance) {
     return { dropped: false as const, reason: "miss" as const };

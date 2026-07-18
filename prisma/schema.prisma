@@ -139,6 +139,12 @@ model User {
   monumentTutorialDone        Boolean   @default(false)
   gachaTicketsStandard Int                    @default(0)
   gachaTicketsPremium  Int                    @default(0)
+  /** KST day key (YYYY-MM-DD) for daily free gacha counters */
+  gachaFreeDayKey               String?
+  gachaFreeStandardUsed         Int       @default(0)
+  gachaFreePremiumUsed          Int       @default(0)
+  /** Next time STANDARD free pull is allowed (cooldown). */
+  gachaFreeStandardCooldownAt   DateTime?
   workshopUpgrades     UserWorkshopUpgrade[]
   workshopShopPurchases UserWorkshopShopPurchase[]
   monumentUpgrades     UserMonumentUpgrade[]

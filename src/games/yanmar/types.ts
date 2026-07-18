@@ -108,6 +108,8 @@ export interface DumpScorePanelState {
   earnedStars: number;
   earnedXp: number;
   earnedEnhanceCores: number;
+  /** 조형물 퀘스트 등으로 획득한 조형물 포인트 */
+  earnedMonumentPoints: number;
   pendingRewards: number;
   pulseKey: number;
 }

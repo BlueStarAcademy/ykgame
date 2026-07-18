@@ -6,6 +6,8 @@ import {
   dumpRateLimitEventKey,
   dumpRateLimitKey,
   rankingsTopKey,
+  seasonDropCouponsKey,
+  sessionVersionKey,
   userStatsKey,
 } from "../src/lib/redis-keys";
 import { calculateTokenBucket } from "../src/lib/token-bucket";
@@ -80,8 +82,17 @@ test("Redis keys are versioned and do not expose raw identifiers", () => {
   const rateEventKey = dumpRateLimitEventKey("custom", userId, eventId);
   const statsKey = userStatsKey("custom", "yanmar", "2026-7", userId, "sum");
   const topKey = rankingsTopKey("custom", "yanmar", "2026-7", 10, "sum");
+  const sessionKey = sessionVersionKey("custom", userId);
+  const couponKey = seasonDropCouponsKey("custom", "2026-3");
 
-  for (const key of [rateKey, rateEventKey, statsKey, topKey]) {
+  for (const key of [
+    rateKey,
+    rateEventKey,
+    statsKey,
+    topKey,
+    sessionKey,
+    couponKey,
+  ]) {
     assert.match(key, /^custom:v1:/);
     assert.equal(key.includes(userId), false);
     assert.equal(key.includes(eventId), false);

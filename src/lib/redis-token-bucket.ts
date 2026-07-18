@@ -67,7 +67,11 @@ export async function consumeDumpRateLimit(
       ],
     }),
   );
-  if (!result.available) return { allowed: true, bypassed: true };
+  if (!result.available) {
+    // REDIS_URL is configured but Redis is unreachable — fail closed so Postgres
+    // is not flooded when the shared rate limiter is down.
+    return { allowed: false, bypassed: true };
+  }
 
   const reply = result.value;
   if (
@@ -76,7 +80,7 @@ export async function consumeDumpRateLimit(
     (Number(reply[0]) !== 0 && Number(reply[0]) !== 1) ||
     !Number.isFinite(Number(reply[1]))
   ) {
-    return { allowed: true, bypassed: true };
+    return { allowed: false, bypassed: true };
   }
   return {
     allowed: Number(reply[0]) === 1,

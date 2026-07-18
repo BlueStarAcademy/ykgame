@@ -1,11 +1,15 @@
 import http from "k6/http";
 import { check, fail, sleep } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
-import { validateLoadEnvironment } from "./load-config.mjs";
+import {
+  resolveLoadEnv,
+  validateLoadEnvironment,
+} from "./load-config.mjs";
 
 const loadConfig = (() => {
   try {
-    return { value: validateLoadEnvironment(__ENV), error: null };
+    const env = resolveLoadEnv(__ENV, (path) => open(path));
+    return { value: validateLoadEnvironment(env), error: null };
   } catch (error) {
     return { value: null, error: error.message };
   }

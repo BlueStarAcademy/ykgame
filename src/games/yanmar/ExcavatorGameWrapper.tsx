@@ -77,8 +77,9 @@ import { type HornId } from "./soundSettings";
 import { useSoundSettings } from "./useSoundSettings";
 import { yanmarAudio } from "./yanmarAudio";
 import { QuestPanel } from "./QuestPanel";
-import { ShopPanel } from "./ShopPanel";
+import { ShopPanel, type GachaPayWith } from "./ShopPanel";
 import { GachaResultModal } from "./GachaResultModal";
+import type { GachaFreeStatus } from "./gachaFree";
 import { ActiveShopBuffIcons } from "./ActiveShopBuffIcons";
 import {
   activateShopBuff,
@@ -190,6 +191,7 @@ import {
   isInMonumentRange,
   loadMonumentQuestState,
   markMonumentDailyClaimed,
+  MONUMENT_POINTS_ICON,
   MONUMENT_UNLOCK_LEVEL,
   pushMonumentQuestProgress,
   saveMonumentQuestState,
@@ -468,7 +470,15 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
   const showXp = panel.earnedXp > 0;
   const showStars = panel.earnedStars > 0;
   const showCores = panel.earnedEnhanceCores > 0;
-  if (!showScore && !showXp && !showStars && !showCores && !panel.rewardText) {
+  const showMonumentPoints = panel.earnedMonumentPoints > 0;
+  if (
+    !showScore &&
+    !showXp &&
+    !showStars &&
+    !showCores &&
+    !showMonumentPoints &&
+    !panel.rewardText
+  ) {
     return null;
   }
 
@@ -496,6 +506,21 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
           draggable={false}
         />
         {panel.earnedStars.toLocaleString()}
+      </span>,
+    );
+  }
+  if (showMonumentPoints) {
+    valueParts.push(
+      <span key="monument" className="inline-flex items-center gap-0.5">
+        <img
+          src={MONUMENT_POINTS_ICON}
+          alt=""
+          width={16}
+          height={16}
+          className="object-contain"
+          draggable={false}
+        />
+        {panel.earnedMonumentPoints.toLocaleString()}
       </span>,
     );
   }
@@ -974,6 +999,7 @@ export function ExcavatorGameWrapper({
   const monumentTutorialArmedRef = useRef(false);
   const [gachaTicketsStandard, setGachaTicketsStandard] = useState(0);
   const [gachaTicketsPremium, setGachaTicketsPremium] = useState(0);
+  const [freeGacha, setFreeGacha] = useState<GachaFreeStatus | null>(null);
   const travelMetersAccumRef = useRef(0);
   const travelFlushBusyRef = useRef(false);
   const [activeShopBuffs, setActiveShopBuffs] = useState<ActiveShopBuff[]>([]);
@@ -1044,6 +1070,17 @@ export function ExcavatorGameWrapper({
   const processedExitSignalRef = useRef(0);
   const processedScoreCommitRef = useRef(0);
   const dumpScorePanelRef = useRef<DumpScorePanelState | null>(null);
+  const showStandaloneRewardPanelRef = useRef<
+    (
+      score: number,
+      critical: boolean,
+      earnedStars: number,
+      earnedXp?: number,
+      rewardText?: string,
+      earnedEnhanceCores?: number,
+      earnedMonumentPoints?: number,
+    ) => void
+  >(() => {});
   const dumpScoreHideTimerRef = useRef<number | null>(null);
   const dumpOutboxOwnerRef = useRef<string | null>(null);
   const dumpOutboxOpenBatchRef = useRef<DumpRewardOutboxBatch | null>(null);
@@ -1178,7 +1215,13 @@ export function ExcavatorGameWrapper({
       const delta = fb.crashHitTick - lastSyncedCrashHitTickRef.current;
       if (delta > 0) {
         const now = performance.now();
-        if (now - lastBreakerVibrationAtRef.current >= 2000) {
+        // Skip haptic while the foot pedal is held — vibrate can cancel the
+        // active touch and release the breaker pedal mid-strike.
+        const pedalHeld = (auxiliaryRef.current.attachmentPedal ?? 0) !== 0;
+        if (
+          !pedalHeld &&
+          now - lastBreakerVibrationAtRef.current >= 2000
+        ) {
           lastBreakerVibrationAtRef.current = now;
           if (typeof navigator.vibrate === "function") navigator.vibrate(120);
         }
@@ -1903,8 +1946,10 @@ export function ExcavatorGameWrapper({
         currency: data.currency,
       });
       if (typeof data.totalXp === "number") {
-        applyTotalXp(data.totalXp, { announceLevelUp: false });
-        void updateSessionRef.current({ user: { totalXp: data.totalXp } });
+        if (data.totalXp !== totalXpRef.current) {
+          applyTotalXp(data.totalXp, { announceLevelUp: false });
+          void updateSessionRef.current({ user: { totalXp: data.totalXp } });
+        }
       }
       if (typeof data.gachaTicketsStandard === "number") {
         setGachaTicketsStandard(data.gachaTicketsStandard);
@@ -1956,8 +2001,10 @@ export function ExcavatorGameWrapper({
         currency: data.currency,
       });
       if (typeof data.totalXp === "number") {
-        applyTotalXp(data.totalXp, { announceLevelUp: false });
-        void updateSessionRef.current({ user: { totalXp: data.totalXp } });
+        if (data.totalXp !== totalXpRef.current) {
+          applyTotalXp(data.totalXp, { announceLevelUp: false });
+          void updateSessionRef.current({ user: { totalXp: data.totalXp } });
+        }
       }
       if (typeof data.currency === "number") {
         currencyRef.current = data.currency;
@@ -1974,7 +2021,7 @@ export function ExcavatorGameWrapper({
       }
 
       const level = getPlayerLevelProgress(
-        data.totalXp ?? session?.user?.totalXp ?? 0,
+        data.totalXp ?? totalXpRef.current,
       ).level;
       if (
         level >= MONUMENT_UNLOCK_LEVEL &&
@@ -1987,7 +2034,7 @@ export function ExcavatorGameWrapper({
     } catch {
       /* ignore */
     }
-  }, [applyTotalXp, enqueueUnlockNotices, session?.user?.totalXp]);
+  }, [applyTotalXp, enqueueUnlockNotices]);
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
@@ -2005,13 +2052,14 @@ export function ExcavatorGameWrapper({
     monumentQuestStateRef.current = mq;
     setMonumentQuestState(mq);
     questTrackRef.current.ready = false;
-    if (session?.user?.id) {
-      void loadWorkshopState();
-      void loadMonumentState();
-    }
+  }, [session?.user?.id, session?.user?.totalXp, sessionStatus]);
+
+  useEffect(() => {
+    if (sessionStatus === "loading" || !session?.user?.id) return;
+    void loadWorkshopState();
+    void loadMonumentState();
   }, [
     session?.user?.id,
-    session?.user?.totalXp,
     sessionStatus,
     loadWorkshopState,
     loadMonumentState,
@@ -2260,6 +2308,9 @@ export function ExcavatorGameWrapper({
       }
       if (typeof data.gachaTicketsPremium === "number") {
         setGachaTicketsPremium(data.gachaTicketsPremium);
+      }
+      if (data.freeGacha && typeof data.freeGacha === "object") {
+        setFreeGacha(data.freeGacha as GachaFreeStatus);
       }
       if (typeof data.inventorySlots === "number") {
         setGearInventorySlots(data.inventorySlots);
@@ -2673,7 +2724,7 @@ export function ExcavatorGameWrapper({
     async (
       banner: "STANDARD" | "PREMIUM",
       count: 1 | 10,
-      payWith: "stars" | "tickets" = "stars",
+      payWith: GachaPayWith = "stars",
     ) => {
       setGachaBusy(true);
       try {
@@ -2694,6 +2745,9 @@ export function ExcavatorGameWrapper({
         }
         if (typeof data.gachaTicketsPremium === "number") {
           setGachaTicketsPremium(data.gachaTicketsPremium);
+        }
+        if (data.free && typeof data.free === "object") {
+          setFreeGacha(data.free as GachaFreeStatus);
         }
         if (Array.isArray(data.items) && data.items.length > 0) {
           setLastGachaBanner(banner);
@@ -2861,6 +2915,9 @@ export function ExcavatorGameWrapper({
           setMonumentQuestState(next);
           saveMonumentQuestState(next);
         }
+        if (!data.duplicate && points > 0) {
+          showStandaloneRewardPanelRef.current(0, false, 0, 0, "", 0, points);
+        }
       } finally {
         setMonumentBusy(false);
       }
@@ -2974,6 +3031,12 @@ export function ExcavatorGameWrapper({
       if (typeof data.currency === "number") {
         currencyRef.current = data.currency;
         setCurrency(data.currency);
+      }
+      const claimed =
+        typeof data.claimed === "number" ? Math.max(0, data.claimed) : 0;
+      if (claimed > 0) {
+        rewardStarsRef.current += claimed;
+        showStandaloneRewardPanelRef.current(0, false, claimed);
       }
       await loadMonumentState();
     } finally {
@@ -3983,6 +4046,7 @@ export function ExcavatorGameWrapper({
         earnedXp: (previous?.earnedXp ?? 0) + earnedXp,
         earnedEnhanceCores:
           (previous?.earnedEnhanceCores ?? 0) + earnedEnhanceCores,
+        earnedMonumentPoints: previous?.earnedMonumentPoints ?? 0,
         pendingRewards: previous?.pendingRewards ?? 0,
         pulseKey: (previous?.pulseKey ?? 0) + 1,
       };
@@ -4002,6 +4066,7 @@ export function ExcavatorGameWrapper({
       earnedXp = 0,
       rewardText = "",
       earnedEnhanceCores = 0,
+      earnedMonumentPoints = 0,
     ) => {
       if (score > 0) {
         arcadeScoreRef.current += score;
@@ -4015,6 +4080,7 @@ export function ExcavatorGameWrapper({
         earnedStars,
         earnedXp,
         earnedEnhanceCores,
+        earnedMonumentPoints,
         pendingRewards: 0,
         pulseKey: (dumpScorePanelRef.current?.pulseKey ?? 0) + 1,
       };
@@ -4024,6 +4090,7 @@ export function ExcavatorGameWrapper({
     },
     [scheduleHideDumpScorePanel],
   );
+  showStandaloneRewardPanelRef.current = showStandaloneRewardPanel;
 
   const appendEnhanceCoresToRewardPanel = useCallback(
     (amount: number) => {
@@ -4984,11 +5051,15 @@ export function ExcavatorGameWrapper({
       syncMergedInput();
     };
     const down = (e: KeyboardEvent) => {
-      keys.add(e.key.toLowerCase());
+      const key = e.key?.toLowerCase();
+      if (!key) return;
+      keys.add(key);
       updateKeys();
     };
     const up = (e: KeyboardEvent) => {
-      keys.delete(e.key.toLowerCase());
+      const key = e.key?.toLowerCase();
+      if (!key) return;
+      keys.delete(key);
       updateKeys();
     };
     const clearKeys = () => {
@@ -5424,6 +5495,7 @@ export function ExcavatorGameWrapper({
                   stars={mode === "game" ? currency : previewStars}
                   gachaTicketsStandard={gachaTicketsStandard}
                   gachaTicketsPremium={gachaTicketsPremium}
+                  freeGacha={freeGacha}
                   activeItemIds={activeShopBuffs.map((buff) => buff.id)}
                   purchasingId={purchasingShopItemId}
                   onPurchase={(itemId) => {
@@ -6170,6 +6242,10 @@ export function ExcavatorGameWrapper({
           onShowGuide={onShowGuide}
           onShowRanking={onShowRanking}
           onSaveAndExit={onRequestExit}
+          isAdmin={isAdmin}
+          onBeforeOpenAdmin={() => {
+            persistGameSession(true);
+          }}
         />
 
         {tutorialFlash && (

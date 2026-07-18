@@ -52,9 +52,9 @@ export function workshopXpMult(level = 0) {
   return 1 + Math.max(0, Math.floor(level)) * 0.05;
 }
 
-/** Additive percentage points (0.005 per level). */
+/** Additive percentage points (0.01 per level). */
 export function workshopLuckyDropBonus(level = 0) {
-  return Math.max(0, Math.floor(level)) * 0.005;
+  return Math.max(0, Math.floor(level)) * 0.01;
 }
 
 export function workshopBreakerPowerMult(level = 0) {

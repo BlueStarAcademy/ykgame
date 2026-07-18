@@ -17,11 +17,14 @@ import { CustomerInquiryModal } from "@/components/games/CustomerInquiryModal";
 import { MailboxModal } from "@/components/layout/MailboxModal";
 import { InventoryModal } from "@/components/layout/InventoryModal";
 import {
+  exitFullscreen,
   isApiFullscreenActive,
   isStandalonePwa,
   requestFullscreen,
   shouldUseBrowserFullscreen,
 } from "@/lib/fullscreen";
+import { disablePwaMode } from "@/lib/pwa-mode";
+import { markResumeInGame } from "@/lib/resumeInGame";
 import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
 import { HORN_OPTIONS, type HornId } from "./soundSettings";
 
@@ -279,6 +282,10 @@ interface YanmarGameSettingsMenuProps {
   onShowRanking?: () => void;
   onSaveAndExit?: () => void;
   onLogout?: () => void;
+  /** ADMIN only — show 「관리」 under 고객문의 */
+  isAdmin?: boolean;
+  /** Called before navigating to /admin (e.g. persist session). */
+  onBeforeOpenAdmin?: () => void;
 }
 
 const TABS: { id: SettingsTab; label: string }[] = [
@@ -316,6 +323,8 @@ export function YanmarGameSettingsMenu({
   onShowRanking,
   onSaveAndExit,
   onLogout,
+  isAdmin = false,
+  onBeforeOpenAdmin,
 }: YanmarGameSettingsMenuProps) {
   const isModal = presentation === "modal";
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
@@ -567,6 +576,21 @@ export function YanmarGameSettingsMenu({
                 setInquiryOpen(true);
               }}
             />
+            {isAdmin ? (
+              <ActionRow
+                label="관리"
+                onClick={() => {
+                  onOpenChange(false);
+                  onBeforeOpenAdmin?.();
+                  markResumeInGame();
+                  // Don't await leave — exitFullscreen can hang and block navigation.
+                  void immersiveFullscreen?.leave();
+                  void exitFullscreen();
+                  disablePwaMode();
+                  window.location.assign("/admin");
+                }}
+              />
+            ) : null}
             {onLogout ? (
               <ActionRow
                 label="로그아웃"

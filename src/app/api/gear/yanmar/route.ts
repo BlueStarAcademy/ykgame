@@ -7,6 +7,7 @@ import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import { CHASSIS_CATALOG, CHASSIS_CLASS_LABEL } from "@/games/yanmar/chassisCatalog";
 import { GEAR_SLOT_LABEL, ITEM_GRADE_LABEL, MAIN_OPTION_BY_SLOT, SUB_OPTION_POOL, GEAR_INVENTORY_BASE, clampGearInventorySlots, getGearInventoryExpandCost, type ItemGrade, type GearSlot } from "@/games/yanmar/gearCatalog";
 import { buildItemName, canonicalizeMainOption, canonicalizeSubOptions } from "@/games/yanmar/gearGenerate";
+import { buildGachaFreeStatus } from "@/games/yanmar/gachaFree";
 
 export async function GET() {
   const session = await auth();
@@ -26,6 +27,10 @@ export async function GET() {
         gearInventorySlots: true,
         gachaTicketsStandard: true,
         gachaTicketsPremium: true,
+        gachaFreeDayKey: true,
+        gachaFreeStandardUsed: true,
+        gachaFreePremiumUsed: true,
+        gachaFreeStandardCooldownAt: true,
       },
     });
     return { migration, loaded, user };
@@ -41,6 +46,13 @@ export async function GET() {
     enhanceCores: result.user?.enhanceCores ?? 0,
     gachaTicketsStandard: result.user?.gachaTicketsStandard ?? 0,
     gachaTicketsPremium: result.user?.gachaTicketsPremium ?? 0,
+    freeGacha: buildGachaFreeStatus({
+      gachaFreeDayKey: result.user?.gachaFreeDayKey ?? null,
+      gachaFreeStandardUsed: result.user?.gachaFreeStandardUsed ?? 0,
+      gachaFreePremiumUsed: result.user?.gachaFreePremiumUsed ?? 0,
+      gachaFreeStandardCooldownAt:
+        result.user?.gachaFreeStandardCooldownAt ?? null,
+    }),
     inventorySlots,
     expandCost: getGearInventoryExpandCost(inventorySlots),
     totalXp: result.user?.totalXp ?? 0,

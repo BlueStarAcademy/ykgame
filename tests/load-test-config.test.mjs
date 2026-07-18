@@ -12,7 +12,7 @@ import {
 test("load test requires an authenticated cookie", () => {
   assert.throws(
     () => validateLoadEnvironment({ K6_BASE_URL: "http://localhost:3000" }),
-    /K6_SESSION_COOKIES_JSON or K6_SESSION_COOKIE/,
+    /K6_SESSION_COOKIES_JSON, K6_SESSION_COOKIES_JSON_FILE, or K6_SESSION_COOKIE/,
   );
 });
 

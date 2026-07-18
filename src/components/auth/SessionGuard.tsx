@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { clientLogout } from "@/lib/client-logout";
 
-const POLL_INTERVAL_MS = 15_000;
+const POLL_INTERVAL_MS = 30_000;
 
 /**
  * Polls session status while authenticated. If another device takes over,

@@ -11667,6 +11667,13 @@ button.yanmar-gear-icon-cell {
     linear-gradient(180deg, rgba(100, 116, 139, 0.32), rgba(30, 41, 59, 0.55));
 }
 
+.yanmar-gacha-pull-btn--free {
+  border-color: rgba(52, 211, 153, 0.45);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 55%),
+    linear-gradient(180deg, rgba(16, 185, 129, 0.38), rgba(6, 78, 59, 0.55));
+}
+
 .yanmar-gacha-pull-btn--multi.yanmar-gacha-pull-btn--ticket {
   border-color: rgba(186, 230, 253, 0.4);
   background:

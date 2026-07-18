@@ -41,10 +41,6 @@ function taskKindLabel(kind: string) {
   }
 }
 
-function formatReward(stars: number, xp: number) {
-  return formatQuestReward({ stars, xp });
-}
-
 function dailyQuestLabel(def: (typeof DAILY_QUEST_DEFS)[number]) {
   const sample =
     typeof def.target === "number"
@@ -56,12 +52,12 @@ function dailyQuestLabel(def: (typeof DAILY_QUEST_DEFS)[number]) {
 export function getQuestAdminReport() {
   const dailyRows = DAILY_QUEST_DEFS.map((def) => ({
     level: dailyQuestLabel(def),
-    value: `Lv${def.minLevel}+ · 목표 ${describeDailyQuestTarget(def.target)} · ${formatReward(def.reward.stars, def.reward.xp)}`,
+    value: `Lv${def.minLevel}+ · 목표 ${describeDailyQuestTarget(def.target)} · ${formatQuestReward(def.reward)}`,
   }));
 
   const repeatRows = REPEAT_QUEST_DEFS.map((def) => ({
     level: def.title,
-    value: `Lv${def.minLevel}+ · 목표 ${def.target.toLocaleString()} · ${formatReward(def.reward.stars, def.reward.xp)}`,
+    value: `Lv${def.minLevel}+ · 목표 ${def.target.toLocaleString()} · ${formatQuestReward(def.reward)}`,
   }));
 
   const difficultyRows = (

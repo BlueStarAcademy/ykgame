@@ -34,6 +34,12 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# load-test session cookies (never commit)
+scripts/load/.staging-cookies.json
+scripts/load/.production-cookies.json
+scripts/load/.staging-mixed-result.txt
+scripts/load/.staging-*-result.txt
+
 # vercel
 .vercel
 

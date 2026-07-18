@@ -44,9 +44,33 @@ function PwaModeRootInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      // Install prompt may be unavailable without SW; ignore registration errors.
-    });
+    const isLocal =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
+
+    void (async () => {
+      try {
+        if (isLocal) {
+          // Dev: drop any controlling SW so Turbopack/HMR never serves stale chunks.
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((reg) => reg.unregister()));
+          if ("caches" in window) {
+            const keys = await caches.keys();
+            await Promise.all(
+              keys
+                .filter((key) => key.startsWith("ykgame-static-"))
+                .map((key) => caches.delete(key)),
+            );
+          }
+          return;
+        }
+        await navigator.serviceWorker.register("/sw.js", {
+          updateViaCache: "none",
+        });
+      } catch {
+        // Install prompt may be unavailable without SW; ignore registration errors.
+      }
+    })();
   }, []);
 
   useEffect(() => {

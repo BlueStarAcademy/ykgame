@@ -14,6 +14,14 @@ export function redisKey(
   return [prefix, KEY_VERSION, namespace, ...parts.map(digest)].join(":");
 }
 
+export function sessionVersionKey(prefix: string, userId: string): string {
+  return redisKey(prefix, "session:ver", userId);
+}
+
+export function seasonDropCouponsKey(prefix: string, seasonKey: string): string {
+  return redisKey(prefix, "coupon:season-drop", seasonKey);
+}
+
 export function dumpRateLimitKey(prefix: string, userId: string): string {
   return redisKey(prefix, "rate:dump", userId);
 }

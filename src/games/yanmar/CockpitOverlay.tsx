@@ -1521,25 +1521,39 @@ function AttachmentPedalControl({
   const pedal = layout.breakerPedal;
   const isBreaker = attachmentType === "breaker";
   const isGrapple = attachmentType === "grapple";
+  const onChangeRef = useRef(onChange);
+  const canOperateRef = useRef(canOperate);
+  const onRequireAttachmentRef = useRef(onRequireAttachment);
+  onChangeRef.current = onChange;
+  canOperateRef.current = canOperate;
+  onRequireAttachmentRef.current = onRequireAttachment;
+
+  // Window pointerup/cancel — not lostPointerCapture. Capture can drop during
+  // haptic vibrate / UI re-renders while the finger is still down.
+  const pointer = usePointerRelease(() => {
+    onChangeRef.current(0);
+  });
 
   const setDirection = (next: -1 | 0 | 1) => {
     if (next === 0) {
-      onChange(0);
+      onChangeRef.current(0);
       return;
     }
-    if (!canOperate) {
-      onRequireAttachment?.();
+    if (!canOperateRef.current) {
+      onRequireAttachmentRef.current?.();
       return;
     }
-    onChange(next);
+    onChangeRef.current(next);
   };
 
   const pressSide = (
     e: React.PointerEvent<HTMLButtonElement>,
     side: "left" | "right",
   ) => {
+    if (e.button !== 0) return;
     e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    e.stopPropagation();
+    pointer.begin(e.pointerId, e.currentTarget);
     if (isBreaker) {
       // 브레이커: 왼쪽만 작동
       if (side === "left") setDirection(1);
@@ -1551,19 +1565,12 @@ function AttachmentPedalControl({
       setDirection(side === "left" ? -1 : 1);
       return;
     }
-    onRequireAttachment?.();
+    onRequireAttachmentRef.current?.();
   };
 
-  const release = (e: React.PointerEvent<HTMLButtonElement>) => {
+  const handleEnd = (e: React.PointerEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    try {
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      }
-    } catch {
-      /* already released */
-    }
-    setDirection(0);
+    pointer.finish(e.pointerId);
   };
 
   const leftActive =
@@ -1582,6 +1589,7 @@ function AttachmentPedalControl({
         isPortrait ? "yanmar-breaker-pedal-button-portrait" : ""
       }`}
       style={{
+        WebkitTouchCallout: "none",
         left: `${pedal.cx * 100}%`,
         top: FOOT_PEDAL_BASELINE,
         width: isPortrait ? "4.05rem" : "3.85rem",
@@ -1597,7 +1605,7 @@ function AttachmentPedalControl({
       />
       <button
         type="button"
-        className="absolute inset-y-[10%] left-[5%] w-[42%] rounded-l-[0.45rem]"
+        className="absolute inset-y-[10%] left-[5%] w-[42%] touch-none rounded-l-[0.45rem]"
         aria-label={
           isBreaker
             ? "발판 왼쪽: 브레이커 작동"
@@ -1605,13 +1613,13 @@ function AttachmentPedalControl({
         }
         aria-pressed={leftActive}
         onPointerDown={(event) => pressSide(event, "left")}
-        onPointerUp={release}
-        onPointerCancel={release}
-        onLostPointerCapture={() => setDirection(0)}
+        onPointerUp={handleEnd}
+        onPointerCancel={handleEnd}
+        onContextMenu={(e) => e.preventDefault()}
       />
       <button
         type="button"
-        className="absolute inset-y-[10%] right-[5%] w-[42%] rounded-r-[0.45rem]"
+        className="absolute inset-y-[10%] right-[5%] w-[42%] touch-none rounded-r-[0.45rem]"
         aria-label={
           isBreaker
             ? "발판 오른쪽: 브레이커에서는 사용하지 않음"
@@ -1619,9 +1627,9 @@ function AttachmentPedalControl({
         }
         aria-pressed={rightActive}
         onPointerDown={(event) => pressSide(event, "right")}
-        onPointerUp={release}
-        onPointerCancel={release}
-        onLostPointerCapture={() => setDirection(0)}
+        onPointerUp={handleEnd}
+        onPointerCancel={handleEnd}
+        onContextMenu={(e) => e.preventDefault()}
       />
       {highlighted ? (
         <span className="pointer-events-none absolute inset-[-12%] rounded-[0.85rem] border-2 border-amber-300/95 bg-amber-300/10" />
@@ -1702,9 +1710,16 @@ function PedalSwingControl({
 
   useEffect(() => stopAnimation, [stopAnimation]);
 
+  const pointer = usePointerRelease(() => {
+    setPressedDirection(0);
+    stopAnimation();
+  });
+
   const press = (e: React.PointerEvent<HTMLButtonElement>, value: number) => {
+    if (e.button !== 0) return;
     e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    e.stopPropagation();
+    pointer.begin(e.pointerId, e.currentTarget);
     directionRef.current = value;
     setPressedDirection(value);
     lastFrameTimeRef.current = null;
@@ -1713,22 +1728,9 @@ function PedalSwingControl({
     }
   };
 
-  const release = (e: React.PointerEvent<HTMLButtonElement>) => {
+  const handleEnd = (e: React.PointerEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    try {
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      }
-    } catch {
-      /* already released */
-    }
-    setPressedDirection(0);
-    stopAnimation();
-  };
-
-  const handleLostCapture = () => {
-    setPressedDirection(0);
-    stopAnimation();
+    pointer.finish(e.pointerId);
   };
 
   return (
@@ -1766,22 +1768,20 @@ function PedalSwingControl({
       )}
       <button
         type="button"
-        className="absolute inset-y-[10%] left-[5%] w-[42%] rounded-l-[0.45rem]"
+        className="absolute inset-y-[10%] left-[5%] w-[42%] touch-none rounded-l-[0.45rem]"
         onPointerDown={(e) => press(e, 1)}
-        onPointerUp={release}
-        onPointerCancel={release}
-        onLostPointerCapture={handleLostCapture}
+        onPointerUp={handleEnd}
+        onPointerCancel={handleEnd}
         onContextMenu={(e) => e.preventDefault()}
         aria-pressed={pressedDirection > 0}
         aria-label="발판 왼쪽: 암 우측 회전"
       />
       <button
         type="button"
-        className="absolute inset-y-[10%] right-[5%] w-[42%] rounded-r-[0.45rem]"
+        className="absolute inset-y-[10%] right-[5%] w-[42%] touch-none rounded-r-[0.45rem]"
         onPointerDown={(e) => press(e, -1)}
-        onPointerUp={release}
-        onPointerCancel={release}
-        onLostPointerCapture={handleLostCapture}
+        onPointerUp={handleEnd}
+        onPointerCancel={handleEnd}
         onContextMenu={(e) => e.preventDefault()}
         aria-pressed={pressedDirection < 0}
         aria-label="발판 오른쪽: 암 좌측 회전"

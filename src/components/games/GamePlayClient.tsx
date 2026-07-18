@@ -11,6 +11,7 @@ import type { GameId } from "@/lib/games";
 import { getGameById, isGameAvailable } from "@/lib/games";
 import { exitFullscreen, prepareInGameFullscreen } from "@/lib/fullscreen";
 import { enablePwaMode } from "@/lib/pwa-mode";
+import { markResumeInGame, shouldResumeInGame } from "@/lib/resumeInGame";
 import type { GameResult } from "@/games/shared/types";
 import { YanmarGuideModal } from "@/games/yanmar/YanmarInfoModals";
 import { InGameBackProvider } from "@/hooks/useInGameBackNavigation";
@@ -144,8 +145,10 @@ export function GamePlayClient({
   }, [gameId, initialPlay, playable]);
 
   /** 홈 화면 「게임 시작」은 항상 게임모드로만 진입한다. */
-  const handleStartGame = () => {
-    if (!playable || entryLoading) return;
+  const startInFlightRef = useRef(false);
+  const handleStartGame = useCallback(() => {
+    if (!playable || startInFlightRef.current) return;
+    startInFlightRef.current = true;
     if (entryRevealRafRef.current != null) {
       window.cancelAnimationFrame(entryRevealRafRef.current);
       entryRevealRafRef.current = null;
@@ -165,7 +168,22 @@ export function GamePlayClient({
       setYanmarExitSignal(0);
       setPhase("playing");
     })();
-  };
+  }, [loadStats, myStats.bestScore, playable]);
+
+  /** 관리자 페이지에서 돌아오면 저장해 둔 세션으로 인게임 재진입. */
+  useEffect(() => {
+    if (!playable || gameId !== "yanmar" || initialPlay === "ride") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const resumeQuery = params.get("resume") === "1";
+    if (resumeQuery) {
+      markResumeInGame();
+      window.history.replaceState({}, "", "/home");
+    }
+    if (!resumeQuery && !shouldResumeInGame()) return;
+
+    handleStartGame();
+  }, [gameId, handleStartGame, initialPlay, playable]);
 
   const handleGameReady = useCallback(() => {
     // Hard-cut once the canvas has been painted under the opaque splash.

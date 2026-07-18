@@ -10,7 +10,7 @@
     "build": "prisma generate && next build",
     "start": "node scripts/start.mjs",
     "lint": "eslint",
-    "test:scale": "tsx --test tests/database-pool-config.test.ts tests/request-idempotency.test.ts tests/dump-reward-outbox.test.ts tests/hot-api-observability.test.ts tests/redis-scale.test.ts tests/atomic-mutation.test.ts tests/load-test-config.test.mjs",
+    "test:scale": "tsx --test tests/database-pool-config.test.ts tests/request-idempotency.test.ts tests/dump-reward-outbox.test.ts tests/hot-api-observability.test.ts tests/redis-scale.test.ts tests/session-scale.test.ts tests/atomic-mutation.test.ts tests/load-test-config.test.mjs",
     "load:check": "node scripts/load/validate-config.mjs",
     "load:smoke": "node scripts/load/run.mjs --smoke",
     "load:mixed": "node scripts/load/run.mjs",

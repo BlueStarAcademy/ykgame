@@ -11,7 +11,11 @@ export type QuestMetric =
   | "rockLoad"
   | "rockDump"
   | "swing180"
-  | "haulTruckDepart";
+  | "haulTruckDepart"
+  /** 다른 일일 퀘스트 완료 수 (메타) */
+  | "dailyAllComplete"
+  /** 미션 퀘스트 클리어 수 (메타) */
+  | "missionClear";
 
 export type QuestReward = {
   stars: number;
@@ -39,6 +43,11 @@ export type DailyQuestDef = {
   /** 이 레벨 이상일 때 목록에 표시 */
   minLevel: number;
   reward: QuestReward;
+  /**
+   * 메타 일일(모두 완료·미션 N회 등).
+   * 「일일 퀘스트 모두 완료」집계에서 제외된다.
+   */
+  meta?: boolean;
 };
 
 export type DailyQuestProgress = {

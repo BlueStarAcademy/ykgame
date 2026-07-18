@@ -2,6 +2,9 @@ import { randomUUID } from "crypto";
 import type { CouponType, Prisma, PrismaClient } from "@/generated/prisma/client";
 import { YANMAR_REWARD_CONFIG } from "@/games/yanmar/equipment";
 import { getSeasonKey } from "@/lib/games";
+import { deleteRedisKeys, readRedisJson, writeRedisJson } from "@/lib/redis-cache";
+import { getRedisConfig } from "@/lib/redis-config";
+import { seasonDropCouponsKey } from "@/lib/redis-keys";
 import { createTtlCache } from "@/lib/ttl-cache";
 
 type TxClient = Prisma.TransactionClient;
@@ -15,8 +18,24 @@ const SEASON_DROP_COUPON_TYPES = [
 
 type SeasonDropIssuedMap = Record<(typeof SEASON_DROP_COUPON_TYPES)[number], number>;
 
+const SEASON_DROP_CACHE_TTL_MS = 5_000;
+const SEASON_DROP_CACHE_TTL_SECONDS = 5;
+
 /** Pre-roll quota peek only — authoritative checks still use advisory locks. */
-const seasonDropIssuedCache = createTtlCache<SeasonDropIssuedMap>(5_000);
+const seasonDropIssuedCache = createTtlCache<SeasonDropIssuedMap>(
+  SEASON_DROP_CACHE_TTL_MS,
+);
+
+function isSeasonDropIssuedMap(value: unknown): value is SeasonDropIssuedMap {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return SEASON_DROP_COUPON_TYPES.every(
+    (type) =>
+      typeof record[type] === "number" &&
+      Number.isInteger(record[type]) &&
+      (record[type] as number) >= 0,
+  );
+}
 
 export function createBarcodeCode() {
   return `YK-${randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()}`;
@@ -66,9 +85,16 @@ export async function countSeasonGameDropCouponsGrouped(
     FILTER_SET_EXCHANGE: 0,
   };
 
+  const config = getRedisConfig();
+  const sharedKey = seasonDropCouponsKey(config.prefix, seasonKey);
+
   if (!options?.bypassCache) {
-    const cached = seasonDropIssuedCache.get(seasonKey);
-    if (cached) return { ...cached };
+    const shared = await readRedisJson(sharedKey, isSeasonDropIssuedMap);
+    if (shared.available && shared.hit) return { ...shared.value };
+    if (!shared.available) {
+      const cached = seasonDropIssuedCache.get(seasonKey);
+      if (cached) return { ...cached };
+    }
   }
 
   const rows = await db.userCoupon.groupBy({
@@ -89,7 +115,20 @@ export async function countSeasonGameDropCouponsGrouped(
   }
 
   seasonDropIssuedCache.set(seasonKey, issued);
+  if (config.enabled) {
+    await writeRedisJson(sharedKey, issued, SEASON_DROP_CACHE_TTL_SECONDS);
+  }
   return issued;
+}
+
+/** Drop shared pre-roll cache after a game-drop coupon may have been issued. */
+export async function invalidateSeasonDropCouponCache(
+  seasonKey = getSeasonKey(),
+): Promise<void> {
+  seasonDropIssuedCache.delete(seasonKey);
+  const config = getRedisConfig();
+  if (!config.enabled) return;
+  await deleteRedisKeys(seasonDropCouponsKey(config.prefix, seasonKey));
 }
 
 export async function getSeasonCouponQuota(

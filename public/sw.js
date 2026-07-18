@@ -1,13 +1,21 @@
 const CACHE_PREFIX = "ykgame-static-";
-const CACHE_NAME = `${CACHE_PREFIX}v4`;
+const CACHE_NAME = `${CACHE_PREFIX}v5`;
 const STATIC_ASSET_EXTENSION =
   /\.(?:avif|gif|ico|jpe?g|json|mp3|ogg|otf|png|svg|ttf|wav|webp|woff2?)$/i;
+
+function isDevHost() {
+  const host = self.location.hostname;
+  return host === "localhost" || host === "127.0.0.1" || host.endsWith(".local");
+}
 
 function isCacheableStaticRequest(request) {
   if (request.method !== "GET") return false;
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return false;
+
+  // Never cache-first Next/Turbopack chunks in local dev — HMR needs fresh modules.
+  if (isDevHost()) return false;
 
   // Dev/Turbopack may keep the same CSS chunk URL while content changes.
   // Never cache-first CSS or it can pin a broken stylesheet (letterboxing, missing rules).

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { countSeasonGameDropCouponsGrouped } from "@/lib/coupon";
+import {
+  countSeasonGameDropCouponsGrouped,
+  invalidateSeasonDropCouponCache,
+} from "@/lib/coupon";
 import {
   lockAndCanIssueYanmarCoupon,
   parseRewardEventId,
@@ -125,9 +128,6 @@ export const POST = withHotApiObservability(
     );
   }
 
-  await prisma.$transaction(async (tx) => {
-    await ensureYanmarGearMigration(tx, session.user.id);
-  });
   const loaded = await loadUserFinalStats(prisma, session.user.id);
   const { loadActiveShopBuffIds } = await import("@/games/yanmar/shopBuffServer");
   const {
@@ -189,6 +189,8 @@ export const POST = withHotApiObservability(
       tx,
       { userId: session.user.id, gameId: "yanmar-dump", eventId },
       async () => {
+        await ensureYanmarGearMigration(tx, session.user.id);
+
         const responseEvents: DumpRewardEvent[] = [];
         const starInventoryRows: Prisma.UserRewardInventoryCreateManyInput[] = [];
         let totalStars = 0;
@@ -333,6 +335,12 @@ export const POST = withHotApiObservability(
           event.discountPct,
         ),
       }));
+
+    if (tickerEvents.length > 0) {
+      void invalidateSeasonDropCouponCache(seasonKey).catch((error) => {
+        console.error("[coupon] season drop cache invalidate failed:", error);
+      });
+    }
 
     void publishTickerWinEvents(tickerEvents).catch((error) => {
       console.error("[ticker] dump publish failed:", error);

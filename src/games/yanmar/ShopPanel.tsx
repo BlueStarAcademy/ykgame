@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
 import {
@@ -13,8 +13,9 @@ import {
   type GachaBanner,
 } from "./gearCatalog";
 import { gachaBannerArtSrc, gachaBannerChromeClass } from "./gearArt";
+import type { GachaFreeStatus } from "./gachaFree";
 
-export type GachaPayWith = "stars" | "tickets";
+export type GachaPayWith = "stars" | "tickets" | "free";
 
 interface ShopPanelProps {
   open: boolean;
@@ -22,6 +23,7 @@ interface ShopPanelProps {
   stars?: number;
   gachaTicketsStandard?: number;
   gachaTicketsPremium?: number;
+  freeGacha?: GachaFreeStatus | null;
   activeItemIds?: ReadonlySet<ShopItemId> | readonly ShopItemId[];
   purchasingId?: ShopItemId | null;
   onPurchase?: (itemId: ShopItemId) => void | Promise<void>;
@@ -31,6 +33,13 @@ interface ShopPanelProps {
     count: 1 | 10,
     payWith: GachaPayWith,
   ) => void | Promise<void>;
+}
+
+function formatCooldown(ms: number) {
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 function ShopProductCard({
@@ -96,6 +105,9 @@ function GachaBannerSection({
   gachaBusy,
   stars = 0,
   ticketCount,
+  freeRemaining,
+  freeAvailable,
+  cooldownRemainingMs,
   onGacha,
 }: {
   banner: GachaBanner;
@@ -104,6 +116,9 @@ function GachaBannerSection({
   gachaBusy?: boolean;
   stars?: number;
   ticketCount: number;
+  freeRemaining: number;
+  freeAvailable: boolean;
+  cooldownRemainingMs: number;
   onGacha?: (
     banner: "STANDARD" | "PREMIUM",
     count: 1 | 10,
@@ -115,8 +130,11 @@ function GachaBannerSection({
   const ticketIcon = isPremium
     ? "/images/yanmar/2d/gacha-ticket-premium.svg"
     : "/images/yanmar/2d/gacha-ticket-standard.svg";
+  const useFree = freeRemaining > 0;
   const canAfford1 = stars >= cfg.cost1;
   const canAfford10 = stars >= cfg.cost10;
+  const freeOnCooldown = useFree && cooldownRemainingMs > 0;
+  const canFreePull = useFree && freeAvailable && !freeOnCooldown;
 
   return (
     <section className={`yanmar-gacha-banner ${gachaBannerChromeClass(banner)}`}>
@@ -140,33 +158,59 @@ function GachaBannerSection({
               </span>
             ))}
           </div>
-          <p className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-white/70">
-            {isPremium ? "고급 등급 확률 업" : "기본 장비 뽑기"}
+          <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-white/70">
+            <span>{isPremium ? "고급 등급 확률 업" : "기본 장비 뽑기"}</span>
+            {useFree ? (
+              <span className="text-emerald-300/90">
+                · 무료 {freeRemaining}회
+                {freeOnCooldown
+                  ? ` · ${formatCooldown(cooldownRemainingMs)}`
+                  : ""}
+              </span>
+            ) : null}
           </p>
         </div>
       </div>
       <div className="yanmar-gacha-actions">
         <div className="yanmar-gacha-action-row-btns">
-          <button
-            type="button"
-            disabled={gachaBusy || !onGacha || !canAfford1}
-            className="yanmar-gacha-pull-btn"
-            onClick={() => void onGacha?.(banner, 1, "stars")}
-          >
-            <span className="yanmar-gacha-pull-label">1회</span>
-            <span
-              className={`yanmar-gacha-pull-cost${
-                canAfford1 ? "" : " is-short"
-              }`}
+          {useFree ? (
+            <button
+              type="button"
+              disabled={gachaBusy || !onGacha || !canFreePull}
+              className="yanmar-gacha-pull-btn yanmar-gacha-pull-btn--free"
+              onClick={() => void onGacha?.(banner, 1, "free")}
             >
-              <StarAmount
-                value={cfg.cost1}
-                size={11}
-                className="yanmar-gacha-pull-star-amount"
-                valueClassName="yanmar-gacha-pull-cost-value"
-              />
-            </span>
-          </button>
+              <span className="yanmar-gacha-pull-label">1회</span>
+              <span className="yanmar-gacha-pull-cost">
+                <span className="yanmar-gacha-pull-cost-value">
+                  {freeOnCooldown
+                    ? formatCooldown(cooldownRemainingMs)
+                    : "무료"}
+                </span>
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={gachaBusy || !onGacha || !canAfford1}
+              className="yanmar-gacha-pull-btn"
+              onClick={() => void onGacha?.(banner, 1, "stars")}
+            >
+              <span className="yanmar-gacha-pull-label">1회</span>
+              <span
+                className={`yanmar-gacha-pull-cost${
+                  canAfford1 ? "" : " is-short"
+                }`}
+              >
+                <StarAmount
+                  value={cfg.cost1}
+                  size={11}
+                  className="yanmar-gacha-pull-star-amount"
+                  valueClassName="yanmar-gacha-pull-cost-value"
+                />
+              </span>
+            </button>
+          )}
           <button
             type="button"
             disabled={gachaBusy || !onGacha || !canAfford10}
@@ -244,6 +288,7 @@ export function ShopPanel({
   stars,
   gachaTicketsStandard = 0,
   gachaTicketsPremium = 0,
+  freeGacha = null,
   activeItemIds,
   purchasingId = null,
   onPurchase,
@@ -251,10 +296,38 @@ export function ShopPanel({
   onGacha,
 }: ShopPanelProps) {
   const [tab, setTab] = useState<"gear" | "buff">("gear");
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [cooldownAnchor, setCooldownAnchor] = useState<{
+    remaining: number;
+    at: number;
+  } | null>(null);
   const activeSet =
     activeItemIds instanceof Set
       ? activeItemIds
       : new Set(activeItemIds ?? []);
+
+  useEffect(() => {
+    if (!open) return;
+    setNowMs(Date.now());
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [open]);
+
+  useEffect(() => {
+    const remaining = freeGacha?.standard.cooldownRemainingMs ?? 0;
+    if (remaining > 0) {
+      setCooldownAnchor({ remaining, at: Date.now() });
+    } else {
+      setCooldownAnchor(null);
+    }
+  }, [freeGacha]);
+
+  const liveStandardCooldownMs = cooldownAnchor
+    ? Math.max(0, cooldownAnchor.remaining - (nowMs - cooldownAnchor.at))
+    : 0;
+
+  const standardRemaining = freeGacha?.standard.remaining ?? 0;
+  const premiumRemaining = freeGacha?.premium.remaining ?? 0;
 
   return (
     <AppModalOverlay
@@ -332,6 +405,11 @@ export function ShopPanel({
                 gachaBusy={gachaBusy}
                 stars={stars}
                 ticketCount={gachaTicketsStandard}
+                freeRemaining={standardRemaining}
+                freeAvailable={
+                  standardRemaining > 0 && liveStandardCooldownMs <= 0
+                }
+                cooldownRemainingMs={liveStandardCooldownMs}
                 onGacha={onGacha}
               />
               <GachaBannerSection
@@ -341,6 +419,9 @@ export function ShopPanel({
                 gachaBusy={gachaBusy}
                 stars={stars}
                 ticketCount={gachaTicketsPremium}
+                freeRemaining={premiumRemaining}
+                freeAvailable={premiumRemaining > 0}
+                cooldownRemainingMs={0}
                 onGacha={onGacha}
               />
             </div>

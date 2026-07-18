@@ -51,6 +51,12 @@ const DUMP_UPGRADES = [
     description: "덤프트럭 복귀 대기시간 감소",
     maxLevel: 10,
   },
+  {
+    key: "lucky_drop" as const,
+    label: "행운의 작업자",
+    description: "장비 획득 확률 +1%p",
+    maxLevel: 10,
+  },
 ];
 
 const CRASH_UPGRADES = [
@@ -75,7 +81,7 @@ const CRASH_UPGRADES = [
   {
     key: "lucky_drop" as const,
     label: "행운의 작업자",
-    description: "장비 획득 확률 +0.5%p",
+    description: "장비 획득 확률 +1%p",
     maxLevel: 10,
   },
 ];
@@ -108,7 +114,7 @@ const HILL_UPGRADES = [
   {
     key: "lucky_drop" as const,
     label: "행운의 작업자",
-    description: "장비 획득 확률 +0.5%p",
+    description: "장비 획득 확률 +1%p",
     maxLevel: 10,
   },
   {

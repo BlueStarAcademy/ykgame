@@ -272,7 +272,7 @@ export const MAIN_OPTION_BY_SLOT: Record<GearSlot, MainOptionDef> = {
   BREAKER: { key: "technique", label: "기술", baseAt0: 6, baseAt10: 22, isPercent: false },
 };
 
-export const WORK_GEAR_DROP_BASE_CHANCE = 0.03;
+export const WORK_GEAR_DROP_BASE_CHANCE = 0.1;
 
 /** 작업 완료 시 강화코어 독립 드롭 */
 export const WORK_CORE_DROP: Record<

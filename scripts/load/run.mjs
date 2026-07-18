@@ -1,5 +1,9 @@
+import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { validateLoadEnvironment } from "./load-config.mjs";
+import {
+  resolveLoadEnv,
+  validateLoadEnvironment,
+} from "./load-config.mjs";
 
 const smoke = process.argv.includes("--smoke");
 const env = { ...process.env };
@@ -15,16 +19,22 @@ if (smoke) {
 }
 
 try {
-  validateLoadEnvironment(env);
+  validateLoadEnvironment(
+    resolveLoadEnv(env, (path) => readFileSync(path, "utf8")),
+  );
 } catch (error) {
   console.error(`k6 preflight failed: ${error.message}`);
   process.exit(1);
 }
 
+// Do not forward multi-KB cookie JSON through the Windows environment block.
+const k6Env = { ...env };
+delete k6Env.K6_SESSION_COOKIES_JSON;
+
 const result = spawnSync("k6", ["run", "scripts/load/mixed.js"], {
   cwd: process.cwd(),
-  env,
-  shell: process.platform === "win32",
+  env: k6Env,
+  shell: false,
   stdio: "inherit",
 });
 

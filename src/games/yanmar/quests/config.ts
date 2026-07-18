@@ -10,6 +10,9 @@ import type {
 
 export const QUEST_MISSIONS_PER_DAY = 3;
 
+export const DAILY_ALL_COMPLETE_QUEST_ID = "daily-all-complete";
+export const DAILY_MISSION_CLEAR_QUEST_ID = "daily-mission-clear-3";
+
 /** 클리어·수령 후 진행도가 초기화되어 다시 반복 가능한 퀘스트 */
 export const REPEAT_QUEST_DEFS: readonly RepeatQuestDef[] = [
   {
@@ -102,6 +105,25 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
     target: 5,
     minLevel: 15,
     reward: { stars: 10, xp: 2000, enhanceCores: 2 },
+  },
+  {
+    id: DAILY_ALL_COMPLETE_QUEST_ID,
+    title: () => "일일 퀘스트 모두 완료하기",
+    metric: "dailyAllComplete",
+    /** 실제 목표는 노출 중인 비메타 일일 수로 동기화된다 */
+    target: 1,
+    minLevel: 1,
+    reward: { stars: 50, xp: 0, gachaTicketsPremium: 2 },
+    meta: true,
+  },
+  {
+    id: DAILY_MISSION_CLEAR_QUEST_ID,
+    title: () => "미션퀘스트 3회 완료하기",
+    metric: "missionClear",
+    target: QUEST_MISSIONS_PER_DAY,
+    minLevel: 1,
+    reward: { stars: 50, xp: 0, gachaTicketsPremium: 2 },
+    meta: true,
   },
 ] as const;
 
@@ -396,7 +418,17 @@ export function metricUnitLabel(metric: QuestMetric) {
     case "soilLoad":
     case "soilDump":
       return "";
+    case "dailyAllComplete":
+      return "개";
     default:
       return "회";
   }
+}
+
+export function isMetaDailyQuest(def: Pick<DailyQuestDef, "meta" | "id">) {
+  if (def.meta) return true;
+  return (
+    def.id === DAILY_ALL_COMPLETE_QUEST_ID ||
+    def.id === DAILY_MISSION_CLEAR_QUEST_ID
+  );
 }

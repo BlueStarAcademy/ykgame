@@ -17,7 +17,11 @@ export async function GET() {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { sessionVersion: true, isActive: true },
+      select: {
+        sessionVersion: true,
+        isActive: true,
+        sessionLastSeenAt: true,
+      },
     });
 
     if (!user || !user.isActive) {
@@ -28,7 +32,9 @@ export async function GET() {
       return NextResponse.json({ status: "superseded" });
     }
 
-    await touchSession(session.user.id, version);
+    await touchSession(session.user.id, version, {
+      lastSeenAt: user.sessionLastSeenAt,
+    });
     return NextResponse.json({ status: "ok" });
   } catch (error) {
     console.error("[auth/session-status]", error);
