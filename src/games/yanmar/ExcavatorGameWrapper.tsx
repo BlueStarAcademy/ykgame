@@ -1832,12 +1832,14 @@ export function ExcavatorGameWrapper({
         return;
       }
       const current = questStateRef.current;
-      if (!current) return;
-      const next = applyQuestProgress(current, { metric, amount });
-      if (next === current) return;
-      questStateRef.current = next;
-      setQuestState(next);
-      saveQuestState(next);
+      if (current) {
+        const next = applyQuestProgress(current, { metric, amount });
+        if (next !== current) {
+          questStateRef.current = next;
+          setQuestState(next);
+          saveQuestState(next);
+        }
+      }
 
       const workshopMetric = metric as WorkshopQuestMetric;
       if (
