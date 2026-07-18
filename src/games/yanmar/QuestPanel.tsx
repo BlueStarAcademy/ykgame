@@ -34,97 +34,134 @@ function QuestNotifyBadge({
     </span>
   );
 }
-function QuestRewardDisplay({ reward }: { reward: QuestReward }) {
-  const parts: ReactNode[] = [];
+function QuestRewardDisplay({
+  reward,
+  layout = "inline",
+}: {
+  reward: QuestReward;
+  layout?: "inline" | "grid";
+}) {
+  const parts: { key: string; node: ReactNode }[] = [];
   if (reward.xp > 0) {
-    parts.push(
-      <span key="xp" className="tabular-nums">
-        {reward.xp.toLocaleString()} EXP
-      </span>,
-    );
+    parts.push({
+      key: "xp",
+      node: (
+        <span className="tabular-nums">{reward.xp.toLocaleString()} EXP</span>
+      ),
+    });
   }
   if (reward.stars > 0) {
-    parts.push(
-      <span key="stars" className="inline-flex items-center gap-0.5 tabular-nums">
-        <img
-          src="/images/star-currency.svg"
-          alt=""
-          width={12}
-          height={12}
-          className="yanmar-score-panel-star"
-          draggable={false}
-        />
-        {reward.stars.toLocaleString()}
-      </span>,
-    );
+    parts.push({
+      key: "stars",
+      node: (
+        <>
+          <img
+            src="/images/star-currency.svg"
+            alt=""
+            width={12}
+            height={12}
+            className="yanmar-quest-reward-icon yanmar-score-panel-star"
+            draggable={false}
+          />
+          <span className="tabular-nums">{reward.stars.toLocaleString()}</span>
+        </>
+      ),
+    });
   }
   if ((reward.score ?? 0) > 0) {
-    parts.push(
-      <span key="score" className="tabular-nums">
-        {reward.score!.toLocaleString()}점
-      </span>,
-    );
+    parts.push({
+      key: "score",
+      node: (
+        <span className="tabular-nums">
+          {reward.score!.toLocaleString()}점
+        </span>
+      ),
+    });
   }
   if ((reward.enhanceCores ?? 0) > 0) {
-    parts.push(
-      <span
-        key="cores"
-        className="inline-flex items-center gap-0.5 tabular-nums"
-      >
-        <img
-          src="/images/yanmar/2d/enhance-core.png?v=3"
-          alt=""
-          width={12}
-          height={12}
-          draggable={false}
-        />
-        {reward.enhanceCores!.toLocaleString()}
-      </span>,
-    );
+    parts.push({
+      key: "cores",
+      node: (
+        <>
+          <img
+            src="/images/yanmar/2d/enhance-core.png?v=3"
+            alt=""
+            width={12}
+            height={12}
+            className="yanmar-quest-reward-icon"
+            draggable={false}
+          />
+          <span className="tabular-nums">
+            {reward.enhanceCores!.toLocaleString()}
+          </span>
+        </>
+      ),
+    });
   }
   if ((reward.gachaTicketsStandard ?? 0) > 0) {
-    parts.push(
-      <span
-        key="ticket-std"
-        className="inline-flex items-center gap-0.5 tabular-nums"
-      >
-        <img
-          src="/images/yanmar/2d/gacha-ticket-standard.svg"
-          alt=""
-          width={12}
-          height={12}
-          draggable={false}
-        />
-        {reward.gachaTicketsStandard!.toLocaleString()}
-      </span>,
-    );
+    parts.push({
+      key: "ticket-std",
+      node: (
+        <>
+          <img
+            src="/images/yanmar/2d/gacha-ticket-standard.svg"
+            alt=""
+            width={12}
+            height={12}
+            className="yanmar-quest-reward-icon"
+            draggable={false}
+          />
+          <span className="tabular-nums">
+            {reward.gachaTicketsStandard!.toLocaleString()}
+          </span>
+        </>
+      ),
+    });
   }
   if ((reward.gachaTicketsPremium ?? 0) > 0) {
-    parts.push(
-      <span
-        key="ticket-prem"
-        className="inline-flex items-center gap-0.5 tabular-nums"
-      >
-        <img
-          src="/images/yanmar/2d/gacha-ticket-premium.svg"
-          alt=""
-          width={12}
-          height={12}
-          draggable={false}
-        />
-        {reward.gachaTicketsPremium!.toLocaleString()}
-      </span>,
-    );
+    parts.push({
+      key: "ticket-prem",
+      node: (
+        <>
+          <img
+            src="/images/yanmar/2d/gacha-ticket-premium.svg"
+            alt=""
+            width={12}
+            height={12}
+            className="yanmar-quest-reward-icon"
+            draggable={false}
+          />
+          <span className="tabular-nums">
+            {reward.gachaTicketsPremium!.toLocaleString()}
+          </span>
+        </>
+      ),
+    });
   }
   if (parts.length === 0) {
     return <span>보상 없음</span>;
   }
+  if (layout === "grid") {
+    return (
+      <span className="yanmar-quest-reward-grid">
+        {parts.map((part) => (
+          <span key={part.key} className="yanmar-quest-reward-cell">
+            {part.node}
+          </span>
+        ))}
+      </span>
+    );
+  }
   return (
-    <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+    <span className="yanmar-quest-reward-inline">
       {parts.map((part, index) => (
-        <span key={index} className="inline-flex items-center gap-1.5">
-          {index > 0 ? <span className="text-amber-200/40">+</span> : null}
-          {part}
+        <span key={part.key} className="yanmar-quest-reward-inline-item">
+          {index > 0 ? (
+            <span className="yanmar-quest-reward-sep" aria-hidden>
+              +
+            </span>
+          ) : null}
+          <span className="yanmar-quest-reward-cell">{part.node}</span>
         </span>
       ))}
     </span>
@@ -382,8 +419,19 @@ export function QuestPanel({
                 </div>
               ) : (
                 <div className="rounded-xl border border-amber-200/20 bg-black/40 px-3 py-3">
-                  <div className="flex items-center justify-end">
+                  <div className="flex items-center justify-between gap-2">
                     <DifficultyStars count={currentMission.difficulty} />
+                    <span className="text-[10px] font-bold text-amber-200/55">
+                      보상
+                    </span>
+                  </div>
+                  <div className="mt-2 rounded-lg border border-amber-200/10 bg-black/25 px-2.5 py-2">
+                    <QuestRewardDisplay
+                      layout="grid"
+                      reward={
+                        MISSION_DIFFICULTY_REWARDS[currentMission.difficulty]
+                      }
+                    />
                   </div>
 
                   <ul className="mt-3 space-y-2">
@@ -431,22 +479,11 @@ export function QuestPanel({
                       type="button"
                       disabled={claimingId === "mission"}
                       onClick={onClaimMission}
-                      className="mt-3 flex w-full flex-col items-center gap-1 rounded-xl border border-amber-300/40 bg-amber-500/90 px-3 py-2.5 text-white disabled:opacity-60"
+                      className="mt-3 w-full rounded-xl border border-amber-300/40 bg-amber-500/90 px-3 py-2.5 text-[12px] font-black text-white disabled:opacity-60"
                     >
-                      <span className="text-[12px] font-black leading-none">
-                        {claimingId === "mission"
-                          ? "보상 수령 중..."
-                          : "미션 보상 받기"}
-                      </span>
-                      {claimingId !== "mission" ? (
-                        <span className="text-[10px] font-semibold text-white/95">
-                          <QuestRewardDisplay
-                            reward={
-                              MISSION_DIFFICULTY_REWARDS[currentMission.difficulty]
-                            }
-                          />
-                        </span>
-                      ) : null}
+                      {claimingId === "mission"
+                        ? "보상 수령 중..."
+                        : "미션 보상 받기"}
                     </button>
                   ) : (
                     <p className="mt-3 text-center text-[10px] font-semibold text-white/40">

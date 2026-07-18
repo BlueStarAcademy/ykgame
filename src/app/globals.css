@@ -2477,6 +2477,54 @@ body {
   box-shadow: 0 0 0.35rem rgba(251, 191, 36, 0.35);
 }
 
+.yanmar-quest-reward-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.28rem 0.55rem;
+  width: 100%;
+}
+
+.yanmar-quest-reward-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  column-gap: 0.35rem;
+  row-gap: 0.2rem;
+}
+
+.yanmar-quest-reward-inline-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.yanmar-quest-reward-sep {
+  color: rgba(253, 230, 138, 0.35);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.yanmar-quest-reward-cell {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.28rem;
+  color: rgba(253, 230, 138, 0.88);
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.yanmar-quest-reward-icon {
+  display: block;
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
 .yanmar-shop-button {
   position: relative;
   width: 2.75rem;
