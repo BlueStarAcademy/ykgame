@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { ensureAdminYanmarTestBoost } from "@/lib/adminTestBoost";
 import { prisma } from "@/lib/prisma";
 import {
   WORKSHOP_DEFS,
@@ -24,6 +25,10 @@ export async function GET() {
   const weekKey = getWorkshopWeekKey();
 
   await prisma.$transaction(async (tx) => {
+    await ensureAdminYanmarTestBoost(tx, {
+      userId,
+      role: session.user.role,
+    });
     await settleWorkshopPendingUpgrades(tx, userId);
   });
 

@@ -4,11 +4,12 @@ import {
   WORKSHOP_SHOP_PRICES,
   WORKSHOP_SHOP_WEEKLY_LIMIT,
 } from "../workshop/economy";
-import type {
-  MonumentBuildQuestDef,
-  MonumentQuestDef,
-  MonumentUpgradeDef,
-  MonumentUpgradeKey,
+import {
+  MONUMENT_STARS_PER_TICK,
+  type MonumentBuildQuestDef,
+  type MonumentQuestDef,
+  type MonumentUpgradeDef,
+  type MonumentUpgradeKey,
 } from "./types";
 
 export const MONUMENT_SIGN = {
@@ -31,7 +32,7 @@ export const MONUMENT_UPGRADES: readonly MonumentUpgradeDef[] = [
   {
     key: "prod_speed",
     label: "생산 속도",
-    description: "스타 1개 생산에 걸리는 시간 단축",
+    description: `스타 ${MONUMENT_STARS_PER_TICK}개 생산에 걸리는 시간 단축`,
     maxLevel: 10,
   },
 ] as const;

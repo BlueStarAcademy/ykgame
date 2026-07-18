@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { ensureAdminYanmarTestBoost } from "@/lib/adminTestBoost";
 import { prisma } from "@/lib/prisma";
 import { AVAILABLE_GAME_IDS, GAMES, getSeasonKey } from "@/lib/games";
 import { getUserGameStatsForGames } from "@/lib/rankings";
@@ -14,6 +15,11 @@ export async function GET() {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  await ensureAdminYanmarTestBoost(prisma, {
+    userId: session.user.id,
+    role: session.user.role,
+  });
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },

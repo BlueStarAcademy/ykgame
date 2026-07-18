@@ -176,7 +176,7 @@ export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSection[] = [
     items: [
       {
         label: "필드 스타",
-        desc: "맵에 떠 있는 스타를 주우면 3~5 스타를 얻습니다. 시간당 최대 10회.",
+        desc: "맵에 떠 있는 스타를 주우면 50~200 스타를 얻습니다. 매 정시에 1개씩 등장합니다.",
       },
       {
         label: "속도 버프",

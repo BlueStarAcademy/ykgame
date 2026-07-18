@@ -40,13 +40,15 @@ export interface MonumentBuildQuestDef {
 
 export const MONUMENT_UNLOCK_LEVEL = 20;
 export const MONUMENT_CONSTRUCTION_MS = 60 * 60_000;
-export const MONUMENT_BASE_STORAGE = 10;
+export const MONUMENT_BASE_STORAGE = 100;
 export const MONUMENT_BASE_INTERVAL_MS = 20 * 60_000;
 export const MONUMENT_MIN_INTERVAL_MS = 60_000;
+/** Stars granted per completed production interval. */
+export const MONUMENT_STARS_PER_TICK = 10;
 
 /** Per-level storage capacity bonuses (index 0 = +1). */
 export const MONUMENT_STORAGE_BONUS = [
-  2, 2, 2, 3, 3, 3, 4, 4, 4, 7,
+  20, 20, 20, 30, 30, 30, 40, 40, 40, 70,
 ] as const;
 
 /** Per-level production interval reduction in seconds (index 0 = +1). */

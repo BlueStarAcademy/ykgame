@@ -7,6 +7,7 @@ import {
   MONUMENT_BUILD_QUESTS,
   MONUMENT_POINTS_ICON,
   MONUMENT_SHOP_ITEMS,
+  MONUMENT_STARS_PER_TICK,
   MONUMENT_UPGRADES,
   getMonumentUpgradeCost,
   getMonumentUpgradeMaxLevel,
@@ -160,7 +161,8 @@ export function MonumentPanel({
               <p className="mt-1 text-xs text-amber-100/90">
                 저장 ★{panelState.starsStored} / {monumentStorageCap(storageLv)}
                 {" · "}
-                {Math.round(monumentIntervalMs(speedLv) / 1000)}초마다 1★
+                {Math.round(monumentIntervalMs(speedLv) / 1000)}초마다{" "}
+                {MONUMENT_STARS_PER_TICK}★
               </p>
             ) : null}
           </div>

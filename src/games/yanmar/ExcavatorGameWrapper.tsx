@@ -44,6 +44,8 @@ import type { WorldPickup } from "./worldPickups";
 import {
   createWorldPickupsState,
   rollClientStarReward,
+  starRewardToastFontRem,
+  starRewardToastIconPx,
 } from "./worldPickups";
 import type {
   AttachmentType,
@@ -1611,6 +1613,8 @@ export function ExcavatorGameWrapper({
   );
 
   const modeRef = useRef<GameMode>(mode);
+  const sessionRoleRef = useRef(session?.user?.role);
+  sessionRoleRef.current = session?.user?.role;
 
   const simRef = useRef<ExcavatorSimState>(createInitialSim());
   const velRef = useRef<HydraulicVelocity>(createHydraulicVelocity());
@@ -1722,13 +1726,16 @@ export function ExcavatorGameWrapper({
     return () => window.clearTimeout(timer);
   }, [travelRaiseWarn]);
 
+  const isAdmin = session?.user?.role === "ADMIN";
   const practiceUnlocksAll =
-    mode === "practice" || mode === "tutorial";
+    mode === "practice" || mode === "tutorial" || isAdmin;
 
   const handleAttachmentChange = useCallback(
     (next: AttachmentType) => {
       const unlockAll =
-        modeRef.current === "practice" || modeRef.current === "tutorial";
+        modeRef.current === "practice" ||
+        modeRef.current === "tutorial" ||
+        sessionRoleRef.current === "ADMIN";
       const playerLevel = getPlayerLevelProgress(totalXpRef.current).level;
       if (!isAttachmentUnlocked(next, playerLevel, { unlockAll })) {
         showAttachmentWarning(
@@ -1898,6 +1905,10 @@ export function ExcavatorGameWrapper({
         totalXp: data.totalXp,
         currency: data.currency,
       });
+      if (typeof data.totalXp === "number") {
+        applyTotalXp(data.totalXp, { announceLevelUp: false });
+        void updateSessionRef.current({ user: { totalXp: data.totalXp } });
+      }
       if (typeof data.gachaTicketsStandard === "number") {
         setGachaTicketsStandard(data.gachaTicketsStandard);
       }
@@ -1914,7 +1925,7 @@ export function ExcavatorGameWrapper({
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [applyTotalXp]);
 
   const warpToMonument = useCallback(() => {
     const sim = simRef.current;
@@ -1946,6 +1957,10 @@ export function ExcavatorGameWrapper({
         totalXp: data.totalXp,
         currency: data.currency,
       });
+      if (typeof data.totalXp === "number") {
+        applyTotalXp(data.totalXp, { announceLevelUp: false });
+        void updateSessionRef.current({ user: { totalXp: data.totalXp } });
+      }
       if (typeof data.currency === "number") {
         currencyRef.current = data.currency;
         setCurrency(data.currency);
@@ -1974,7 +1989,7 @@ export function ExcavatorGameWrapper({
     } catch {
       /* ignore */
     }
-  }, [enqueueUnlockNotices, session?.user?.totalXp]);
+  }, [applyTotalXp, enqueueUnlockNotices, session?.user?.totalXp]);
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
@@ -6106,12 +6121,21 @@ export function ExcavatorGameWrapper({
                 <img
                   src="/images/star-currency.svg"
                   alt=""
-                  width={28}
-                  height={28}
+                  width={starRewardToastIconPx(attachmentWarning.stars)}
+                  height={starRewardToastIconPx(attachmentWarning.stars)}
                   className="yanmar-enhance-core-toast-img"
+                  style={{
+                    width: starRewardToastIconPx(attachmentWarning.stars),
+                    height: starRewardToastIconPx(attachmentWarning.stars),
+                  }}
                   draggable={false}
                 />
-                <span className="yanmar-enhance-core-toast-amount tabular-nums">
+                <span
+                  className="yanmar-enhance-core-toast-amount tabular-nums"
+                  style={{
+                    fontSize: `${starRewardToastFontRem(attachmentWarning.stars)}rem`,
+                  }}
+                >
                   +{attachmentWarning.stars}
                 </span>
               </span>

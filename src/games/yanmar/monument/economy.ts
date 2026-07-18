@@ -4,6 +4,7 @@ import {
   MONUMENT_BASE_STORAGE,
   MONUMENT_MIN_INTERVAL_MS,
   MONUMENT_SPEED_REDUCTION_SEC,
+  MONUMENT_STARS_PER_TICK,
   MONUMENT_STORAGE_BONUS,
   type MonumentUpgradeKey,
 } from "./types";
@@ -63,8 +64,9 @@ export function computeProducedStars(opts: {
   }
   const ticks = Math.floor(elapsed / interval);
   const room = Math.max(0, cap - opts.stored);
-  const produced = Math.min(room, ticks);
-  const consumedMs = produced * interval;
+  const produced = Math.min(room, ticks * MONUMENT_STARS_PER_TICK);
+  const ticksConsumed = Math.ceil(produced / MONUMENT_STARS_PER_TICK);
+  const consumedMs = ticksConsumed * interval;
   return {
     stored: opts.stored + produced,
     produced,

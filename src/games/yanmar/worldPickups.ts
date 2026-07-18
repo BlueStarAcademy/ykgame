@@ -40,16 +40,14 @@ export interface WorldPickupsState {
   speedBuffUntilMs: number;
 }
 
-export const STARS_PER_HOUR = 10;
-export const MAX_ACTIVE_STARS = 3;
+export const STARS_PER_HOUR = 1;
+export const MAX_ACTIVE_STARS = 1;
 export const SPEED_PER_HOUR = 5;
 export const MAX_ACTIVE_SPEED = 1;
-export const STAR_REWARD_MIN = 3;
-export const STAR_REWARD_MAX = 5;
+export const STAR_REWARD_MIN = 50;
+export const STAR_REWARD_MAX = 200;
 export const SPEED_BUFF_MS = 30_000;
 export const SPEED_BUFF_MULT = 2;
-/** After collecting a star, next star appears within this window. */
-export const STAR_RESPAWN_MAX_MS = 5 * 60 * 1000;
 /** After collecting a speed buff, next buff appears within this window. */
 export const SPEED_RESPAWN_MAX_MS = 10 * 60 * 1000;
 export const WORLD_PICKUP_RADIUS = EXCAVATOR_COLLISION_RADIUS + 0.6;
@@ -61,7 +59,7 @@ const MAP_EDGE_MARGIN = 10;
 const ZONE_CLEARANCE = 10;
 const MAX_PLACE_ATTEMPTS = 40;
 const MAX_SPAWN_SLOPE = 0.55;
-/** First spawns when entering / hour resets appear quickly. */
+/** First speed spawns when entering / hour resets appear quickly. */
 const INITIAL_SPAWN_JITTER_MS = 5_000;
 
 function isNearRepairTent(wx: number, wz: number) {
@@ -100,7 +98,8 @@ export function createWorldPickupsState(now = Date.now()): WorldPickupsState {
     revision: 0,
     speedBuffUntilMs: 0,
   };
-  seedMissingSpawns(state, now, INITIAL_SPAWN_JITTER_MS);
+  seedHourlyStar(state, now);
+  seedMissingSpeedSpawns(state, now, INITIAL_SPAWN_JITTER_MS);
   return state;
 }
 
@@ -110,10 +109,6 @@ function perHourLimit(kind: WorldPickupKind) {
 
 function maxActive(kind: WorldPickupKind) {
   return kind === "star" ? MAX_ACTIVE_STARS : MAX_ACTIVE_SPEED;
-}
-
-function respawnMaxMs(kind: WorldPickupKind) {
-  return kind === "star" ? STAR_RESPAWN_MAX_MS : SPEED_RESPAWN_MAX_MS;
 }
 
 function collectedThisHour(state: WorldPickupsState, kind: WorldPickupKind) {
@@ -155,38 +150,49 @@ function pushPendingSpawn(
 }
 
 /**
- * Schedule one future spawn within `maxDelayMs` (clamped to the current hour).
- * No-op if hourly budget or active cap is exhausted.
+ * Stars: exactly one per KST hour. Spawn at hour open (or session join mid-hour
+ * if this hour's star was not yet collected / is not already on the map).
+ * After collect, wait for the next 정시 — no mid-hour respawn.
  */
-function scheduleRespawn(
+function seedHourlyStar(state: WorldPickupsState, now: number) {
+  if (spawnSlotsRemaining(state, "star") <= 0) return;
+  if (countActive(state, "star") + state.pendingStarAt.length >= MAX_ACTIVE_STARS) {
+    return;
+  }
+  pushPendingSpawn(state, "star", now);
+}
+
+/**
+ * Schedule one future speed spawn within `maxDelayMs` (clamped to the current hour).
+ */
+function scheduleSpeedRespawn(
   state: WorldPickupsState,
-  kind: WorldPickupKind,
   now: number,
   maxDelayMs: number,
 ) {
-  if (spawnSlotsRemaining(state, kind) <= 0) return;
-  if (countActive(state, kind) + pendingFor(state, kind).length >= maxActive(kind)) {
+  if (spawnSlotsRemaining(state, "speed") <= 0) return;
+  if (
+    countActive(state, "speed") + state.pendingSpeedAt.length >=
+    MAX_ACTIVE_SPEED
+  ) {
     return;
   }
   const untilHourEnd = Math.max(0, hourEndMs(state) - now);
   if (untilHourEnd <= 0) return;
   const delay = Math.random() * Math.min(maxDelayMs, untilHourEnd);
-  pushPendingSpawn(state, kind, now + delay);
+  pushPendingSpawn(state, "speed", now + delay);
 }
 
-/** Fill empty active slots with near-term pending spawns (hour start / session enter). */
-function seedMissingSpawns(
+function seedMissingSpeedSpawns(
   state: WorldPickupsState,
   now: number,
   maxDelayMs: number,
 ) {
-  for (const kind of ["star", "speed"] as const) {
-    while (
-      spawnSlotsRemaining(state, kind) > 0 &&
-      countActive(state, kind) + pendingFor(state, kind).length < maxActive(kind)
-    ) {
-      scheduleRespawn(state, kind, now, maxDelayMs);
-    }
+  while (
+    spawnSlotsRemaining(state, "speed") > 0 &&
+    countActive(state, "speed") + state.pendingSpeedAt.length < MAX_ACTIVE_SPEED
+  ) {
+    scheduleSpeedRespawn(state, now, maxDelayMs);
   }
 }
 
@@ -198,7 +204,9 @@ function ensureHourBucket(state: WorldPickupsState, now: number) {
   state.speedCollectedThisHour = 0;
   state.pendingStarAt = [];
   state.pendingSpeedAt = [];
-  seedMissingSpawns(state, now, INITIAL_SPAWN_JITTER_MS);
+  // New 정시: one star for the hour (skip if last hour's star is still on the map).
+  seedHourlyStar(state, now);
+  seedMissingSpeedSpawns(state, now, INITIAL_SPAWN_JITTER_MS);
 }
 
 function randomId(kind: WorldPickupKind) {
@@ -333,7 +341,11 @@ function trySpawnKind(
     pending.shift();
     if (!pos) {
       // Placement failed — retry soon (not the full collect-respawn window).
-      scheduleRespawn(state, kind, now, INITIAL_SPAWN_JITTER_MS * 4);
+      if (kind === "star") {
+        pushPendingSpawn(state, "star", now + INITIAL_SPAWN_JITTER_MS);
+      } else {
+        scheduleSpeedRespawn(state, now, INITIAL_SPAWN_JITTER_MS * 4);
+      }
       continue;
     }
 
@@ -391,12 +403,13 @@ export function tryCollectWorldPickup(
 
     if (p.kind === "star") {
       state.starCollectedThisHour += 1;
+      // Next star waits for the following KST 정시 (ensureHourBucket).
     } else {
       state.speedCollectedThisHour += 1;
       state.speedBuffUntilMs = now + SPEED_BUFF_MS;
+      scheduleSpeedRespawn(state, now, SPEED_RESPAWN_MAX_MS);
     }
 
-    scheduleRespawn(state, p.kind, now, respawnMaxMs(p.kind));
     return p;
   }
   return null;
@@ -414,4 +427,21 @@ export function rollClientStarReward() {
     STAR_REWARD_MIN +
     Math.floor(Math.random() * (STAR_REWARD_MAX - STAR_REWARD_MIN + 1))
   );
+}
+
+/** Toast amount font size grows with reward (50 → compact, 200 → large). */
+export function starRewardToastFontRem(stars: number): number {
+  const clamped = Math.max(
+    STAR_REWARD_MIN,
+    Math.min(STAR_REWARD_MAX, stars),
+  );
+  const t =
+    (clamped - STAR_REWARD_MIN) / (STAR_REWARD_MAX - STAR_REWARD_MIN || 1);
+  return 0.95 + t * 0.95;
+}
+
+/** Matching icon size for the star reward toast. */
+export function starRewardToastIconPx(stars: number): number {
+  const rem = starRewardToastFontRem(stars);
+  return Math.round(22 + (rem - 0.95) * 28);
 }
