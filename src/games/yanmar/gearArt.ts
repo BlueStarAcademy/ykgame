@@ -1,6 +1,10 @@
 import type { ChassisClass, ChassisModelId } from "./chassisCatalog";
 import { getChassisDef } from "./chassisCatalog";
-import type { GearSlot, ItemGrade } from "./gearCatalog";
+import {
+  GEAR_SLOTS,
+  type GearSlot,
+  type ItemGrade,
+} from "./gearCatalog";
 
 const SLOT_FILE: Record<GearSlot, string> = {
   ARM: "arm",
@@ -18,7 +22,11 @@ const GRADE_FILE: Record<ItemGrade, string> = {
   MASTER: "master",
 };
 
+const ITEM_GRADES = Object.keys(GRADE_FILE) as ItemGrade[];
+
 const CHASSIS_MODEL_THUMB_VERSION = 13;
+
+const preloadedIconUrls = new Set<string>();
 
 export function gearIconSrc(
   slot: GearSlot,
@@ -30,6 +38,42 @@ export function gearIconSrc(
 
 export function gearEmptySlotSrc(): string {
   return "/images/yanmar/2d/gear/empty-slot.png?v=7";
+}
+
+/** 가챠·인벤에 쓰는 장비 아이콘 URL 전체 (6슬롯×4등급). */
+export function allGearIconSrcs(): string[] {
+  const urls: string[] = [gearEmptySlotSrc()];
+  for (const slot of GEAR_SLOTS) {
+    for (const grade of ITEM_GRADES) {
+      urls.push(gearIconSrc(slot, grade));
+    }
+  }
+  return urls;
+}
+
+export function preloadImage(src: string): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (preloadedIconUrls.has(src)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.decoding = "async";
+    img.onload = () => {
+      preloadedIconUrls.add(src);
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = src;
+  });
+}
+
+/** 상점/가챠 진입 시 아이콘 세트를 미리 받아 10연 연출 끊김을 줄인다. */
+export function preloadAllGearIcons(): Promise<void> {
+  return Promise.all(allGearIconSrcs().map(preloadImage)).then(() => undefined);
+}
+
+export function preloadGearIconSrcs(srcs: readonly string[]): Promise<void> {
+  const unique = [...new Set(srcs)];
+  return Promise.all(unique.map(preloadImage)).then(() => undefined);
 }
 
 export function gradeFrameClass(grade: ItemGrade | null | undefined): string {

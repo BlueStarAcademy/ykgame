@@ -8,3 +8,10 @@ export const YK_GEONGI_LOGO = {
 } as const;
 
 export type YkGeongiLogoVariant = keyof Pick<typeof YK_GEONGI_LOGO, "black" | "white">;
+
+/** Official YANMAR mark (transparent PNG) for monument / brand boards. */
+export const YANMAR_MARK_LOGO = {
+  src: "/images/yanmar/2d/monument/yanmar-mark.png",
+  /** Intrinsic pixel aspect of the processed official asset */
+  aspect: 448 / 342,
+} as const;

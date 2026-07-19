@@ -115,7 +115,7 @@ export function GameImmersiveOverlay({
         className="relative z-30 grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 px-3 py-2 text-white pointer-events-auto"
         style={{ backgroundColor: headerColor }}
       >
-        <div className="flex min-w-0 max-w-full items-center gap-2 justify-self-stretch overflow-hidden">
+        <div className="flex min-w-0 max-w-full items-center gap-2 justify-self-stretch overflow-visible">
           {!hideExitButton ? (
             <button
               type="button"
@@ -128,7 +128,7 @@ export function GameImmersiveOverlay({
               ✕ 종료
             </button>
           ) : null}
-          <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 max-w-full flex-1 items-center overflow-x-clip overflow-y-visible" />
+          <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 max-w-full flex-1 items-center overflow-visible" />
         </div>
         <div
           id={GAME_IMMERSIVE_HEADER_CENTER_ID}

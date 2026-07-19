@@ -125,6 +125,7 @@ import {
   computeGrappleAdhesion,
   createGrappleGripRuntime,
   grappleBucketAngleReady,
+  grappleClampOpenForRock,
   hillBoulderGripEnvelope,
   hillBoulderWrapRadius,
   isGrappleClampNearGround,
@@ -293,37 +294,37 @@ function isGrappleWrappingRock(
   terrain: TerrainData,
 ): boolean {
   const envelope = hillBoulderGripEnvelope(rock);
-  const ground = sampleHeight(terrain, rock.x, rock.z);
-  // 벌어진 집게 끝(가장 낮은 샘플) 기준으로 바닥 근접을 본다.
-  const lowestY =
-    samples.length > 0
-      ? Math.min(clamp.y, ...samples.map((p) => p.y))
-      : clamp.y;
-  if (!isGrappleClampNearGround(lowestY, ground, rock)) {
+  // 집게가 내려앉은 지면(도구 아래) 기준으로 판정 — 돌 바로 위일 필요 없음.
+  const toolGround = sampleHeight(terrain, clamp.x, clamp.z);
+  const rockGround = sampleHeight(terrain, rock.x, rock.z);
+  const points = samples.length > 0 ? samples : [clamp];
+  const lowestY = Math.min(clamp.y, ...points.map((p) => p.y));
+
+  // 땅에 완전히 내린 뒤, 돌이 집게 근처면 집기 가능.
+  if (isGrappleGroundPickupPose(clamp, rock, toolGround, points)) {
+    return true;
+  }
+
+  // 보조: 집게가 지면에 가깝고 돌 옆/높이에 샘플이 닿는 경우
+  if (!isGrappleClampNearGround(lowestY, toolGround, rock)) {
     return false;
   }
 
   const scale = hillBoulderVisualScale(rock.size);
-  const rockY = ground + scale * 0.55;
-  const yMin = ground - 0.35;
+  const rockY = rockGround + scale * 0.55;
+  const yMin = rockGround - 0.35;
   const yMax = rockY + envelope.verticalRadius;
+  const nearRadius = envelope.horizontalRadius + 0.35;
 
-  // 바닥 근처에서 돌 위로 내려온 자세면 입구에 들어온 것으로 본다.
-  if (isGrappleGroundPickupPose(clamp, rock, ground)) {
-    return true;
-  }
-
-  const points = samples.length > 0 ? samples : [clamp];
   for (const point of points) {
     const xz = Math.hypot(point.x - rock.x, point.z - rock.z);
-    if (xz <= envelope.horizontalRadius && point.y >= yMin && point.y <= yMax) {
+    if (xz <= nearRadius && point.y >= yMin && point.y <= yMax) {
       return true;
     }
   }
 
-  // 차체 근처 폴백 — 클램프만으로도 돌 옆이면 집기
   const clampXz = Math.hypot(clamp.x - rock.x, clamp.z - rock.z);
-  if (clampXz <= envelope.horizontalRadius && clamp.y >= yMin && clamp.y <= yMax) {
+  if (clampXz <= nearRadius && clamp.y >= yMin && clamp.y <= yMax) {
     return true;
   }
 
@@ -331,8 +332,7 @@ function isGrappleWrappingRock(
     for (let i = 0; i < points.length - 1; i += 1) {
       const a = points[i];
       const b = points[i + 1];
-      // 세그먼트 양 끝도 돌 높이 근처여야 공중 아크가 잡히지 않는다.
-      if (a.y > yMax + 0.2 && b.y > yMax + 0.2) continue;
+      if (a.y > yMax + 0.25 && b.y > yMax + 0.25) continue;
       const seg = distancePointToSegment3(
         rock.x,
         rockY,
@@ -367,7 +367,7 @@ function findWrappableHillRock(
   for (const candidate of candidates) {
     if (
       candidate.distance >
-      hillBoulderGripEnvelope(candidate.item).horizontalRadius + 1.2
+      hillBoulderGripEnvelope(candidate.item).horizontalRadius + 0.75
     ) {
       break;
     }
@@ -567,7 +567,7 @@ function resolveExcavatorDumpTruckOverlap(
   const hx = DUMP_TRUCK_COLLIDER.halfX;
   const hz = DUMP_TRUCK_COLLIDER.halfZ;
   const radius = EXCAVATOR_COLLISION_RADIUS;
-  const pad = 0.04;
+  const pad = 0.1;
 
   const closestX = Math.max(-hx, Math.min(hx, lx));
   const closestZ = Math.max(-hz, Math.min(hz, lz));
@@ -615,16 +615,18 @@ function resolveExcavatorDumpTruckOverlap(
 
 function constrainExcavatorToDumpTruck(
   sim: ExcavatorSimState,
-  previous: { x: number; z: number },
+  previous: { x: number; z: number; heading: number; swing: number },
   pose?: DumpTruckPose,
 ) {
   if (!pose || !isExcavatorCollidingWithDumpTruck(sim.posX, sim.posZ, pose)) {
     return false;
   }
-  // 평소: 진입 직전 위치로 되돌림. 이미 겹친 상태(복귀 끼임 등)는 밀어낸다.
+  // 진입 직전 자세로 되돌림(선회로 궤도가 파고드는 것 포함). 이미 겹치면 밀어낸다.
   if (!isExcavatorCollidingWithDumpTruck(previous.x, previous.z, pose)) {
     sim.posX = previous.x;
     sim.posZ = previous.z;
+    sim.heading = previous.heading;
+    sim.swing = previous.swing;
     return true;
   }
   const resolved = resolveExcavatorDumpTruckOverlap(sim.posX, sim.posZ, pose);
@@ -801,6 +803,8 @@ export function tickExcavatorSim(params: SimTickParams) {
   const beforeTravel = {
     x: sim.posX,
     z: sim.posZ,
+    heading: sim.heading,
+    swing: sim.swing,
   };
   const hillZone = terrain.hillZone;
   const haulTruckPresent =
@@ -1013,15 +1017,28 @@ export function tickExcavatorSim(params: SimTickParams) {
   const grappleClamp = getGrappleClampWorld(sim, boomSwing);
   if (sim.attachmentType === "grapple" && auxiliary) {
     const pedal = auxiliary.attachmentPedal;
-    // 발판 유지 동안 개폐가 서서히 변하도록 (풀오픈 → 닫기 집기 모션)
-    const openRate = 0.675;
+    // 발판 +: 닫기·집기 / −: 열기 (풀오픈 → 닫으며 집기)
+    const openRate = 0.9;
     if (pedal > 0) {
       auxiliary.grappleOpen = Math.max(0, auxiliary.grappleOpen - openRate * dt);
     } else if (pedal < 0) {
       auxiliary.grappleOpen = Math.min(1, auxiliary.grappleOpen + openRate * dt);
     }
-    // 암과 겹치면 더 이상 열리지 않음. 버켓을 말아 암이 들어오면 자동으로 조금 닫힘.
+    // 버켓 관통·암 충돌·컬 한도까지. 말면/암에 닿으면 자동으로 조금 닫힘.
     auxiliary.grappleOpen = clampGrappleOpenAgainstArm(sim, auxiliary.grappleOpen);
+
+    // 운반 중: 돌 크기만큼 덜 접힌 채 멈춤 — 그 상태에서 닫기 유지 시 압력 상승.
+    if (sim.carriedBoulderId && terrain.hillZone) {
+      const carriedRock = terrain.hillZone.boulders.find(
+        (item) => item.id === sim.carriedBoulderId,
+      );
+      if (carriedRock) {
+        const restOpen = grappleClampOpenForRock(carriedRock);
+        if (auxiliary.grappleOpen < restOpen) {
+          auxiliary.grappleOpen = restOpen;
+        }
+      }
+    }
   }
   const grappleJawSamples =
     sim.attachmentType === "grapple"
@@ -1176,7 +1193,8 @@ export function tickExcavatorSim(params: SimTickParams) {
       isGrappleGroundPickupPose(
         grappleClamp,
         wrappableRock,
-        sampleHeight(terrain, wrappableRock.x, wrappableRock.z),
+        sampleHeight(terrain, grappleClamp.x, grappleClamp.z),
+        grappleJawSamples,
       );
     // Rocks only exist in the stone zone — allow wrap contact even if the clamp
     // samples just outside the painted radius after terrain flatten.
@@ -1206,6 +1224,13 @@ export function tickExcavatorSim(params: SimTickParams) {
               grappleClamp.x,
               grappleClamp.z,
             );
+            // 집은 직후부터 돌 두께만큼 벌린 자세로 — 완전 접힘 금지.
+            if (auxiliary) {
+              auxiliary.grappleOpen = Math.max(
+                auxiliary.grappleOpen,
+                grappleClampOpenForRock(wrappableRock),
+              );
+            }
             const initial = computeGrappleAdhesion({
               rock: wrappableRock,
               contactElapsed: 0,
@@ -1558,7 +1583,8 @@ export function tickExcavatorSim(params: SimTickParams) {
     isGrappleGroundPickupPose(
       grappleClamp,
       wrappableRock,
-      sampleHeight(terrain, wrappableRock.x, wrappableRock.z),
+      sampleHeight(terrain, grappleClamp.x, grappleClamp.z),
+      grappleJawSamples,
     );
   const grappleReadyToCloseGrab =
     grappleOpenEnoughToGrab(sim, grappleOpenForHud) ||

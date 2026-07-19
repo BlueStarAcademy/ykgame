@@ -86,11 +86,10 @@ export function getWorldPickupHourStartMs(hourBucket: number) {
   return hourBucket * HOUR_MS - KST_OFFSET_MS;
 }
 
-export function createWorldPickupsState(now = Date.now()): WorldPickupsState {
-  const hourBucket = getWorldPickupHourBucket(now);
-  const state: WorldPickupsState = {
+export function createEmptyWorldPickupsState(now = Date.now()): WorldPickupsState {
+  return {
     active: [],
-    hourBucket,
+    hourBucket: getWorldPickupHourBucket(now),
     starCollectedThisHour: 0,
     speedCollectedThisHour: 0,
     pendingStarAt: [],
@@ -98,9 +97,77 @@ export function createWorldPickupsState(now = Date.now()): WorldPickupsState {
     revision: 0,
     speedBuffUntilMs: 0,
   };
+}
+
+export function createWorldPickupsState(now = Date.now()): WorldPickupsState {
+  const state = createEmptyWorldPickupsState(now);
   seedHourlyStar(state, now);
   seedMissingSpeedSpawns(state, now, INITIAL_SPAWN_JITTER_MS);
   return state;
+}
+
+export type WorldPickupsHydrateInput = {
+  hourBucket: number;
+  starCollectedThisHour: number;
+  speedCollectedThisHour: number;
+  pendingStarAt: number[];
+  pendingSpeedAt: number[];
+  speedBuffUntilMs: number;
+  active: WorldPickup[];
+};
+
+/**
+ * Restore cooldown / pending spawns from persistence for the current hour.
+ * Falls back to a fresh hourly seed when the snapshot hour has rolled over.
+ */
+export function createWorldPickupsStateFromHydrate(
+  hydrate: WorldPickupsHydrateInput | null | undefined,
+  now = Date.now(),
+): WorldPickupsState {
+  const currentBucket = getWorldPickupHourBucket(now);
+  if (!hydrate || hydrate.hourBucket !== currentBucket) {
+    return createWorldPickupsState(now);
+  }
+
+  const state = createEmptyWorldPickupsState(now);
+  state.hourBucket = hydrate.hourBucket;
+  state.starCollectedThisHour = Math.max(
+    0,
+    Math.floor(hydrate.starCollectedThisHour),
+  );
+  state.speedCollectedThisHour = Math.max(
+    0,
+    Math.floor(hydrate.speedCollectedThisHour),
+  );
+  state.pendingStarAt = hydrate.pendingStarAt
+    .filter((t) => Number.isFinite(t))
+    .sort((a, b) => a - b);
+  state.pendingSpeedAt = hydrate.pendingSpeedAt
+    .filter((t) => Number.isFinite(t))
+    .sort((a, b) => a - b);
+  state.speedBuffUntilMs =
+    hydrate.speedBuffUntilMs > now ? hydrate.speedBuffUntilMs : 0;
+  state.active = hydrate.active.map((p) => ({ ...p }));
+  state.revision = 1;
+
+  // Only seed what is still owed this hour (no-ops when collected / already pending).
+  seedHourlyStar(state, now);
+  seedMissingSpeedSpawns(state, now, INITIAL_SPAWN_JITTER_MS);
+  return state;
+}
+
+/** Mark the hourly star as already taken and clear any live/pending stars. */
+export function markWorldStarHourlyLimitReached(state: WorldPickupsState) {
+  state.starCollectedThisHour = Math.max(
+    state.starCollectedThisHour,
+    STARS_PER_HOUR,
+  );
+  const before = state.active.length;
+  state.active = state.active.filter((p) => p.kind !== "star");
+  state.pendingStarAt = [];
+  if (state.active.length !== before) {
+    state.revision += 1;
+  }
 }
 
 function perHourLimit(kind: WorldPickupKind) {
@@ -403,7 +470,8 @@ export function tryCollectWorldPickup(
 
     if (p.kind === "star") {
       state.starCollectedThisHour += 1;
-      // Next star waits for the following KST 정시 (ensureHourBucket).
+      // No mid-hour respawn — drop any leftover pending star slots.
+      state.pendingStarAt = [];
     } else {
       state.speedCollectedThisHour += 1;
       state.speedBuffUntilMs = now + SPEED_BUFF_MS;

@@ -1833,6 +1833,7 @@ function AttachmentButton({
   selected,
   playerLevel,
   unlockAll,
+  interactive = true,
   onSelect,
 }: {
   type: AttachmentType;
@@ -1841,10 +1842,13 @@ function AttachmentButton({
   selected: boolean;
   playerLevel: number;
   unlockAll?: boolean;
+  /** False while the function menu is collapsed — blocks ghost presses. */
+  interactive?: boolean;
   onSelect: () => void;
 }) {
   const unlocked = isAttachmentUnlocked(type, playerLevel, { unlockAll });
   const requiredLevel = getAttachmentRequiredLevel(type);
+  const canSelect = interactive && unlocked;
   return (
     <button
       type="button"
@@ -1852,9 +1856,10 @@ function AttachmentButton({
         unlocked ? "" : " is-locked"
       }`}
       onPointerDown={
-        unlocked ? activateOnPointerDown(onSelect) : undefined
+        canSelect ? activateOnPointerDown(onSelect) : undefined
       }
-      disabled={!unlocked}
+      disabled={!canSelect}
+      tabIndex={interactive ? undefined : -1}
       aria-pressed={selected}
       aria-label={
         unlocked ? `${label} 장착` : `${label} 잠김, 레벨 ${requiredLevel} 필요`
@@ -1907,6 +1912,7 @@ function FunctionMenu({
       <div
         className={`yanmar-function-menu-grid ${expanded ? "is-expanded" : ""}`}
         aria-hidden={!expanded}
+        inert={!expanded || undefined}
       >
         <div className="yanmar-function-menu-attachments">
           {ATTACHMENTS.map((item) => (
@@ -1916,6 +1922,7 @@ function FunctionMenu({
               selected={attachmentType === item.type}
               playerLevel={playerLevel}
               unlockAll={unlockAllAttachments}
+              interactive={expanded}
               onSelect={() => onAttachmentChange(item.type)}
             />
           ))}

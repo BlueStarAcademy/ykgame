@@ -49,7 +49,10 @@ export async function POST(request: Request) {
   } | null;
 
   const eventId = parseRewardEventId(body?.eventId);
-  if (!eventId || !eventId.startsWith("world-star:")) {
+  // One claim per KST hour — eventId must be world-star:{hourBucket}.
+  const currentBucket = getWorldPickupHourBucket();
+  const expectedEventId = `world-star:${currentBucket}`;
+  if (!eventId || eventId !== expectedEventId) {
     return NextResponse.json({ error: "Invalid eventId" }, { status: 400 });
   }
 

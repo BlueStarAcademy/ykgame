@@ -466,10 +466,10 @@ export const HAUL_TRUCK = {
 
 /** 트럭 고체 껍데기 — 칸 내부 공동은 비움 (하역 공간) */
 export const DUMP_TRUCK_SOLID = {
-  centerLocalX: -0.12,
+  centerLocalX: -0.08,
   centerLocalZ: 0,
-  halfX: 3.22,
-  halfZ: 1.62,
+  halfX: 3.4,
+  halfZ: 1.85,
   minY: DUMP_TRUCK_GROUND_Y + 0.08,
   maxY: DUMP_TRUCK_GROUP_Y + DUMP_TRUCK_BODY_LOCAL_Y + 2.55,
   cavityHalfX: DUMP_TRUCK.bedWidth / 2 - 0.18,

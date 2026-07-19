@@ -9,7 +9,9 @@ import {
   type GearSlot,
   type ItemGrade,
 } from "./gearCatalog";
+import { gearIconSrc, preloadGearIconSrcs } from "./gearArt";
 import { GearIconCell } from "./GearIconCell";
+import { yanmarAudio } from "./yanmarAudio";
 
 export type GachaResultItem = {
   nameSnapshot: string;
@@ -117,6 +119,15 @@ export function GachaResultModal({
       });
 
     async function run() {
+      // 공개 연출 전에 결과 아이콘을 먼저 받아 빈 프레임/늦게 뜨는 현상을 줄인다.
+      const pendingUrls = pullItems.map((item) =>
+        gearIconSrc(normalizeSlot(item.slot), normalizeGrade(item.grade)),
+      );
+      await Promise.race([
+        preloadGearIconSrcs(pendingUrls),
+        sleep(900),
+      ]);
+      if (cancelled) return;
       await sleep(FIRST_LEAD_MS);
       if (cancelled) return;
 
@@ -124,6 +135,12 @@ export function GachaResultModal({
         if (cancelled) return;
 
         if (skipRef.current) {
+          const hasUnrevealedMaster = pullItems
+            .slice(i)
+            .some((item) => normalizeGrade(item.grade) === "MASTER");
+          if (hasUnrevealedMaster && pullItems.length > 1) {
+            yanmarAudio.playMasterItemAcquire();
+          }
           setJackpotFlash(false);
           setFlashGrade(null);
           setJustRevealedIndex(null);
@@ -137,6 +154,10 @@ export function GachaResultModal({
 
         setJustRevealedIndex(i);
         setRevealedCount(i + 1);
+
+        if (grade === "MASTER" && pullItems.length > 1) {
+          yanmarAudio.playMasterItemAcquire();
+        }
 
         if (isJackpot) {
           setFlashGrade(grade);
@@ -235,39 +256,43 @@ export function GachaResultModal({
             const isJackpot = grade === jackpotGrade;
             const popping = justRevealedIndex === i;
 
-            if (!revealed) {
-              return (
+            return (
+              <div
+                key={`card-${sessionKey}-${i}`}
+                className={`yanmar-gacha-result-modal-card${
+                  revealed ? " is-revealed" : " is-sealed"
+                }${popping ? " is-pop" : ""}${
+                  revealed && isJackpot ? " is-jackpot" : ""
+                }`}
+                title={revealed ? r.nameSnapshot : undefined}
+                aria-hidden={!revealed}
+              >
+                {/* 봉인 상태에서도 마운트해 브라우저 캐시에 올려 둔다 */}
                 <div
-                  key={`sealed-${sessionKey}-${i}`}
-                  className="yanmar-gacha-result-modal-card is-sealed"
-                  aria-hidden
+                  className={
+                    revealed ? undefined : "yanmar-gacha-result-preload-icon"
+                  }
                 >
+                  <GearIconCell
+                    slot={slot}
+                    grade={grade}
+                    size={count <= 1 ? "lg" : "md"}
+                  />
+                </div>
+                {revealed ? (
+                  <>
+                    <span className="yanmar-gacha-result-modal-grade">
+                      {ITEM_GRADE_LABEL[grade]}
+                    </span>
+                    <span className="yanmar-gacha-result-modal-name">
+                      {r.nameSnapshot}
+                    </span>
+                  </>
+                ) : (
                   <div className="yanmar-gacha-result-seal">
                     <span>?</span>
                   </div>
-                </div>
-              );
-            }
-
-            return (
-              <div
-                key={`open-${sessionKey}-${i}`}
-                className={`yanmar-gacha-result-modal-card is-revealed${
-                  popping ? " is-pop" : ""
-                }${isJackpot ? " is-jackpot" : ""}`}
-                title={r.nameSnapshot}
-              >
-                <GearIconCell
-                  slot={slot}
-                  grade={grade}
-                  size={count <= 1 ? "lg" : "md"}
-                />
-                <span className="yanmar-gacha-result-modal-grade">
-                  {ITEM_GRADE_LABEL[grade]}
-                </span>
-                <span className="yanmar-gacha-result-modal-name">
-                  {r.nameSnapshot}
-                </span>
+                )}
               </div>
             );
           })}

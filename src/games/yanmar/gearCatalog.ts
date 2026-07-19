@@ -449,7 +449,8 @@ export const MILESTONE_MAIN_FLAT: Record<number, number> = {
 export const REPAIR_TENT = {
   x: -45,
   z: -42,
-  radius: 14,
+  /** Isolated corner — generous so the bay is easy to enter. */
+  radius: 20,
   /** Yaw so the bay-door facade faces the worksite / spawn approach. */
   rotationY: Math.atan2(27, 20),
 } as const;
@@ -464,8 +465,8 @@ export const SELL_STARS_BY_GRADE: Record<ItemGrade, number> = {
 
 /** 합성 시 한 단계 상위 등급이 나올 확률 (나머지는 동일 등급). 마스터는 0. */
 export const SYNTH_UPGRADE_CHANCE: Record<ItemGrade, number> = {
-  NORMAL: 0.5,
-  ENHANCED: 0.3,
+  NORMAL: 0.7,
+  ENHANCED: 0.5,
   PRECISION: 0.1,
   MASTER: 0,
 };

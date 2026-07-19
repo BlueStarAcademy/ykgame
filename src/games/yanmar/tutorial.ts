@@ -1,6 +1,6 @@
 import type { ExcavatorSimState } from "./ExcavatorScene";
 import type { ControlMask, ExcavatorControlState } from "./controls";
-import { ALL_CONTROLS } from "./controls";
+import { ALL_CONTROLS, JOINT_LIMITS } from "./controls";
 import type { AttachmentType } from "./types";
 
 export type { ControlMask };
@@ -440,7 +440,9 @@ export function advanceTutorialProgress(
     }
     case "boom": {
       if (progress.phase === 0 && sim.boom >= 0.75) advancePhase(progress);
-      else if (progress.phase === 1 && sim.boom <= 0.4) return true;
+      else if (progress.phase === 1 && sim.boom <= JOINT_LIMITS.boom.min + 0.02) {
+        return true;
+      }
       return false;
     }
     case "bucket": {

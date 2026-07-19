@@ -5,6 +5,17 @@ export const YANMAR_MACHINE_RIG = {
   armLength: 2.5,
   bucketLength: 1.2,
   boomPivotY: 1.68,
+  /**
+   * Gooseneck boom visual kink (fraction of boomLength / metres).
+   * Keep in sync with workEquipment ReferenceBoom.
+   */
+  /**
+   * Gooseneck ~45° bend — kink past mid-boom so the upper (sky / arm) leg
+   * is shorter than the lower (chassis) leg.
+   */
+  boomGooseneckKinkAlong: 0.55,
+  boomGooseneckKinkRise: 0.24,
+  boomGooseneckKinkRiseCap: 0.78,
   /** Body-local +X of boom foot relative to undercarriage swing center */
   boomOffset: 0.8,
   /** Undercarriage swing / house yaw axis in body local +X */
@@ -20,14 +31,17 @@ export const YANMAR_MACHINE_RIG = {
   breakerRotationZ: -0.08,
   breakerTipLocalX: -2.18,
   breakerTipLocalY: -0.15,
-  /** Bucket-local jaw samples for grapple wrap (teeth → mouth → tip). */
-  grappleTeethLocalX: -1.02,
-  grappleTeethLocalY: -0.46,
-  /** Mouth center between hydraulic thumb and bucket teeth. */
-  grappleClampLocalX: -1.05,
-  grappleClampLocalY: -0.32,
-  grappleMouthLocalX: -0.88,
-  grappleMouthLocalY: -0.18,
+  /**
+   * Grab mouth in bucket-local:
+   * teeth = fixed jaw, clamp = between teeth and open-thumb path,
+   * so a rock sits in the gap then gets pressed into the bucket.
+   */
+  grappleTeethLocalX: -1.25,
+  grappleTeethLocalY: -0.29,
+  grappleClampLocalX: -1.14,
+  grappleClampLocalY: -0.28,
+  grappleMouthLocalX: -0.7,
+  grappleMouthLocalY: 0.15,
   /** 블레이드 0=상승, 1=하강 시 그룹 Y 하강량 */
   dozerBladeDrop: 0.55,
   dozerBladeGroupBaseY: 0.72,
@@ -42,6 +56,28 @@ export const YANMAR_MACHINE_RIG = {
   dozerBladeMeshLocalX: 1.8,
   excavatorVisualY: 0.68,
 } as const;
+
+/** Local pitch of the chassis-side gooseneck segment above the boom axis. */
+export function getBoomGooseneckLowerAngle(
+  boomLength = YANMAR_MACHINE_RIG.boomLength,
+): number {
+  const kinkX = boomLength * YANMAR_MACHINE_RIG.boomGooseneckKinkAlong;
+  const kinkY = Math.min(
+    YANMAR_MACHINE_RIG.boomGooseneckKinkRiseCap,
+    boomLength * YANMAR_MACHINE_RIG.boomGooseneckKinkRise,
+  );
+  return Math.atan2(kinkY, kinkX);
+}
+
+/**
+ * Max boom raise (min joint): chassis-side boom segment stands vertical
+ * (90° to ground). Smaller values fold past vertical into the cab.
+ */
+export function getBoomRaiseMinJoint(
+  boomLength = YANMAR_MACHINE_RIG.boomLength,
+): number {
+  return getBoomGooseneckLowerAngle(boomLength);
+}
 
 /** Chassis scale/trackWidth에 맞춰 블레이드가 궤도 앞에 남도록 reach 계산. */
 export function getDozerBladeReach(scale = 1, trackWidth = 1): number {
@@ -238,12 +274,179 @@ export function configureYkGeongiLogoTexture(texture: THREE.Texture) {
   texture.needsUpdate = true;
 }
 
+/**
+ * Boom side decal: light padding only — no opaque plate / white halo background.
+ * Soft dark edge so YK red/blue still reads on paintRed without a fake backdrop.
+ */
+export function createYkGeongiBoomDecalTexture(
+  source: CanvasImageSource,
+  outlinePx = 3,
+): { texture: THREE.Texture; aspect: number } | null {
+  if (typeof document === "undefined") return null;
+
+  const w =
+    "naturalWidth" in source && source.naturalWidth
+      ? source.naturalWidth
+      : "width" in source && typeof source.width === "number"
+        ? source.width
+        : 0;
+  const h =
+    "naturalHeight" in source && source.naturalHeight
+      ? source.naturalHeight
+      : "height" in source && typeof source.height === "number"
+        ? source.height
+        : 0;
+  if (!w || !h) return null;
+
+  const pad = Math.ceil(outlinePx * 2.5);
+  const canvas = document.createElement("canvas");
+  canvas.width = w + pad * 2;
+  canvas.height = h + pad * 2;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.filter = `drop-shadow(0 0 ${outlinePx}px rgba(0,0,0,0.55))`;
+  ctx.drawImage(source, pad, pad);
+  ctx.filter = "none";
+  ctx.drawImage(source, pad, pad);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  configureYkGeongiLogoTexture(texture);
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  return { texture, aspect: canvas.width / canvas.height };
+}
+
+function configureSideBrandTexture(texture: THREE.Texture) {
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.anisotropy = 16;
+  texture.premultiplyAlpha = false;
+  texture.needsUpdate = true;
+}
+
+/**
+ * Factory ViO 17HD side mark (ViO + large 17 + HD).
+ * Used for the default ViO17-1 chassis side decal.
+ */
+export function createVio17HdSideBrandTexture(): {
+  texture: THREE.Texture;
+  aspect: number;
+} | null {
+  if (typeof document === "undefined") return null;
+
+  const scale = 5;
+  const baseWidth = 760;
+  const baseHeight = 240;
+  const canvas = document.createElement("canvas");
+  canvas.width = baseWidth * scale;
+  canvas.height = baseHeight * scale;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.clearRect(0, 0, baseWidth, baseHeight);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+
+  const fontStack =
+    'Arial Black, Impact, "Helvetica Neue", Arial, sans-serif';
+  const shear = -0.18;
+
+  const setFont = (size: number) => {
+    ctx.font = `900 ${size}px ${fontStack}`;
+  };
+
+  const measure = (text: string, size: number) => {
+    setFont(size);
+    return ctx.measureText(text).width;
+  };
+
+  const vioSize = 86;
+  const numSize = 162;
+  const hdSize = 54;
+  const vioW = measure("ViO", vioSize);
+  const numW = measure("17", numSize);
+  const gapVioNum = 8;
+  const contentW = vioW + gapVioNum + numW + hdSize * 0.55;
+  const originX = (baseWidth - contentW) / 2 + 12;
+  const numX = originX + vioW + gapVioNum;
+  const baseline = 178;
+
+  const makeFill = (top: number, bottom: number) => {
+    const gradient = ctx.createLinearGradient(0, top, 0, bottom);
+    gradient.addColorStop(0, "#d8dee3");
+    gradient.addColorStop(0.18, "#ffffff");
+    gradient.addColorStop(0.82, "#ffffff");
+    gradient.addColorStop(1, "#eef2f5");
+    return gradient;
+  };
+
+  const drawMark = (
+    text: string,
+    x: number,
+    y: number,
+    size: number,
+    strokeWidth: number,
+  ) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.transform(1, 0, shear, 1, 0, 0);
+    setFont(size);
+
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1.5;
+    ctx.shadowOffsetY = 2.5;
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeStyle = "#070b0f";
+    ctx.strokeText(text, 0, 0);
+
+    ctx.shadowColor = "transparent";
+    ctx.lineWidth = Math.max(1.5, strokeWidth * 0.22);
+    ctx.strokeStyle = "rgba(12, 18, 24, 0.65)";
+    ctx.strokeText(text, 0, 0);
+
+    ctx.fillStyle = makeFill(-size * 0.86, size * 0.1);
+    ctx.fillText(text, 0, 0);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-size * 0.15, -size * 0.92, size * 4, size * 0.34);
+    ctx.clip();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+
+    ctx.restore();
+  };
+
+  drawMark("ViO", originX, baseline - 22, vioSize, 12);
+  drawMark("17", numX, baseline, numSize, 18);
+  drawMark("HD", numX + numW * 0.7, baseline + 4, hdSize, 8.5);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  configureSideBrandTexture(texture);
+  return { texture, aspect: baseWidth / baseHeight };
+}
+
 /** Upper-body side model mark (e.g. ViO17-1, SV100-7). */
 export function createChassisModelSideBrandTexture(modelPlate: string): {
   texture: THREE.Texture;
   aspect: number;
 } | null {
   if (typeof document === "undefined" || !modelPlate) return null;
+
+  // Default chassis keeps the premium ViO 17HD factory mark.
+  if (modelPlate === "ViO17-1") {
+    return createVio17HdSideBrandTexture();
+  }
 
   const scale = 6;
   const baseWidth = 780;
@@ -279,11 +482,8 @@ export function createChassisModelSideBrandTexture(modelPlate: string): {
   ctx.fillText(modelPlate, baseWidth / 2, baseHeight / 2 + 4);
 
   const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
+  configureSideBrandTexture(texture);
   texture.generateMipmaps = false;
   texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.anisotropy = 16;
-  texture.needsUpdate = true;
   return { texture, aspect: baseWidth / baseHeight };
 }

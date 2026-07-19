@@ -1,5 +1,7 @@
 import type { ExcavatorSimState } from "./ExcavatorScene";
+import { getGrappleThumbBucketLocals } from "./grappleArmClearance";
 import { YANMAR_MACHINE_RIG } from "./machineVisualTheme";
+import { WE } from "./workEquipment/workEquipmentStructure";
 
 const {
   boomLength: BOOM_LEN,
@@ -103,21 +105,16 @@ export function getGrappleJawSampleWorlds(
   openAmount = 1,
 ): BucketTip[] {
   const open = Math.max(0, Math.min(1, openAmount));
-  // 집게가 벌어질수록 엄지·입구 쪽 샘플을 넓혀 바닥 집기 자세를 잡기 쉽게 한다.
-  const openDrop = open * 0.42;
-  const openOut = open * 0.28;
-  const locals: ReadonlyArray<readonly [number, number]> = [
+  // 고정 입구(이빨·클램프·마우스) + 실제 엄지 키네마틱 샘플만 사용.
+  // 예전의 openDrop/openOut 가상 확장은 돌에서 멀리 '집게가능'이 뜨게 했다.
+  const locals: Array<readonly [number, number]> = [
     [YANMAR_MACHINE_RIG.grappleTeethLocalX, YANMAR_MACHINE_RIG.grappleTeethLocalY],
     [YANMAR_MACHINE_RIG.grappleClampLocalX, YANMAR_MACHINE_RIG.grappleClampLocalY],
     [YANMAR_MACHINE_RIG.grappleMouthLocalX, YANMAR_MACHINE_RIG.grappleMouthLocalY],
     [-BUCKET_LEN, 0],
     [-BUCKET_LEN * 0.82, -0.22],
     [-0.72, -0.08],
-    [YANMAR_MACHINE_RIG.grappleTeethLocalX - openOut, YANMAR_MACHINE_RIG.grappleTeethLocalY - openDrop * 0.35],
-    [YANMAR_MACHINE_RIG.grappleClampLocalX, YANMAR_MACHINE_RIG.grappleClampLocalY - openDrop],
-    [YANMAR_MACHINE_RIG.grappleMouthLocalX + openOut * 0.4, YANMAR_MACHINE_RIG.grappleMouthLocalY + openDrop * 0.55],
-    [-1.12, -0.28 - openDrop * 0.5],
-    [-0.85, 0.12 + openDrop * 0.35],
+    ...getGrappleThumbBucketLocals(open),
   ];
   return locals.map(([lx, ly]) => bucketPointWorld(sim, boomSwing, lx, ly));
 }
@@ -188,21 +185,13 @@ function linkPointWorld(
   };
 }
 
-/** 붐·암·버킷 vs 덤프트럭 고체 충돌 샘플 */
+/** 붐·암·버킷 vs 덤프트럭 고체 충돌 샘플 (공장형 메시 동기) */
 export function getArmCollisionSamples(sim: ExcavatorSimState, boomSwing = 0): BucketTip[] {
   return [
     getBoomPivotWorld(sim, boomSwing),
-    linkPointWorld(sim, boomSwing, "boom", 0.18),
-    linkPointWorld(sim, boomSwing, "boom", 0.35),
-    linkPointWorld(sim, boomSwing, "boom", 0.55),
-    linkPointWorld(sim, boomSwing, "boom", 0.72),
-    linkPointWorld(sim, boomSwing, "boom", 0.92),
+    ...WE.boomCollisionT.map((t) => linkPointWorld(sim, boomSwing, "boom", t)),
     getArmPivotWorld(sim, boomSwing),
-    linkPointWorld(sim, boomSwing, "arm", 0.2),
-    linkPointWorld(sim, boomSwing, "arm", 0.35),
-    linkPointWorld(sim, boomSwing, "arm", 0.55),
-    linkPointWorld(sim, boomSwing, "arm", 0.72),
-    linkPointWorld(sim, boomSwing, "arm", 0.92),
+    ...WE.armCollisionT.map((t) => linkPointWorld(sim, boomSwing, "arm", t)),
     getBucketBodyContactWorld(sim, boomSwing),
     getBucketScraperContactWorld(sim, boomSwing),
     getBucketTipWorld(sim, boomSwing),
@@ -223,20 +212,11 @@ function lowestBucketPoint(
 }
 
 export function getBucketScraperContactWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {
-  return lowestBucketPoint(sim, boomSwing, [
-    [-1.18, -0.54],
-    [-0.96, -0.58],
-    [-0.82, -0.6],
-  ]);
+  return lowestBucketPoint(sim, boomSwing, WE.bucketScraperLocals);
 }
 
 export function getBucketBodyContactWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {
-  return lowestBucketPoint(sim, boomSwing, [
-    [-0.68, -0.56],
-    [-0.36, -0.48],
-    [-0.08, -0.24],
-    [0.08, -0.1],
-  ]);
+  return lowestBucketPoint(sim, boomSwing, WE.bucketBodyLocals);
 }
 
 export function getBucketGroundContactWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {

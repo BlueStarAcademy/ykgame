@@ -7,10 +7,11 @@ import {
   runReplayableRewardEvent,
 } from "@/lib/yanmar-rewards";
 
-const MAX_STARS = 40;
+/** Align with meta daily rewards (stars 50 + premium tickets 2). */
+const MAX_STARS = 50;
 const MAX_XP = 6000;
 const MAX_CORES = 16;
-const MAX_TICKETS = 1;
+const MAX_TICKETS = 2;
 
 export async function POST(request: Request) {
   const session = await auth();

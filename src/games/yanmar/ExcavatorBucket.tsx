@@ -3,250 +3,299 @@
 import { useLayoutEffect, useMemo, type RefObject } from "react";
 import * as THREE from "three";
 import { createBucketDirtTexture } from "./proceduralTextures";
+import { WE } from "./workEquipment/workEquipmentStructure";
+import { WorkLinkPin } from "./workEquipment/ykWorkGear";
 
-const STEEL = {
-  color: "#3f4b55",
-  metalness: 0.62,
-  roughness: 0.26,
-} as const;
-const STEEL_DARK = {
-  color: "#202a33",
-  metalness: 0.58,
-  roughness: 0.36,
-} as const;
-const EDGE = {
-  color: "#d8e0e8",
-  metalness: 0.78,
-  roughness: 0.18,
-} as const;
-const LINK = {
-  color: "#151d25",
-  metalness: 0.54,
-  roughness: 0.26,
-} as const;
+/** Charcoal bucket + teeth — KakaoTalk reference (no chrome tips). */
+/** Mid steel-gray shell — not near-black. */
+const SHELL = "#6a747e";
+const SHELL_DARK = "#545e68";
+const SHELL_LIT = "#87919b";
 
-function LinkPin({
-  x,
-  y,
-  z = 0,
-  radius = 0.14,
-  width = 0.46,
-}: {
-  x: number;
-  y: number;
-  z?: number;
-  radius?: number;
-  width?: number;
-}) {
+/**
+ * Compact four-bar: one tip pin + H-link + dogbones.
+ * Plain pins only — no chrome stack that looks like extra cylinders.
+ */
+function PowerLink() {
+  const h = WE.hLinkCylPin;
+  const b = WE.hLinkBucketPin;
+  const arm = { x: 0.04, y: 0.12 };
+  const hMid = { x: (h.x + b.x) / 2, y: (h.y + b.y) / 2 };
+  const hLen = Math.hypot(h.x - b.x, h.y - b.y);
+  const hAng = Math.atan2(h.y - b.y, h.x - b.x);
+  const iMid = { x: (arm.x + h.x) / 2, y: (arm.y + h.y) / 2 };
+  const iLen = Math.hypot(h.x - arm.x, h.y - arm.y);
+  const iAng = Math.atan2(h.y - arm.y, h.x - arm.x);
+
   return (
-    <group position={[x, y, z]}>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[radius, radius, width, 24]} />
-        <meshStandardMaterial {...LINK} />
-      </mesh>
-      {[1, -1].map((side) => (
+    <group>
+      <WorkLinkPin x={0} y={0} radius={0.14} width={0.48} />
+      {([-1, 1] as const).map((side) => (
         <mesh
           key={side}
-          position={[0, 0, side * (width / 2 + 0.014)]}
-          rotation={[Math.PI / 2, 0, 0]}
+          position={[hMid.x, hMid.y, side * 0.1]}
+          rotation={[0, 0, hAng]}
+          castShadow
         >
-          <cylinderGeometry args={[radius * 0.72, radius * 0.72, 0.035, 24]} />
-          <meshStandardMaterial color="#d7dee6" roughness={0.22} metalness={0.72} />
+          <boxGeometry args={[hLen + 0.06, 0.11, 0.038]} />
+          <meshStandardMaterial color={SHELL_DARK} roughness={0.32} metalness={0.5} />
         </mesh>
       ))}
+      <mesh position={[hMid.x, hMid.y, 0]} rotation={[0, 0, hAng]} castShadow>
+        <boxGeometry args={[hLen, 0.06, 0.12]} />
+        <meshStandardMaterial color={SHELL} roughness={0.34} metalness={0.48} />
+      </mesh>
+      <WorkLinkPin x={h.x} y={h.y} radius={0.07} width={0.28} plain />
+      <WorkLinkPin x={b.x} y={b.y} radius={0.075} width={0.32} plain />
+      {([-1, 1] as const).map((side) => (
+        <mesh
+          key={`i-${side}`}
+          position={[iMid.x, iMid.y, side * 0.14]}
+          rotation={[0, 0, iAng]}
+          castShadow
+        >
+          <boxGeometry args={[iLen, 0.048, 0.034]} />
+          <meshStandardMaterial color={SHELL} roughness={0.34} metalness={0.48} />
+        </mesh>
+      ))}
+      <WorkLinkPin x={arm.x} y={arm.y} radius={0.06} width={0.28} plain />
     </group>
   );
 }
 
-function HydraulicRod({
-  x,
-  y,
-  length,
-  angle,
-}: {
-  x: number;
-  y: number;
-  length: number;
-  angle: number;
-}) {
-  return (
-    <group position={[x, y, 0]} rotation={[0, 0, angle]}>
-      <mesh position={[-length * 0.18, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <capsuleGeometry args={[0.06, length * 0.42, 8, 16]} />
-        <meshStandardMaterial color="#12171d" roughness={0.3} metalness={0.5} />
-      </mesh>
-      <mesh position={[length * 0.2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <capsuleGeometry args={[0.028, length * 0.48, 6, 12]} />
-        <meshStandardMaterial color="#dfe7ee" roughness={0.18} metalness={0.84} />
-      </mesh>
-    </group>
-  );
+/**
+ * Floor lip tangent near the cutting edge (into the bowl = local +X).
+ * Matches floorKey [-0.88,-0.54] → [-1.06,-0.42].
+ */
+const CUTTING_LIP_ANGLE = Math.atan2(-0.12, 0.18);
+
+/** Flat wedge tooth profile — reference style (not cones / rolled shanks). */
+function createToothShape() {
+  const s = new THREE.Shape();
+  // Base at lip (+X into bowl a little), tip −X as a flat point.
+  s.moveTo(0.05, 0.045);
+  s.lineTo(0.05, -0.045);
+  s.lineTo(-0.08, -0.038);
+  s.lineTo(-0.2, -0.012);
+  s.lineTo(-0.2, 0.012);
+  s.lineTo(-0.08, 0.038);
+  s.closePath();
+  return s;
 }
 
-function SidePlate({
-  side,
+/**
+ * Reference scraper tooth: charcoal wedge on the cutting edge,
+ * same colour as the bucket shell.
+ */
+function Tooth({
+  z,
   shape,
 }: {
-  side: 1 | -1;
+  z: number;
   shape: THREE.Shape;
 }) {
+  const depth = 0.1;
   return (
-    <mesh position={[0, 0, side * 0.42]}>
-      <extrudeGeometry
-        args={[
-          shape,
-          {
-            depth: 0.045,
-            bevelEnabled: true,
-            bevelSize: 0.008,
-            bevelThickness: 0.008,
-            bevelSegments: 1,
-          },
-        ]}
-      />
-      <meshStandardMaterial {...STEEL} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
-
-function BottomPanel({
-  x,
-  y,
-  width,
-  angle,
-}: {
-  x: number;
-  y: number;
-  width: number;
-  angle: number;
-}) {
-  return (
-    <mesh position={[x, y, 0]} rotation={[0, 0, angle]}>
-      <boxGeometry args={[width, 0.055, 0.72]} />
-      <meshStandardMaterial {...STEEL_DARK} />
-    </mesh>
-  );
-}
-
-function ChiselTooth({ z }: { z: number }) {
-  return (
-    <group position={[0.98, -0.41, z]} rotation={[0, 0, -0.16]}>
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[0.18, 0.075, 0.11]} />
-        <meshStandardMaterial {...EDGE} />
+    <group position={[-1.08, -0.4, z]} rotation={[0, 0, CUTTING_LIP_ANGLE]}>
+      <mesh position={[0, 0, -depth / 2]} castShadow>
+        <extrudeGeometry
+          args={[
+            shape,
+            {
+              depth,
+              bevelEnabled: true,
+              bevelSize: 0.006,
+              bevelThickness: 0.006,
+              bevelSegments: 1,
+            },
+          ]}
+        />
+        <meshStandardMaterial color={SHELL} metalness={0.48} roughness={0.38} />
       </mesh>
-      <mesh position={[0.075, -0.025, 0]}>
-        <boxGeometry args={[0.08, 0.032, 0.105]} />
-        <meshStandardMaterial color="#eef3f7" roughness={0.16} metalness={0.82} />
+      {/* Slight face highlight — still charcoal, not chrome */}
+      <mesh position={[-0.06, 0.02, 0]} castShadow>
+        <boxGeometry args={[0.16, 0.012, depth * 0.7]} />
+        <meshStandardMaterial color={SHELL_LIT} metalness={0.5} roughness={0.34} />
       </mesh>
     </group>
   );
 }
 
-/** 3D 버킷: 속이 빈 바구니형 본체 + 납작한 긁개 이빨 + 실제 링크 구조 */
+function lerp2(
+  a: readonly [number, number],
+  b: readonly [number, number],
+  t: number,
+): [number, number] {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+}
+
+function samplePolyline(
+  pts: ReadonlyArray<readonly [number, number]>,
+  segments: number,
+): Array<[number, number]> {
+  if (pts.length < 2) return pts.map((p) => [p[0], p[1]]);
+  const out: Array<[number, number]> = [];
+  const spans = pts.length - 1;
+  for (let i = 0; i <= segments; i++) {
+    const u = (i / segments) * spans;
+    const seg = Math.min(spans - 1, Math.floor(u));
+    const t = u - seg;
+    out.push(lerp2(pts[seg], pts[seg + 1], t));
+  }
+  return out;
+}
+
+/**
+ * One-piece scoop shell: continuous floor + side walls + back wall.
+ * No separate plates — dirt cannot fall through gaps.
+ */
+function createBucketBowlGeometry(width = 0.84, wall = 0.045): THREE.BufferGeometry {
+  const hw = width / 2;
+  const outerHw = hw + wall;
+
+  // Bucket-local (teeth −X): floor centerline from neck back → cutting edge.
+  const floorKey: Array<readonly [number, number]> = [
+    [0.05, 0.1],
+    [0.02, -0.08],
+    [-0.12, -0.32],
+    [-0.35, -0.5],
+    [-0.62, -0.58],
+    [-0.88, -0.54],
+    [-1.06, -0.42],
+  ];
+  // Top rim of the mouth (same stations).
+  const rimKey: Array<readonly [number, number]> = [
+    [0.08, 0.22],
+    [0.02, 0.2],
+    [-0.18, 0.14],
+    [-0.42, 0.06],
+    [-0.68, -0.02],
+    [-0.92, -0.14],
+    [-1.14, -0.28],
+  ];
+
+  const segments = 28;
+  const floor = samplePolyline(floorKey, segments);
+  const rim = samplePolyline(rimKey, segments);
+  const n = floor.length;
+
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const indices: number[] = [];
+
+  const push = (x: number, y: number, z: number) => {
+    positions.push(x, y, z);
+    normals.push(0, 0, 0);
+  };
+
+  // Station layout (8 verts each):
+  // 0 inner L rim, 1 inner L floor, 2 inner R floor, 3 inner R rim
+  // 4 outer L rim, 5 outer L floor, 6 outer R floor, 7 outer R rim
+  for (let i = 0; i < n; i++) {
+    const [fx, fy] = floor[i];
+    const [rx, ry] = rim[i];
+    push(rx, ry, -hw);
+    push(fx, fy, -hw);
+    push(fx, fy, hw);
+    push(rx, ry, hw);
+    push(rx, ry, -outerHw);
+    push(fx - wall * 0.15, fy - wall, -outerHw);
+    push(fx - wall * 0.15, fy - wall, outerHw);
+    push(rx, ry, outerHw);
+  }
+
+  const quad = (a: number, b: number, c: number, d: number) => {
+    indices.push(a, b, c, a, c, d);
+  };
+
+  for (let i = 0; i < n - 1; i++) {
+    const a = i * 8;
+    const b = (i + 1) * 8;
+    // Inner cavity (facing inward — reverse winding so normals point into bowl)
+    quad(a + 0, b + 0, b + 1, a + 1); // left wall inner
+    quad(a + 1, b + 1, b + 2, a + 2); // floor inner
+    quad(a + 2, b + 2, b + 3, a + 3); // right wall inner
+    // Outer shell
+    quad(a + 4, a + 5, b + 5, b + 4); // left outer
+    quad(a + 5, a + 6, b + 6, b + 5); // floor outer
+    quad(a + 6, a + 7, b + 7, b + 6); // right outer
+    // Rim flanges (top lips)
+    quad(a + 0, a + 4, b + 4, b + 0); // left rim
+    quad(a + 3, b + 3, b + 7, a + 7); // right rim
+  }
+
+  // Sealed back wall at neck (station 0)
+  const s0 = 0;
+  quad(s0 + 0, s0 + 3, s0 + 2, s0 + 1); // inner back
+  quad(s0 + 4, s0 + 5, s0 + 6, s0 + 7); // outer back
+  quad(s0 + 0, s0 + 1, s0 + 5, s0 + 4);
+  quad(s0 + 3, s0 + 7, s0 + 6, s0 + 2);
+  quad(s0 + 0, s0 + 4, s0 + 7, s0 + 3);
+
+  // Cutting-edge lip (last station) — closed blade face
+  const sN = (n - 1) * 8;
+  quad(sN + 0, sN + 1, sN + 2, sN + 3);
+  quad(sN + 4, sN + 7, sN + 6, sN + 5);
+  quad(sN + 0, sN + 3, sN + 7, sN + 4);
+  quad(sN + 1, sN + 5, sN + 6, sN + 2);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** One-piece backhoe scoop — sealed bowl, 5 teeth, power link. */
 export function ExcavatorBucket({
   dirtRef,
 }: {
   dirtRef: RefObject<THREE.Mesh | null>;
 }) {
   const dirtTexture = useMemo(() => createBucketDirtTexture(), []);
-  const sideShape = useMemo(() => {
-    const shape = new THREE.Shape();
+  const bowl = useMemo(() => createBucketBowlGeometry(), []);
+  const toothShape = useMemo(() => createToothShape(), []);
 
-    // 측판 외곽: 힌지 쪽은 높고, 앞 커팅엣지로 갈수록 낮아지는 실제 버킷 실루엣.
-    shape.moveTo(-0.1, 0.2);
-    shape.lineTo(-0.08, -0.08);
-    shape.quadraticCurveTo(0.05, -0.34, 0.36, -0.49);
-    shape.quadraticCurveTo(0.64, -0.61, 0.96, -0.48);
-    shape.lineTo(1.05, -0.31);
-    shape.quadraticCurveTo(0.82, -0.12, 0.54, 0.02);
-    shape.quadraticCurveTo(0.22, 0.17, -0.1, 0.2);
-
-    return shape;
-  }, []);
-
-  useLayoutEffect(() => () => dirtTexture.dispose(), [dirtTexture]);
-
-  const teeth = [-0.3, -0.15, 0, 0.15, 0.3];
+  useLayoutEffect(
+    () => () => {
+      dirtTexture.dispose();
+      bowl.dispose();
+    },
+    [dirtTexture, bowl],
+  );
 
   return (
     <group>
-      {/* 버킷 링크/실린더 */}
-      <LinkPin x={0} y={0} radius={0.155} width={0.52} />
-      <HydraulicRod x={0.08} y={0.24} length={0.82} angle={-0.58} />
-      {[1, -1].map((side) => (
-        <mesh
-          key={`upper-link-${side}`}
-          position={[0.16, -0.02, side * 0.13]}
-          rotation={[0, side * 0.12, -0.76]}
-        >
-          <boxGeometry args={[0.34, 0.06, 0.07]} />
-          <meshStandardMaterial {...LINK} />
-        </mesh>
-      ))}
-      <LinkPin x={0.23} y={-0.12} radius={0.12} width={0.46} />
-      <mesh position={[0.2, -0.1, 0]}>
-        <boxGeometry args={[0.14, 0.13, 0.38]} />
-        <meshStandardMaterial {...LINK} />
+      <PowerLink />
+      <mesh geometry={bowl} castShadow receiveShadow>
+        <meshStandardMaterial
+          color={SHELL}
+          metalness={0.52}
+          roughness={0.34}
+          side={THREE.DoubleSide}
+        />
       </mesh>
-
-      {/* 버킷 본체: 피벗 기준 안쪽(-X)으로 감기는 백호 버킷 배치 */}
-      <group position={[-0.06, -0.07, 0]} scale={[-1, 1, 1]}>
-        <SidePlate side={1} shape={sideShape} />
-        <SidePlate side={-1} shape={sideShape} />
-
-        {/* 곡면 바닥: 흙이 담길 바닥만 막고 위쪽 공간은 비워 둠 */}
-        <BottomPanel x={0.18} y={-0.29} width={0.42} angle={-0.5} />
-        <BottomPanel x={0.48} y={-0.45} width={0.48} angle={-0.18} />
-        <BottomPanel x={0.82} y={-0.45} width={0.38} angle={0.1} />
-        <mesh position={[0.52, -0.42, 0]} rotation={[0, 0, -0.18]}>
-          <boxGeometry args={[0.7, 0.045, 0.64]} />
-          <meshStandardMaterial color="#303b45" roughness={0.42} metalness={0.46} />
-        </mesh>
-
-        {/* 뒤판과 상단 림 */}
-        <mesh position={[-0.07, 0.02, 0]} rotation={[0, 0, 0.05]}>
-          <boxGeometry args={[0.065, 0.42, 0.76]} />
-          <meshStandardMaterial {...STEEL_DARK} />
-        </mesh>
-        {[1, -1].map((side) => (
-          <mesh key={`top-rim-${side}`} position={[0.32, 0.06, side * 0.43]} rotation={[0, 0, -0.09]}>
-            <boxGeometry args={[0.78, 0.045, 0.05]} />
-            <meshStandardMaterial {...EDGE} />
-          </mesh>
-        ))}
-        {[1, -1].map((side) => (
-          <mesh key={`side-highlight-${side}`} position={[0.52, -0.32, side * 0.455]} rotation={[0, 0, -0.18]}>
-            <boxGeometry args={[0.72, 0.028, 0.035]} />
-            <meshStandardMaterial color="#8fa0ad" roughness={0.22} metalness={0.62} />
-          </mesh>
-        ))}
-
-        {/* 앞 커팅엣지 + 긁개형 이빨 */}
-        <mesh position={[0.95, -0.36, 0]} rotation={[0, 0, -0.08]}>
-          <boxGeometry args={[0.08, 0.11, 0.78]} />
-          <meshStandardMaterial {...EDGE} />
-        </mesh>
-        {teeth.map((z) => (
-          <ChiselTooth key={z} z={z} />
-        ))}
-
-        {/* 내부 그늘: 구멍이 아니라 비어 있는 바구니 안쪽 깊이만 표현 */}
-        <mesh position={[0.42, -0.24, 0]} rotation={[0, 0, -0.2]}>
-          <boxGeometry args={[0.5, 0.025, 0.56]} />
-          <meshStandardMaterial color="#121920" roughness={0.7} metalness={0.18} />
-        </mesh>
-
-        <mesh ref={dirtRef} position={[0.48, -0.35, 0]} visible={false}>
-          <boxGeometry args={[0.72, 0.28, 0.62]} />
-          <meshStandardMaterial
-            map={dirtTexture}
-            color="#8f6438"
-            roughness={0.98}
-            metalness={0}
-          />
-        </mesh>
-      </group>
+      {/* Cutting lip — same charcoal as shell (reference, not chrome) */}
+      <mesh
+        position={[-1.05, -0.42, 0]}
+        rotation={[0, 0, CUTTING_LIP_ANGLE]}
+        castShadow
+      >
+        <boxGeometry args={[0.14, 0.06, 0.86]} />
+        <meshStandardMaterial color={SHELL_DARK} metalness={0.5} roughness={0.4} />
+      </mesh>
+      {[-0.32, -0.16, 0, 0.16, 0.32].map((z) => (
+        <Tooth key={z} z={z} shape={toothShape} />
+      ))}
+      <mesh ref={dirtRef} position={[-0.5, -0.32, 0]} visible={false}>
+        <boxGeometry args={[0.68, 0.28, 0.58]} />
+        <meshStandardMaterial
+          map={dirtTexture}
+          color="#8f6438"
+          roughness={0.98}
+          metalness={0}
+        />
+      </mesh>
     </group>
   );
 }

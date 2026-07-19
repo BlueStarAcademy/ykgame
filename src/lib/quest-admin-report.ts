@@ -135,7 +135,7 @@ export function getQuestAdminReport() {
           },
           {
             label: "수령 API 상한",
-            value: "스타 40 / EXP 6,000 / 코어 16 / 뽑기권 각 1 (1회)",
+            value: "스타 50 / EXP 6,000 / 코어 16 / 뽑기권 각 2 (1회)",
             detail: "POST /api/rewards/yanmar-quest · eventId는 quest: 접두사 필수",
           },
           {

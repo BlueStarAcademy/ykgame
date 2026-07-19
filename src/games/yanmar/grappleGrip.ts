@@ -12,10 +12,15 @@ export const GRAPPLE_LIFT_JUDGE_CLEARANCE_DELTA = 0.45;
 /** The visible jaws can enclose a rock throughout this practical curl range. */
 export const GRAPPLE_BUCKET_ANGLE_MIN = 0.35;
 export const GRAPPLE_BUCKET_ANGLE_MAX = 2.4;
-/** 클램프 XZ 기준 돌 집기 반경 (시각·키네마틱 오차 흡수). */
-export const GRAPPLE_GRAB_XZ_RADIUS = 2.35;
+/** 클램프·집게 샘플 XZ 기준 돌 근접 반경 (땅에 내린 집게 근처). */
+export const GRAPPLE_GRAB_XZ_RADIUS = 1.55;
 /** 이 이상 열려 있을 때만 접기(닫기)로 돌을 집을 수 있다. 0=닫힘, 1=완전 열림. */
 export const GRAPPLE_GRAB_MIN_OPEN = 0.7;
+/**
+ * 집게를 땅에 완전히 내린 것으로 볼 지면 여유 상한.
+ * (공중 집기 방지 — 돌 바로 위일 필요는 없음)
+ */
+export const GRAPPLE_FULLY_LOWERED_MAX_CLEARANCE = 0.45;
 /**
  * 집기용 클램프 지면 여유 기본 상한 (작은 돌 기준).
  * 실제 판정은 {@link grapplePickupMaxClearance}로 돌 크기를 반영한다.
@@ -81,6 +86,16 @@ export function hillBoulderWrapRadius(rock: HillBoulder): number {
   return hillBoulderGripEnvelope(rock).horizontalRadius;
 }
 
+/**
+ * Jaw open rest while gripping a rock (0=shut, 1=wide).
+ * Larger rocks keep the thumb visibly less closed; pressure builds against this stop.
+ */
+export function grappleClampOpenForRock(rock: HillBoulder): number {
+  const size01 = Math.max(0, Math.min(1, rock.size));
+  // size 0 → ~12% open, size 1 → ~48% open
+  return 0.12 + size01 * 0.36;
+}
+
 export function grappleBucketAngleReady(bucket: number): boolean {
   return bucket >= GRAPPLE_BUCKET_ANGLE_MIN && bucket <= GRAPPLE_BUCKET_ANGLE_MAX;
 }
@@ -101,23 +116,53 @@ export function isGrappleClampNearGround(
     ? grapplePickupMaxClearance(rock)
     : GRAPPLE_GROUND_PICKUP_MAX_CLEARANCE;
   const clearance = clampY - groundY;
-  return clearance >= -0.02 && clearance <= maxClearance;
+  return clearance >= -0.08 && clearance <= maxClearance;
 }
 
-/** 붐·클램프가 바닥 근처에서 돌 위로 내려온 집기 자세인지. */
+/** 집게 끝(가장 낮은 샘플)이 지면에 완전히 내려와 있는지. */
+export function isGrappleFullyLoweredToGround(
+  lowestToolY: number,
+  groundY: number,
+): boolean {
+  const clearance = lowestToolY - groundY;
+  return (
+    clearance >= -0.1 && clearance <= GRAPPLE_FULLY_LOWERED_MAX_CLEARANCE
+  );
+}
+
+function nearestGrappleHorizontalDist(
+  rock: HillBoulder,
+  clamp: { x: number; z: number },
+  jawSamples?: ReadonlyArray<{ x: number; z: number }>,
+): number {
+  let best = Math.hypot(clamp.x - rock.x, clamp.z - rock.z);
+  if (!jawSamples) return best;
+  for (const point of jawSamples) {
+    const d = Math.hypot(point.x - rock.x, point.z - rock.z);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+/**
+ * 집게를 땅에 완전히 내린 상태에서 돌이 집게 근처에 있으면 집기 자세.
+ * 돌 바로 위일 필요는 없고, 클램프·이빨·엄지 샘플 중 하나라도 가까우면 된다.
+ */
 export function isGrappleGroundPickupPose(
   clamp: { x: number; y: number; z: number },
   rock: HillBoulder,
-  clampGroundY: number,
+  toolGroundY: number,
+  jawSamples: ReadonlyArray<{ x: number; y: number; z: number }> = [],
 ): boolean {
-  const scale = hillBoulderVisualScale(rock.size);
+  const points = jawSamples.length > 0 ? jawSamples : [clamp];
+  const lowestY = Math.min(clamp.y, ...points.map((p) => p.y));
+  if (!isGrappleFullyLoweredToGround(lowestY, toolGroundY)) {
+    return false;
+  }
+
   const envelope = hillBoulderGripEnvelope(rock);
-  const xz = Math.hypot(clamp.x - rock.x, clamp.z - rock.z);
-  return (
-    xz <= envelope.horizontalRadius + 0.55 &&
-    isGrappleClampNearGround(clamp.y, clampGroundY, rock) &&
-    clamp.y <= clampGroundY + scale * 1.05 + 0.35
-  );
+  const nearRadius = envelope.horizontalRadius + 0.4;
+  return nearestGrappleHorizontalDist(rock, clamp, points) <= nearRadius;
 }
 
 function clamp01(v: number) {

@@ -40,6 +40,7 @@ import {
 import { type ChassisModelId } from "./chassisCatalog";
 import { calculateFinalYanmarStats } from "./gearStats";
 import type { YanmarEquipmentStats } from "./equipment";
+import { yanmarAudio } from "./yanmarAudio";
 
 export interface GearPanelItem {
   id: string;
@@ -745,6 +746,7 @@ export function GearPanel({
       }
       return;
     }
+    yanmarAudio.playEnhanceResult(result.success);
     setEnhanceResult(result);
     setEnhancePhase("result");
   };

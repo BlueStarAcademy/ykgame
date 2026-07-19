@@ -12,7 +12,11 @@ import {
   GACHA_CONFIG,
   type GachaBanner,
 } from "./gearCatalog";
-import { gachaBannerArtSrc, gachaBannerChromeClass } from "./gearArt";
+import {
+  gachaBannerArtSrc,
+  gachaBannerChromeClass,
+  preloadAllGearIcons,
+} from "./gearArt";
 import type { GachaFreeStatus } from "./gachaFree";
 
 export type GachaPayWith = "stars" | "tickets" | "free";
@@ -160,6 +164,18 @@ function GachaBannerSection({
           </div>
           <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-white/70">
             <span>{isPremium ? "고급 등급 확률 업" : "기본 장비 뽑기"}</span>
+            <span className="inline-flex items-center gap-1 text-white/85">
+              ·
+              <img
+                src={ticketIcon}
+                alt=""
+                width={11}
+                height={11}
+                className="shrink-0"
+                draggable={false}
+              />
+              보유 {ticketCount.toLocaleString()}
+            </span>
             {useFree ? (
               <span className="text-emerald-300/90">
                 · 무료 {freeRemaining}회
@@ -313,6 +329,12 @@ export function ShopPanel({
     return () => window.clearInterval(id);
   }, [open]);
 
+  // 10연 연출 직전에 아이콘이 비는 것을 막기 위해 상점 오픈 시 세트 워밍업
+  useEffect(() => {
+    if (!open) return;
+    void preloadAllGearIcons();
+  }, [open]);
+
   useEffect(() => {
     const remaining = freeGacha?.standard.cooldownRemainingMs ?? 0;
     if (remaining > 0) {
@@ -341,7 +363,7 @@ export function ShopPanel({
             <span className="yanmar-shop-panel-badge" aria-hidden />
             <h2 className="text-sm font-black text-amber-100">상점</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {typeof stars === "number" ? (
               <span className="inline-flex items-center rounded-lg border border-amber-200/20 bg-black/35 px-2 py-1 text-amber-100">
                 <StarAmount
@@ -351,6 +373,38 @@ export function ShopPanel({
                 />
               </span>
             ) : null}
+            <span
+              className="inline-flex items-center gap-1 rounded-lg border border-sky-200/20 bg-black/35 px-2 py-1"
+              title="일반 뽑기권"
+            >
+              <img
+                src="/images/yanmar/2d/gacha-ticket-standard.svg"
+                alt=""
+                width={12}
+                height={12}
+                className="shrink-0"
+                draggable={false}
+              />
+              <span className="text-[11px] font-black tabular-nums text-sky-100">
+                {gachaTicketsStandard.toLocaleString()}
+              </span>
+            </span>
+            <span
+              className="inline-flex items-center gap-1 rounded-lg border border-violet-200/20 bg-black/35 px-2 py-1"
+              title="고급 뽑기권"
+            >
+              <img
+                src="/images/yanmar/2d/gacha-ticket-premium.svg"
+                alt=""
+                width={12}
+                height={12}
+                className="shrink-0"
+                draggable={false}
+              />
+              <span className="text-[11px] font-black tabular-nums text-violet-100">
+                {gachaTicketsPremium.toLocaleString()}
+              </span>
+            </span>
             <button
               type="button"
               onClick={onClose}

@@ -4,97 +4,39 @@ import { useMemo, useRef, type RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import {
-  YANMAR_MACHINE_COLORS as COLOR,
-  YANMAR_MACHINE_MATERIALS as MATERIAL,
-} from "./machineVisualTheme";
-import { GRAPPLE_THUMB_MAX_OPEN_RAD } from "./grappleArmClearance";
+  GRAPPLE_THUMB_HINGE,
+  GRAPPLE_THUMB_MAX_OPEN_RAD,
+  GRAPPLE_THUMB_OPEN_SIGN,
+} from "./grappleArmClearance";
+import { WorkLinkPin } from "./workEquipment/ykWorkGear";
+
+const SHELL = "#2a323a";
+const SHELL_DARK = "#1a2028";
 
 export interface ExcavatorGrappleProps {
-  /** Parent group userData.openAmount: 0=closed against bucket, 1=fully open. */
   openAmountRef: RefObject<THREE.Group | null>;
 }
 
-function CrossPin({
-  position,
-  radius,
-  width,
-}: {
-  position: [number, number, number];
-  radius: number;
-  width: number;
-}) {
-  return (
-    <group position={position}>
-      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[radius, radius, width, 24]} />
-        <meshStandardMaterial
-          color={COLOR.frame}
-          {...MATERIAL.frame}
-        />
-      </mesh>
-      {[-1, 1].map((side) => (
-        <mesh
-          key={side}
-          position={[0, 0, side * (width / 2 + 0.012)]}
-          rotation={[Math.PI / 2, 0, 0]}
-        >
-          <cylinderGeometry args={[radius * 0.66, radius * 0.66, 0.034, 18]} />
-          <meshStandardMaterial
-            color={COLOR.steelBright}
-            {...MATERIAL.steel}
-          />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-function ThumbTine({
-  side,
-  shape,
-}: {
-  side: -1 | 1;
-  shape: THREE.Shape;
-}) {
-  return (
-    <mesh position={[0, 0, side * 0.29]} castShadow>
-      <extrudeGeometry
-        args={[
-          shape,
-          {
-            depth: 0.09,
-            bevelEnabled: true,
-            bevelSize: 0.012,
-            bevelThickness: 0.012,
-            bevelSegments: 2,
-          },
-        ]}
-      />
-      <meshStandardMaterial
-        color={COLOR.steel}
-        {...MATERIAL.steel}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
-  );
-}
-
-/** 버켓 위에 장착되어 버켓 이빨과 맞물리는 유압식 엄지 집게. */
-export function ExcavatorGrapple({
-  openAmountRef,
-}: ExcavatorGrappleProps) {
+/**
+ * Hydraulic thumb: arms + tip plate.
+ * No scrapers on the tip — only the clamp face, oriented to bite
+ * toward the bucket teeth (plate face flipped vs the old outward pad).
+ */
+export function ExcavatorGrapple({ openAmountRef }: ExcavatorGrappleProps) {
   const thumbRef = useRef<THREE.Group>(null);
   const currentOpenRef = useRef(1);
-  const tineShape = useMemo(() => {
+  const hinge = GRAPPLE_THUMB_HINGE;
+
+  const armShape = useMemo(() => {
     const shape = new THREE.Shape();
-    shape.moveTo(0.08, 0.11);
-    shape.lineTo(-0.2, 0.17);
-    shape.quadraticCurveTo(-0.62, 0.12, -0.93, -0.12);
-    shape.quadraticCurveTo(-1.1, -0.25, -1.18, -0.42);
-    shape.lineTo(-1.08, -0.48);
-    shape.quadraticCurveTo(-0.97, -0.31, -0.82, -0.2);
-    shape.quadraticCurveTo(-0.55, -0.01, -0.16, 0.02);
-    shape.lineTo(0.08, 0.01);
+    shape.moveTo(0.05, 0.05);
+    shape.lineTo(-0.1, 0.06);
+    shape.quadraticCurveTo(-0.42, -0.02, -0.7, -0.26);
+    shape.quadraticCurveTo(-0.98, -0.42, -1.26, -0.5);
+    shape.lineTo(-1.18, -0.58);
+    shape.quadraticCurveTo(-0.92, -0.42, -0.55, -0.26);
+    shape.quadraticCurveTo(-0.3, -0.1, -0.04, 0.0);
+    shape.lineTo(0.05, 0.0);
     shape.closePath();
     return shape;
   }, []);
@@ -104,72 +46,69 @@ export function ExcavatorGrapple({
       0,
       Math.min(1, Number(openAmountRef.current?.userData.openAmount ?? 1)),
     );
-    // 유압 엄지 개폐 속도: 기존 대비 1/8 (직전에 비해 절반)
-    // 암 충돌로 open이 줄어들 때는 관통이 보이지 않게 즉시 맞춤
-    if (target < currentOpenRef.current) {
-      currentOpenRef.current = target;
-    } else {
-      const follow = 1 - Math.exp(-delta * 0.625);
-      currentOpenRef.current += (target - currentOpenRef.current) * follow;
-    }
+    currentOpenRef.current +=
+      (target - currentOpenRef.current) * (1 - Math.exp(-delta * 10));
     if (thumbRef.current) {
-      // 최대 각도는 크게 두고, 암 충돌 한도는 sim의 openAmount에 반영됨
       thumbRef.current.rotation.z =
-        -currentOpenRef.current * GRAPPLE_THUMB_MAX_OPEN_RAD;
+        GRAPPLE_THUMB_OPEN_SIGN *
+        currentOpenRef.current *
+        GRAPPLE_THUMB_MAX_OPEN_RAD;
     }
   });
 
   return (
     <group>
-      {/* 버켓 링크 위 고정 브래킷. 버켓 자체는 별도 컴포넌트로 항상 함께 보인다. */}
-      <CrossPin position={[-0.03, 0.18, 0]} radius={0.14} width={0.68} />
-      {[-1, 1].map((side) => (
+      {([-1, 1] as const).map((side) => (
         <mesh
           key={side}
-          position={[-0.08, 0.23, side * 0.3]}
-          rotation={[0, 0, -0.16]}
+          position={[hinge.x - 0.02, hinge.y - 0.02, side * 0.3]}
+          rotation={[0, 0, -0.1]}
           castShadow
         >
-          <boxGeometry args={[0.52, 0.16, 0.08]} />
-          <meshStandardMaterial
-            color={COLOR.paintRedDark}
-            {...MATERIAL.paintedDark}
-          />
+          <boxGeometry args={[0.2, 0.12, 0.05]} />
+          <meshStandardMaterial color={SHELL_DARK} metalness={0.48} roughness={0.4} />
         </mesh>
       ))}
 
-      {/* 엄지를 여닫는 중앙 유압 실린더. */}
-      <mesh position={[-0.12, 0.48, 0]} rotation={[0, 0, -0.22]}>
-        <capsuleGeometry args={[0.075, 0.46, 8, 16]} />
-        <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
-      </mesh>
-      <mesh position={[-0.29, 0.7, 0]} rotation={[0, 0, -0.22]}>
-        <capsuleGeometry args={[0.035, 0.3, 7, 14]} />
-        <meshStandardMaterial
-          color={COLOR.steelBright}
-          {...MATERIAL.steel}
-        />
-      </mesh>
+      <group ref={thumbRef} position={[hinge.x, hinge.y, 0]}>
+        <WorkLinkPin x={0} y={0} radius={0.065} width={0.52} plain />
 
-      <group ref={thumbRef} position={[-0.08, 0.2, 0]}>
-        <CrossPin position={[0, 0, 0]} radius={0.12} width={0.72} />
-        <ThumbTine side={-1} shape={tineShape} />
-        <ThumbTine side={1} shape={tineShape} />
-        <mesh position={[-0.52, 0.01, 0]} castShadow>
-          <boxGeometry args={[0.65, 0.09, 0.64]} />
-          <meshStandardMaterial
-            color={COLOR.frameLight}
-            {...MATERIAL.frame}
-          />
-        </mesh>
-        <mesh position={[-1.11, -0.43, 0]} castShadow>
-          <boxGeometry args={[0.2, 0.11, 0.7]} />
-          <meshStandardMaterial
-            color={COLOR.chrome}
-            roughness={0.19}
-            metalness={0.84}
-          />
-        </mesh>
+        {([-1, 1] as const).map((side) => (
+          <mesh key={side} position={[0, 0, side * 0.3 - 0.04]} castShadow>
+            <extrudeGeometry
+              args={[
+                armShape,
+                {
+                  depth: 0.08,
+                  bevelEnabled: true,
+                  bevelSize: 0.008,
+                  bevelThickness: 0.008,
+                  bevelSegments: 1,
+                },
+              ]}
+            />
+            <meshStandardMaterial
+              color={SHELL}
+              metalness={0.48}
+              roughness={0.38}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        ))}
+
+        {/*
+          Tip plate — reaches scraper tips when closed; bite pad faces the jaw.
+        */}
+        <group position={[-1.24, -0.5, 0]} rotation={[0, 0, -0.36]}>
+          <mesh position={[0.08, 0, 0]} castShadow>
+            <boxGeometry args={[0.16, 0.07, 0.68]} />
+            <meshStandardMaterial color={SHELL_DARK} metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0.06, 0.055, 0]} castShadow>
+            <boxGeometry args={[0.13, 0.05, 0.62]} />
+            <meshStandardMaterial color={SHELL} metalness={0.48} roughness={0.38} />
+          </mesh>
+        </group>
       </group>
     </group>
   );

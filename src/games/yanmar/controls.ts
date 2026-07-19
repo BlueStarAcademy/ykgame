@@ -1,5 +1,6 @@
 /** 얀마 SV08-1 조작 매핑 — YK건기 조작 도면 기준 */
 
+import { FACTORY_JOINT_LIMITS } from "./workEquipment/workEquipmentStructure";
 import type { AutoPoseSlotIndex, AutoPoseState } from "./types";
 
 export const YANMAR_ASSETS = {
@@ -163,11 +164,8 @@ const DAMPING = {
   bucket: 3.2,
 } as const;
 
-export const JOINT_LIMITS = {
-  boom: { min: 0.06, max: 1.45 },
-  arm: { min: -2.05, max: 0.55 },
-  bucket: { min: 0.35, max: 3.6 },
-} as const;
+/** Factory joint limits: cylinder stroke ∩ mechanical stops. */
+export const JOINT_LIMITS = FACTORY_JOINT_LIMITS;
 
 export interface HydraulicVelocity {
   swing: number;
@@ -201,13 +199,17 @@ export function createHydraulicVelocity(): HydraulicVelocity {
  */
 const TRACK_WIDTH_PHYSICS = 4;
 
-/** 직진 주행 시 하부가 상체 방향으로 따라오는 정렬 속도. */
-const DRIVE_CHASSIS_ALIGN_MAX_SPEED = 0.72;
-const DRIVE_CHASSIS_ALIGN_RESPONSE = 1.45;
+/**
+ * 직진 주행 시 하부가 상체 방향으로 따라오는 정렬 속도.
+ * 상부 선회(≈0.35 rad/s)보다 분명히 느리게 두어, 주행 중 선회 시
+ * 상부만 먼저 돌고 궤도가 늦게 따라오는 느낌이 나도록 한다.
+ */
+const DRIVE_CHASSIS_ALIGN_MAX_SPEED = 0.34;
+const DRIVE_CHASSIS_ALIGN_RESPONSE = 0.75;
 const DRIVE_CHASSIS_ALIGN_INPUT_THRESHOLD = 0.1;
 const DRIVE_CHASSIS_ALIGN_EPSILON = 0.006;
-/** 주행 중 상체 선회 입력이 있을 때 하부 추종을 조금 늦춰 상체가 먼저 도는 느낌을 남긴다. */
-const DRIVE_CHASSIS_ALIGN_WHILE_SWINGING = 0.55;
+/** 상체 선회 입력 중 하부 정렬 상한 (rad/s). 상부보다 훨씬 느리게. */
+const DRIVE_CHASSIS_ALIGN_MAX_SPEED_WHILE_SWINGING = 0.09;
 
 function approach(current: number, target: number, accel: number, damp: number, dt: number) {
   if (Math.abs(target) > 0.02) {
@@ -351,14 +353,14 @@ export function applyControls(
     if (Math.abs(alignmentError) <= DRIVE_CHASSIS_ALIGN_EPSILON) {
       state.swing = 0;
     } else {
-      const followScale = activeSwingInput ? DRIVE_CHASSIS_ALIGN_WHILE_SWINGING : 1;
+      const maxAlignSpeed = activeSwingInput
+        ? DRIVE_CHASSIS_ALIGN_MAX_SPEED_WHILE_SWINGING
+        : DRIVE_CHASSIS_ALIGN_MAX_SPEED;
       const alignmentSpeed =
         Math.min(
-          DRIVE_CHASSIS_ALIGN_MAX_SPEED,
+          maxAlignSpeed,
           Math.abs(alignmentError) * DRIVE_CHASSIS_ALIGN_RESPONSE,
-        ) *
-        Math.min(1, Math.abs(driveCommand)) *
-        followScale;
+        ) * Math.min(1, Math.abs(driveCommand));
       chassisAlignmentDelta =
         Math.sign(alignmentError) *
         Math.min(Math.abs(alignmentError), alignmentSpeed * dt);

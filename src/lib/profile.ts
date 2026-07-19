@@ -4,13 +4,14 @@ import {
   DEFAULT_CHASSIS_ID,
 } from "@/games/yanmar/chassisCatalog";
 import { chassisModelThumbSrc } from "@/games/yanmar/gearArt";
+import { containsProfanity } from "@/lib/profanity";
 
 /** 닉네임 변경(최초 설정 제외) 비용 */
 export const NICKNAME_CHANGE_COST_STARS = 300;
 
 /** 한글 음절 등 유니코드 코드포인트 기준 길이 */
 export const NICKNAME_MIN_LENGTH = 2;
-export const NICKNAME_MAX_LENGTH = 6;
+export const NICKNAME_MAX_LENGTH = 7;
 
 export function nicknameCharLength(value: string): number {
   return Array.from(value).length;
@@ -20,7 +21,8 @@ export type NicknameValidationError =
   | "EMPTY"
   | "TOO_SHORT"
   | "TOO_LONG"
-  | "INVALID_TYPE";
+  | "INVALID_TYPE"
+  | "PROFANITY";
 
 export function validateNickname(
   value: unknown,
@@ -55,6 +57,13 @@ export function validateNickname(
       ok: false,
       code: "TOO_LONG",
       message: `닉네임은 ${NICKNAME_MAX_LENGTH}글자 이하여야 합니다. (현재 ${length}글자)`,
+    };
+  }
+  if (containsProfanity(nickname)) {
+    return {
+      ok: false,
+      code: "PROFANITY",
+      message: "부적절한 단어가 있습니다.",
     };
   }
   return { ok: true, nickname };

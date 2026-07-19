@@ -35,9 +35,27 @@ const HORN_SRC: Record<HornId, string> = {
 };
 
 const BREAKER_SRC = `${SOUND_BASE}/breaker.wav`;
+const ENHANCE_SUCCESS_SRC = `${SOUND_BASE}/enhance-success.wav`;
+const ENHANCE_FAIL_SRC = `${SOUND_BASE}/enhance-fail.wav`;
+const UI_CLICK_SRC = `${SOUND_BASE}/ui-click.wav`;
+const SERVICE_ENTER_SRC = `${SOUND_BASE}/service-enter.ogg`;
+const MONUMENT_ENTER_SRC = `${SOUND_BASE}/monument-enter.ogg`;
+const STAR_ACQUIRE_SRC = `${SOUND_BASE}/star-acquire.ogg`;
+const BUFF_ACQUIRE_SRC = `${SOUND_BASE}/buff-acquire.ogg`;
+const ITEM_ACQUIRE_SRC = `${SOUND_BASE}/item-acquire.ogg`;
+const MASTER_ITEM_ACQUIRE_SRC = `${SOUND_BASE}/master-item-acquire.ogg`;
 const INGAME_BGM_SRC = "/sounds/site-legend/ingame-bgm.ogg";
 const HORN_BASE_VOLUME = 0.88;
 const BREAKER_BASE_GAIN = 0.92;
+const ENHANCE_SFX_BASE_VOLUME = 0.9;
+const UI_CLICK_BASE_VOLUME = 0.72;
+const SERVICE_ENTER_BASE_VOLUME = 0.85;
+const MONUMENT_ENTER_BASE_VOLUME = 0.85;
+const STAR_ACQUIRE_BASE_VOLUME = 0.88;
+const BUFF_ACQUIRE_BASE_VOLUME = 0.88;
+const ITEM_ACQUIRE_BASE_VOLUME = 0.88;
+const MASTER_ITEM_ACQUIRE_BASE_VOLUME = 0.92;
+const UI_CLICK_POOL_SIZE = 4;
 /** Ignore brief contact flicker so the loop does not restart mid-strike. */
 const BREAKER_STOP_GRACE_MS = 120;
 
@@ -53,6 +71,15 @@ function bag(): GlobalBag {
 
 class YanmarAudioController {
   private hornCache = new Map<HornId, HTMLAudioElement>();
+  private enhanceSfxCache = new Map<"success" | "fail", HTMLAudioElement>();
+  private uiClickPool: HTMLAudioElement[] = [];
+  private uiClickPoolIndex = 0;
+  private serviceEnterAudio: HTMLAudioElement | null = null;
+  private monumentEnterAudio: HTMLAudioElement | null = null;
+  private starAcquireAudio: HTMLAudioElement | null = null;
+  private buffAcquireAudio: HTMLAudioElement | null = null;
+  private itemAcquireAudio: HTMLAudioElement | null = null;
+  private masterItemAcquireAudio: HTMLAudioElement | null = null;
   private hornId: HornId = 1;
   private unlocked = false;
   private sfxEnabled = true;
@@ -339,6 +366,24 @@ class YanmarAudioController {
     clearBrowserMediaSession();
   }
 
+  private playHtmlAudio(audio: HTMLAudioElement, volume: number) {
+    audio.volume = volume;
+    try {
+      audio.currentTime = 0;
+      void audio
+        .play()
+        .then(() => {
+          this.unlocked = true;
+          void this.ensureAudioContext();
+        })
+        .catch(() => {
+          // Unsupported codec / autoplay block — ignore
+        });
+    } catch {
+      // ignore
+    }
+  }
+
   playHorn(hornId: HornId = this.hornId) {
     if (typeof window === "undefined") return;
     if (!this.sfxEnabled) return;
@@ -348,16 +393,133 @@ class YanmarAudioController {
       audio.preload = "auto";
       this.hornCache.set(hornId, audio);
     }
-    audio.volume = HORN_BASE_VOLUME * volumeToGain(this.sfxVolume);
-    try {
-      audio.currentTime = 0;
-      void audio.play().then(() => {
-        this.unlocked = true;
-        void this.ensureAudioContext();
-      });
-    } catch {
-      // ignore
+    this.playHtmlAudio(
+      audio,
+      HORN_BASE_VOLUME * volumeToGain(this.sfxVolume),
+    );
+  }
+
+  playEnhanceResult(success: boolean) {
+    if (typeof window === "undefined") return;
+    if (!this.sfxEnabled) return;
+    const key = success ? "success" : "fail";
+    let audio = this.enhanceSfxCache.get(key);
+    if (!audio) {
+      audio = new Audio(success ? ENHANCE_SUCCESS_SRC : ENHANCE_FAIL_SRC);
+      audio.preload = "auto";
+      this.enhanceSfxCache.set(key, audio);
     }
+    this.playHtmlAudio(
+      audio,
+      ENHANCE_SFX_BASE_VOLUME * volumeToGain(this.sfxVolume),
+    );
+  }
+
+  playUiClick() {
+    if (typeof window === "undefined") return;
+    if (!this.sfxEnabled) return;
+    this.ensureStoreSubscription();
+    let audio = this.uiClickPool[this.uiClickPoolIndex];
+    if (!audio) {
+      audio = new Audio(UI_CLICK_SRC);
+      audio.preload = "auto";
+      this.uiClickPool[this.uiClickPoolIndex] = audio;
+    }
+    this.uiClickPoolIndex = (this.uiClickPoolIndex + 1) % UI_CLICK_POOL_SIZE;
+    this.playHtmlAudio(
+      audio,
+      UI_CLICK_BASE_VOLUME * volumeToGain(this.sfxVolume),
+    );
+  }
+
+  /** One-shot when the excavator enters the repair tent zone. */
+  playServiceEnter() {
+    if (typeof window === "undefined") return;
+    if (!this.sfxEnabled) return;
+    this.ensureStoreSubscription();
+    if (!this.serviceEnterAudio) {
+      this.serviceEnterAudio = new Audio(SERVICE_ENTER_SRC);
+      this.serviceEnterAudio.preload = "auto";
+    }
+    this.playHtmlAudio(
+      this.serviceEnterAudio,
+      SERVICE_ENTER_BASE_VOLUME * volumeToGain(this.sfxVolume),
+    );
+  }
+
+  /** One-shot when the excavator enters the monument / sculpture zone. */
+  playMonumentEnter() {
+    if (typeof window === "undefined") return;
+    if (!this.sfxEnabled) return;
+    this.ensureStoreSubscription();
+    if (!this.monumentEnterAudio) {
+      this.monumentEnterAudio = new Audio(MONUMENT_ENTER_SRC);
+      this.monumentEnterAudio.preload = "auto";
+    }
+    this.playHtmlAudio(
+      this.monumentEnterAudio,
+      MONUMENT_ENTER_BASE_VOLUME * volumeToGain(this.sfxVolume),
+    );
+  }
+
+  /** One-shot when stars are gained (street pickup or ad reward). */
+  playStarAcquire() {
+    if (typeof window === "undefined") return;
+    if (!this.sfxEnabled) return;
+    this.ensureStoreSubscription();
+    if (!this.starAcquireAudio) {
+      this.starAcquireAudio = new Audio(STAR_ACQUIRE_SRC);
+      this.starAcquireAudio.preload = "auto";
+    }
+    this.playHtmlAudio(
+      this.starAcquireAudio,
+      STAR_ACQUIRE_BASE_VOLUME * volumeToGain(this.sfxVolume),
+    );
+  }
+
+  /** One-shot when a timed buff is gained (street speed or shop). */
+  playBuffAcquire() {
+    if (typeof window === "undefined") return;
+    if (!this.sfxEnabled) return;
+    this.ensureStoreSubscription();
+    if (!this.buffAcquireAudio) {
+      this.buffAcquireAudio = new Audio(BUFF_ACQUIRE_SRC);
+      this.buffAcquireAudio.preload = "auto";
+    }
+    this.playHtmlAudio(
+      this.buffAcquireAudio,
+      BUFF_ACQUIRE_BASE_VOLUME * volumeToGain(this.sfxVolume),
+    );
+  }
+
+  /** One-shot when gear/equipment is acquired (drop or gacha). */
+  playItemAcquire() {
+    if (typeof window === "undefined") return;
+    if (!this.sfxEnabled) return;
+    this.ensureStoreSubscription();
+    if (!this.itemAcquireAudio) {
+      this.itemAcquireAudio = new Audio(ITEM_ACQUIRE_SRC);
+      this.itemAcquireAudio.preload = "auto";
+    }
+    this.playHtmlAudio(
+      this.itemAcquireAudio,
+      ITEM_ACQUIRE_BASE_VOLUME * volumeToGain(this.sfxVolume),
+    );
+  }
+
+  /** One-shot when MASTER-grade gear is acquired. */
+  playMasterItemAcquire() {
+    if (typeof window === "undefined") return;
+    if (!this.sfxEnabled) return;
+    this.ensureStoreSubscription();
+    if (!this.masterItemAcquireAudio) {
+      this.masterItemAcquireAudio = new Audio(MASTER_ITEM_ACQUIRE_SRC);
+      this.masterItemAcquireAudio.preload = "auto";
+    }
+    this.playHtmlAudio(
+      this.masterItemAcquireAudio,
+      MASTER_ITEM_ACQUIRE_BASE_VOLUME * volumeToGain(this.sfxVolume),
+    );
   }
 
   /**
@@ -523,6 +685,47 @@ class YanmarAudioController {
       audio.src = "";
     }
     this.hornCache.clear();
+    for (const audio of this.enhanceSfxCache.values()) {
+      audio.pause();
+      audio.src = "";
+    }
+    this.enhanceSfxCache.clear();
+    for (const audio of this.uiClickPool) {
+      audio.pause();
+      audio.src = "";
+    }
+    this.uiClickPool = [];
+    this.uiClickPoolIndex = 0;
+    if (this.serviceEnterAudio) {
+      this.serviceEnterAudio.pause();
+      this.serviceEnterAudio.src = "";
+      this.serviceEnterAudio = null;
+    }
+    if (this.monumentEnterAudio) {
+      this.monumentEnterAudio.pause();
+      this.monumentEnterAudio.src = "";
+      this.monumentEnterAudio = null;
+    }
+    if (this.starAcquireAudio) {
+      this.starAcquireAudio.pause();
+      this.starAcquireAudio.src = "";
+      this.starAcquireAudio = null;
+    }
+    if (this.buffAcquireAudio) {
+      this.buffAcquireAudio.pause();
+      this.buffAcquireAudio.src = "";
+      this.buffAcquireAudio = null;
+    }
+    if (this.itemAcquireAudio) {
+      this.itemAcquireAudio.pause();
+      this.itemAcquireAudio.src = "";
+      this.itemAcquireAudio = null;
+    }
+    if (this.masterItemAcquireAudio) {
+      this.masterItemAcquireAudio.pause();
+      this.masterItemAcquireAudio.src = "";
+      this.masterItemAcquireAudio = null;
+    }
     clearBrowserMediaSession();
   }
 }

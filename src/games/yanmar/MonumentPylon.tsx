@@ -1,24 +1,20 @@
 "use client";
 
-import { Suspense, useEffect, useLayoutEffect, useMemo } from "react";
+import { Suspense, useLayoutEffect } from "react";
 import { Billboard, Text } from "@react-three/drei";
 import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
-import { YK_GEONGI_LOGO } from "@/lib/brand-assets";
+import { YANMAR_MARK_LOGO, YK_GEONGI_LOGO } from "@/lib/brand-assets";
 import { MONUMENT_SIGN } from "./monument/catalog";
 import type { MonumentPhase } from "./monument/types";
 
 const PANEL = "#f2f0ea";
 const PANEL_EDGE = "#d4d0c6";
 const POLE = "#8a9098";
-const YANMAR_RED = "#e30613";
 const SCAFFOLD = "#c4a035";
 
 /** 월드 스케일 — 시인성·접근 안내를 위해 기존 대비 확대 */
 const MONUMENT_SCALE = 1.45;
-
-/** 세로 얀마 마크 텍스처 비율 (보드 안 맞춤) */
-const YANMAR_MARK_ASPECT = 0.72;
 
 function configureDecalTexture(texture: THREE.Texture) {
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -28,97 +24,6 @@ function configureDecalTexture(texture: THREE.Texture) {
   texture.anisotropy = 16;
   texture.premultiplyAlpha = false;
   texture.needsUpdate = true;
-}
-
-/**
- * 굴착기 차체와 동일한 쉐브론 작법으로 세로 얀마 마크를 그린다.
- * (사진 PNG를 그대로 붙이지 않음 — 배경·왜곡 없이 브랜드만)
- */
-function createYanmarVerticalMarkTexture(): THREE.CanvasTexture | null {
-  if (typeof document === "undefined") return null;
-
-  const w = 720;
-  const h = 1000;
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-
-  ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = YANMAR_RED;
-
-  const drawSolidChevron = (x: number, y: number, cw: number, ch: number) => {
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + cw * 0.5, y + ch);
-    ctx.lineTo(x + cw, y);
-    ctx.lineTo(x + cw * 0.78, y);
-    ctx.lineTo(x + cw * 0.5, y + ch * 0.55);
-    ctx.lineTo(x + cw * 0.22, y);
-    ctx.closePath();
-    ctx.fill();
-  };
-
-  /** 아래 쉐브론: 좌·우 대칭 막대, 중심 틈 — 양옆 두께 동일 */
-  const drawSplitChevron = (x: number, y: number, cw: number, ch: number) => {
-    const cx = x + cw * 0.5;
-    const gap = cw * 0.06;
-    const topInset = cw * 0.22;
-    const innerTipY = y + ch * 0.55;
-    const outerTipY = y + ch;
-
-    const drawArm = (side: -1 | 1) => {
-      const topOuterX = side < 0 ? x : x + cw;
-      const topInnerX = side < 0 ? x + topInset : x + cw - topInset;
-      const cutX = cx + side * (gap * 0.5);
-
-      // 외곽·내곽 선을 따라 cutX까지 보간 → 수직 절단면에서 두께 보존
-      const tOuter = (cutX - topOuterX) / (cx - topOuterX);
-      const tInner = (cutX - topInnerX) / (cx - topInnerX);
-      const cutOuterY = y + tOuter * (outerTipY - y);
-      const cutInnerY = y + tInner * (innerTipY - y);
-
-      ctx.beginPath();
-      ctx.moveTo(topOuterX, y);
-      ctx.lineTo(topInnerX, y);
-      ctx.lineTo(cutX, cutInnerY);
-      ctx.lineTo(cutX, cutOuterY);
-      ctx.closePath();
-      ctx.fill();
-    };
-
-    drawArm(-1);
-    drawArm(1);
-  };
-
-  const markW = 640;
-  const markX = (w - markW) / 2;
-  const topChevronH = 255;
-  const botChevronH = 215;
-  const botChevronOffset = 185; // 위 쉐브론 top 기준, 아래 쉐브론 top
-  const fontSize = 148;
-  const textGap = 72; // 아래 쉐브론 끝 → 텍스트 상단
-  const chevronBlockH = botChevronOffset + botChevronH;
-  const blockH = chevronBlockH + textGap + fontSize;
-  const originY = (h - blockH) / 2;
-
-  // 위: 이어진 V / 아래: 꼭짓점만 갈라진 V — 블록 전체를 세로 중앙
-  drawSolidChevron(markX, originY, markW, topChevronH);
-  drawSplitChevron(markX, originY + botChevronOffset, markW, botChevronH);
-
-  ctx.font = `900 ${fontSize}px Arial, "Helvetica Neue", "Noto Sans KR", sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(
-    "YANMAR",
-    w / 2,
-    originY + chevronBlockH + textGap + fontSize / 2,
-  );
-
-  const texture = new THREE.CanvasTexture(canvas);
-  configureDecalTexture(texture);
-  return texture;
 }
 
 function MonumentLabel({
@@ -188,6 +93,22 @@ function SignDecal({
   );
 }
 
+/** 공식 YANMAR 마크 (제공 파일, 검정 배경 제거) */
+function YanmarMarkDecal() {
+  const mark = useLoader(THREE.TextureLoader, YANMAR_MARK_LOGO.src);
+
+  useLayoutEffect(() => {
+    configureDecalTexture(mark);
+  }, [mark]);
+
+  const markW = 2.9;
+  const markH = markW / YANMAR_MARK_LOGO.aspect;
+
+  return (
+    <SignDecal map={mark} width={markW} height={markH} position={[0, 5.1, 0.34]} />
+  );
+}
+
 /** 공식 YK건기 투명 워드마크 (정비소·차체와 동일 에셋) */
 function YkGeongiDecal() {
   const ykLogo = useLoader(THREE.TextureLoader, YK_GEONGI_LOGO.black);
@@ -205,17 +126,6 @@ function YkGeongiDecal() {
 }
 
 function CompletedPylon() {
-  const yanmarMap = useMemo(() => createYanmarVerticalMarkTexture(), []);
-
-  useEffect(() => {
-    return () => {
-      yanmarMap?.dispose();
-    };
-  }, [yanmarMap]);
-
-  const yanmarH = 2.85;
-  const yanmarW = yanmarH * YANMAR_MARK_ASPECT;
-
   return (
     <group>
       <mesh position={[0, 3.2, 0]} castShadow frustumCulled={false}>
@@ -227,23 +137,18 @@ function CompletedPylon() {
         <meshStandardMaterial color="#9aa0a6" roughness={0.9} />
       </mesh>
 
-      {/* bottom board — drawn Yanmar mark (not photo PNG) */}
+      {/* bottom board — official YANMAR mark file */}
       <mesh position={[0, 5.1, 0]} castShadow frustumCulled={false}>
-        <boxGeometry args={[3.4, 3.2, 0.55]} />
+        <boxGeometry args={[3.4, 2.7, 0.55]} />
         <meshStandardMaterial color={PANEL} roughness={0.75} />
       </mesh>
       <mesh position={[0, 5.1, 0.29]} frustumCulled={false}>
-        <boxGeometry args={[3.15, 2.95, 0.04]} />
+        <boxGeometry args={[3.15, 2.45, 0.04]} />
         <meshStandardMaterial color="#faf8f4" roughness={0.88} />
       </mesh>
-      {yanmarMap ? (
-        <SignDecal
-          map={yanmarMap}
-          width={yanmarW}
-          height={yanmarH}
-          position={[0, 5.1, 0.34]}
-        />
-      ) : null}
+      <Suspense fallback={null}>
+        <YanmarMarkDecal />
+      </Suspense>
 
       {/* top board — official YK건기 wordmark */}
       <mesh position={[0, 7.35, 0]} castShadow frustumCulled={false}>
@@ -258,7 +163,7 @@ function CompletedPylon() {
         <YkGeongiDecal />
       </Suspense>
 
-      <mesh position={[0, 6.65, 0]} frustumCulled={false}>
+      <mesh position={[0, 6.45, 0]} frustumCulled={false}>
         <boxGeometry args={[3.5, 0.08, 0.58]} />
         <meshStandardMaterial color={PANEL_EDGE} roughness={0.6} />
       </mesh>

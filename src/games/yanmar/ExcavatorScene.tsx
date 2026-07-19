@@ -15,16 +15,31 @@ import { ExcavatorGrapple } from "./ExcavatorGrapple";
 import {
   PremiumDozerBlade,
   PremiumExcavatorBody,
-  PremiumExcavatorLink,
   SWING_HOUSE_LIFT_Y,
   SWING_PIVOT_X,
 } from "./ExcavatorModel";
 import { PremiumDumpTruckModel } from "./DumpTruckModel";
 import {
   configureYkGeongiLogoTexture,
+  createYkGeongiBoomDecalTexture,
   getDozerBladeReach,
   YANMAR_MACHINE_RIG,
 } from "./machineVisualTheme";
+import { poseWorkEquipmentCylinders } from "./workEquipment/hydraulicPose";
+import {
+  getBucketCylMeetLocal,
+  WE,
+} from "./workEquipment/workEquipmentStructure";
+import {
+  BoomArmClevis,
+  BoomArmScrewPin,
+  BoomHydraulicMounts,
+  HydraulicCylinder,
+  HydraulicMountBracket,
+  ReferenceArm,
+  ReferenceBoom,
+  WorkLinkPin,
+} from "./workEquipment/ykWorkGear";
 import { getChassisVisualProfile } from "./chassisVisualConfig";
 import { yanmarAudio } from "./yanmarAudio";
 import {
@@ -631,38 +646,6 @@ function DumpSoilParticles({
   );
 }
 
-function LinkPin({
-  x,
-  y,
-  z = 0,
-  radius = 0.18,
-  width = 0.5,
-}: {
-  x: number;
-  y: number;
-  z?: number;
-  radius?: number;
-  width?: number;
-}) {
-  return (
-    <group position={[x, y, z]}>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[radius, radius, width, 24]} />
-        <meshStandardMaterial color="#1f252c" roughness={0.34} metalness={0.45} />
-      </mesh>
-      {[1, -1].map((side) => (
-        <mesh
-          key={side}
-          position={[0, 0, side * (width / 2 + 0.012)]}
-          rotation={[Math.PI / 2, 0, 0]}
-        >
-          <cylinderGeometry args={[radius * 0.72, radius * 0.72, 0.035, 24]} />
-          <meshStandardMaterial color="#d8dee5" roughness={0.26} metalness={0.58} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
 
 const YANMAR_LOGO_ASPECT = 512 / 62;
 const YK_LABEL_ASPECT = YK_GEONGI_LOGO.aspect;
@@ -739,250 +722,6 @@ function clampControl(value: number, min = -1, max = 1) {
   return Math.max(min, Math.min(max, value));
 }
 
-function setHydraulicCylinderPose(
-  cylinder: THREE.Group | null,
-  startX: number,
-  startY: number,
-  endX: number,
-  endY: number,
-) {
-  if (!cylinder) return;
-  const dx = endX - startX;
-  const dy = endY - startY;
-  cylinder.position.set(startX, startY, 0);
-  cylinder.rotation.z = Math.atan2(dy, dx);
-  cylinder.userData.pinDistance = Math.hypot(dx, dy);
-}
-
-function HydraulicMountBracket({
-  x,
-  y,
-  width = 0.38,
-}: {
-  x: number;
-  y: number;
-  width?: number;
-}) {
-  return (
-    <group position={[x, y, 0]}>
-      {[-1, 1].map((side) => (
-        <RoundedBox
-          key={side}
-          args={[0.25, 0.16, 0.055]}
-          radius={0.035}
-          smoothness={4}
-          position={[0, -0.035, side * (width / 2)]}
-        >
-          <meshStandardMaterial color="#c91d18" roughness={0.32} metalness={0.22} />
-        </RoundedBox>
-      ))}
-    </group>
-  );
-}
-
-function HydraulicJointCover({
-  x,
-  y,
-  width = 0.54,
-}: {
-  x: number;
-  y: number;
-  width?: number;
-}) {
-  return (
-    <group position={[x, y, 0]}>
-      {[-1, 1].map((side) => (
-        <RoundedBox
-          key={side}
-          args={[0.62, 0.54, 0.085]}
-          radius={0.16}
-          smoothness={6}
-          position={[0, 0.015, side * (width / 2 - 0.035)]}
-          castShadow
-        >
-          <meshStandardMaterial color="#df281f" roughness={0.3} metalness={0.2} />
-        </RoundedBox>
-      ))}
-    </group>
-  );
-}
-
-function HydraulicCylinder({
-  barrelLength,
-  initialDistance,
-  controlRef,
-}: {
-  barrelLength: number;
-  initialDistance: number;
-  controlRef: React.MutableRefObject<THREE.Group | null>;
-}) {
-  const cylinderRef = useRef<THREE.Group>(null);
-  const rodRef = useRef<THREE.Mesh>(null);
-  const endPinRef = useRef<THREE.Mesh>(null);
-  const endCapRef = useRef<THREE.Mesh>(null);
-  const barrelRearX = 0.08;
-  const barrelFrontX = barrelRearX + barrelLength;
-  const barrelCenterX = (barrelRearX + barrelFrontX) / 2;
-  const hoseCurve = useMemo(
-    () =>
-      new THREE.CatmullRomCurve3([
-        new THREE.Vector3(barrelRearX + 0.12, 0.095, 0.045),
-        new THREE.Vector3(barrelCenterX, 0.13, 0.055),
-        new THREE.Vector3(barrelFrontX - 0.1, 0.095, 0.045),
-      ]),
-    [barrelCenterX, barrelFrontX, barrelRearX],
-  );
-
-  useFrame(() => {
-    const pinDistance = Math.max(
-      barrelFrontX + 0.14,
-      Number(cylinderRef.current?.userData.pinDistance ?? initialDistance),
-    );
-    const visibleRodLength = Math.max(0.08, pinDistance - barrelFrontX - 0.08);
-
-    if (rodRef.current) {
-      rodRef.current.position.x = barrelFrontX + visibleRodLength / 2;
-      rodRef.current.scale.y = visibleRodLength;
-    }
-    if (endPinRef.current) {
-      endPinRef.current.position.x = pinDistance;
-    }
-    if (endCapRef.current) {
-      endCapRef.current.position.x = pinDistance;
-    }
-  });
-
-  return (
-    <group
-      ref={(node) => {
-        cylinderRef.current = node;
-        controlRef.current = node;
-      }}
-    >
-      <mesh position={[barrelCenterX, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-        <cylinderGeometry args={[0.09, 0.09, barrelLength, 20]} />
-        <meshStandardMaterial color="#151a20" roughness={0.28} metalness={0.42} />
-      </mesh>
-      <mesh position={[barrelFrontX, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-        <cylinderGeometry args={[0.11, 0.11, 0.12, 20]} />
-        <meshStandardMaterial color="#252c34" roughness={0.26} metalness={0.52} />
-      </mesh>
-      <mesh>
-        <tubeGeometry args={[hoseCurve, 20, 0.018, 6, false]} />
-        <meshStandardMaterial color="#080b0d" roughness={0.72} metalness={0.18} />
-      </mesh>
-      <mesh
-        ref={rodRef}
-        position={[barrelFrontX, 0, 0]}
-        rotation={[0, 0, -Math.PI / 2]}
-      >
-        <cylinderGeometry args={[0.035, 0.035, 1, 16]} />
-        <meshStandardMaterial color="#dfe7ee" roughness={0.18} metalness={0.78} />
-      </mesh>
-      <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.11, 0.11, 0.34, 18]} />
-        <meshStandardMaterial color="#252c34" roughness={0.3} metalness={0.45} />
-      </mesh>
-      <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.055, 0.055, 0.38, 18]} />
-        <meshStandardMaterial color="#cbd4dc" roughness={0.2} metalness={0.72} />
-      </mesh>
-      <mesh ref={endPinRef} position={[initialDistance, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.11, 0.11, 0.34, 18]} />
-        <meshStandardMaterial color="#252c34" roughness={0.3} metalness={0.45} />
-      </mesh>
-      <mesh ref={endCapRef} position={[initialDistance, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.055, 0.055, 0.38, 18]} />
-        <meshStandardMaterial color="#cbd4dc" roughness={0.2} metalness={0.72} />
-      </mesh>
-    </group>
-  );
-}
-
-function RedLinkPanel({
-  length,
-  height,
-  sideDepth,
-  logo,
-  logoWidth = 1.2,
-  logoHeight = 0.24,
-  logoX,
-  logoRotation = 0,
-  coreStartRatio = 0.04,
-  rootReliefScale = 1,
-}: {
-  length: number;
-  height: number;
-  sideDepth: number;
-  logo?: THREE.Texture;
-  logoWidth?: number;
-  logoHeight?: number;
-  logoX?: number;
-  logoRotation?: number;
-  coreStartRatio?: number;
-  rootReliefScale?: number;
-}) {
-  const coreEndRatio = 0.96;
-  const coreLength = length * Math.max(0.1, coreEndRatio - coreStartRatio);
-  const coreX = length * ((coreStartRatio + coreEndRatio) / 2);
-  const hasLogo = Boolean(logo && logoX != null);
-
-  return (
-    <>
-      {[1, -1].map((side) => (
-        <group key={side} position={[0, 0, side * sideDepth]}>
-          <mesh position={[length / 2, 0, 0]}>
-            <boxGeometry args={[length, height, 0.08]} />
-            <meshStandardMaterial color="#e11f1f" roughness={0.34} metalness={0.18} />
-          </mesh>
-          <mesh position={[length / 2, height * 0.39, 0.052]}>
-            <boxGeometry args={[length * 0.86, height * 0.09, 0.022]} />
-            <meshStandardMaterial color="#ff7a5f" roughness={0.26} metalness={0.2} />
-          </mesh>
-          <mesh position={[length / 2, -height * 0.4, 0.052]}>
-            <boxGeometry args={[length * 0.78, height * 0.12, 0.024]} />
-            <meshStandardMaterial color="#7d1111" roughness={0.5} metalness={0.08} />
-          </mesh>
-          <mesh position={[length * 0.18, height * 0.05, 0.052]} rotation={[0, 0, -0.34]}>
-            <boxGeometry args={[length * 0.18 * rootReliefScale, height * 0.16 * rootReliefScale, 0.028]} />
-            <meshStandardMaterial color="#11151a" roughness={0.65} metalness={0.1} />
-          </mesh>
-          {!hasLogo ? (
-            <mesh position={[length * 0.52, 0, 0.058]}>
-              <boxGeometry args={[length * 0.72, 0.018, 0.018]} />
-              <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.18} />
-            </mesh>
-          ) : null}
-          {hasLogo ? (
-            <mesh
-              position={[logoX!, 0.04, side * 0.068]}
-              rotation={[0, side < 0 ? Math.PI : 0, logoRotation]}
-              renderOrder={12}
-            >
-              <planeGeometry args={[logoWidth, logoHeight]} />
-              <meshBasicMaterial
-                map={logo}
-                transparent
-                alphaTest={0.35}
-                toneMapped={false}
-                depthTest
-                depthWrite={false}
-                side={THREE.FrontSide}
-                polygonOffset
-                polygonOffsetFactor={-2}
-                polygonOffsetUnits={-2}
-              />
-            </mesh>
-          ) : null}
-        </group>
-      ))}
-      <mesh position={[coreX, 0, 0]}>
-        <boxGeometry args={[coreLength, height * 0.62, sideDepth * 1.45]} />
-        <meshStandardMaterial color="#aa1515" roughness={0.44} metalness={0.14} />
-      </mesh>
-    </>
-  );
-}
 
 function CockpitJoystick({
   side,
@@ -1785,9 +1524,10 @@ function ExcavatorArm({
   const boomSwingRef = useRef<THREE.Group>(null);
   const boomRef = useRef<THREE.Group>(null);
   const armRef = useRef<THREE.Group>(null);
-  const armRockerRef = useRef<THREE.Group>(null);
   const boomCylinderRef = useRef<THREE.Group>(null);
   const armCylinderRef = useRef<THREE.Group>(null);
+  const bucketCylinderRef = useRef<THREE.Group>(null);
+  const bucketCylinderGearRef = useRef<THREE.Group>(null);
   const bucketRef = useRef<THREE.Group>(null);
   const bucketVisualRef = useRef<THREE.Group>(null);
   const breakerVisualRef = useRef<THREE.Group>(null);
@@ -1807,6 +1547,21 @@ function ExcavatorArm({
   useLayoutEffect(() => {
     configureYkGeongiLogoTexture(ykBoomLogo);
   }, [ykBoomLogo]);
+
+  const ykBoomDecal = useMemo(
+    () => createYkGeongiBoomDecalTexture(ykBoomLogo.image),
+    [ykBoomLogo],
+  );
+
+  useLayoutEffect(() => {
+    return () => {
+      ykBoomDecal?.texture.dispose();
+    };
+  }, [ykBoomDecal]);
+
+  const boomLogoTexture = ykBoomDecal?.texture ?? ykBoomLogo;
+  const boomLogoAspect = ykBoomDecal?.aspect ?? YK_LABEL_ASPECT;
+  const boomLogoWidth = 0.82;
 
   const boomLen = YANMAR_MACHINE_RIG.boomLength;
   const armLen = YANMAR_MACHINE_RIG.armLength;
@@ -1937,40 +1692,25 @@ function ExcavatorArm({
     if (boomRef.current) boomRef.current.rotation.z = boomRotation;
     if (armRef.current) armRef.current.rotation.z = armRotation;
 
-    // Each cylinder bridges two different rigid bodies. Rotating a joint changes
-    // the distance between its pins, so the chrome rod visibly pushes or pulls.
-    const boomCos = Math.cos(boomRotation);
-    const boomSin = Math.sin(boomRotation);
-    const transformBoomPoint = (localX: number, localY: number) => ({
-      x: boomCos * localX - boomSin * localY,
-      y: boomSin * localX + boomCos * localY,
+    const bucketRotation = s.bucket * YANMAR_MACHINE_RIG.bucketRotationScale;
+    if (bucketRef.current) bucketRef.current.rotation.z = bucketRotation;
+
+    // Boom/arm work gear (cylinders + joint cover) stays for every attachment,
+    // including breaker — only the tip tool mesh swaps.
+    if (bucketCylinderGearRef.current) {
+      bucketCylinderGearRef.current.visible = true;
+    }
+    poseWorkEquipmentCylinders({
+      boomJoint: s.boom,
+      armJoint: armRotation,
+      bucketJoint: bucketRotation,
+      boomCylinder: boomCylinderRef.current,
+      armCylinder: armCylinderRef.current,
+      bucketCylinder: bucketCylinderRef.current,
+      showBucketCylinder: true,
+      boomLen,
+      armLen,
     });
-
-    const boomCylinderEnd = transformBoomPoint(1, 0.3);
-    setHydraulicCylinderPose(
-      boomCylinderRef.current,
-      -0.28,
-      0.18,
-      boomCylinderEnd.x,
-      boomCylinderEnd.y,
-    );
-
-    const armCylinderStart = transformBoomPoint(1.35, 0.35);
-    const rockerRotation = armRotation * 0.45;
-    if (armRockerRef.current) armRockerRef.current.rotation.z = rockerRotation;
-    const rockerCos = Math.cos(rockerRotation);
-    const rockerSin = Math.sin(rockerRotation);
-    const rockerPinX = boomLen + rockerCos * -0.32 - rockerSin * 0.18;
-    const rockerPinY = rockerSin * -0.32 + rockerCos * 0.18;
-    const armCylinderEnd = transformBoomPoint(rockerPinX, rockerPinY);
-    setHydraulicCylinderPose(
-      armCylinderRef.current,
-      armCylinderStart.x,
-      armCylinderStart.y,
-      armCylinderEnd.x,
-      armCylinderEnd.y,
-    );
-    if (bucketRef.current) bucketRef.current.rotation.z = s.bucket * YANMAR_MACHINE_RIG.bucketRotationScale;
     if (bucketVisualRef.current) {
       bucketVisualRef.current.visible =
         s.attachmentType === "bucket" || s.attachmentType === "grapple";
@@ -2043,8 +1783,8 @@ function ExcavatorArm({
         0.35 + fill * 0.65,
       );
       dirtRef.current.position.set(
-        0.28 + fill * 0.2,
-        -0.43 + fill * 0.12,
+        -0.32 - fill * 0.18,
+        -0.4 + fill * 0.12,
         0,
       );
     }
@@ -2102,68 +1842,61 @@ function ExcavatorArm({
           ]}
         >
         <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.28, 0.28, 0.55, 24]} />
+          <cylinderGeometry args={[0.15, 0.15, 0.36, 20]} />
           <meshStandardMaterial color="#2b3139" roughness={0.38} metalness={0.32} />
         </mesh>
-        <HydraulicMountBracket x={-0.28} y={0.18} />
-        <HydraulicCylinder
-          barrelLength={0.52}
-          initialDistance={0.95}
-          controlRef={boomCylinderRef}
-        />
-        <HydraulicCylinder
-          barrelLength={0.82}
-          initialDistance={1.45}
-          controlRef={armCylinderRef}
-        />
         <group ref={boomRef}>
-          <PremiumExcavatorLink
+          <ReferenceBoom
             length={boomLen}
-            height={0.42 * boomThickness}
-            sideDepth={0.155 * boomThickness}
-            logo={ykBoomLogo}
-            logoWidth={0.96}
-            logoHeight={logoHeightForWidth(0.96, YK_LABEL_ASPECT)}
-            logoX={boomLen * 0.48}
+            logo={boomLogoTexture}
+            logoWidth={boomLogoWidth}
+            logoHeight={logoHeightForWidth(boomLogoWidth, boomLogoAspect)}
           />
-          <LinkPin x={0} y={0} radius={0.21} width={0.58} />
-          <HydraulicJointCover x={boomLen} y={0} />
-          <LinkPin x={boomLen} y={0} radius={0.19} width={0.54} />
-          <HydraulicMountBracket x={1} y={0.3} />
-          <HydraulicMountBracket x={1.35} y={0.35} />
-          <group ref={armRockerRef} position={[boomLen, 0, 0]}>
-            <RoundedBox
-              args={[0.42, 0.15, 0.3]}
-              radius={0.055}
-              smoothness={5}
-              position={[-0.16, 0.09, 0]}
-              rotation={[0, 0, Math.atan2(0.18, -0.32)]}
-              castShadow
-            >
-              <meshStandardMaterial color="#b91816" roughness={0.34} metalness={0.24} />
-            </RoundedBox>
-            <HydraulicMountBracket x={-0.32} y={0.18} width={0.38} />
-          </group>
-          <mesh position={[boomLen * 0.58, 0.28, 0]}>
-            <boxGeometry args={[boomLen * 0.55, 0.045, 0.34]} />
-            <meshStandardMaterial color="#ef3b2f" roughness={0.36} metalness={0.12} />
-          </mesh>
+          <WorkLinkPin x={0} y={0} radius={0.11} width={0.34} />
+          <BoomHydraulicMounts boomLen={boomLen} />
+          {/* Boom-lift: rod tip ends inside 45° kink cover pocket */}
+          <HydraulicCylinder
+            barrelLength={0.72}
+            initialDistance={1.05}
+            radius={0.045}
+            detail="clean"
+            controlRef={boomCylinderRef}
+          />
+          {/* Boom–arm pivot — clean pin faces (reference joint hero) */}
+          <BoomArmScrewPin x={boomLen} y={0} radius={0.095} width={0.34} />
+          {/* Boom 등 실린더: 꺾임 후드 → 붐 끝 (채널 안, 배럴 노출) */}
+          <HydraulicCylinder
+            barrelLength={1.2}
+            initialDistance={1.77}
+            radius={0.062}
+            controlRef={armCylinderRef}
+          />
 
           <group ref={armRef} position={[boomLen, 0, 0]}>
-            <PremiumExcavatorLink
+            <ReferenceArm
               length={armLen}
-              height={0.36 * boomThickness}
-              sideDepth={0.135 * boomThickness}
               logo={yanmarLogo}
               logoWidth={YANMAR_LOGO_WIDTH}
               logoHeight={logoHeightForWidth(YANMAR_LOGO_WIDTH, YANMAR_LOGO_ASPECT)}
               logoX={armLen * 0.52}
             />
-            <LinkPin x={armLen} y={0} radius={0.15} width={0.48} />
-            <mesh position={[armLen * 0.58, 0.2, 0]}>
-              <boxGeometry args={[armLen * 0.54, 0.04, 0.3]} />
-              <meshStandardMaterial color="#ef3b2f" roughness={0.36} metalness={0.12} />
-            </mesh>
+            {/* Jumper pipe (boom-cyl ↔ arm-cyl) + bolted cover */}
+            <BoomArmClevis />
+            <group ref={bucketCylinderGearRef}>
+              {/* Arm cylinder after jumper → H-link */}
+              <HydraulicMountBracket
+                x={getBucketCylMeetLocal(boomLen).x}
+                y={getBucketCylMeetLocal(boomLen).y}
+                width={0.18}
+              />
+              <HydraulicCylinder
+                barrelLength={1.4}
+                initialDistance={2.2}
+                detail="full"
+                radius={0.056}
+                controlRef={bucketCylinderRef}
+              />
+            </group>
 
             <group ref={bucketRef} position={[armLen, 0, 0]}>
               <group ref={bucketVisualRef}>
@@ -4104,7 +3837,7 @@ export function ExcavatorScene(props: ExcavatorSceneProps) {
 export function createInitialSim(): ExcavatorSimState {
   return {
     swing: 0,
-    boom: 0.45,
+    boom: 0.55,
     arm: -0.95,
     bucket: 0.85,
     posX: -18,

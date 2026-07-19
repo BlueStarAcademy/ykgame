@@ -15,6 +15,47 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Global tactile press — uses translate/scale so existing `transform` still composes */
+:where(
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  a.site-legend-btn
+):not(:disabled):not([aria-disabled="true"]):not([data-no-ui-click]) {
+  transition:
+    translate 90ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    scale 90ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 90ms ease,
+    box-shadow 90ms ease;
+}
+
+:where(
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  a.site-legend-btn
+):not(:disabled):not([aria-disabled="true"]):not([data-no-ui-click]):active {
+  translate: 0 3px;
+  scale: 0.96;
+  filter: brightness(0.93);
+}
+
+/* Hold / vehicle controls — keep native feel, skip global press squash */
+.yanmar-control-touch-layer :where(button, [role="button"]):active,
+.yanmar-pedal-button:active,
+.yanmar-breaker-pedal-button:active,
+.yanmar-horn-touch-zone:active,
+.yanmar-horn-standalone:active,
+[data-no-ui-click]:active {
+  translate: none;
+  scale: none;
+  filter: none;
+}
+
 .game-card-equipment-image {
   display: block;
   width: 100%;
@@ -722,11 +763,11 @@ body {
 .yanmar-aux-menu-layer .yanmar-horn-standalone,
 .yanmar-aux-menu-layer .yanmar-auto-menu-toggle,
 .yanmar-aux-menu-layer .yanmar-auto-menu-edit,
-.yanmar-aux-menu-layer .yanmar-auto-menu-action,
-.yanmar-aux-menu-layer .yanmar-attachment-button,
+.yanmar-aux-menu-layer .yanmar-function-menu-grid.is-expanded .yanmar-attachment-button,
 .yanmar-aux-menu-layer .yanmar-function-menu-grid.is-expanded .yanmar-function-menu-item,
 .yanmar-aux-menu-layer .yanmar-function-menu-grid.is-expanded .yanmar-function-menu-attachments,
-.yanmar-aux-menu-layer .yanmar-auto-menu-items.is-expanded .yanmar-auto-menu-item {
+.yanmar-aux-menu-layer .yanmar-auto-menu-items.is-expanded .yanmar-auto-menu-item,
+.yanmar-aux-menu-layer .yanmar-auto-menu-items.is-expanded .yanmar-auto-menu-action {
   pointer-events: auto;
   touch-action: manipulation;
 }
@@ -2888,25 +2929,34 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.12rem;
-  width: 0.9rem;
-  max-height: 5.5rem;
+  gap: 3px;
+  width: 22px;
+  max-height: 148px;
   padding: 0;
-  margin: 0.15rem 0 0;
+  margin: 2px 0 0;
   list-style: none;
   pointer-events: auto;
+  flex-shrink: 0;
+  z-index: 31;
+}
+
+.yanmar-active-buff-stack.is-minimap-aligned {
+  /* Match camera button row (h-6) so icons sit beside the map tile. */
+  margin-top: 26px;
 }
 
 .yanmar-active-buff-icon {
   position: relative;
-  width: 0.82rem;
-  height: 0.82rem;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
   overflow: visible;
-  border-radius: 0.18rem;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(2, 6, 23, 0.55);
-  box-shadow: 0 0.08rem 0.14rem rgba(0, 0, 0, 0.55);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(2, 6, 23, 0.78);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.65),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .yanmar-active-buff-hit {
@@ -2942,21 +2992,21 @@ body {
 
 .yanmar-active-buff-tip {
   position: absolute;
-  right: calc(100% + 0.32rem);
+  right: calc(100% + 6px);
   top: 50%;
   z-index: 45;
   transform: translateY(-50%);
   border: 1px solid rgba(253, 230, 138, 0.45);
-  border-radius: 0.42rem;
+  border-radius: 6px;
   background: rgba(2, 6, 23, 0.92);
-  padding: 0.18rem 0.38rem;
+  padding: 3px 6px;
   color: #fde68a;
-  font-size: 0.58rem;
+  font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.02em;
   line-height: 1;
   white-space: nowrap;
-  box-shadow: 0 0.12rem 0.28rem rgba(0, 0, 0, 0.55);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55);
   pointer-events: none;
   animation: yanmar-active-buff-tip-fade 3s ease-out forwards;
 }
@@ -2968,7 +3018,7 @@ body {
   top: 50%;
   width: 0;
   height: 0;
-  border: 0.28rem solid transparent;
+  border: 4px solid transparent;
   border-left-color: rgba(2, 6, 23, 0.92);
   transform: translateY(-50%);
 }
@@ -4112,24 +4162,70 @@ body {
   opacity: 1;
 }
 
-@keyframes yanmar-crash-hit-float {
+@keyframes yanmar-crash-hit-float-left {
   0% {
     opacity: 0;
-    transform: translateY(0.35rem) scale(0.92);
+    transform: translate(-50%, 0.2rem) translateX(0) rotate(-4deg) scale(0.85);
   }
-  18% {
+  12% {
     opacity: 1;
-    transform: translateY(0) scale(1.05);
+    transform: translate(-50%, -0.15rem) translateX(-0.55rem) rotate(-10deg)
+      scale(1.22);
+  }
+  28% {
+    transform: translate(-50%, -0.35rem) translateX(0.28rem) rotate(6deg)
+      scale(1.12);
+  }
+  48% {
+    transform: translate(-50%, -0.7rem) translateX(-0.35rem) rotate(-5deg)
+      scale(1.08);
   }
   100% {
     opacity: 0;
-    transform: translateY(-1.15rem) scale(1);
+    transform: translate(-50%, -1.55rem) translateX(-0.7rem) rotate(-8deg)
+      scale(1.02);
+  }
+}
+
+@keyframes yanmar-crash-hit-float-right {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0.2rem) translateX(0) rotate(4deg) scale(0.85);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -0.15rem) translateX(0.55rem) rotate(10deg)
+      scale(1.22);
+  }
+  28% {
+    transform: translate(-50%, -0.35rem) translateX(-0.28rem) rotate(-6deg)
+      scale(1.12);
+  }
+  48% {
+    transform: translate(-50%, -0.7rem) translateX(0.35rem) rotate(5deg)
+      scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -1.55rem) translateX(0.7rem) rotate(8deg)
+      scale(1.02);
   }
 }
 
 .yanmar-crash-hit-float {
-  animation: yanmar-crash-hit-float 0.7s ease-out forwards;
-  text-shadow: 0 0.08rem 0.18rem rgba(0, 0, 0, 0.75);
+  text-shadow:
+    0 0.1rem 0.2rem rgba(0, 0, 0, 0.85),
+    0 0 0.45rem rgba(251, 191, 36, 0.45);
+}
+
+.yanmar-crash-hit-float.is-bounce-left {
+  animation: yanmar-crash-hit-float-left 0.78s cubic-bezier(0.22, 0.82, 0.28, 1)
+    forwards;
+}
+
+.yanmar-crash-hit-float.is-bounce-right {
+  animation: yanmar-crash-hit-float-right 0.78s cubic-bezier(0.22, 0.82, 0.28, 1)
+    forwards;
 }
 
 .yanmar-portrait-side-button {
@@ -12061,8 +12157,23 @@ button.yanmar-gear-icon-cell {
 }
 
 .yanmar-gacha-result-modal-card.is-sealed {
+  position: relative;
   min-height: 4.2rem;
   justify-content: center;
+}
+
+/* 봉인 카드에서도 img를 마운트해 캐시만 채우고 UI에는 보이지 않게 한다 */
+.yanmar-gacha-result-preload-icon {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .yanmar-gacha-result-seal {
@@ -12323,8 +12434,8 @@ button.yanmar-gear-icon-cell {
   align-items: center;
   gap: 0.4rem;
   min-width: 0;
+  width: max-content;
   max-width: 100%;
-  width: 100%;
   border: 0;
   background: transparent;
   padding: 0;
@@ -12394,9 +12505,9 @@ button.yanmar-gear-icon-cell {
   align-items: center;
   justify-content: center;
   gap: 0.12rem;
+  flex: 0 0 auto;
   min-width: 0;
-  flex: 1;
-  padding: 0.15rem 0.45rem 0.2rem;
+  padding: 0.15rem 0.4rem 0.2rem;
   border-radius: 0.45rem;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(0, 0, 0, 0.28);
@@ -12423,15 +12534,19 @@ button.yanmar-gear-icon-cell {
 
 .yanmar-profile-chip-name {
   display: block;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  width: max-content;
+  max-width: none;
+  overflow: visible;
   white-space: nowrap;
   font-size: 0.72rem;
   font-weight: 900;
   line-height: 1.1;
   text-align: center;
+}
+
+.yanmar-profile-chip-name.is-compact {
+  font-size: 0.58rem;
+  letter-spacing: -0.03em;
 }
 
 .yanmar-profile-modal {

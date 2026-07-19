@@ -84,6 +84,8 @@ export function GearIconCell({
         alt=""
         className="yanmar-gear-icon-cell-img yanmar-gear-icon-cell-img--empty"
         draggable={false}
+        decoding="async"
+        loading="eager"
       />
     );
   } else if (empty || !slot) {
@@ -98,6 +100,8 @@ export function GearIconCell({
           alt=""
           className="yanmar-gear-icon-cell-img"
           draggable={false}
+          decoding="async"
+          loading="eager"
         />
         {enhanceLevel > 0 ? (
           <span className="yanmar-gear-icon-cell-badge">+{enhanceLevel}</span>

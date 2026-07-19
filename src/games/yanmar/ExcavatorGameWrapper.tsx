@@ -42,11 +42,20 @@ import {
 } from "./ExcavatorScene";
 import type { WorldPickup } from "./worldPickups";
 import {
-  createWorldPickupsState,
+  createEmptyWorldPickupsState,
+  createWorldPickupsStateFromHydrate,
+  getWorldPickupHourBucket,
+  markWorldStarHourlyLimitReached,
   rollClientStarReward,
   starRewardToastFontRem,
   starRewardToastIconPx,
 } from "./worldPickups";
+import {
+  isWorldPickupSnapshotCurrent,
+  loadWorldPickupSnapshot,
+  saveWorldPickupSnapshot,
+  snapshotToActivePickups,
+} from "./worldPickupPersistence";
 import type {
   AttachmentType,
   CameraMode,
@@ -79,6 +88,12 @@ import { yanmarAudio } from "./yanmarAudio";
 import { QuestPanel } from "./QuestPanel";
 import { ShopPanel, type GachaPayWith } from "./ShopPanel";
 import { GachaResultModal } from "./GachaResultModal";
+import { HourlyAdBanner } from "./HourlyAdBanner";
+import {
+  getHourlyAdHourBucket,
+  loadHourlyAdGrantLocally,
+  type HourlyAdClaimResult,
+} from "./hourlyAdReward";
 import type { GachaFreeStatus } from "./gachaFree";
 import { ActiveShopBuffIcons } from "./ActiveShopBuffIcons";
 import {
@@ -210,7 +225,7 @@ import {
 import { isInRepairTentRange } from "./RepairTent";
 import type { ChassisModelId } from "./chassisCatalog";
 import { getChassisDef } from "./chassisCatalog";
-import { profileAvatarSrc } from "@/lib/profile";
+import { nicknameCharLength, profileAvatarSrc } from "@/lib/profile";
 import {
   emptyAbilityAlloc,
   spentAbilityPoints,
@@ -402,19 +417,20 @@ function CrashAsphaltHpPanel({
   const safeMax = Math.max(1, maxHp);
   const ratio = Math.max(0, Math.min(1, hp / safeMax));
   const pct = Math.round(ratio * 100);
+  const bounceSide = hitTick % 2 === 0 ? "is-bounce-left" : "is-bounce-right";
 
   return (
-    <div className="relative w-[11.5rem] rounded-xl border border-white/20 bg-black/55 px-3 py-2 shadow-lg backdrop-blur-sm">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[9px] font-black uppercase tracking-[0.14em] text-white/70">
+    <div className="relative w-[8.25rem] rounded-xl border border-white/20 bg-black/55 px-2 py-1.5 shadow-lg backdrop-blur-sm">
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-[8px] font-black uppercase tracking-[0.12em] text-white/70">
           아스팔트
         </span>
-        <span className="text-[10px] font-black tabular-nums text-white">
+        <span className="text-[9px] font-black tabular-nums text-white">
           ({Math.round(hp).toLocaleString()}
           <span className="text-white/45">/{safeMax.toLocaleString()}</span>)
         </span>
       </div>
-      <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-white/15">
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/15">
         <div
           className={`h-full rounded-full transition-[width] duration-100 ease-out ${crashHpBarColor(ratio)}`}
           style={{ width: `${pct}%` }}
@@ -423,7 +439,7 @@ function CrashAsphaltHpPanel({
       {hitTick > 0 && hitDamage > 0 ? (
         <span
           key={hitTick}
-          className="yanmar-crash-hit-float pointer-events-none absolute -right-1 top-0 text-xs font-black text-amber-200"
+          className={`yanmar-crash-hit-float pointer-events-none absolute left-1/2 top-0 text-lg font-black tabular-nums text-amber-100 ${bounceSide}`}
         >
           -{hitDamage}
         </span>
@@ -901,7 +917,7 @@ export function ExcavatorGameWrapper({
     timeLeft: config.duration,
     bucketLoad: 0,
     goalDist: 0,
-    boom: 0.45,
+    boom: 0.55,
     arm: -0.95,
     bucket: 0.85,
     score: 0,
@@ -1064,8 +1080,9 @@ export function ExcavatorGameWrapper({
   const arcadeScoreRef = useRef(0);
   const rewardStarsRef = useRef(0);
   const currencyRef = useRef(session?.user?.currency ?? 0);
-  const worldPickupsRef = useRef(createWorldPickupsState());
+  const worldPickupsRef = useRef(createEmptyWorldPickupsState());
   const worldPickupRevisionRef = useRef(0);
+  const worldPickupOwnerRef = useRef<string | null>(session?.user?.id ?? null);
   const [worldPickupRevision, setWorldPickupRevision] = useState(0);
   const processedExitSignalRef = useRef(0);
   const processedScoreCommitRef = useRef(0);
@@ -1215,13 +1232,9 @@ export function ExcavatorGameWrapper({
       const delta = fb.crashHitTick - lastSyncedCrashHitTickRef.current;
       if (delta > 0) {
         const now = performance.now();
-        // Skip haptic while the foot pedal is held — vibrate can cancel the
-        // active touch and release the breaker pedal mid-strike.
-        const pedalHeld = (auxiliaryRef.current.attachmentPedal ?? 0) !== 0;
-        if (
-          !pedalHeld &&
-          now - lastBreakerVibrationAtRef.current >= 2000
-        ) {
+        // Pedal release no longer depends on lostpointercapture, so vibrate
+        // during a held strike is safe (throttle: once per 2s).
+        if (now - lastBreakerVibrationAtRef.current >= 2000) {
           lastBreakerVibrationAtRef.current = now;
           if (typeof navigator.vibrate === "function") navigator.vibrate(120);
         }
@@ -2065,6 +2078,40 @@ export function ExcavatorGameWrapper({
     loadMonumentState,
   ]);
 
+  // If the player force-quit after claim (before pressing 확인), restore wallets
+  // from the persisted grant + server state so the reward stays received.
+  useEffect(() => {
+    if (mode !== "game" || sessionStatus === "loading") return;
+    const grant = loadHourlyAdGrantLocally(getHourlyAdHourBucket());
+    if (!grant) return;
+
+    if (typeof grant.currency === "number") {
+      currencyRef.current = Math.max(currencyRef.current, grant.currency);
+      setCurrency(currencyRef.current);
+      setPreviewStars(currencyRef.current);
+    }
+    if (typeof grant.gachaTicketsStandard === "number") {
+      setGachaTicketsStandard((prev) =>
+        Math.max(prev, grant.gachaTicketsStandard!),
+      );
+    }
+    if (typeof grant.gachaTicketsPremium === "number") {
+      setGachaTicketsPremium((prev) =>
+        Math.max(prev, grant.gachaTicketsPremium!),
+      );
+    }
+    if (session?.user?.id) {
+      void loadWorkshopState();
+      void loadMonumentState();
+    }
+  }, [
+    mode,
+    session?.user?.id,
+    sessionStatus,
+    loadMonumentState,
+    loadWorkshopState,
+  ]);
+
   useEffect(() => {
     if (sessionStatus === "loading") return;
     setActiveShopBuffs(loadActiveShopBuffs(session?.user?.id));
@@ -2108,6 +2155,7 @@ export function ExcavatorGameWrapper({
           );
           return next;
         });
+        yanmarAudio.playBuffAcquire();
         return;
       }
 
@@ -2148,6 +2196,7 @@ export function ExcavatorGameWrapper({
           );
           return next;
         });
+        yanmarAudio.playBuffAcquire();
       } catch {
         /* keep current buffs / currency */
       } finally {
@@ -2175,6 +2224,101 @@ export function ExcavatorGameWrapper({
     if (!session?.user?.id) return;
     pushQuestProgress("login", 1);
   }, [mode, pushQuestProgress, session?.user?.id]);
+
+  const applyHourlyAdClaim = useCallback(
+    async (result: HourlyAdClaimResult) => {
+      if (typeof result.currency === "number") {
+        currencyRef.current = result.currency;
+        setCurrency(result.currency);
+        setPreviewStars(result.currency);
+        await updateSessionRef.current({ user: { currency: result.currency } });
+      } else if (result.reward.kind === "stars" && !session?.user?.id) {
+        setPreviewStars((value) => value + result.reward.amount);
+        setCurrency((value) => value + result.reward.amount);
+      }
+
+      if (typeof result.gachaTicketsStandard === "number") {
+        setGachaTicketsStandard(result.gachaTicketsStandard);
+      } else if (result.reward.kind === "gachaStandard" && !session?.user?.id) {
+        setGachaTicketsStandard((prev) => prev + result.reward.amount);
+      }
+
+      if (typeof result.gachaTicketsPremium === "number") {
+        setGachaTicketsPremium(result.gachaTicketsPremium);
+      } else if (result.reward.kind === "gachaPremium" && !session?.user?.id) {
+        setGachaTicketsPremium((prev) => prev + result.reward.amount);
+      }
+
+      if (
+        typeof result.dumpWorkshopPoints === "number" ||
+        typeof result.crashWorkshopPoints === "number" ||
+        typeof result.hillWorkshopPoints === "number"
+      ) {
+        setWorkshopPanelState((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            points: {
+              ...prev.points,
+              ...(typeof result.dumpWorkshopPoints === "number"
+                ? { dump: result.dumpWorkshopPoints }
+                : {}),
+              ...(typeof result.crashWorkshopPoints === "number"
+                ? { crash: result.crashWorkshopPoints }
+                : {}),
+              ...(typeof result.hillWorkshopPoints === "number"
+                ? { hill: result.hillWorkshopPoints }
+                : {}),
+            },
+          };
+        });
+      } else if (
+        !session?.user?.id &&
+        (result.reward.kind === "dumpPoints" ||
+          result.reward.kind === "crashPoints" ||
+          result.reward.kind === "hillPoints")
+      ) {
+        const key =
+          result.reward.kind === "dumpPoints"
+            ? "dump"
+            : result.reward.kind === "crashPoints"
+              ? "crash"
+              : "hill";
+        setWorkshopPanelState((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            points: {
+              ...prev.points,
+              [key]: (prev.points[key] ?? 0) + result.reward.amount,
+            },
+          };
+        });
+      }
+
+      if (typeof result.monumentPoints === "number") {
+        setMonumentPanelState((prev) =>
+          prev ? { ...prev, points: result.monumentPoints! } : prev,
+        );
+      } else if (result.reward.kind === "monumentPoints" && !session?.user?.id) {
+        setMonumentPanelState((prev) =>
+          prev
+            ? { ...prev, points: (prev.points ?? 0) + result.reward.amount }
+            : prev,
+        );
+      }
+
+      // Refresh wallets from server so a force-quit still shows granted balances.
+      if (session?.user?.id) {
+        await Promise.all([loadWorkshopState(), loadMonumentState()]);
+      }
+    },
+    [
+      loadMonumentState,
+      loadWorkshopState,
+      session?.user?.id,
+    ],
+  );
 
   const grantQuestReward = useCallback(
     async (opts: {
@@ -2397,6 +2541,7 @@ export function ExcavatorGameWrapper({
           }
         | null
         | undefined,
+      opts?: { playSound?: boolean },
     ) => {
       if (!drop?.nameSnapshot) return;
       const next: GearDiscoveryState = {
@@ -2416,6 +2561,13 @@ export function ExcavatorGameWrapper({
         gearDiscoveryRef.current = null;
         setGearDiscovery(null);
       }, GEAR_DISCOVERY_DURATION_MS);
+      if (opts?.playSound !== false) {
+        if (drop.grade === "MASTER") {
+          yanmarAudio.playMasterItemAcquire();
+        } else {
+          yanmarAudio.playItemAcquire();
+        }
+      }
       void loadEquipment();
     },
     [loadEquipment],
@@ -2753,6 +2905,15 @@ export function ExcavatorGameWrapper({
           setLastGachaBanner(banner);
           setLastGachaResults(data.items);
           setShowGachaResultModal(true);
+          const hasMaster = data.items.some(
+            (item: { grade?: string }) => item.grade === "MASTER",
+          );
+          if (data.items.length === 1 && hasMaster) {
+            yanmarAudio.playMasterItemAcquire();
+          } else {
+            // Multi-pull: one generic acquire SFX; master SFX plays on reveal.
+            yanmarAudio.playItemAcquire();
+          }
         }
         await loadEquipment();
       } finally {
@@ -3097,15 +3258,19 @@ export function ExcavatorGameWrapper({
       if (!sim) return;
       const near = isInRepairTentRange(sim.posX, sim.posZ);
       if (near !== nearRepairTentRef.current) {
+        const entered = near && !nearRepairTentRef.current;
         nearRepairTentRef.current = near;
         setNearRepairTent(near);
+        if (entered) yanmarAudio.playServiceEnter();
         if (!near) setShowRepairPanel(false);
       }
 
       const nearMon = isInMonumentRange(sim.posX, sim.posZ);
       if (nearMon !== nearMonumentRef.current) {
+        const enteredMon = nearMon && !nearMonumentRef.current;
         nearMonumentRef.current = nearMon;
         setNearMonument(nearMon);
+        if (enteredMon) yanmarAudio.playMonumentEnter();
         if (!nearMon) setShowMonumentPanel(false);
       }
 
@@ -3380,7 +3545,7 @@ export function ExcavatorGameWrapper({
       timeLeft: config.duration,
       bucketLoad: 0,
       goalDist: 0,
-      boom: 0.45,
+      boom: 0.55,
       arm: -0.95,
       bucket: 0.85,
       score: 0,
@@ -3803,6 +3968,9 @@ export function ExcavatorGameWrapper({
     if (pickups.revision !== worldPickupRevisionRef.current) {
       worldPickupRevisionRef.current = pickups.revision;
       setWorldPickupRevision(pickups.revision);
+      if (modeRef.current === "game" && worldPickupOwnerRef.current) {
+        saveWorldPickupSnapshot(worldPickupOwnerRef.current, pickups);
+      }
     }
 
     const modeNow = modeRef.current;
@@ -4361,9 +4529,9 @@ export function ExcavatorGameWrapper({
             enhanceCores?: number;
           };
           if (data.gearDrops && data.gearDrops.length > 0) {
-            for (const drop of data.gearDrops) {
-              notifyGearDrop(drop);
-            }
+            data.gearDrops.forEach((drop, index) => {
+              notifyGearDrop(drop, { playSound: index === 0 });
+            });
           }
           const coresDropped = notifyCoresDrop(
             data.coresDropped,
@@ -4612,16 +4780,26 @@ export function ExcavatorGameWrapper({
     [accumulateDumpScore, pushQuestProgress, queueDumpRewardChunk],
   );
 
+  const worldStarClaimInFlightRef = useRef(false);
+
   const handleWorldPickup = useCallback(
     (pickup: WorldPickup) => {
       if (modeRef.current !== "game") return;
+      const userId = session?.user?.id;
+      if (userId) {
+        saveWorldPickupSnapshot(userId, worldPickupsRef.current);
+      }
 
       if (pickup.kind === "speed") {
         showAttachmentWarning("이동속도 2배! (30초)");
+        yanmarAudio.playBuffAcquire();
         return;
       }
 
-      if (!session?.user?.id) return;
+      if (!userId) return;
+      // One street-star claim per hour — block overlapping client awards.
+      if (worldStarClaimInFlightRef.current) return;
+      worldStarClaimInFlightRef.current = true;
 
       const optimistic = rollClientStarReward();
       const before = currencyRef.current;
@@ -4631,8 +4809,10 @@ export function ExcavatorGameWrapper({
       setCurrency(currencyRef.current);
       setPreviewStars(currencyRef.current);
       showAttachmentWarning(`스타 +${optimistic}`, { stars: optimistic });
+      yanmarAudio.playStarAcquire();
 
-      const eventId = `world-star:${pickup.id}`;
+      // Hour-scoped id so a respawn / double-collect cannot grant twice.
+      const eventId = `world-star:${getWorldPickupHourBucket()}`;
       void (async () => {
         try {
           const res = await fetch("/api/rewards/yanmar-world-pickup", {
@@ -4644,6 +4824,10 @@ export function ExcavatorGameWrapper({
             currencyRef.current = before;
             setCurrency(before);
             setPreviewStars(before);
+            markWorldStarHourlyLimitReached(worldPickupsRef.current);
+            saveWorldPickupSnapshot(userId, worldPickupsRef.current);
+            worldPickupRevisionRef.current = worldPickupsRef.current.revision;
+            setWorldPickupRevision(worldPickupsRef.current.revision);
             showAttachmentWarning("시간당 스타 획득 한도에 도달했습니다.");
             return;
           }
@@ -4653,10 +4837,15 @@ export function ExcavatorGameWrapper({
             setPreviewStars(before);
             return;
           }
+          markWorldStarHourlyLimitReached(worldPickupsRef.current);
+          saveWorldPickupSnapshot(userId, worldPickupsRef.current);
+          worldPickupRevisionRef.current = worldPickupsRef.current.revision;
+          setWorldPickupRevision(worldPickupsRef.current.revision);
           const data = (await res.json()) as {
             stars?: number;
             currency?: number;
           };
+          // Silently reconcile to server balance — do not show a second +스타 toast.
           if (typeof data.currency === "number") {
             syncSessionBalances(data, { syncPreviewCurrency: true });
           } else if (typeof data.stars === "number") {
@@ -4665,13 +4854,12 @@ export function ExcavatorGameWrapper({
             setCurrency(corrected);
             setPreviewStars(corrected);
           }
-          if (typeof data.stars === "number" && data.stars !== optimistic) {
-            showAttachmentWarning(`스타 +${data.stars}`, { stars: data.stars });
-          }
         } catch {
           currencyRef.current = before;
           setCurrency(before);
           setPreviewStars(before);
+        } finally {
+          worldStarClaimInFlightRef.current = false;
         }
       })();
     },
@@ -4679,19 +4867,35 @@ export function ExcavatorGameWrapper({
   );
 
   useEffect(() => {
-    if (mode === "game" && session?.user?.id) {
-      worldPickupsRef.current = createWorldPickupsState();
-      worldPickupRevisionRef.current = worldPickupsRef.current.revision;
-      setWorldPickupRevision(worldPickupsRef.current.revision);
+    worldPickupOwnerRef.current = session?.user?.id ?? null;
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    const userId = session?.user?.id ?? null;
+    worldPickupOwnerRef.current = userId;
+    if (mode === "game" && userId) {
+      const snap = loadWorldPickupSnapshot(userId);
+      const hydrate =
+        snap && isWorldPickupSnapshotCurrent(snap)
+          ? {
+              hourBucket: snap.hourBucket,
+              starCollectedThisHour: snap.starCollectedThisHour,
+              speedCollectedThisHour: snap.speedCollectedThisHour,
+              pendingStarAt: snap.pendingStarAt,
+              pendingSpeedAt: snap.pendingSpeedAt,
+              speedBuffUntilMs: snap.speedBuffUntilMs,
+              active: snapshotToActivePickups(snap),
+            }
+          : null;
+      const next = createWorldPickupsStateFromHydrate(hydrate);
+      worldPickupsRef.current = next;
+      worldPickupRevisionRef.current = next.revision;
+      setWorldPickupRevision(next.revision);
+      saveWorldPickupSnapshot(userId, next);
       return;
     }
-    const empty = createWorldPickupsState();
-    empty.active = [];
-    empty.pendingStarAt = [];
-    empty.pendingSpeedAt = [];
-    empty.starCollectedThisHour = 0;
-    empty.speedCollectedThisHour = 0;
-    empty.speedBuffUntilMs = 0;
+    // Leaving game mode — keep last snapshot on disk; clear in-memory pickups.
+    const empty = createEmptyWorldPickupsState();
     worldPickupsRef.current = empty;
     worldPickupRevisionRef.current = empty.revision;
     setWorldPickupRevision(empty.revision);
@@ -5112,6 +5316,11 @@ export function ExcavatorGameWrapper({
             : gameFrameStyle
         }
       >
+        <HourlyAdBanner
+          enabled={mode === "game"}
+          isLoggedIn={Boolean(session?.user?.id)}
+          onClaimed={applyHourlyAdClaim}
+        />
         <TutorialSelectModal
           open={showTutorialMenu}
           activeId={tutorialStep?.id ?? null}
@@ -5715,9 +5924,7 @@ export function ExcavatorGameWrapper({
               </div>
             ) : digFeedback.canStrike ? (
               <div className="rounded-xl border border-amber-200/50 bg-amber-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                타격가능 (
-                {Math.round(digFeedback.crashTileHp).toLocaleString()}/
-                {Math.round(digFeedback.crashTileMaxHp).toLocaleString()})
+                타격가능
               </div>
             ) : digFeedback.canGrab ? (
               <div className="rounded-xl border border-sky-200/50 bg-sky-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
@@ -5794,6 +6001,7 @@ export function ExcavatorGameWrapper({
               );
               const nickname =
                 session?.user?.nickname ?? session?.user?.loginId ?? "PLAYER";
+              const nickLen = nicknameCharLength(nickname);
               const displayScore =
                 mode === "game" ? seasonScoreBase + hud.score : hud.score;
               const bonusRemaining = Math.max(
@@ -5863,7 +6071,11 @@ export function ExcavatorGameWrapper({
                               Lv.{xpProgress.level}
                             </span>
                             <span
-                              className="yanmar-profile-chip-name"
+                              className={
+                                nickLen >= 7
+                                  ? "yanmar-profile-chip-name is-compact"
+                                  : "yanmar-profile-chip-name"
+                              }
                               title={nickname}
                             >
                               {nickname}
@@ -5949,6 +6161,13 @@ export function ExcavatorGameWrapper({
             <ActiveShopBuffIcons
               buffs={activeShopBuffs}
               onChange={persistActiveShopBuffs}
+              worldPickupsRef={
+                mode === "game" && session?.user?.id
+                  ? worldPickupsRef
+                  : undefined
+              }
+              worldPickupRevision={worldPickupRevision}
+              alignWithMinimap={mode !== "gameReady"}
             />
             <div className="flex w-[88px] flex-col items-stretch gap-1.5">
             <div className="relative flex w-full flex-col overflow-hidden rounded-xl border border-white/15 bg-black/60 shadow-lg backdrop-blur-sm">

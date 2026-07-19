@@ -35,8 +35,9 @@ export const HAUL_TRUCK_ALIGN = {
   collider: {
     centerOffsetX: 0,
     centerOffsetZ: -0.05,
-    halfX: 1.56,
-    halfZ: 3.45,
+    /** 짐칸 측판·캡 폭(시각 ~3.3)보다 여유 */
+    halfX: 1.85,
+    halfZ: 3.55,
   },
   /** 붐·암 충돌용 높이·짐칸 공동 (휠 바닥=그룹 원점 기준) */
   solidMinY: 0.5,
@@ -233,7 +234,7 @@ export function resolveExcavatorTruckOverlap(
   const hx = target.collider.halfX;
   const hz = target.collider.halfZ;
   const radius = EXCAVATOR_COLLISION_RADIUS;
-  const pad = 0.04;
+  const pad = 0.1;
 
   const closestX = Math.max(-hx, Math.min(hx, lx));
   const closestZ = Math.max(-hz, Math.min(hz, lz));
@@ -280,18 +281,35 @@ export function resolveExcavatorTruckOverlap(
   );
 }
 
-/** 주행 중 트럭에 부딪히면 직전 위치로 되돌리거나 밀어낸다. */
+export type ExcavatorTravelSnapshot = {
+  x: number;
+  z: number;
+  heading: number;
+  swing: number;
+};
+
+function restoreExcavatorTravel(
+  sim: ExcavatorSimState,
+  previous: ExcavatorTravelSnapshot,
+) {
+  sim.posX = previous.x;
+  sim.posZ = previous.z;
+  sim.heading = previous.heading;
+  sim.swing = previous.swing;
+}
+
+/** 주행 중 트럭에 부딪히면 직전 자세로 되돌리거나 밀어낸다. */
 export function constrainExcavatorToTruckTarget(
   sim: ExcavatorSimState,
-  previous: { x: number; z: number },
+  previous: ExcavatorTravelSnapshot,
   target: TruckAlignTarget | null,
 ): boolean {
   if (!target || !isExcavatorCollidingWithTruckTarget(sim.posX, sim.posZ, target)) {
     return false;
   }
+  // 진입 직전으로 되돌릴 때 heading도 복구 — 선회로 궤도가 파고드는 것 방지
   if (!isExcavatorCollidingWithTruckTarget(previous.x, previous.z, target)) {
-    sim.posX = previous.x;
-    sim.posZ = previous.z;
+    restoreExcavatorTravel(sim, previous);
     return true;
   }
   const resolved = resolveExcavatorTruckOverlap(sim.posX, sim.posZ, target);

@@ -1369,9 +1369,12 @@ function UpperHood({
   );
   useLayoutEffect(() => () => sideBrand?.texture.dispose(), [sideBrand]);
 
+  const isVio17HdMark = visual.modelPlate === "ViO17-1";
   const plateWidth = Math.min(
     1.35,
-    Math.max(0.78, visual.modelPlate.length * 0.11),
+    isVio17HdMark
+      ? 1.18
+      : Math.max(0.78, visual.modelPlate.length * 0.11),
   );
   const plateHeight = sideBrand
     ? plateWidth / sideBrand.aspect
@@ -1599,6 +1602,8 @@ export function PremiumExcavatorLink({
   logoHeight = 0.2,
   logoX,
   logoRotation = 0,
+  /** Open sky-facing channel so a hydraulic cylinder can sit inside. */
+  openTop = false,
 }: {
   length: number;
   height: number;
@@ -1608,18 +1613,48 @@ export function PremiumExcavatorLink({
   logoHeight?: number;
   logoX?: number;
   logoRotation?: number;
+  openTop?: boolean;
 }) {
   return (
     <group>
-      <RoundedBox
-        args={[length * 0.88, height * 0.68, sideDepth * 1.55]}
-        radius={Math.min(0.14, height * 0.28)}
-        smoothness={7}
-        position={[length * 0.52, 0, 0]}
-        castShadow
-      >
-        <meshStandardMaterial color={COLOR.paintRedDark} {...MATERIAL.paintedDark} />
-      </RoundedBox>
+      {openTop ? (
+        <>
+          {/* Belly web only — leaves the top open as a U-channel */}
+          <RoundedBox
+            args={[length * 0.9, height * 0.28, sideDepth * 1.5]}
+            radius={Math.min(0.1, height * 0.18)}
+            smoothness={6}
+            position={[length * 0.52, -height * 0.22, 0]}
+            castShadow
+          >
+            <meshStandardMaterial
+              color={COLOR.paintRedDark}
+              {...MATERIAL.paintedDark}
+            />
+          </RoundedBox>
+          {/* Thin inner floor so the channel reads as a box section */}
+          <mesh position={[length * 0.55, -height * 0.02, 0]} castShadow>
+            <boxGeometry args={[length * 0.78, height * 0.06, sideDepth * 1.15]} />
+            <meshStandardMaterial
+              color={COLOR.paintRedDark}
+              {...MATERIAL.paintedDark}
+            />
+          </mesh>
+        </>
+      ) : (
+        <RoundedBox
+          args={[length * 0.88, height * 0.68, sideDepth * 1.55]}
+          radius={Math.min(0.14, height * 0.28)}
+          smoothness={7}
+          position={[length * 0.52, 0, 0]}
+          castShadow
+        >
+          <meshStandardMaterial
+            color={COLOR.paintRedDark}
+            {...MATERIAL.paintedDark}
+          />
+        </RoundedBox>
+      )}
       {[-1, 1].map((side) => (
         <group key={`link-side-${side}`} position={[0, 0, side * sideDepth]}>
           <RoundedBox
@@ -1631,13 +1666,30 @@ export function PremiumExcavatorLink({
           >
             <meshStandardMaterial color={COLOR.paintRed} {...MATERIAL.painted} />
           </RoundedBox>
-          <mesh position={[length * 0.52, height * 0.39, side * 0.052]}>
-            <boxGeometry args={[length * 0.72, height * 0.075, 0.022]} />
-            <meshStandardMaterial color={COLOR.paintHighlight} {...MATERIAL.painted} />
-          </mesh>
+          {openTop ? (
+            // Top flange of the open channel (does not close the sky face)
+            <mesh position={[length * 0.52, height * 0.42, side * 0.02]}>
+              <boxGeometry args={[length * 0.78, height * 0.06, 0.055]} />
+              <meshStandardMaterial
+                color={COLOR.paintHighlight}
+                {...MATERIAL.painted}
+              />
+            </mesh>
+          ) : (
+            <mesh position={[length * 0.52, height * 0.39, side * 0.052]}>
+              <boxGeometry args={[length * 0.72, height * 0.075, 0.022]} />
+              <meshStandardMaterial
+                color={COLOR.paintHighlight}
+                {...MATERIAL.painted}
+              />
+            </mesh>
+          )}
           <mesh position={[length * 0.56, -height * 0.4, side * 0.052]}>
             <boxGeometry args={[length * 0.68, height * 0.09, 0.024]} />
-            <meshStandardMaterial color={COLOR.paintRedDark} {...MATERIAL.paintedDark} />
+            <meshStandardMaterial
+              color={COLOR.paintRedDark}
+              {...MATERIAL.paintedDark}
+            />
           </mesh>
           {logo && logoX != null ? (
             <mesh
@@ -1658,6 +1710,94 @@ export function PremiumExcavatorLink({
           ) : null}
         </group>
       ))}
+    </group>
+  );
+}
+
+/**
+ * SV 스타일 gooseneck 붐 — 발(0,0)·암 피벗(length,0)은 키네마틱과 동일,
+ * 중간만 앞으로~위쪽으로 약 45° 꺾인 시각 형상.
+ */
+export function PremiumExcavatorBoom({
+  length,
+  height,
+  sideDepth,
+  logo,
+  logoWidth = 1,
+  logoHeight = 0.2,
+}: {
+  length: number;
+  height: number;
+  sideDepth: number;
+  logo?: THREE.Texture;
+  logoWidth?: number;
+  logoHeight?: number;
+}) {
+  const kinkX = length * YANMAR_MACHINE_RIG.boomGooseneckKinkAlong;
+  const kinkY = Math.min(
+    YANMAR_MACHINE_RIG.boomGooseneckKinkRiseCap,
+    length * YANMAR_MACHINE_RIG.boomGooseneckKinkRise,
+  );
+  const lowerDx = kinkX;
+  const lowerDy = kinkY;
+  const lowerLen = Math.hypot(lowerDx, lowerDy);
+  const lowerAngle = Math.atan2(lowerDy, lowerDx);
+  const upperDx = length - kinkX;
+  const upperDy = -kinkY;
+  const upperLen = Math.hypot(upperDx, upperDy);
+  const upperAngle = Math.atan2(upperDy, upperDx);
+
+  return (
+    <group>
+      {/* 하부: 발 → 꺾임 */}
+      <group position={[0, 0, 0]} rotation={[0, 0, lowerAngle]}>
+        <PremiumExcavatorLink
+          length={lowerLen}
+          height={height}
+          sideDepth={sideDepth}
+        />
+      </group>
+
+      {/* 꺾임 보강 (관절 플레이트 — 실린더 덮개 아님) */}
+      <group position={[kinkX, kinkY, 0]}>
+        {[-1, 1].map((side) => (
+          <RoundedBox
+            key={`kink-cheek-${side}`}
+            args={[height * 0.95, height * 1.05, 0.09]}
+            radius={0.08}
+            smoothness={5}
+            position={[0, 0, side * sideDepth]}
+            castShadow
+          >
+            <meshStandardMaterial color={COLOR.paintRed} {...MATERIAL.painted} />
+          </RoundedBox>
+        ))}
+        <RoundedBox
+          args={[height * 0.55, height * 0.55, sideDepth * 1.35]}
+          radius={0.08}
+          smoothness={5}
+          castShadow
+        >
+          <meshStandardMaterial
+            color={COLOR.paintRedDark}
+            {...MATERIAL.paintedDark}
+          />
+        </RoundedBox>
+      </group>
+
+      {/* 상부: 꺾임 → 암 피벗 — 등쪽 오픈 채널로 암 실린더가 직선으로 앉음 */}
+      <group position={[kinkX, kinkY, 0]} rotation={[0, 0, upperAngle]}>
+        <PremiumExcavatorLink
+          length={upperLen}
+          height={height * 0.96}
+          sideDepth={sideDepth}
+          logo={logo}
+          logoWidth={logoWidth}
+          logoHeight={logoHeight}
+          logoX={upperLen * 0.52}
+          openTop
+        />
+      </group>
     </group>
   );
 }

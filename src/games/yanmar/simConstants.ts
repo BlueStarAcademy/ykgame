@@ -11,14 +11,19 @@ export const BREAKER_TIP_PROBE_RADIUS = 0.65;
 /** 이 높이보다 브레이커 팁이 낮으면 주행 잠금. */
 export const BREAKER_TRAVEL_LOCK_CLEARANCE = 0.28;
 export const EXCAVATOR_MAP_WALL_MARGIN = 4.6;
-export const EXCAVATOR_COLLISION_RADIUS = 1.35;
+/**
+ * 차체(궤도 포함) 충돌 원 반경.
+ * 대형 차체 궤도 폭(~1.5m)이 트럭 측면에 파고들지 않도록 시각보다 약간 여유 있게.
+ */
+export const EXCAVATOR_COLLISION_RADIUS = 1.68;
 
 /** 붐·암·버킷 vs 덤프트럭 고체 — 구(sphere) 근사 반경 */
 export const DUMP_TRUCK_ARM_PROBE_RADIUS = 0.32;
 
+/** 덤프트럭 차체 OBB (모델 측판·캡 외곽에 맞춤) */
 export const DUMP_TRUCK_COLLIDER = {
-  centerOffsetX: -0.12,
+  centerOffsetX: -0.08,
   centerOffsetZ: 0,
-  halfX: 3.15,
-  halfZ: 1.62,
+  halfX: 3.4,
+  halfZ: 1.85,
 } as const;
