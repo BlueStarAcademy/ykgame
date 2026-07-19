@@ -218,6 +218,7 @@ import {
   markMonumentDailyClaimed,
   MONUMENT_POINTS_ICON,
   MONUMENT_UNLOCK_LEVEL,
+  monumentStorageCap,
   pushMonumentQuestProgress,
   saveMonumentQuestState,
   type MonumentPhase,
@@ -1020,6 +1021,7 @@ export function ExcavatorGameWrapper({
   /** False until the first real XP value is applied — blocks false level-up on boot. */
   const xpHydratedRef = useRef((session?.user?.totalXp ?? 0) > 0);
   const attachmentWarningTimerRef = useRef<number | null>(null);
+  const attachmentWarningMessageRef = useRef<string | null>(null);
   const [travelRaiseWarn, setTravelRaiseWarn] = useState<{
     key: number;
     phase: "hold" | "fade";
@@ -1836,9 +1838,20 @@ export function ExcavatorGameWrapper({
 
   const showAttachmentWarning = useCallback(
     (message: string, opts?: { enhanceCores?: number; stars?: number }) => {
+      const isReward = Boolean(opts?.enhanceCores || opts?.stars);
+      // Identical status toast already up — do not remount / reset the dismiss
+      // timer (sim contact flicker used to spam this and freeze the banner).
+      if (
+        !isReward &&
+        attachmentWarningMessageRef.current === message &&
+        attachmentWarningTimerRef.current != null
+      ) {
+        return;
+      }
       if (attachmentWarningTimerRef.current != null) {
         window.clearTimeout(attachmentWarningTimerRef.current);
       }
+      attachmentWarningMessageRef.current = message;
       setAttachmentWarning((current) => ({
         key: (current?.key ?? 0) + 1,
         message,
@@ -1848,6 +1861,7 @@ export function ExcavatorGameWrapper({
       attachmentWarningTimerRef.current = window.setTimeout(() => {
         setAttachmentWarning(null);
         attachmentWarningTimerRef.current = null;
+        attachmentWarningMessageRef.current = null;
       }, 2400);
     },
     [],
@@ -1908,6 +1922,12 @@ export function ExcavatorGameWrapper({
       simRef.current.attachmentType = next;
       simRef.current.carriedBoulderId = null;
       setAttachmentType(next);
+      if (attachmentWarningTimerRef.current != null) {
+        window.clearTimeout(attachmentWarningTimerRef.current);
+        attachmentWarningTimerRef.current = null;
+      }
+      attachmentWarningMessageRef.current = null;
+      setAttachmentWarning(null);
     },
     [showAttachmentWarning],
   );
@@ -3431,7 +3451,12 @@ export function ExcavatorGameWrapper({
         const enteredMon = nearMon && !nearMonumentRef.current;
         nearMonumentRef.current = nearMon;
         setNearMonument(nearMon);
-        if (enteredMon) yanmarAudio.playMonumentEnter();
+        if (enteredMon) {
+          yanmarAudio.playMonumentEnter();
+          if (monumentPhaseRef.current === "active") {
+            void loadMonumentState();
+          }
+        }
         if (!nearMon) setShowMonumentPanel(false);
       }
 
@@ -3454,7 +3479,23 @@ export function ExcavatorGameWrapper({
       }
     }, 250);
     return () => window.clearInterval(id);
-  }, []);
+  }, [loadMonumentState]);
+
+  useEffect(() => {
+    if (sessionStatus === "loading" || !session?.user?.id) return;
+    if ((monumentPanelState?.phase ?? monumentPhaseRef.current) !== "active") {
+      return;
+    }
+    const id = window.setInterval(() => {
+      void loadMonumentState();
+    }, 75_000);
+    return () => window.clearInterval(id);
+  }, [
+    session?.user?.id,
+    sessionStatus,
+    monumentPanelState?.phase,
+    loadMonumentState,
+  ]);
 
   useEffect(() => {
     void loadEquipment();
@@ -5897,7 +5938,10 @@ export function ExcavatorGameWrapper({
                                 ? "미션 확인"
                                 : monumentPanelState?.phase === "building"
                                   ? "건설 현황"
-                                  : "조형물 입장"}
+                                  : monumentPanelState?.phase === "active" &&
+                                      (monumentPanelState.starsStored ?? 0) > 0
+                                    ? `스타 수령 ${monumentPanelState.starsStored.toLocaleString()}`
+                                    : "조형물 입장"}
                             </span>
                           </span>
                         </button>
@@ -6108,7 +6152,10 @@ export function ExcavatorGameWrapper({
                             ? "미션 확인"
                             : monumentPanelState?.phase === "building"
                               ? "건설 현황"
-                              : "조형물 입장"}
+                              : monumentPanelState?.phase === "active" &&
+                                  (monumentPanelState.starsStored ?? 0) > 0
+                                ? `스타 수령 ${monumentPanelState.starsStored.toLocaleString()}`
+                                : "조형물 입장"}
                         </span>
                       </span>
                     </button>
@@ -6873,6 +6920,9 @@ export function ExcavatorGameWrapper({
                 "locked"
               }
               monumentStarsStored={monumentPanelState?.starsStored ?? 0}
+              monumentStorageCap={monumentStorageCap(
+                monumentPanelState?.levels?.storage_cap ?? 0,
+              )}
             />
           </div>
         )}

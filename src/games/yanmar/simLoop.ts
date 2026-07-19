@@ -1120,10 +1120,11 @@ export function tickExcavatorSim(params: SimTickParams) {
   ) {
     const permission = checkAttachmentUse("breaker", toolZone, "strike");
     if (!permission.allowed) {
+      // Latch while the pedal is held outside the crash zone. Do not clear on
+      // brief tip lift — contact flicker was re-firing the toast every frame
+      // and resetting the UI dismiss timer so the warning never disappeared.
       if (toolTouchesGround) {
         warnAttachment(permission.message, "breaker-zone");
-      } else {
-        clearWarningLatch("breaker-zone");
       }
     } else {
       clearWarningLatch("breaker-zone");
@@ -1202,7 +1203,8 @@ export function tickExcavatorSim(params: SimTickParams) {
 
     if (grapplePedal !== 0 && !canGrabHere && toolTouchesGround) {
       warnAttachment(permission.message, "grapple-zone");
-    } else {
+    } else if (grapplePedal === 0 || canGrabHere) {
+      // Keep latch across brief tip lift while still pressing outside zone.
       clearWarningLatch("grapple-zone");
     }
 
@@ -1711,14 +1713,11 @@ export function tickExcavatorSim(params: SimTickParams) {
   const bucketDigInput =
     Math.max(0, -filtered.right.x) > 0.12 ||
     Math.max(0, -filtered.left.y) > 0.12;
-  if (
-    sim.attachmentType === "bucket" &&
-    bucketDigInput &&
-    toolTouchesGround &&
-    !inZone
-  ) {
-    const permission = checkAttachmentUse("bucket", toolZone, "dig");
-    warnAttachment(permission.message, "bucket-dig-zone");
+  if (sim.attachmentType === "bucket" && bucketDigInput && !inZone) {
+    if (toolTouchesGround) {
+      const permission = checkAttachmentUse("bucket", toolZone, "dig");
+      warnAttachment(permission.message, "bucket-dig-zone");
+    }
   } else {
     clearWarningLatch("bucket-dig-zone");
   }

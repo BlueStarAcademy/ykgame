@@ -173,6 +173,7 @@ interface ExcavatorSceneProps {
   workshopClaimableIds?: ReadonlySet<WorkshopId> | readonly WorkshopId[];
   monumentPhase?: import("./monument/types").MonumentPhase;
   monumentStarsStored?: number;
+  monumentStorageCap?: number;
 }
 
 function TerrainMesh({
@@ -3711,6 +3712,7 @@ function SceneContent(props: ExcavatorSceneProps) {
       <MonumentPylon
         phase={props.monumentPhase ?? "locked"}
         starsStored={props.monumentStarsStored ?? 0}
+        storageCap={props.monumentStorageCap}
       />
       <TerrainRockScatter key={`rocks-${terrainRevision}`} terrainRef={props.terrainRef} />
       <ContactShadows

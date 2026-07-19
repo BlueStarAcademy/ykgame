@@ -242,13 +242,21 @@ function QuestMarker() {
 export function MonumentPylon({
   phase,
   starsStored = 0,
+  storageCap = 100,
 }: {
   phase: MonumentPhase;
   starsStored?: number;
+  storageCap?: number;
 }) {
   if (phase === "locked") return null;
 
   const { x, z, rotationY } = MONUMENT_SIGN;
+  const cap = Math.max(1, storageCap);
+  const storagePct = Math.max(
+    0,
+    Math.min(100, Math.round((100 * Math.max(0, starsStored)) / cap)),
+  );
+  const storageFull = storagePct >= 100;
 
   return (
     <group
@@ -272,14 +280,14 @@ export function MonumentPylon({
           건설완료 가능
         </MonumentLabel>
       ) : null}
-      {phase === "active" && starsStored > 0 ? (
+      {phase === "active" ? (
         <MonumentLabel
-          position={[0, 9.2, 0.2]}
-          fontSize={0.46}
-          color="#fbbf24"
-          outlineColor="#422006"
+          position={[0, 9.55, 0.2]}
+          fontSize={storageFull ? 0.58 : 0.52}
+          color={storageFull ? "#fb923c" : "#fbbf24"}
+          outlineColor={storageFull ? "#7c2d12" : "#422006"}
         >
-          {`★ ${starsStored}`}
+          {`${storagePct}%`}
         </MonumentLabel>
       ) : null}
     </group>
