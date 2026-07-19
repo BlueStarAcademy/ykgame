@@ -411,6 +411,19 @@ export function GearPanel({
     enhanceLevel: number;
     stars: number;
   } | null>(null);
+  const [bulkMode, setBulkMode] = useState<
+    "dismantle" | "sell" | "synth" | null
+  >(null);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkDone, setBulkDone] = useState<
+    | { kind: "dismantle"; count: number; cores: number }
+    | { kind: "sell"; count: number; stars: number }
+    | { kind: "synth"; batches: number; upgraded: number }
+    | null
+  >(null);
   const [synthOpen, setSynthOpen] = useState(false);
   const [synthGrade, setSynthGrade] = useState<ItemGrade | null>(null);
   const [synthSlots, setSynthSlots] = useState<[string | null, string | null, string | null]>([
@@ -421,6 +434,11 @@ export function GearPanel({
   const [synthResult, setSynthResult] = useState<SynthesizeActionResult | null>(
     null,
   );
+  const [synthPhase, setSynthPhase] = useState<"select" | "fusing" | "result">(
+    "select",
+  );
+  const [synthMaterials, setSynthMaterials] = useState<GearPanelItem[]>([]);
+  const [synthFuseReveal, setSynthFuseReveal] = useState(false);
   const [synthFocusId, setSynthFocusId] = useState<string | null>(null);
   const [artPreview, setArtPreview] = useState<GearPanelItem | null>(null);
   const [expandConfirmOpen, setExpandConfirmOpen] = useState(false);
@@ -501,6 +519,10 @@ export function GearPanel({
       setSynthFocusId(null);
       setPendingSellId(null);
       setSellResult(null);
+      setBulkMode(null);
+      setBulkSelected(new Set());
+      setBulkConfirmOpen(false);
+      setBulkDone(null);
     }
   }, [open, embedded]);
 
@@ -526,6 +548,41 @@ export function GearPanel({
   const sellStars = pendingSell
     ? SELL_STARS_BY_GRADE[pendingSell.grade]
     : 0;
+  const bulkItems = useMemo(() => {
+    if (!bulkMode) return [] as GearPanelItem[];
+    return filtered.filter(
+      (item) => bulkSelected.has(item.id) && !item.equippedSlot,
+    );
+  }, [bulkMode, bulkSelected, filtered]);
+  const bulkSynthGrade = bulkMode === "synth" ? (bulkItems[0]?.grade ?? null) : null;
+  const bulkSynthBatches =
+    bulkMode === "synth" &&
+    bulkItems.length >= 3 &&
+    bulkItems.length % 3 === 0 &&
+    bulkItems.every((item) => item.grade === bulkSynthGrade)
+      ? bulkItems.length / 3
+      : 0;
+  const bulkSynthReady = bulkSynthBatches > 0;
+  const bulkCoresPreview = useMemo(
+    () =>
+      bulkItems.reduce(
+        (sum, item) =>
+          sum + getDismantleEnhanceCores(item.grade, item.enhanceLevel),
+        0,
+      ),
+    [bulkItems],
+  );
+  const bulkStarsPreview = useMemo(
+    () =>
+      bulkItems.reduce((sum, item) => sum + SELL_STARS_BY_GRADE[item.grade], 0),
+    [bulkItems],
+  );
+  const bulkSynthUpgradeChance = bulkSynthGrade
+    ? Math.round(SYNTH_UPGRADE_CHANCE[bulkSynthGrade] * 100)
+    : 0;
+  const bulkSynthNextGrade = bulkSynthGrade
+    ? SYNTH_NEXT_GRADE[bulkSynthGrade]
+    : null;
   const synthSlotItems = synthSlots.map((id) =>
     id ? (items.find((i) => i.id === id) ?? null) : null,
   );
@@ -593,17 +650,25 @@ export function GearPanel({
   const closeSellResult = () => setSellResult(null);
 
   const closeSynth = () => {
+    if (synthPhase === "fusing") return;
     setSynthOpen(false);
     setSynthGrade(null);
     setSynthSlots([null, null, null]);
     setSynthResult(null);
+    setSynthPhase("select");
+    setSynthMaterials([]);
+    setSynthFuseReveal(false);
     setSynthFocusId(null);
   };
 
   const openSynth = (seedItem: GearPanelItem) => {
     if (seedItem.equippedSlot) return;
     setBubble(null);
+    exitBulkMode();
     setSynthResult(null);
+    setSynthPhase("select");
+    setSynthMaterials([]);
+    setSynthFuseReveal(false);
     setSynthGrade(seedItem.grade);
     setSynthSlots([seedItem.id, null, null]);
     setSynthFocusId(seedItem.id);
@@ -611,7 +676,8 @@ export function GearPanel({
   };
 
   const tryFillSynthSlot = (item: GearPanelItem) => {
-    if (!synthOpen || !synthGrade || synthResult) return false;
+    if (!synthOpen || !synthGrade || synthResult || synthPhase !== "select")
+      return false;
     if (item.equippedSlot) return true;
     if (item.grade !== synthGrade) return true;
     setSynthFocusId(item.id);
@@ -678,14 +744,180 @@ export function GearPanel({
     });
   }
 
+  function enterBulkMode(mode: "dismantle" | "sell" | "synth") {
+    if (busy) return;
+    setBubble(null);
+    setFilterOpen(false);
+    setEnhanceItemId(null);
+    setPendingDismantleId(null);
+    setPendingSellId(null);
+    setSynthOpen(false);
+    setSynthGrade(null);
+    setSynthSlots([null, null, null]);
+    setSynthResult(null);
+    setSynthPhase("select");
+    setSynthMaterials([]);
+    setSynthFuseReveal(false);
+    setSynthFocusId(null);
+    setBulkConfirmOpen(false);
+    setBulkDone(null);
+    setBulkMode(mode);
+    setBulkSelected(new Set());
+  }
+
+  function exitBulkMode() {
+    setBulkMode(null);
+    setBulkSelected(new Set());
+    setBulkConfirmOpen(false);
+  }
+
+  function toggleBulkSelect(item: GearPanelItem) {
+    if (item.equippedSlot) return;
+    setBulkSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(item.id)) {
+        next.delete(item.id);
+        return next;
+      }
+      if (bulkMode === "synth" && next.size > 0) {
+        const firstId = next.values().next().value as string | undefined;
+        const first = items.find((i) => i.id === firstId);
+        if (first && first.grade !== item.grade) return prev;
+      }
+      next.add(item.id);
+      return next;
+    });
+  }
+
+  function selectAllBulkVisible() {
+    if (bulkMode === "synth") {
+      const grade =
+        bulkItems[0]?.grade ??
+        filtered.find((item) => !item.equippedSlot)?.grade ??
+        null;
+      if (!grade) {
+        setBulkSelected(new Set());
+        return;
+      }
+      const candidates = filtered.filter(
+        (item) => !item.equippedSlot && item.grade === grade,
+      );
+      const usable = Math.floor(candidates.length / 3) * 3;
+      setBulkSelected(
+        new Set(candidates.slice(0, usable).map((item) => item.id)),
+      );
+      return;
+    }
+    setBulkSelected(
+      new Set(
+        filtered.filter((item) => !item.equippedSlot).map((item) => item.id),
+      ),
+    );
+  }
+
+  async function confirmBulkAction() {
+    if (!bulkMode || bulkItems.length === 0 || busy) return;
+    if (bulkMode === "synth" && !bulkSynthReady) return;
+    const targets = bulkItems.map((item) => ({
+      id: item.id,
+      grade: item.grade,
+      enhanceLevel: item.enhanceLevel,
+    }));
+    setBulkConfirmOpen(false);
+    if (bulkMode === "dismantle") {
+      let cores = 0;
+      let count = 0;
+      for (const target of targets) {
+        const result = await onDismantle(target.id);
+        if (result && typeof result.cores === "number") {
+          cores += result.cores;
+          count += 1;
+        }
+      }
+      exitBulkMode();
+      if (count > 0) setBulkDone({ kind: "dismantle", count, cores });
+      return;
+    }
+    if (bulkMode === "sell") {
+      let stars = 0;
+      let count = 0;
+      for (const target of targets) {
+        const result = await onSell(target.id);
+        if (result && typeof result.stars === "number") {
+          stars += result.stars;
+          count += 1;
+        }
+      }
+      exitBulkMode();
+      if (count > 0) setBulkDone({ kind: "sell", count, stars });
+      return;
+    }
+
+    let batches = 0;
+    let upgraded = 0;
+    for (let i = 0; i + 2 < targets.length; i += 3) {
+      const trio: [string, string, string] = [
+        targets[i]!.id,
+        targets[i + 1]!.id,
+        targets[i + 2]!.id,
+      ];
+      const result = await onSynthesize(trio);
+      if (result?.item) {
+        batches += 1;
+        if (result.upgraded) upgraded += 1;
+      }
+    }
+    exitBulkMode();
+    if (batches > 0) setBulkDone({ kind: "synth", batches, upgraded });
+  }
+
   async function confirmSynthesize() {
-    if (busy || !synthGrade) return;
+    if (busy || !synthGrade || synthPhase !== "select") return;
     const ids = synthSlots.filter((id): id is string => !!id);
     if (ids.length !== 3) return;
-    const result = await onSynthesize(ids as [string, string, string]);
-    if (!result?.item) return;
+    const materials = synthSlotItems.filter(
+      (item): item is GearPanelItem => !!item,
+    );
+    if (materials.length !== 3) return;
+
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const gatherMs = reducedMotion ? 120 : 980;
+    const revealMs = reducedMotion ? 80 : 620;
+
+    setSynthMaterials(materials);
+    setSynthFuseReveal(false);
+    setSynthPhase("fusing");
+
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        window.setTimeout(resolve, ms);
+      });
+
+    const apiPromise = (async (): Promise<SynthesizeActionResult | null> => {
+      try {
+        const raw = await onSynthesize(ids as [string, string, string]);
+        return (raw as SynthesizeActionResult | null | undefined) ?? null;
+      } catch {
+        return null;
+      }
+    })();
+
+    const [, result] = await Promise.all([wait(gatherMs), apiPromise]);
+    if (!result?.item) {
+      setSynthPhase("select");
+      setSynthMaterials([]);
+      setSynthFuseReveal(false);
+      return;
+    }
+
     setSynthSlots([null, null, null]);
     setSynthResult(result);
+    setSynthFuseReveal(true);
+    await wait(revealMs);
+    setSynthPhase("result");
+    setSynthMaterials([]);
   }
 
   const dismissEnhanceResult = () => {
@@ -954,50 +1186,123 @@ export function GearPanel({
 
         <section className="yanmar-gear-mgr-inv">
           <div className="yanmar-gear-mgr-inv-bar">
-            <div className="yanmar-gear-filter-dd" ref={filterRef}>
-              <button
-                type="button"
-                className="yanmar-gear-filter-dd-btn"
-                onClick={() => setFilterOpen((v) => !v)}
-                aria-expanded={filterOpen}
-              >
-                필터: {filterSummary}
-                <span aria-hidden>▾</span>
-              </button>
-              {filterOpen ? (
-                <div className="yanmar-gear-filter-dd-menu" role="menu">
-                  <label className="yanmar-gear-filter-dd-item">
-                    <input
-                      type="checkbox"
-                      checked={filterAll}
-                      onChange={(e) => {
-                        const on = e.target.checked;
-                        setSlotFilters(
-                          Object.fromEntries(
-                            GEAR_SLOTS.map((s) => [s, on]),
-                          ) as Record<GearSlot, boolean>,
-                        );
-                      }}
-                    />
-                    전체
-                  </label>
-                  {GEAR_SLOTS.map((slot) => (
-                    <label key={slot} className="yanmar-gear-filter-dd-item">
+            <div className="yanmar-gear-mgr-inv-bar-left">
+              <div className="yanmar-gear-filter-dd" ref={filterRef}>
+                <button
+                  type="button"
+                  className="yanmar-gear-filter-dd-btn"
+                  onClick={() => setFilterOpen((v) => !v)}
+                  aria-expanded={filterOpen}
+                  disabled={!!bulkMode}
+                >
+                  {filterSummary}
+                  <span aria-hidden>▾</span>
+                </button>
+                {filterOpen && !bulkMode ? (
+                  <div className="yanmar-gear-filter-dd-menu" role="menu">
+                    <label className="yanmar-gear-filter-dd-item">
                       <input
                         type="checkbox"
-                        checked={slotFilters[slot]}
+                        checked={filterAll}
                         onChange={(e) => {
-                          setSlotFilters((prev) => ({
-                            ...prev,
-                            [slot]: e.target.checked,
-                          }));
+                          const on = e.target.checked;
+                          setSlotFilters(
+                            Object.fromEntries(
+                              GEAR_SLOTS.map((s) => [s, on]),
+                            ) as Record<GearSlot, boolean>,
+                          );
                         }}
                       />
-                      {GEAR_SLOT_LABEL[slot]}
+                      전체
                     </label>
-                  ))}
-                </div>
-              ) : null}
+                    {GEAR_SLOTS.map((slot) => (
+                      <label key={slot} className="yanmar-gear-filter-dd-item">
+                        <input
+                          type="checkbox"
+                          checked={slotFilters[slot]}
+                          onChange={(e) => {
+                            setSlotFilters((prev) => ({
+                              ...prev,
+                              [slot]: e.target.checked,
+                            }));
+                          }}
+                        />
+                        {GEAR_SLOT_LABEL[slot]}
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              {!bulkMode ? (
+                <>
+                  <button
+                    type="button"
+                    className="yanmar-gear-bulk-btn yanmar-gear-bulk-btn--dismantle"
+                    disabled={busy}
+                    onClick={() => enterBulkMode("dismantle")}
+                  >
+                    선택분해
+                  </button>
+                  <button
+                    type="button"
+                    className="yanmar-gear-bulk-btn yanmar-gear-bulk-btn--sell"
+                    disabled={busy}
+                    onClick={() => enterBulkMode("sell")}
+                  >
+                    선택판매
+                  </button>
+                  <button
+                    type="button"
+                    className="yanmar-gear-bulk-btn yanmar-gear-bulk-btn--synth"
+                    disabled={busy}
+                    onClick={() => enterBulkMode("synth")}
+                  >
+                    선택합성
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="yanmar-gear-bulk-btn"
+                    disabled={busy}
+                    onClick={selectAllBulkVisible}
+                  >
+                    전체선택
+                  </button>
+                  <button
+                    type="button"
+                    className="yanmar-gear-bulk-btn"
+                    disabled={busy}
+                    onClick={exitBulkMode}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    className={`yanmar-gear-bulk-btn ${
+                      bulkMode === "dismantle"
+                        ? "yanmar-gear-bulk-btn--dismantle"
+                        : bulkMode === "sell"
+                          ? "yanmar-gear-bulk-btn--sell"
+                          : "yanmar-gear-bulk-btn--synth"
+                    }`}
+                    disabled={
+                      busy ||
+                      (bulkMode === "synth"
+                        ? !bulkSynthReady
+                        : bulkItems.length === 0)
+                    }
+                    onClick={() => setBulkConfirmOpen(true)}
+                  >
+                    {bulkMode === "dismantle"
+                      ? "분해하기"
+                      : bulkMode === "sell"
+                        ? "판매하기"
+                        : "합성하기"}
+                  </button>
+                </>
+              )}
             </div>
             <span className="yanmar-gear-mgr-cap">
               {items.length} / {inventorySlots}
@@ -1012,16 +1317,35 @@ export function GearPanel({
                   grade={item.grade}
                   enhanceLevel={item.enhanceLevel}
                   selected={
-                    (!!bubble &&
-                      bubble.itemId === item.id &&
-                      (bubble.kind === "compare" ||
-                        bubble.kind === "equipped")) ||
-                    (synthOpen && synthSlots.includes(item.id))
+                    (bulkMode
+                      ? bulkSelected.has(item.id)
+                      : (!!bubble &&
+                          bubble.itemId === item.id &&
+                          (bubble.kind === "compare" ||
+                            bubble.kind === "equipped")) ||
+                        (synthOpen && synthSlots.includes(item.id)))
                   }
+                  checked={!!bulkMode && bulkSelected.has(item.id)}
                   equipped={!!item.equippedSlot}
                   size="md"
-                  className="yanmar-gear-mgr-inv-cell"
+                  className={`yanmar-gear-mgr-inv-cell${
+                    bulkMode &&
+                    (item.equippedSlot ||
+                      (bulkMode === "synth" &&
+                        !!bulkSynthGrade &&
+                        item.grade !== bulkSynthGrade))
+                      ? " yanmar-gear-mgr-inv-cell--bulk-locked"
+                      : ""
+                  }${
+                    bulkMode && bulkSelected.has(item.id)
+                      ? " yanmar-gear-mgr-inv-cell--bulk-on"
+                      : ""
+                  }`}
                   onClick={() => {
+                    if (bulkMode) {
+                      toggleBulkSelect(item);
+                      return;
+                    }
                     if (tryFillSynthSlot(item)) return;
                     if (item.equippedSlot) {
                       setBubble({
@@ -1037,9 +1361,19 @@ export function GearPanel({
                       slot: item.slot,
                     });
                   }}
-                  title={`${item.nameSnapshot}${
-                    item.enhanceLevel > 0 ? ` +${item.enhanceLevel}` : ""
-                  }`}
+                  title={
+                    bulkMode && item.equippedSlot
+                      ? "장착 중 — 선택 불가"
+                      : bulkMode === "synth" &&
+                          bulkSynthGrade &&
+                          item.grade !== bulkSynthGrade
+                        ? "같은 등급만 선택 가능"
+                        : `${item.nameSnapshot}${
+                            item.enhanceLevel > 0
+                              ? ` +${item.enhanceLevel}`
+                              : ""
+                          }`
+                  }
                 />
               ))}
               {filterAll
@@ -1842,6 +2176,190 @@ export function GearPanel({
         </div>
       ) : null}
 
+      {bulkConfirmOpen && bulkMode ? (
+        <div
+          className="yanmar-gear-confirm-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="yanmar-gear-bulk-title"
+        >
+          <button
+            type="button"
+            className="yanmar-gear-confirm-backdrop"
+            aria-label="일괄 확인 닫기"
+            disabled={busy}
+            onClick={() => setBulkConfirmOpen(false)}
+          />
+          <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--dismantle">
+            <p className="yanmar-gear-confirm-eyebrow">
+              {bulkMode === "dismantle"
+                ? "선택 분해"
+                : bulkMode === "sell"
+                  ? "선택 판매"
+                  : "선택 합성"}
+            </p>
+            <h3 id="yanmar-gear-bulk-title">
+              {bulkMode === "dismantle"
+                ? `${bulkItems.length}개 장비를 분해할까요?`
+                : bulkMode === "sell"
+                  ? `${bulkItems.length}개 장비를 판매할까요?`
+                  : `${bulkItems.length}개 장비를 ${bulkSynthBatches}회 합성할까요?`}
+            </h3>
+            {bulkMode === "synth" ? (
+              <div className="yanmar-gear-confirm-reward">
+                <span className="yanmar-gear-confirm-reward-label">합성 정보</span>
+                <span className="yanmar-gear-confirm-reward-value">
+                  <strong>
+                    {bulkSynthGrade
+                      ? ITEM_GRADE_LABEL[bulkSynthGrade]
+                      : ""}{" "}
+                    × {bulkItems.length}
+                  </strong>
+                  {bulkSynthNextGrade ? (
+                    <span>
+                      → {ITEM_GRADE_LABEL[bulkSynthNextGrade]}{" "}
+                      {bulkSynthUpgradeChance}%
+                    </span>
+                  ) : (
+                    <span>동일 등급 100%</span>
+                  )}
+                </span>
+              </div>
+            ) : (
+              <div className="yanmar-gear-confirm-reward">
+                <span className="yanmar-gear-confirm-reward-label">
+                  예상 획득
+                </span>
+                {bulkMode === "dismantle" ? (
+                  <span className="yanmar-gear-confirm-reward-value">
+                    <img
+                      src="/images/yanmar/2d/enhance-core.png?v=3"
+                      alt=""
+                      width={22}
+                      height={22}
+                      draggable={false}
+                    />
+                    <strong className="tabular-nums">+{bulkCoresPreview}</strong>
+                    <span>강화코어</span>
+                  </span>
+                ) : (
+                  <span className="yanmar-gear-confirm-reward-value">
+                    <StarAmount value={bulkStarsPreview} />
+                  </span>
+                )}
+              </div>
+            )}
+            <p className="yanmar-gear-confirm-warn">
+              {bulkMode === "dismantle"
+                ? "분해한 장비는 되돌릴 수 없습니다."
+                : bulkMode === "sell"
+                  ? "판매한 장비는 되돌릴 수 없습니다."
+                  : "재료 장비는 소모되며 되돌릴 수 없습니다. 3개 단위로 합성됩니다."}
+            </p>
+            <div className="yanmar-gear-confirm-actions">
+              <button
+                type="button"
+                className="yanmar-gear-btn yanmar-gear-btn--unequip"
+                disabled={busy}
+                onClick={() => setBulkConfirmOpen(false)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className={
+                  bulkMode === "dismantle"
+                    ? "yanmar-gear-btn yanmar-gear-btn--sell"
+                    : bulkMode === "sell"
+                      ? "yanmar-gear-btn yanmar-gear-btn--vend"
+                      : "yanmar-gear-btn yanmar-gear-btn--synth"
+                }
+                disabled={
+                  busy ||
+                  (bulkMode === "synth"
+                    ? !bulkSynthReady
+                    : bulkItems.length === 0)
+                }
+                onClick={() => void confirmBulkAction()}
+              >
+                {bulkMode === "dismantle"
+                  ? "분해하기"
+                  : bulkMode === "sell"
+                    ? "판매하기"
+                    : "합성하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {bulkDone ? (
+        <div
+          className="yanmar-gear-confirm-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="yanmar-gear-bulk-done-title"
+        >
+          <button
+            type="button"
+            className="yanmar-gear-confirm-backdrop"
+            aria-label="일괄 결과 닫기"
+            onClick={() => setBulkDone(null)}
+          />
+          <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--done">
+            <p className="yanmar-gear-confirm-eyebrow">
+              {bulkDone.kind === "dismantle"
+                ? "분해 완료"
+                : bulkDone.kind === "sell"
+                  ? "판매 완료"
+                  : "합성 완료"}
+            </p>
+            <h3 id="yanmar-gear-bulk-done-title">
+              {bulkDone.kind === "dismantle"
+                ? `${bulkDone.count}개 장비를 분해했습니다`
+                : bulkDone.kind === "sell"
+                  ? `${bulkDone.count}개 장비를 판매했습니다`
+                  : `${bulkDone.batches}회 합성했습니다${
+                      bulkDone.upgraded > 0
+                        ? ` (등급 상승 ${bulkDone.upgraded}회)`
+                        : ""
+                    }`}
+            </h3>
+            {bulkDone.kind === "synth" ? null : (
+              <div className="yanmar-gear-confirm-reward">
+                <span className="yanmar-gear-confirm-reward-label">획득</span>
+                {bulkDone.kind === "dismantle" ? (
+                  <span className="yanmar-gear-confirm-reward-value">
+                    <img
+                      src="/images/yanmar/2d/enhance-core.png?v=3"
+                      alt=""
+                      width={22}
+                      height={22}
+                      draggable={false}
+                    />
+                    <strong className="tabular-nums">+{bulkDone.cores}</strong>
+                    <span>강화코어</span>
+                  </span>
+                ) : (
+                  <span className="yanmar-gear-confirm-reward-value">
+                    <StarAmount value={bulkDone.stars} />
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="yanmar-gear-confirm-actions yanmar-gear-confirm-actions--single">
+              <button
+                type="button"
+                className="yanmar-gear-btn yanmar-gear-btn--enhance"
+                onClick={() => setBulkDone(null)}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {synthOpen ? (
         <div
           className="yanmar-gear-confirm-layer"
@@ -1853,18 +2371,20 @@ export function GearPanel({
             type="button"
             className="yanmar-gear-confirm-backdrop"
             aria-label="합성 모달 닫기"
-            disabled={busy}
+            disabled={busy || synthPhase === "fusing"}
             onClick={closeSynth}
           />
           <div className="yanmar-gear-confirm-card yanmar-gear-synth-card">
             <p className="yanmar-gear-confirm-eyebrow">장비 합성</p>
             <h3 id="yanmar-gear-synth-title">
-              {synthResult
+              {synthPhase === "result"
                 ? "합성 완료"
-                : `${synthGrade ? ITEM_GRADE_LABEL[synthGrade] : ""} 장비 3개 합성`}
+                : synthPhase === "fusing"
+                  ? "합성 중…"
+                  : `${synthGrade ? ITEM_GRADE_LABEL[synthGrade] : ""} 장비 3개 합성`}
             </h3>
 
-            {synthResult ? (
+            {synthPhase === "result" && synthResult ? (
               <>
                 <div className="yanmar-gear-confirm-item">
                   <GearIconCell
@@ -1904,6 +2424,49 @@ export function GearPanel({
                   </button>
                 </div>
               </>
+            ) : synthPhase === "fusing" ? (
+              <div
+                className={`yanmar-gear-synth-fuse${
+                  synthFuseReveal ? " is-revealed" : ""
+                }${synthResult?.upgraded ? " is-upgraded" : ""}`}
+                aria-live="polite"
+              >
+                <div className="yanmar-gear-synth-fuse-stage">
+                  <div className="yanmar-gear-synth-fuse-core" aria-hidden />
+                  <div className="yanmar-gear-synth-fuse-burst" aria-hidden />
+                  {synthMaterials.map((material, idx) => (
+                    <div
+                      key={`${material.id}-fuse-${idx}`}
+                      className={`yanmar-gear-synth-fuse-piece is-slot-${idx}`}
+                    >
+                      <GearIconCell
+                        slot={material.slot}
+                        grade={material.grade}
+                        enhanceLevel={material.enhanceLevel}
+                        size="md"
+                        checked
+                      />
+                    </div>
+                  ))}
+                  {synthFuseReveal && synthResult ? (
+                    <div className="yanmar-gear-synth-fuse-result">
+                      <GearIconCell
+                        slot={synthResult.item.slot}
+                        grade={synthResult.item.grade}
+                        enhanceLevel={synthResult.item.enhanceLevel}
+                        size="md"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+                <p className="yanmar-gear-synth-fuse-label">
+                  {synthFuseReveal
+                    ? synthResult?.upgraded
+                      ? "등급 상승!"
+                      : "합성 완료"
+                    : "재료 장비가 하나로 모이는 중…"}
+                </p>
+              </div>
             ) : (
               <>
                 <div className="yanmar-gear-synth-slots">

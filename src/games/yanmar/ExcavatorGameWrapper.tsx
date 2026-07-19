@@ -20,6 +20,7 @@ import {
   GAME_IMMERSIVE_HEADER_RIGHT_ID,
 } from "@/components/games/GameImmersiveOverlay";
 import { LandingPromoPopup } from "@/components/landing/LandingPromoPopup";
+import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
 import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
 import type { GameResult } from "@/games/shared/types";
@@ -388,57 +389,42 @@ function InventoryFullModal({
   onClose: () => void;
   onOpenGear: () => void;
 }) {
-  useRegisterInGameBackDismiss(open, onClose);
-
-  if (!open) return null;
-
   return (
-    <div
-      className="absolute inset-0 z-[72] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm"
-      role="presentation"
-      onClick={onClose}
+    <AppModalOverlay
+      open={open}
+      onClose={onClose}
+      nested
+      panelClassName="!max-w-[21rem] !overflow-visible !rounded-none !bg-transparent !p-0 !shadow-none"
     >
       <div
-        className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="yanmar-gear-confirm-card yanmar-inventory-full-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby="yanmar-inventory-full-title"
-        onClick={(e) => e.stopPropagation()}
       >
-        <div className="bg-gradient-to-br from-amber-500 to-orange-600 px-4 py-3 text-white">
-          <h2
-            id="yanmar-inventory-full-title"
-            className="text-base font-black tracking-tight"
+        <p className="yanmar-gear-confirm-eyebrow">INVENTORY FULL</p>
+        <h3 id="yanmar-inventory-full-title">인벤토리 공간이 부족합니다.</h3>
+        <p className="yanmar-inventory-full-lead">
+          장비를 분해·판매하거나 슬롯을 확장한 뒤 다시 획득할 수 있습니다.
+        </p>
+        <div className="yanmar-gear-confirm-actions">
+          <button
+            type="button"
+            className="yanmar-gear-btn yanmar-gear-btn--unequip"
+            onClick={onClose}
           >
-            인벤토리 부족
-          </h2>
-        </div>
-        <div className="space-y-3 p-4">
-          <p className="text-sm font-bold leading-relaxed text-slate-800">
-            인벤토리 공간이 부족합니다.
-          </p>
-          <p className="text-xs font-medium leading-snug text-slate-500">
-            장비를 분해·판매하거나 슬롯을 확장한 뒤 다시 획득할 수 있습니다.
-          </p>
-          <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onOpenGear}
-              className="flex-1 rounded-xl bg-red-600 py-2.5 text-xs font-black text-white shadow-sm hover:bg-red-700"
-            >
-              장비관리
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-xl border border-gray-200 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-            >
-              닫기
-            </button>
-          </div>
+            닫기
+          </button>
+          <button
+            type="button"
+            className="yanmar-gear-btn yanmar-gear-btn--enhance"
+            onClick={onOpenGear}
+          >
+            장비관리
+          </button>
         </div>
       </div>
-    </div>
+    </AppModalOverlay>
   );
 }
 
@@ -2958,6 +2944,12 @@ export function ExcavatorGameWrapper({
       count: 1 | 10,
       payWith: GachaPayWith = "stars",
     ) => {
+      const freeSlots = Math.max(0, gearInventorySlots - gearItems.length);
+      if (count > freeSlots) {
+        setShowInventoryFullModal(true);
+        return;
+      }
+
       setGachaBusy(true);
       try {
         const res = await fetch("/api/gacha/yanmar", {
@@ -2965,8 +2957,20 @@ export function ExcavatorGameWrapper({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ banner, count, payWith }),
         });
-        const data = await res.json();
-        if (!res.ok) return;
+        const data = (await res.json()) as {
+          error?: string;
+          currency?: number;
+          gachaTicketsStandard?: number;
+          gachaTicketsPremium?: number;
+          free?: GachaFreeStatus;
+          items?: { nameSnapshot: string; grade: string; slot?: string }[];
+        };
+        if (!res.ok) {
+          if (data.error === "INVENTORY_FULL") {
+            setShowInventoryFullModal(true);
+          }
+          return;
+        }
         if (typeof data.currency === "number") {
           currencyRef.current = data.currency;
           setCurrency(data.currency);
@@ -2979,14 +2983,14 @@ export function ExcavatorGameWrapper({
           setGachaTicketsPremium(data.gachaTicketsPremium);
         }
         if (data.free && typeof data.free === "object") {
-          setFreeGacha(data.free as GachaFreeStatus);
+          setFreeGacha(data.free);
         }
         if (Array.isArray(data.items) && data.items.length > 0) {
           setLastGachaBanner(banner);
           setLastGachaResults(data.items);
           setShowGachaResultModal(true);
           const hasMaster = data.items.some(
-            (item: { grade?: string }) => item.grade === "MASTER",
+            (item) => item.grade === "MASTER",
           );
           if (data.items.length === 1 && hasMaster) {
             yanmarAudio.playMasterItemAcquire();
@@ -3000,7 +3004,7 @@ export function ExcavatorGameWrapper({
         setGachaBusy(false);
       }
     },
-    [loadEquipment],
+    [gearInventorySlots, gearItems.length, loadEquipment],
   );
 
   const handleWorkshopClaim = useCallback(
@@ -5414,6 +5418,7 @@ export function ExcavatorGameWrapper({
           onClose={() => setShowInventoryFullModal(false)}
           onOpenGear={() => {
             setShowInventoryFullModal(false);
+            setShowShopPanel(false);
             setShowEquipmentUpgrade(true);
           }}
         />

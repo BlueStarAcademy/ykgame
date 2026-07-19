@@ -33,11 +33,11 @@ export function gearIconSrc(
   grade: ItemGrade | null | undefined = "NORMAL",
 ): string {
   const gradeKey = grade && GRADE_FILE[grade] ? GRADE_FILE[grade] : "normal";
-  return `/images/yanmar/2d/gear/${SLOT_FILE[slot]}-${gradeKey}.png?v=7`;
+  return `/images/yanmar/2d/gear/${SLOT_FILE[slot]}-${gradeKey}.png?v=8`;
 }
 
 export function gearEmptySlotSrc(): string {
-  return "/images/yanmar/2d/gear/empty-slot.png?v=7";
+  return "/images/yanmar/2d/gear/empty-slot.png?v=8";
 }
 
 /** 가챠·인벤에 쓰는 장비 아이콘 URL 전체 (6슬롯×4등급). */
