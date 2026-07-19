@@ -54,10 +54,10 @@ function bonusPoolIcons(
       add("points", POINT_ICONS[pointKind], pointKindLabel(pointKind));
     }
     if (o.enhanceCores) add("cores", CORE_ICON, "강화코어");
-    if (o.gachaTicketsStandard) {
+    if (o.gachaTicketsStandard || o.gachaTicketsStandardRange) {
       add("ticket-std", TICKET_STANDARD_ICON, "일반 뽑기권");
     }
-    if (o.gachaTicketsPremium) {
+    if (o.gachaTicketsPremium || o.gachaTicketsPremiumRange) {
       add("ticket-prem", TICKET_PREMIUM_ICON, "고급 뽑기권");
     }
   }

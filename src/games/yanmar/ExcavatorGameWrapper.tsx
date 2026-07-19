@@ -80,6 +80,7 @@ import {
   type HydraulicVelocity,
 } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
+import { ExcavatorMapModal } from "./ExcavatorMapModal";
 import { GrappleGripGauge } from "./DigHintPanel";
 import { DumpHintPanel } from "./DumpHintPanel";
 import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
@@ -1042,6 +1043,7 @@ export function ExcavatorGameWrapper({
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [soundSettings, updateSoundSettings] = useSoundSettings();
   const [showMinimap, setShowMinimap] = useState(true);
+  const [showMapModal, setShowMapModal] = useState(false);
   const [showMissionQuest, setShowMissionQuest] = useState(true);
   const [showTutorialMenu, setShowTutorialMenu] = useState(false);
   const [showQuestPanel, setShowQuestPanel] = useState(false);
@@ -5555,6 +5557,21 @@ export function ExcavatorGameWrapper({
   const questClaimableCount = questsDisabled
     ? 0
     : countClaimableQuestRewards(questState).total;
+  const monumentHudPhase =
+    monumentPanelState?.phase ?? monumentPhaseRef.current ?? "locked";
+  const showMonumentMinimapProgress = monumentHudPhase === "active";
+  const monumentMinimapStorageCap = monumentStorageCap(
+    monumentPanelState?.levels?.storage_cap ?? 0,
+  );
+  const monumentMinimapStoragePct = Math.min(
+    100,
+    Math.round(
+      (100 * (monumentPanelState?.starsStored ?? 0)) /
+        Math.max(1, monumentMinimapStorageCap),
+    ),
+  );
+  const monumentMinimapStorageFull =
+    (monumentPanelState?.starsStored ?? 0) >= monumentMinimapStorageCap;
 
   return (
     <div
@@ -5707,6 +5724,20 @@ export function ExcavatorGameWrapper({
           onClaimStars={() => void handleMonumentClaimStars()}
           onRefresh={() => void loadMonumentState()}
         />
+        <ExcavatorMapModal
+          open={showMapModal}
+          onClose={() => setShowMapModal(false)}
+          simRef={simRef}
+          terrainRef={terrainRef}
+          tutorialStepRef={tutorialStepRef}
+          tutorialWaypointRef={tutorialWaypointRef}
+          worldPickupsRef={
+            mode === "game" && session?.user?.id ? worldPickupsRef : undefined
+          }
+          monumentPhase={
+            monumentPanelState?.phase ?? monumentPhaseRef.current ?? "locked"
+          }
+        />
 
         {mode !== "intro" && mode !== "gameReady" && travelRaiseWarn ? (
           <div
@@ -5825,6 +5856,64 @@ export function ExcavatorGameWrapper({
                       />
                       <span className="yanmar-shop-button-label">상점</span>
                     </button>
+                    {nearMonument &&
+                    !showMonumentPanel &&
+                    !nearRepairTent &&
+                    (monumentPanelState?.phase ?? "locked") !== "locked" ? (
+                      <div className="pointer-events-auto flex flex-col items-stretch gap-1.5">
+                        <button
+                          type="button"
+                          className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                          onClick={() => {
+                            setShowQuestPanel(false);
+                            setShowShopPanel(false);
+                            setShowEquipmentUpgrade(false);
+                            setShowProfileModal(false);
+                            setShowRepairPanel(false);
+                            setShowWorkshopPanel(false);
+                            setShowMonumentPanel(true);
+                            void loadMonumentState();
+                          }}
+                          aria-label="조형물 입장"
+                        >
+                          <span className="yanmar-site-prompt-hud-copy">
+                            <span className="yanmar-site-prompt-hud-eyebrow">
+                              조형물
+                            </span>
+                            <span className="yanmar-site-prompt-hud-label">
+                              {monumentPanelState?.phase === "quest"
+                                ? "미션 확인"
+                                : monumentPanelState?.phase === "building"
+                                  ? "건설 현황"
+                                  : monumentPanelState?.phase === "active" &&
+                                      (monumentPanelState.starsStored ?? 0) > 0
+                                    ? `스타 수령 ${monumentPanelState.starsStored.toLocaleString()}`
+                                    : "조형물 입장"}
+                            </span>
+                          </span>
+                        </button>
+                        {monumentPanelState?.phase === "claimable" ? (
+                          <button
+                            type="button"
+                            className="yanmar-site-prompt-hud-btn touch-none active:scale-95 disabled:opacity-50"
+                            disabled={monumentBusy}
+                            onClick={() =>
+                              void handleMonumentClaimConstruction()
+                            }
+                            aria-label="건설완료"
+                          >
+                            <span className="yanmar-site-prompt-hud-copy">
+                              <span className="yanmar-site-prompt-hud-eyebrow">
+                                조형물
+                              </span>
+                              <span className="yanmar-site-prompt-hud-label">
+                                건설완료
+                              </span>
+                            </span>
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {nearRepairTent && !showRepairPanel ? (
                       <button
                         type="button"
@@ -5908,64 +5997,6 @@ export function ExcavatorGameWrapper({
                           </span>
                         </span>
                       </button>
-                    ) : null}
-                    {nearMonument &&
-                    !showMonumentPanel &&
-                    !nearRepairTent &&
-                    (monumentPanelState?.phase ?? "locked") !== "locked" ? (
-                      <div className="pointer-events-auto flex flex-col items-stretch gap-1.5">
-                        <button
-                          type="button"
-                          className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
-                          onClick={() => {
-                            setShowQuestPanel(false);
-                            setShowShopPanel(false);
-                            setShowEquipmentUpgrade(false);
-                            setShowProfileModal(false);
-                            setShowRepairPanel(false);
-                            setShowWorkshopPanel(false);
-                            setShowMonumentPanel(true);
-                            void loadMonumentState();
-                          }}
-                          aria-label="조형물 입장"
-                        >
-                          <span className="yanmar-site-prompt-hud-copy">
-                            <span className="yanmar-site-prompt-hud-eyebrow">
-                              조형물
-                            </span>
-                            <span className="yanmar-site-prompt-hud-label">
-                              {monumentPanelState?.phase === "quest"
-                                ? "미션 확인"
-                                : monumentPanelState?.phase === "building"
-                                  ? "건설 현황"
-                                  : monumentPanelState?.phase === "active" &&
-                                      (monumentPanelState.starsStored ?? 0) > 0
-                                    ? `스타 수령 ${monumentPanelState.starsStored.toLocaleString()}`
-                                    : "조형물 입장"}
-                            </span>
-                          </span>
-                        </button>
-                        {monumentPanelState?.phase === "claimable" ? (
-                          <button
-                            type="button"
-                            className="yanmar-site-prompt-hud-btn touch-none active:scale-95 disabled:opacity-50"
-                            disabled={monumentBusy}
-                            onClick={() =>
-                              void handleMonumentClaimConstruction()
-                            }
-                            aria-label="건설완료"
-                          >
-                            <span className="yanmar-site-prompt-hud-copy">
-                              <span className="yanmar-site-prompt-hud-eyebrow">
-                                조형물
-                              </span>
-                              <span className="yanmar-site-prompt-hud-label">
-                                건설완료
-                              </span>
-                            </span>
-                          </button>
-                        ) : null}
-                      </div>
                     ) : null}
                   </div>
                   {showMissionQuest ? (
@@ -6051,6 +6082,59 @@ export function ExcavatorGameWrapper({
                 >
                   튜토리얼
                 </button>
+                {nearMonument &&
+                !showMonumentPanel &&
+                !nearRepairTent &&
+                (monumentPanelState?.phase ?? "locked") !== "locked" ? (
+                  <div className="pointer-events-auto flex flex-col items-stretch gap-1.5">
+                    <button
+                      type="button"
+                      className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                      onClick={() => {
+                        setShowEquipmentUpgrade(false);
+                        setShowRepairPanel(false);
+                        setShowWorkshopPanel(false);
+                        setShowMonumentPanel(true);
+                        void loadMonumentState();
+                      }}
+                      aria-label="조형물 입장"
+                    >
+                      <span className="yanmar-site-prompt-hud-copy">
+                        <span className="yanmar-site-prompt-hud-eyebrow">
+                          조형물
+                        </span>
+                        <span className="yanmar-site-prompt-hud-label">
+                          {monumentPanelState?.phase === "quest"
+                            ? "미션 확인"
+                            : monumentPanelState?.phase === "building"
+                              ? "건설 현황"
+                              : monumentPanelState?.phase === "active" &&
+                                  (monumentPanelState.starsStored ?? 0) > 0
+                                ? `스타 수령 ${monumentPanelState.starsStored.toLocaleString()}`
+                                : "조형물 입장"}
+                        </span>
+                      </span>
+                    </button>
+                    {monumentPanelState?.phase === "claimable" ? (
+                      <button
+                        type="button"
+                        className="yanmar-site-prompt-hud-btn touch-none active:scale-95 disabled:opacity-50"
+                        disabled={monumentBusy}
+                        onClick={() => void handleMonumentClaimConstruction()}
+                        aria-label="건설완료"
+                      >
+                        <span className="yanmar-site-prompt-hud-copy">
+                          <span className="yanmar-site-prompt-hud-eyebrow">
+                            조형물
+                          </span>
+                          <span className="yanmar-site-prompt-hud-label">
+                            건설완료
+                          </span>
+                        </span>
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
                 {nearRepairTent && !showRepairPanel ? (
                   <button
                     type="button"
@@ -6125,59 +6209,6 @@ export function ExcavatorGameWrapper({
                       </span>
                     </span>
                   </button>
-                ) : null}
-                {nearMonument &&
-                !showMonumentPanel &&
-                !nearRepairTent &&
-                (monumentPanelState?.phase ?? "locked") !== "locked" ? (
-                  <div className="pointer-events-auto flex flex-col items-stretch gap-1.5">
-                    <button
-                      type="button"
-                      className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
-                      onClick={() => {
-                        setShowEquipmentUpgrade(false);
-                        setShowRepairPanel(false);
-                        setShowWorkshopPanel(false);
-                        setShowMonumentPanel(true);
-                        void loadMonumentState();
-                      }}
-                      aria-label="조형물 입장"
-                    >
-                      <span className="yanmar-site-prompt-hud-copy">
-                        <span className="yanmar-site-prompt-hud-eyebrow">
-                          조형물
-                        </span>
-                        <span className="yanmar-site-prompt-hud-label">
-                          {monumentPanelState?.phase === "quest"
-                            ? "미션 확인"
-                            : monumentPanelState?.phase === "building"
-                              ? "건설 현황"
-                              : monumentPanelState?.phase === "active" &&
-                                  (monumentPanelState.starsStored ?? 0) > 0
-                                ? `스타 수령 ${monumentPanelState.starsStored.toLocaleString()}`
-                                : "조형물 입장"}
-                        </span>
-                      </span>
-                    </button>
-                    {monumentPanelState?.phase === "claimable" ? (
-                      <button
-                        type="button"
-                        className="yanmar-site-prompt-hud-btn touch-none active:scale-95 disabled:opacity-50"
-                        disabled={monumentBusy}
-                        onClick={() => void handleMonumentClaimConstruction()}
-                        aria-label="건설완료"
-                      >
-                        <span className="yanmar-site-prompt-hud-copy">
-                          <span className="yanmar-site-prompt-hud-eyebrow">
-                            조형물
-                          </span>
-                          <span className="yanmar-site-prompt-hud-label">
-                            건설완료
-                          </span>
-                        </span>
-                      </button>
-                    ) : null}
-                  </div>
                 ) : null}
               </div>
             ) : null}
@@ -6532,17 +6563,36 @@ export function ExcavatorGameWrapper({
                     monumentPhaseRef.current ??
                     "locked"
                   }
+                  onExpand={() => {
+                    clearFreeLook();
+                    setShowMapModal(true);
+                  }}
                 />
               ) : null}
               {digFeedback.truckCooldownRemaining > 0 ||
               digFeedback.haulTruckCooldownRemaining > 0 ||
               digFeedback.digCooldowns.length > 0 ||
               digFeedback.crashCooldownEtaSec > 0 ||
-              digFeedback.hillCooldownEtaSec > 0 ? (
+              digFeedback.hillCooldownEtaSec > 0 ||
+              showMonumentMinimapProgress ? (
                 <ul
                   className="flex w-full flex-col gap-0.5 border-t border-white/10 px-1 py-0.5"
                   aria-label="리젠 대기"
                 >
+                  {showMonumentMinimapProgress ? (
+                    <li className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85">
+                      <span className="truncate">조형물</span>
+                      <span
+                        className={`shrink-0 tabular-nums ${
+                          monumentMinimapStorageFull
+                            ? "text-orange-200"
+                            : "text-amber-200"
+                        }`}
+                      >
+                        {monumentMinimapStoragePct}%
+                      </span>
+                    </li>
+                  ) : null}
                   {digFeedback.truckCooldownRemaining > 0 ? (
                     <li className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85">
                       <span className="truncate">덤프트럭</span>

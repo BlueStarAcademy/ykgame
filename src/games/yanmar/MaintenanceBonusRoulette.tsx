@@ -8,6 +8,7 @@ import {
   bonusTableForFluid,
   pointKindLabel,
   type MaintenanceBonusOutcome,
+  type MaintenanceBonusSpec,
   type MaintenanceFluidId,
   type MaintenancePointKind,
 } from "./maintenance";
@@ -40,7 +41,7 @@ type Phase = "spinning" | "reveal";
 
 function outcomeToReelItem(
   fluidId: MaintenanceFluidId,
-  outcome: MaintenanceBonusOutcome,
+  outcome: MaintenanceBonusOutcome | MaintenanceBonusSpec,
 ): ReelItem {
   const pointKind = MAINTENANCE_FLUIDS[fluidId].pointKind;
   const key = bonusOutcomeKey(outcome);
@@ -59,10 +60,17 @@ function outcomeToReelItem(
   if (outcome.enhanceCores) {
     return { key, label: outcome.label, icon: CORE_ICON, amount };
   }
-  if (outcome.gachaTicketsStandard) {
+  if (
+    outcome.gachaTicketsStandard ||
+    ("gachaTicketsStandardRange" in outcome &&
+      outcome.gachaTicketsStandardRange)
+  ) {
     return { key, label: outcome.label, icon: TICKET_STANDARD_ICON, amount };
   }
-  if (outcome.gachaTicketsPremium) {
+  if (
+    outcome.gachaTicketsPremium ||
+    ("gachaTicketsPremiumRange" in outcome && outcome.gachaTicketsPremiumRange)
+  ) {
     return { key, label: outcome.label, icon: TICKET_PREMIUM_ICON, amount };
   }
   return { key, label: outcome.label, icon: STAR_ICON, amount };

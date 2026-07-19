@@ -22,6 +22,10 @@ interface ExcavatorMinimapProps {
   /** 세로 HUD 등 공간이 좁을 때 캔버스 한 변 길이(px) */
   displaySize?: number;
   monumentPhase?: MonumentPhase;
+  /** 범례 표시 (확대 모달에서는 별도 UI로 대체 가능) */
+  showLegend?: boolean;
+  /** 탭/클릭 시 맵 확대 */
+  onExpand?: () => void;
 }
 
 const DEFAULT_DISPLAY_SIZE = 120;
@@ -168,6 +172,8 @@ export function ExcavatorMinimap({
   embedded = false,
   displaySize = DEFAULT_DISPLAY_SIZE,
   monumentPhase = "locked",
+  showLegend = true,
+  onExpand,
 }: ExcavatorMinimapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -553,28 +559,48 @@ export function ExcavatorMinimap({
           : "pointer-events-none absolute right-1.5 top-1.5 z-20 flex flex-col items-stretch overflow-hidden rounded-xl border border-white/15 bg-black/60 shadow-lg backdrop-blur-sm"
       }
     >
-      <canvas
-        ref={canvasRef}
-        className="block"
-        aria-label="미니맵"
-      />
-      <ul
-        className="grid w-full grid-cols-2 gap-x-1 gap-y-0.5 border-t border-white/10 px-1 py-0.5"
-        aria-label="미니맵 범례"
-      >
-        {legendItems.map((item) => (
-          <li
-            key={item.label}
-            className="flex min-w-0 items-center justify-center gap-0.5 text-[7px] font-bold leading-none text-white/85"
-          >
-            <span
-              className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.swatch}`}
-              aria-hidden
-            />
-            <span className="truncate">{item.label}</span>
-          </li>
-        ))}
-      </ul>
+      {onExpand ? (
+        <button
+          type="button"
+          className="yanmar-minimap-expand-hit relative block w-full touch-manipulation pointer-events-auto active:brightness-110"
+          onClick={onExpand}
+          aria-label="맵 크게 보기"
+        >
+          <canvas ref={canvasRef} className="block w-full" aria-hidden />
+          <span className="yanmar-minimap-expand-badge" aria-hidden>
+            <svg viewBox="0 0 16 16" width="10" height="10" fill="none">
+              <path
+                d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        </button>
+      ) : (
+        <canvas ref={canvasRef} className="block" aria-label="미니맵" />
+      )}
+      {showLegend ? (
+        <ul
+          className="grid w-full grid-cols-2 gap-x-1 gap-y-0.5 border-t border-white/10 px-1 py-0.5"
+          aria-label="미니맵 범례"
+        >
+          {legendItems.map((item) => (
+            <li
+              key={item.label}
+              className="flex min-w-0 items-center justify-center gap-0.5 text-[7px] font-bold leading-none text-white/85"
+            >
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.swatch}`}
+                aria-hidden
+              />
+              <span className="truncate">{item.label}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

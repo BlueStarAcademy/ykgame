@@ -5963,6 +5963,325 @@ html.pwa-mode .site-legend-home-page {
   touch-action: pan-y;
 }
 
+.yanmar-minimap-expand-hit {
+  margin: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+.yanmar-minimap-expand-badge {
+  position: absolute;
+  right: 0.28rem;
+  bottom: 0.28rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0.28rem;
+  background: linear-gradient(
+    160deg,
+    rgba(40, 44, 52, 0.92),
+    rgba(12, 14, 18, 0.95)
+  );
+  color: #ffe082;
+  box-shadow: 0 0.2rem 0.45rem rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.yanmar-map-modal-panel {
+  display: flex !important;
+  width: min(100%, 24.5rem) !important;
+  height: auto !important;
+  max-height: min(92dvh, 40rem) !important;
+  max-width: 24.5rem !important;
+  flex-direction: column;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 1.35rem !important;
+  background: linear-gradient(
+    180deg,
+    #161b24 0%,
+    #0d1118 48%,
+    #090c12 100%
+  ) !important;
+  padding: 0 !important;
+  color: #fff !important;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 28px 72px -20px rgba(0, 0, 0, 0.7),
+    0 0 56px -16px rgba(227, 6, 19, 0.32) !important;
+  animation: ranking-modal-panel-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .yanmar-map-modal-panel {
+    width: min(100%, 34rem) !important;
+    max-width: 34rem !important;
+    max-height: min(94dvh, 28rem) !important;
+  }
+}
+
+.yanmar-map-modal {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.yanmar-map-modal-header {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.95rem 1rem 0.85rem;
+  background:
+    radial-gradient(
+      120% 90% at 12% -20%,
+      rgba(227, 6, 19, 0.28),
+      transparent 55%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 70%);
+}
+
+.yanmar-map-modal-header-glow {
+  position: absolute;
+  top: -2.5rem;
+  right: -1.5rem;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 213, 79, 0.18),
+    transparent 68%
+  );
+  pointer-events: none;
+}
+
+.yanmar-map-modal-header-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.18;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 18px 18px;
+  mask-image: linear-gradient(180deg, #000 20%, transparent 95%);
+  pointer-events: none;
+}
+
+.yanmar-map-modal-header-top {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.yanmar-map-modal-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.yanmar-map-modal-compass {
+  position: relative;
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex-shrink: 0;
+  place-items: center;
+  border: 1px solid rgba(255, 224, 130, 0.45);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.16), transparent 55%),
+    linear-gradient(160deg, #2a303a, #12161d);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0.35rem 0.9rem rgba(0, 0, 0, 0.35);
+}
+
+.yanmar-map-modal-compass::before {
+  content: "";
+  position: absolute;
+  inset: 0.32rem;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+
+.yanmar-map-modal-compass-n {
+  position: relative;
+  color: #ffd54f;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 10px rgba(255, 213, 79, 0.35);
+}
+
+.yanmar-map-modal-eyebrow {
+  margin: 0;
+  color: rgba(255, 214, 140, 0.82);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.yanmar-map-modal-title {
+  margin: 0.12rem 0 0;
+  font-size: 1.2rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.yanmar-map-modal-subtitle {
+  position: relative;
+  margin: 0.55rem 0 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: keep-all;
+}
+
+.yanmar-map-modal-close {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.85rem;
+  line-height: 1;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.yanmar-map-modal-close:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.yanmar-map-modal-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem 0.85rem 1.05rem;
+  background:
+    radial-gradient(
+      80% 55% at 50% 18%,
+      rgba(227, 6, 19, 0.1),
+      transparent 60%
+    ),
+    linear-gradient(180deg, #10151d 0%, #0a0d12 100%);
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .yanmar-map-modal-body {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.7rem 0.75rem 0.8rem;
+  }
+}
+
+.yanmar-map-modal-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 1.15rem;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 1rem 2.2rem rgba(0, 0, 0, 0.45);
+}
+
+.yanmar-map-modal-stage-ring {
+  position: absolute;
+  inset: -0.35rem;
+  border: 1px solid rgba(227, 6, 19, 0.35);
+  border-radius: 1.35rem;
+  box-shadow:
+    0 0 18px rgba(227, 6, 19, 0.18),
+    inset 0 0 18px rgba(255, 213, 79, 0.05);
+  pointer-events: none;
+}
+
+.yanmar-map-modal-legend {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .yanmar-map-modal-legend {
+    width: auto;
+    min-width: 7.5rem;
+    grid-template-columns: 1fr;
+  }
+}
+
+.yanmar-map-modal-legend-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.38rem 0.45rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.yanmar-map-modal-legend-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.yanmar-map-modal-legend-item.is-dig .yanmar-map-modal-legend-dot {
+  background: #ffb300;
+}
+.yanmar-map-modal-legend-item.is-dump .yanmar-map-modal-legend-dot {
+  background: #81c784;
+}
+.yanmar-map-modal-legend-item.is-crash .yanmar-map-modal-legend-dot {
+  background: #fbbf24;
+}
+.yanmar-map-modal-legend-item.is-hill .yanmar-map-modal-legend-dot {
+  background: #cbd5e1;
+}
+.yanmar-map-modal-legend-item.is-repair .yanmar-map-modal-legend-dot {
+  background: #e8c56a;
+}
+.yanmar-map-modal-legend-item.is-monument .yanmar-map-modal-legend-dot {
+  background: #ffe082;
+}
+
 .yanmar-help {
   display: flex;
   flex-direction: column;

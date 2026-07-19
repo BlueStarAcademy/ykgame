@@ -146,7 +146,9 @@ export const MAINTENANCE_FLUIDS: Record<MaintenanceFluidId, MaintenanceFluidDef>
     },
   };
 
-/** Guaranteed claim payout (XP is garnish only). */
+/** Guaranteed claim payout (XP is garnish only).
+ * Star amounts scale with cycle length (longer wait → larger payout).
+ */
 export type MaintenanceReward = {
   stars: number;
   enhanceCores?: number;
@@ -158,38 +160,44 @@ export type MaintenanceReward = {
 
 export const MAINTENANCE_REWARDS: Record<MaintenanceFluidId, MaintenanceReward> =
   {
+    /* 4h */
     engineOil: {
-      stars: 12,
-      workshopPoints: 40,
-      xpGarnish: 50,
+      stars: 50,
+      workshopPoints: 70,
+      xpGarnish: 60,
     },
+    /* 8h */
     engineOilFilter: {
-      stars: 12,
-      workshopPoints: 50,
-      xpGarnish: 50,
-    },
-    hydraulicOil: {
-      stars: 16,
-      workshopPoints: 80,
-      xpGarnish: 50,
-    },
-    hydraulicFilter: {
-      stars: 15,
-      enhanceCores: 1,
-      workshopPoints: 60,
+      stars: 100,
+      workshopPoints: 100,
       xpGarnish: 80,
     },
-    fuelFilter: {
-      stars: 30,
-      gachaTicketsStandard: 1,
-      workshopPoints: 100,
+    /* 12h */
+    hydraulicOil: {
+      stars: 150,
+      workshopPoints: 140,
       xpGarnish: 100,
     },
+    /* 24h */
+    hydraulicFilter: {
+      stars: 250,
+      enhanceCores: 1,
+      workshopPoints: 200,
+      xpGarnish: 140,
+    },
+    /* 72h */
+    fuelFilter: {
+      stars: 300,
+      gachaTicketsStandard: 1,
+      workshopPoints: 360,
+      xpGarnish: 220,
+    },
+    /* 168h */
     gearOil: {
-      stars: 55,
+      stars: 500,
       enhanceCores: 2,
-      workshopPoints: 150,
-      xpGarnish: 150,
+      workshopPoints: 700,
+      xpGarnish: 400,
     },
   };
 
@@ -244,70 +252,161 @@ export type MaintenanceBonusOutcome = {
   label: string;
 };
 
-type BonusEntry = { weight: number; outcome: MaintenanceBonusOutcome };
+/** Table row before roll — ticket counts may be a range. */
+export type MaintenanceBonusSpec = {
+  stars?: number;
+  enhanceCores?: number;
+  workshopPoints?: number;
+  gachaTicketsStandard?: number;
+  gachaTicketsPremium?: number;
+  /** Inclusive [min, max] rolled when this bonus hits. */
+  gachaTicketsStandardRange?: readonly [number, number];
+  gachaTicketsPremiumRange?: readonly [number, number];
+  label: string;
+};
+
+type BonusEntry = { weight: number; outcome: MaintenanceBonusSpec };
 
 /**
- * Per-fluid bonus pools. Longer cycles → higher amounts and better odds
- * for cores / tickets (esp. premium).
- * Weights roughly sum to 100.
+ * Per-fluid bonus pools. Longer cycles → higher star payouts, more cores,
+ * and wider ticket ranges. Weights roughly sum to 100.
  */
 const BONUS_TABLES: Record<MaintenanceFluidId, readonly BonusEntry[]> = {
-  /* 4h — mostly small stars/points */
+  /* 4h */
   engineOil: [
-    { weight: 42, outcome: { stars: 6, label: "추가 스타 +6" } },
-    { weight: 28, outcome: { workshopPoints: 25, label: "하역 포인트 +25" } },
-    { weight: 14, outcome: { stars: 12, label: "추가 스타 +12" } },
-    { weight: 10, outcome: { enhanceCores: 1, label: "강화코어 +1" } },
-    { weight: 4, outcome: { gachaTicketsStandard: 1, label: "일반 뽑기권 +1" } },
-    { weight: 2, outcome: { gachaTicketsPremium: 1, label: "고급 뽑기권 +1" } },
+    { weight: 28, outcome: { stars: 25, label: "추가 스타 +25" } },
+    { weight: 18, outcome: { workshopPoints: 40, label: "하역 포인트 +40" } },
+    { weight: 18, outcome: { enhanceCores: 2, label: "강화코어 +2" } },
+    { weight: 12, outcome: { stars: 50, label: "추가 스타 +50" } },
+    { weight: 12, outcome: { enhanceCores: 3, label: "강화코어 +3" } },
+    {
+      weight: 8,
+      outcome: {
+        gachaTicketsStandardRange: [1, 3],
+        label: "일반 뽑기권 1~3",
+      },
+    },
+    {
+      weight: 4,
+      outcome: {
+        gachaTicketsPremiumRange: [1, 2],
+        label: "고급 뽑기권 1~2",
+      },
+    },
   ],
   /* 8h */
   engineOilFilter: [
-    { weight: 36, outcome: { stars: 10, label: "추가 스타 +10" } },
-    { weight: 26, outcome: { workshopPoints: 35, label: "브레이커 포인트 +35" } },
-    { weight: 16, outcome: { enhanceCores: 1, label: "강화코어 +1" } },
-    { weight: 12, outcome: { gachaTicketsStandard: 1, label: "일반 뽑기권 +1" } },
-    { weight: 7, outcome: { stars: 18, label: "추가 스타 +18" } },
-    { weight: 3, outcome: { gachaTicketsPremium: 1, label: "고급 뽑기권 +1" } },
+    { weight: 22, outcome: { stars: 50, label: "추가 스타 +50" } },
+    { weight: 16, outcome: { workshopPoints: 60, label: "브레이커 포인트 +60" } },
+    { weight: 18, outcome: { enhanceCores: 3, label: "강화코어 +3" } },
+    { weight: 12, outcome: { enhanceCores: 5, label: "강화코어 +5" } },
+    { weight: 10, outcome: { stars: 100, label: "추가 스타 +100" } },
+    {
+      weight: 14,
+      outcome: {
+        gachaTicketsStandardRange: [1, 4],
+        label: "일반 뽑기권 1~4",
+      },
+    },
+    {
+      weight: 8,
+      outcome: {
+        gachaTicketsPremiumRange: [1, 2],
+        label: "고급 뽑기권 1~2",
+      },
+    },
   ],
   /* 12h */
   hydraulicOil: [
-    { weight: 30, outcome: { stars: 14, label: "추가 스타 +14" } },
-    { weight: 22, outcome: { workshopPoints: 45, label: "브레이커 포인트 +45" } },
-    { weight: 20, outcome: { enhanceCores: 1, label: "강화코어 +1" } },
-    { weight: 14, outcome: { gachaTicketsStandard: 1, label: "일반 뽑기권 +1" } },
-    { weight: 9, outcome: { enhanceCores: 2, label: "강화코어 +2" } },
-    { weight: 5, outcome: { gachaTicketsPremium: 1, label: "고급 뽑기권 +1" } },
+    { weight: 18, outcome: { stars: 75, label: "추가 스타 +75" } },
+    { weight: 14, outcome: { workshopPoints: 90, label: "브레이커 포인트 +90" } },
+    { weight: 18, outcome: { enhanceCores: 4, label: "강화코어 +4" } },
+    { weight: 12, outcome: { enhanceCores: 6, label: "강화코어 +6" } },
+    { weight: 10, outcome: { stars: 150, label: "추가 스타 +150" } },
+    {
+      weight: 16,
+      outcome: {
+        gachaTicketsStandardRange: [2, 5],
+        label: "일반 뽑기권 2~5",
+      },
+    },
+    {
+      weight: 8,
+      outcome: {
+        gachaTicketsPremiumRange: [1, 3],
+        label: "고급 뽑기권 1~3",
+      },
+    },
+    { weight: 4, outcome: { enhanceCores: 8, label: "강화코어 +8" } },
   ],
   /* 24h */
   hydraulicFilter: [
-    { weight: 24, outcome: { stars: 22, label: "추가 스타 +22" } },
-    { weight: 18, outcome: { workshopPoints: 65, label: "언덕 포인트 +65" } },
-    { weight: 18, outcome: { enhanceCores: 1, label: "강화코어 +1" } },
-    { weight: 16, outcome: { gachaTicketsStandard: 1, label: "일반 뽑기권 +1" } },
-    { weight: 14, outcome: { enhanceCores: 2, label: "강화코어 +2" } },
-    { weight: 10, outcome: { gachaTicketsPremium: 1, label: "고급 뽑기권 +1" } },
+    { weight: 14, outcome: { stars: 120, label: "추가 스타 +120" } },
+    { weight: 12, outcome: { workshopPoints: 140, label: "언덕 포인트 +140" } },
+    { weight: 16, outcome: { enhanceCores: 5, label: "강화코어 +5" } },
+    { weight: 14, outcome: { enhanceCores: 8, label: "강화코어 +8" } },
+    { weight: 10, outcome: { stars: 250, label: "추가 스타 +250" } },
+    {
+      weight: 16,
+      outcome: {
+        gachaTicketsStandardRange: [2, 6],
+        label: "일반 뽑기권 2~6",
+      },
+    },
+    {
+      weight: 12,
+      outcome: {
+        gachaTicketsPremiumRange: [1, 3],
+        label: "고급 뽑기권 1~3",
+      },
+    },
+    { weight: 6, outcome: { enhanceCores: 12, label: "강화코어 +12" } },
   ],
   /* 72h */
   fuelFilter: [
-    { weight: 18, outcome: { stars: 36, label: "추가 스타 +36" } },
-    { weight: 16, outcome: { workshopPoints: 95, label: "하역 포인트 +95" } },
-    { weight: 18, outcome: { enhanceCores: 2, label: "강화코어 +2" } },
-    { weight: 14, outcome: { gachaTicketsStandard: 1, label: "일반 뽑기권 +1" } },
-    { weight: 16, outcome: { gachaTicketsPremium: 1, label: "고급 뽑기권 +1" } },
-    { weight: 10, outcome: { enhanceCores: 3, label: "강화코어 +3" } },
-    { weight: 8, outcome: { gachaTicketsPremium: 2, label: "고급 뽑기권 +2" } },
+    { weight: 12, outcome: { stars: 150, label: "추가 스타 +150" } },
+    { weight: 10, outcome: { workshopPoints: 220, label: "하역 포인트 +220" } },
+    { weight: 16, outcome: { enhanceCores: 8, label: "강화코어 +8" } },
+    { weight: 14, outcome: { enhanceCores: 12, label: "강화코어 +12" } },
+    { weight: 10, outcome: { stars: 300, label: "추가 스타 +300" } },
+    {
+      weight: 14,
+      outcome: {
+        gachaTicketsStandardRange: [3, 8],
+        label: "일반 뽑기권 3~8",
+      },
+    },
+    {
+      weight: 14,
+      outcome: {
+        gachaTicketsPremiumRange: [2, 4],
+        label: "고급 뽑기권 2~4",
+      },
+    },
+    { weight: 10, outcome: { enhanceCores: 18, label: "강화코어 +18" } },
   ],
-  /* 168h — best pool + strongest premium odds */
+  /* 168h */
   gearOil: [
-    { weight: 14, outcome: { stars: 60, label: "추가 스타 +60" } },
-    { weight: 12, outcome: { workshopPoints: 150, label: "조형물 포인트 +150" } },
-    { weight: 16, outcome: { enhanceCores: 3, label: "강화코어 +3" } },
-    { weight: 10, outcome: { gachaTicketsStandard: 2, label: "일반 뽑기권 +2" } },
-    { weight: 18, outcome: { gachaTicketsPremium: 1, label: "고급 뽑기권 +1" } },
-    { weight: 14, outcome: { gachaTicketsPremium: 2, label: "고급 뽑기권 +2" } },
-    { weight: 10, outcome: { enhanceCores: 5, label: "강화코어 +5" } },
-    { weight: 6, outcome: { gachaTicketsPremium: 3, label: "고급 뽑기권 +3" } },
+    { weight: 10, outcome: { stars: 250, label: "추가 스타 +250" } },
+    { weight: 8, outcome: { workshopPoints: 400, label: "조형물 포인트 +400" } },
+    { weight: 14, outcome: { enhanceCores: 12, label: "강화코어 +12" } },
+    { weight: 12, outcome: { enhanceCores: 18, label: "강화코어 +18" } },
+    { weight: 10, outcome: { stars: 500, label: "추가 스타 +500" } },
+    {
+      weight: 14,
+      outcome: {
+        gachaTicketsStandardRange: [4, 10],
+        label: "일반 뽑기권 4~10",
+      },
+    },
+    {
+      weight: 18,
+      outcome: {
+        gachaTicketsPremiumRange: [2, 6],
+        label: "고급 뽑기권 2~6",
+      },
+    },
+    { weight: 14, outcome: { enhanceCores: 25, label: "강화코어 +25" } },
   ],
 };
 
@@ -317,21 +416,84 @@ export function bonusTableForFluid(
   return BONUS_TABLES[fluidId];
 }
 
-/** Stable key for matching a rolled outcome to a reel cell. */
-export function bonusOutcomeKey(outcome: MaintenanceBonusOutcome): string {
+function rollIntInclusive(
+  min: number,
+  max: number,
+  rng: () => number,
+): number {
+  const lo = Math.min(min, max);
+  const hi = Math.max(min, max);
+  return lo + Math.floor(rng() * (hi - lo + 1));
+}
+
+export function resolveBonusSpec(
+  spec: MaintenanceBonusSpec,
+  rng: () => number = Math.random,
+): MaintenanceBonusOutcome {
+  if (spec.gachaTicketsStandardRange) {
+    const n = rollIntInclusive(
+      spec.gachaTicketsStandardRange[0],
+      spec.gachaTicketsStandardRange[1],
+      rng,
+    );
+    return { gachaTicketsStandard: n, label: `일반 뽑기권 +${n}` };
+  }
+  if (spec.gachaTicketsPremiumRange) {
+    const n = rollIntInclusive(
+      spec.gachaTicketsPremiumRange[0],
+      spec.gachaTicketsPremiumRange[1],
+      rng,
+    );
+    return { gachaTicketsPremium: n, label: `고급 뽑기권 +${n}` };
+  }
+  return {
+    stars: spec.stars,
+    enhanceCores: spec.enhanceCores,
+    gachaTicketsStandard: spec.gachaTicketsStandard,
+    gachaTicketsPremium: spec.gachaTicketsPremium,
+    workshopPoints: spec.workshopPoints,
+    label: spec.label,
+  };
+}
+
+/** Stable key for matching a rolled outcome / table row to a reel cell. */
+export function bonusOutcomeKey(
+  outcome: MaintenanceBonusOutcome | MaintenanceBonusSpec,
+): string {
   if (outcome.stars) return `stars:${outcome.stars}`;
   if (outcome.workshopPoints) return `points:${outcome.workshopPoints}`;
   if (outcome.enhanceCores) return `cores:${outcome.enhanceCores}`;
-  if (outcome.gachaTicketsStandard) {
-    return `std:${outcome.gachaTicketsStandard}`;
+  if (
+    outcome.gachaTicketsStandard ||
+    ("gachaTicketsStandardRange" in outcome &&
+      outcome.gachaTicketsStandardRange)
+  ) {
+    return "ticket-std";
   }
-  if (outcome.gachaTicketsPremium) {
-    return `prem:${outcome.gachaTicketsPremium}`;
+  if (
+    outcome.gachaTicketsPremium ||
+    ("gachaTicketsPremiumRange" in outcome && outcome.gachaTicketsPremiumRange)
+  ) {
+    return "ticket-prem";
   }
   return outcome.label;
 }
 
-export function bonusOutcomeAmount(outcome: MaintenanceBonusOutcome): number {
+export function bonusOutcomeAmount(
+  outcome: MaintenanceBonusOutcome | MaintenanceBonusSpec,
+): number {
+  if (
+    "gachaTicketsStandardRange" in outcome &&
+    outcome.gachaTicketsStandardRange
+  ) {
+    return outcome.gachaTicketsStandardRange[1];
+  }
+  if (
+    "gachaTicketsPremiumRange" in outcome &&
+    outcome.gachaTicketsPremiumRange
+  ) {
+    return outcome.gachaTicketsPremiumRange[1];
+  }
   return (
     outcome.stars ||
     outcome.workshopPoints ||
@@ -351,9 +513,9 @@ export function rollMaintenanceBonus(
   let roll = rng() * total;
   for (const entry of table) {
     roll -= entry.weight;
-    if (roll <= 0) return entry.outcome;
+    if (roll <= 0) return resolveBonusSpec(entry.outcome, rng);
   }
-  return table[table.length - 1]!.outcome;
+  return resolveBonusSpec(table[table.length - 1]!.outcome, rng);
 }
 
 export function pointKindLabel(kind: MaintenancePointKind): string {
