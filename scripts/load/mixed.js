@@ -16,6 +16,7 @@ const loadConfig = (() => {
 })();
 
 const smoke = __ENV.K6_SMOKE === "true";
+const skipBurst = __ENV.K6_SKIP_BURST === "true";
 const stageDuration = __ENV.K6_STAGE_DURATION || "5m";
 const soakDuration = __ENV.K6_SOAK_DURATION || "60m";
 const rampDownDuration = __ENV.K6_RAMP_DOWN_DURATION || "5m";
@@ -31,6 +32,11 @@ const rankingFailures = new Rate("ranking_failures");
 const scoreDuration = new Trend("score_duration", true);
 const scoreFailures = new Rate("score_failures");
 const dumpRateLimited = new Counter("dump_rate_limited");
+const status2xx = new Counter("status_2xx");
+const status401 = new Counter("status_401");
+const status429 = new Counter("status_429");
+const status5xx = new Counter("status_5xx");
+const statusOther = new Counter("status_other");
 
 const normalStatuses = http.expectedStatuses({ min: 200, max: 399 });
 const rateLimitStatuses = http.expectedStatuses(
@@ -55,15 +61,19 @@ export const options = {
       gracefulRampDown: "30s",
       tags: { workload: "mixed" },
     },
-    dump_burst: {
-      executor: "constant-vus",
-      exec: "dumpBurst",
-      vus: smoke ? 2 : 200,
-      duration: burstDuration,
-      startTime: burstStartTime,
-      gracefulStop: "10s",
-      tags: { workload: "rate_limit" },
-    },
+    ...(skipBurst
+      ? {}
+      : {
+          dump_burst: {
+            executor: "constant-vus",
+            exec: "dumpBurst",
+            vus: smoke ? 2 : 200,
+            duration: burstDuration,
+            startTime: burstStartTime,
+            gracefulStop: "10s",
+            tags: { workload: "rate_limit" },
+          },
+        }),
   },
   thresholds: {
     http_req_failed: ["rate<0.01"],
@@ -112,6 +122,12 @@ function accepted(response, allowRateLimit = false) {
 function record(response, route, allowRateLimit = false) {
   const ok = accepted(response, allowRateLimit);
   const tags = { route };
+  if (response.status >= 200 && response.status < 300) status2xx.add(1, tags);
+  else if (response.status === 401) status401.add(1, tags);
+  else if (response.status === 429) status429.add(1, tags);
+  else if (response.status >= 500) status5xx.add(1, tags);
+  else statusOther.add(1, tags);
+
   if (route === "dump") {
     dumpDuration.add(response.timings.duration, tags);
     dumpFailures.add(!ok, tags);

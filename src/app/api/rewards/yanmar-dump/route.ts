@@ -32,6 +32,11 @@ import {
   tryWorkEnhanceCoresDrop,
   tryWorkGearDrop,
 } from "@/games/yanmar/gearService";
+import { loadActiveShopBuffIds } from "@/games/yanmar/shopBuffServer";
+import {
+  applyShopBuffsToStats,
+  applyRankerWillScore,
+} from "@/games/yanmar/shopBuffEffects";
 import type { CouponType, Prisma } from "@/generated/prisma/client";
 
 type DumpStarEvent = {
@@ -129,11 +134,6 @@ export const POST = withHotApiObservability(
   }
 
   const loaded = await loadUserFinalStats(prisma, session.user.id);
-  const { loadActiveShopBuffIds } = await import("@/games/yanmar/shopBuffServer");
-  const {
-    applyShopBuffsToStats,
-    applyRankerWillScore,
-  } = await import("@/games/yanmar/shopBuffEffects");
   const buffIds = await loadActiveShopBuffIds(session.user.id);
   const stats = applyShopBuffsToStats(loaded.stats, buffIds);
   const seasonKey = getSeasonKey();

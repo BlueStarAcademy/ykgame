@@ -69,6 +69,7 @@ test("k6 script parses in Node and retains scale safety requirements", () => {
   assert.match(source, /target: smoke \? 10 : 1000/);
   assert.match(source, /vus: smoke \? 2 : 200/);
   assert.match(source, /K6_SOAK_DURATION \|\| "60m"/);
+  assert.match(source, /K6_SKIP_BURST/);
   assert.match(source, /http_req_failed: \["rate<0\.01"\]/);
   assert.match(source, /"p\(95\)<300", "p\(99\)<1000"/);
   assert.match(source, /response\.status === 429/);

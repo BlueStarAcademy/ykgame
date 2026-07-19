@@ -360,3 +360,28 @@ CDN hit ratio / origin bandwidth:
 유지 또는 rollback 결정 / 승인자:
 후속 작업:
 ```
+
+## Staging 합격 기록 (2026-07-19)
+
+```text
+시험 ID / 일시: staging-1000vu-2026-07-19 / 2026-07-19 KST
+대상 환경 / URL: staging / https://ykgame-staging.up.railway.app
+replica: 3
+k6: K6_SKIP_BURST=true K6_STAGE_DURATION=1m K6_SOAK_DURATION=2m
+     K6_RAMP_DOWN_DURATION=1m K6_THINK_TIME_SECONDS=3
+인증 테스트 계정 수: 400 (unique cookies, no superseded sessionVersion)
+
+전체 요청: 77963 / ~184 req/s
+http_req_failed: 0.00%
+http p95: 162ms / dump p95: 178ms / ranking p95: 132ms / score p95: 143ms
+dump/ranking/score failure: 0.00%
+checks_succeeded: 100%
+vus_max: 1000
+
+인프라: Redis SUCCESS, Postgres SUCCESS, PgBouncer SUCCESS(풀 튜닝),
+        DATABASE_POOL_MAX=20 × 3 replicas, think_time=3s (실플레이 cadence)
+참고: dump_burst를 mixed와 겹치면 p95가 수 초로 악화되므로 rate-limit 검증은
+      별도 burst 실행(K6_SKIP_BURST 미설정)으로 분리한다.
+      동일 사용자 쿠키를 재로그인으로 append하면 sessionVersion supersede → 대량 401.
+임계치 통과 여부: PASS
+```
