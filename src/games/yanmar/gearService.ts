@@ -275,12 +275,33 @@ export async function tryWorkGearDrop(
   userId: string,
   trigger: WorkDropTrigger,
   gameId = "yanmar",
+  cache?: {
+    stats: Awaited<ReturnType<typeof loadUserFinalStats>>["stats"];
+    workshopById: Awaited<ReturnType<typeof loadUserFinalStats>>["workshopById"];
+    inventorySlots: number;
+    itemsLength: number;
+  },
 ) {
-  const { stats, items, workshopById } = await loadUserFinalStats(
-    tx,
-    userId,
-    gameId,
-  );
+  let stats: Awaited<ReturnType<typeof loadUserFinalStats>>["stats"];
+  let workshopById: Awaited<
+    ReturnType<typeof loadUserFinalStats>
+  >["workshopById"];
+  let inventorySlots: number;
+  let itemsLength: number;
+
+  if (cache) {
+    stats = cache.stats;
+    workshopById = cache.workshopById;
+    inventorySlots = cache.inventorySlots;
+    itemsLength = cache.itemsLength;
+  } else {
+    const loaded = await loadUserFinalStats(tx, userId, gameId);
+    stats = loaded.stats;
+    workshopById = loaded.workshopById;
+    inventorySlots = await getUserGearInventorySlots(tx, userId);
+    itemsLength = loaded.items.length;
+  }
+
   const scopedLuck =
     trigger === "soilDump" || trigger === "dumpTruckFull"
       ? workshopLuckyDropBonus(workshopById.dump.lucky_drop ?? 0)
@@ -298,9 +319,8 @@ export async function tryWorkGearDrop(
   const slot = pickSlot();
   const durabilityMax = stats.durabilityMaxPerPiece;
   const data = createGearItem(slot, grade, durabilityMax);
-  const inventorySlots = await getUserGearInventorySlots(tx, userId);
 
-  if (items.length >= inventorySlots) {
+  if (itemsLength >= inventorySlots) {
     // 인벤 가득: 장비 대신 등급별 스타를 메일 지급 (드롭 성공 시에만 — 스팸 방지)
     const stars = FULL_INVENTORY_MAIL_STARS[grade];
     await tx.userMail.create({
@@ -339,6 +359,7 @@ export async function tryWorkGearDrop(
       equippedSlot: null,
     },
   });
+  if (cache) cache.itemsLength += 1;
   return {
     dropped: true as const,
     item: created,
@@ -353,14 +374,7 @@ export async function tryWorkEnhanceCoresDrop(
   userId: string,
   trigger: WorkDropTrigger,
 ) {
-  const cfg = WORK_CORE_DROP[trigger];
-  if (!cfg || Math.random() >= cfg.chance) {
-    return { dropped: false as const, amount: 0 };
-  }
-  const amount =
-    cfg.min === cfg.max
-      ? cfg.min
-      : cfg.min + Math.floor(Math.random() * (cfg.max - cfg.min + 1));
+  const amount = rollWorkEnhanceCoresTotal(trigger, 1);
   if (amount <= 0) return { dropped: false as const, amount: 0 };
   const updated = await tx.user.update({
     where: { id: userId },
@@ -372,6 +386,24 @@ export async function tryWorkEnhanceCoresDrop(
     amount,
     enhanceCores: updated.enhanceCores,
   };
+}
+
+/** Sum core drops across N independent attempts (no DB). */
+export function rollWorkEnhanceCoresTotal(
+  trigger: WorkDropTrigger,
+  attempts: number,
+): number {
+  const cfg = WORK_CORE_DROP[trigger];
+  if (!cfg || attempts <= 0) return 0;
+  let total = 0;
+  for (let i = 0; i < attempts; i += 1) {
+    if (Math.random() >= cfg.chance) continue;
+    total +=
+      cfg.min === cfg.max
+        ? cfg.min
+        : cfg.min + Math.floor(Math.random() * (cfg.max - cfg.min + 1));
+  }
+  return total;
 }
 
 export function applyMasterScoreXpBonus(

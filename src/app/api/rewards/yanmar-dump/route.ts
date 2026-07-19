@@ -27,9 +27,10 @@ import { ensureYanmarGearMigration } from "@/games/yanmar/gearMigrate";
 import {
   applyMasterScoreXpBonus,
   applyWorkExpGainSub,
+  getUserGearInventorySlots,
   loadUserFinalStats,
+  rollWorkEnhanceCoresTotal,
   serializeWorkGearDrop,
-  tryWorkEnhanceCoresDrop,
   tryWorkGearDrop,
 } from "@/games/yanmar/gearService";
 import { loadActiveShopBuffIds } from "@/games/yanmar/shopBuffServer";
@@ -184,7 +185,8 @@ export const POST = withHotApiObservability(
     xpGained = Math.round(xpGained * (1 + soilXpMaster.value / 100));
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(
+    async (tx) => {
     return runReplayableRewardEvent(
       tx,
       { userId: session.user.id, gameId: "yanmar-dump", eventId },
@@ -266,28 +268,36 @@ export const POST = withHotApiObservability(
       await tx.userRewardInventory.createMany({ data: starInventoryRows });
     }
 
+    // Load drop context once — per-chunk loadUserFinalStats was timing out
+    // large dump batches on the default 5s interactive transaction limit.
+    const dropLoaded = await loadUserFinalStats(tx, session.user.id);
+    const dropCache = {
+      stats: dropLoaded.stats,
+      workshopById: dropLoaded.workshopById,
+      inventorySlots: await getUserGearInventorySlots(tx, session.user.id),
+      itemsLength: dropLoaded.items.length,
+    };
     const gearDrops = [];
-    let coresDropped = 0;
-    let enhanceCoresTotal: number | undefined;
     for (let i = 0; i < safeChunkCount; i += 1) {
-      const drop = await tryWorkGearDrop(tx, session.user.id, "soilDump");
-      const payload = serializeWorkGearDrop(drop);
-      if (payload) gearDrops.push(payload);
-      const coreDrop = await tryWorkEnhanceCoresDrop(
+      const drop = await tryWorkGearDrop(
         tx,
         session.user.id,
         "soilDump",
+        "yanmar",
+        dropCache,
       );
-      if (coreDrop.dropped) {
-        coresDropped += coreDrop.amount;
-        enhanceCoresTotal = coreDrop.enhanceCores;
-      }
+      const payload = serializeWorkGearDrop(drop);
+      if (payload) gearDrops.push(payload);
     }
 
+    const coresDropped = rollWorkEnhanceCoresTotal("soilDump", safeChunkCount);
     const updated = await tx.user.update({
       where: { id: session.user.id },
       data: {
         ...(totalStars > 0 ? { currency: currencyBalance } : {}),
+        ...(coresDropped > 0
+          ? { enhanceCores: { increment: coresDropped } }
+          : {}),
         totalXp: { increment: xpGained },
       },
       select: { currency: true, totalXp: true, enhanceCores: true },
@@ -305,14 +315,19 @@ export const POST = withHotApiObservability(
           xpGained,
           currency: updated.currency,
           totalXp: updated.totalXp,
-          enhanceCores: enhanceCoresTotal ?? updated.enhanceCores,
+          enhanceCores: updated.enhanceCores,
           coresDropped,
           stats,
           gearDrops,
         } as unknown as Prisma.InputJsonValue;
       },
     );
-  });
+  },
+    {
+      maxWait: 10_000,
+      timeout: 20_000,
+    },
+  );
 
   observation.setMetadata({
     outcome: "success",
