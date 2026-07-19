@@ -108,8 +108,11 @@ export const WE = {
    * Tuned to the factory pin geometry so mechStops remain reachable;
    * slightly inside the measured envelope for a firm end-stop feel.
    */
-  /** Boom-lift pin distances along lower 등 (barrel → kink-pocket rod). */
-  boomLiftStroke: { min: 0.92, max: 1.22 },
+  /**
+   * Boom-lift pin distances along lower 등 (barrel → kink-pocket rod).
+   * Tuned to kinkAlong≈0.55 lowerLen≈1.8 (raised≈1.19, lowered≈1.51).
+   */
+  boomLiftStroke: { min: 1.12, max: 1.55 },
   /** Boom-등 cylinder kink → boom tip only (length ~constant; not an arm joint). */
   armCylStroke: { min: 1.5, max: 2.0 },
   /** Arm cylinder along arm 등 (ΔX only). */
