@@ -21,6 +21,7 @@ import {
   type MaintenanceReward,
   type MaintenanceSnapshot,
 } from "./maintenance";
+import { MaintenanceBonusRoulette } from "./MaintenanceBonusRoulette";
 
 const REPAIR_ART = "/images/yanmar/2d/cockpit/repair-tent-premium.png?v=2";
 const STAR_ICON = "/images/star-currency.svg";
@@ -61,41 +62,6 @@ function bonusPoolIcons(
     }
   }
   return icons;
-}
-
-function bonusOutcomeVisual(
-  fluidId: MaintenanceFluidId,
-  bonus: MaintenanceBonusOutcome,
-): { src: string; amount: number; label: string } | null {
-  const pointKind = MAINTENANCE_FLUIDS[fluidId].pointKind;
-  if (bonus.stars) {
-    return { src: STAR_ICON, amount: bonus.stars, label: "스타" };
-  }
-  if (bonus.workshopPoints) {
-    return {
-      src: POINT_ICONS[pointKind],
-      amount: bonus.workshopPoints,
-      label: pointKindLabel(pointKind),
-    };
-  }
-  if (bonus.enhanceCores) {
-    return { src: CORE_ICON, amount: bonus.enhanceCores, label: "강화코어" };
-  }
-  if (bonus.gachaTicketsStandard) {
-    return {
-      src: TICKET_STANDARD_ICON,
-      amount: bonus.gachaTicketsStandard,
-      label: "일반 뽑기권",
-    };
-  }
-  if (bonus.gachaTicketsPremium) {
-    return {
-      src: TICKET_PREMIUM_ICON,
-      amount: bonus.gachaTicketsPremium,
-      label: "고급 뽑기권",
-    };
-  }
-  return null;
 }
 
 function RewardIconChip({
@@ -262,6 +228,9 @@ export function RepairPanel({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [claimResult, setClaimResult] =
     useState<MaintenanceClaimResult | null>(null);
+  const [claimPhase, setClaimPhase] = useState<"idle" | "bonus" | "summary">(
+    "idle",
+  );
   const [nowMs, setNowMs] = useState(() => Date.now() + clockOffsetMs);
 
   useEffect(() => {
@@ -271,6 +240,13 @@ export function RepairPanel({
     const id = window.setInterval(tick, 250);
     return () => window.clearInterval(id);
   }, [open, clockOffsetMs]);
+
+  useEffect(() => {
+    if (open) return;
+    setConfirmOpen(false);
+    setClaimResult(null);
+    setClaimPhase("idle");
+  }, [open]);
 
   const activeFluid = useMemo(() => {
     return (
@@ -322,20 +298,21 @@ export function RepairPanel({
   const tone = statusTone(livePercent, liveEligible);
   const canExchange = liveEligible;
   const remainingHhMm = formatRemainingHhMm(liveRemainingMs);
-  const claimBonusHit = claimResult
-    ? bonusOutcomeVisual(activeId, claimResult.bonus)
-    : null;
 
   async function confirmExchange() {
     if (!canExchange || busy) return;
     setConfirmOpen(false);
     const result = await onRepair(activeId);
-    if (result) setClaimResult(result);
+    if (result) {
+      setClaimResult(result);
+      setClaimPhase("bonus");
+    }
   }
 
   function closeAll() {
     setConfirmOpen(false);
     setClaimResult(null);
+    setClaimPhase("idle");
     onClose();
   }
 
@@ -512,7 +489,15 @@ export function RepairPanel({
           </div>
         ) : null}
 
-        {claimResult ? (
+        {claimResult && claimPhase === "bonus" ? (
+          <MaintenanceBonusRoulette
+            fluidId={activeId}
+            bonus={claimResult.bonus}
+            onDone={() => setClaimPhase("summary")}
+          />
+        ) : null}
+
+        {claimResult && claimPhase === "summary" ? (
           <div
             className="yanmar-repair-confirm"
             role="dialog"
@@ -522,15 +507,6 @@ export function RepairPanel({
             <div className="yanmar-repair-confirm-card is-result">
               <h3 id="yanmar-repair-result-title">교환 완료</h3>
               <RewardPreview fluidId={activeId} compact hideBonusBanner />
-              {claimBonusHit ? (
-                <div className="yanmar-repair-result-bonus">
-                  <RewardIconChip
-                    src={claimBonusHit.src}
-                    amount={claimBonusHit.amount}
-                    label={claimBonusHit.label}
-                  />
-                </div>
-              ) : null}
               <p className="yanmar-repair-confirm-item is-buff">
                 {claimResult.buff.label}
               </p>

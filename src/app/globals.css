@@ -4165,50 +4165,60 @@ body {
 @keyframes yanmar-crash-hit-float-left {
   0% {
     opacity: 0;
-    transform: translate(-50%, 0.2rem) translateX(0) rotate(-4deg) scale(0.85);
+    transform: translate(-50%, 1.35rem) translateX(0) rotate(-2deg) scale(0.72);
   }
-  12% {
+  10% {
     opacity: 1;
-    transform: translate(-50%, -0.15rem) translateX(-0.55rem) rotate(-10deg)
-      scale(1.22);
+    transform: translate(-50%, 0.15rem) translateX(-0.15rem) rotate(-6deg)
+      scale(1.18);
   }
   28% {
-    transform: translate(-50%, -0.35rem) translateX(0.28rem) rotate(6deg)
-      scale(1.12);
+    transform: translate(-50%, -1.55rem) translateX(-0.95rem) rotate(-12deg)
+      scale(1.28);
   }
   48% {
-    transform: translate(-50%, -0.7rem) translateX(-0.35rem) rotate(-5deg)
-      scale(1.08);
+    transform: translate(-50%, -1.95rem) translateX(-1.55rem) rotate(-8deg)
+      scale(1.12);
+  }
+  72% {
+    opacity: 1;
+    transform: translate(-50%, -0.35rem) translateX(-2.05rem) rotate(-4deg)
+      scale(1.02);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -1.55rem) translateX(-0.7rem) rotate(-8deg)
-      scale(1.02);
+    transform: translate(-50%, 1.65rem) translateX(-2.45rem) rotate(2deg)
+      scale(0.88);
   }
 }
 
 @keyframes yanmar-crash-hit-float-right {
   0% {
     opacity: 0;
-    transform: translate(-50%, 0.2rem) translateX(0) rotate(4deg) scale(0.85);
+    transform: translate(-50%, 1.35rem) translateX(0) rotate(2deg) scale(0.72);
   }
-  12% {
+  10% {
     opacity: 1;
-    transform: translate(-50%, -0.15rem) translateX(0.55rem) rotate(10deg)
-      scale(1.22);
+    transform: translate(-50%, 0.15rem) translateX(0.15rem) rotate(6deg)
+      scale(1.18);
   }
   28% {
-    transform: translate(-50%, -0.35rem) translateX(-0.28rem) rotate(-6deg)
-      scale(1.12);
+    transform: translate(-50%, -1.55rem) translateX(0.95rem) rotate(12deg)
+      scale(1.28);
   }
   48% {
-    transform: translate(-50%, -0.7rem) translateX(0.35rem) rotate(5deg)
-      scale(1.08);
+    transform: translate(-50%, -1.95rem) translateX(1.55rem) rotate(8deg)
+      scale(1.12);
+  }
+  72% {
+    opacity: 1;
+    transform: translate(-50%, -0.35rem) translateX(2.05rem) rotate(4deg)
+      scale(1.02);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -1.55rem) translateX(0.7rem) rotate(8deg)
-      scale(1.02);
+    transform: translate(-50%, 1.65rem) translateX(2.45rem) rotate(-2deg)
+      scale(0.88);
   }
 }
 
@@ -4219,13 +4229,13 @@ body {
 }
 
 .yanmar-crash-hit-float.is-bounce-left {
-  animation: yanmar-crash-hit-float-left 0.78s cubic-bezier(0.22, 0.82, 0.28, 1)
-    forwards;
+  animation: yanmar-crash-hit-float-left 0.95s
+    cubic-bezier(0.2, 0.85, 0.28, 1) forwards;
 }
 
 .yanmar-crash-hit-float.is-bounce-right {
-  animation: yanmar-crash-hit-float-right 0.78s cubic-bezier(0.22, 0.82, 0.28, 1)
-    forwards;
+  animation: yanmar-crash-hit-float-right 0.95s
+    cubic-bezier(0.2, 0.85, 0.28, 1) forwards;
 }
 
 .yanmar-portrait-side-button {
@@ -9193,6 +9203,16 @@ html.pwa-mode [contenteditable="true"] {
 
 .yanmar-repair-confirm-card.is-result {
   animation: yanmar-repair-panel-in 0.24s ease-out;
+}
+
+.yanmar-repair-confirm-card.is-result .yanmar-repair-confirm-actions {
+  display: flex;
+  justify-content: center;
+  grid-template-columns: none;
+}
+
+.yanmar-repair-confirm-card.is-result .yanmar-repair-confirm-ok {
+  width: min(100%, 10.5rem);
 }
 
 @media (max-width: 420px) {

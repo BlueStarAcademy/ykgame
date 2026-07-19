@@ -539,12 +539,16 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
   const showStars = panel.earnedStars > 0;
   const showCores = panel.earnedEnhanceCores > 0;
   const showMonumentPoints = panel.earnedMonumentPoints > 0;
+  const showTicketsStd = panel.earnedGachaTicketsStandard > 0;
+  const showTicketsPrem = panel.earnedGachaTicketsPremium > 0;
   if (
     !showScore &&
     !showXp &&
     !showStars &&
     !showCores &&
     !showMonumentPoints &&
+    !showTicketsStd &&
+    !showTicketsPrem &&
     !panel.rewardText
   ) {
     return null;
@@ -604,6 +608,36 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
           draggable={false}
         />
         {panel.earnedEnhanceCores.toLocaleString()}
+      </span>,
+    );
+  }
+  if (showTicketsStd) {
+    valueParts.push(
+      <span key="ticket-std" className="inline-flex items-center gap-0.5">
+        <img
+          src="/images/yanmar/2d/gacha-ticket-standard.svg"
+          alt=""
+          width={16}
+          height={16}
+          className="object-contain"
+          draggable={false}
+        />
+        {panel.earnedGachaTicketsStandard.toLocaleString()}
+      </span>,
+    );
+  }
+  if (showTicketsPrem) {
+    valueParts.push(
+      <span key="ticket-prem" className="inline-flex items-center gap-0.5">
+        <img
+          src="/images/yanmar/2d/gacha-ticket-premium.svg"
+          alt=""
+          width={16}
+          height={16}
+          className="object-contain"
+          draggable={false}
+        />
+        {panel.earnedGachaTicketsPremium.toLocaleString()}
       </span>,
     );
   }
@@ -1163,6 +1197,8 @@ export function ExcavatorGameWrapper({
       rewardText?: string,
       earnedEnhanceCores?: number,
       earnedMonumentPoints?: number,
+      earnedGachaTicketsStandard?: number,
+      earnedGachaTicketsPremium?: number,
     ) => void
   >(() => {});
   const dumpScoreHideTimerRef = useRef<number | null>(null);
@@ -4385,6 +4421,9 @@ export function ExcavatorGameWrapper({
         earnedEnhanceCores:
           (previous?.earnedEnhanceCores ?? 0) + earnedEnhanceCores,
         earnedMonumentPoints: previous?.earnedMonumentPoints ?? 0,
+        earnedGachaTicketsStandard:
+          previous?.earnedGachaTicketsStandard ?? 0,
+        earnedGachaTicketsPremium: previous?.earnedGachaTicketsPremium ?? 0,
         pendingRewards: previous?.pendingRewards ?? 0,
         pulseKey: (previous?.pulseKey ?? 0) + 1,
       };
@@ -4405,6 +4444,8 @@ export function ExcavatorGameWrapper({
       rewardText = "",
       earnedEnhanceCores = 0,
       earnedMonumentPoints = 0,
+      earnedGachaTicketsStandard = 0,
+      earnedGachaTicketsPremium = 0,
     ) => {
       if (score > 0) {
         arcadeScoreRef.current += score;
@@ -4419,6 +4460,8 @@ export function ExcavatorGameWrapper({
         earnedXp,
         earnedEnhanceCores,
         earnedMonumentPoints,
+        earnedGachaTicketsStandard,
+        earnedGachaTicketsPremium,
         pendingRewards: 0,
         pulseKey: (dumpScorePanelRef.current?.pulseKey ?? 0) + 1,
       };
@@ -4480,6 +4523,9 @@ export function ExcavatorGameWrapper({
           claimed.reward.xp,
           "",
           claimed.reward.enhanceCores ?? 0,
+          0,
+          claimed.reward.gachaTicketsStandard ?? 0,
+          claimed.reward.gachaTicketsPremium ?? 0,
         );
       } catch {
         showAttachmentWarning("퀘스트 보상 수령에 실패했습니다.");
@@ -4528,6 +4574,9 @@ export function ExcavatorGameWrapper({
         claimed.reward.xp,
         "",
         claimed.reward.enhanceCores ?? 0,
+        0,
+        claimed.reward.gachaTicketsStandard ?? 0,
+        claimed.reward.gachaTicketsPremium ?? 0,
       );
     } catch {
       showAttachmentWarning("미션 보상 수령에 실패했습니다.");
@@ -4575,6 +4624,9 @@ export function ExcavatorGameWrapper({
           claimed.reward.xp,
           "",
           claimed.reward.enhanceCores ?? 0,
+          0,
+          claimed.reward.gachaTicketsStandard ?? 0,
+          claimed.reward.gachaTicketsPremium ?? 0,
         );
       } catch {
         showAttachmentWarning("퀘스트 보상 수령에 실패했습니다.");
@@ -6600,16 +6652,21 @@ export function ExcavatorGameWrapper({
           </div>
         )}
 
-        {mode !== "intro" && (dumpScorePanel || couponDiscovery || gearDiscovery) ? (
-          <div
-            className="pointer-events-none absolute left-1/2 top-1/2 z-[58] flex max-w-[calc(100%-1rem)] -translate-x-1/2 -translate-y-1/2 flex-row flex-wrap items-center justify-center gap-2.5"
-            aria-live="polite"
-          >
-            <RewardPopupOverlay panel={dumpScorePanel} />
-            <CouponDiscoveryOverlay discovery={couponDiscovery} />
-            <GearDiscoveryOverlay discovery={gearDiscovery} />
-          </div>
-        ) : null}
+        {mode !== "intro" &&
+        (dumpScorePanel || couponDiscovery || gearDiscovery) &&
+        typeof document !== "undefined"
+          ? createPortal(
+              <div
+                className="pointer-events-none fixed left-1/2 top-1/2 z-[350] flex max-w-[calc(100%-1rem)] -translate-x-1/2 -translate-y-1/2 flex-row flex-wrap items-center justify-center gap-2.5"
+                aria-live="polite"
+              >
+                <RewardPopupOverlay panel={dumpScorePanel} />
+                <CouponDiscoveryOverlay discovery={couponDiscovery} />
+                <GearDiscoveryOverlay discovery={gearDiscovery} />
+              </div>,
+              document.body,
+            )
+          : null}
         {mode !== "intro" && poseSaveToastVisible ? (
           <div key={poseSaveToastKey} className="yanmar-pose-save-toast" role="status">
             현재 자세가 저장되었습니다.
