@@ -56,6 +56,7 @@ const BUFF_ACQUIRE_BASE_VOLUME = 0.88;
 const ITEM_ACQUIRE_BASE_VOLUME = 0.88;
 const MASTER_ITEM_ACQUIRE_BASE_VOLUME = 0.92;
 const UI_CLICK_POOL_SIZE = 4;
+const ITEM_ACQUIRE_POOL_SIZE = 4;
 /** Ignore brief contact flicker so the loop does not restart mid-strike. */
 const BREAKER_STOP_GRACE_MS = 120;
 
@@ -78,8 +79,10 @@ class YanmarAudioController {
   private monumentEnterAudio: HTMLAudioElement | null = null;
   private starAcquireAudio: HTMLAudioElement | null = null;
   private buffAcquireAudio: HTMLAudioElement | null = null;
-  private itemAcquireAudio: HTMLAudioElement | null = null;
-  private masterItemAcquireAudio: HTMLAudioElement | null = null;
+  private itemAcquirePool: HTMLAudioElement[] = [];
+  private itemAcquirePoolIndex = 0;
+  private masterItemAcquirePool: HTMLAudioElement[] = [];
+  private masterItemAcquirePoolIndex = 0;
   private hornId: HornId = 1;
   private unlocked = false;
   private sfxEnabled = true;
@@ -497,12 +500,16 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.sfxEnabled) return;
     this.ensureStoreSubscription();
-    if (!this.itemAcquireAudio) {
-      this.itemAcquireAudio = new Audio(ITEM_ACQUIRE_SRC);
-      this.itemAcquireAudio.preload = "auto";
+    let audio = this.itemAcquirePool[this.itemAcquirePoolIndex];
+    if (!audio) {
+      audio = new Audio(ITEM_ACQUIRE_SRC);
+      audio.preload = "auto";
+      this.itemAcquirePool[this.itemAcquirePoolIndex] = audio;
     }
+    this.itemAcquirePoolIndex =
+      (this.itemAcquirePoolIndex + 1) % ITEM_ACQUIRE_POOL_SIZE;
     this.playHtmlAudio(
-      this.itemAcquireAudio,
+      audio,
       ITEM_ACQUIRE_BASE_VOLUME * volumeToGain(this.sfxVolume),
     );
   }
@@ -512,12 +519,16 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.sfxEnabled) return;
     this.ensureStoreSubscription();
-    if (!this.masterItemAcquireAudio) {
-      this.masterItemAcquireAudio = new Audio(MASTER_ITEM_ACQUIRE_SRC);
-      this.masterItemAcquireAudio.preload = "auto";
+    let audio = this.masterItemAcquirePool[this.masterItemAcquirePoolIndex];
+    if (!audio) {
+      audio = new Audio(MASTER_ITEM_ACQUIRE_SRC);
+      audio.preload = "auto";
+      this.masterItemAcquirePool[this.masterItemAcquirePoolIndex] = audio;
     }
+    this.masterItemAcquirePoolIndex =
+      (this.masterItemAcquirePoolIndex + 1) % ITEM_ACQUIRE_POOL_SIZE;
     this.playHtmlAudio(
-      this.masterItemAcquireAudio,
+      audio,
       MASTER_ITEM_ACQUIRE_BASE_VOLUME * volumeToGain(this.sfxVolume),
     );
   }
@@ -716,15 +727,21 @@ class YanmarAudioController {
       this.buffAcquireAudio.src = "";
       this.buffAcquireAudio = null;
     }
-    if (this.itemAcquireAudio) {
-      this.itemAcquireAudio.pause();
-      this.itemAcquireAudio.src = "";
-      this.itemAcquireAudio = null;
+    if (this.itemAcquirePool.length) {
+      for (const audio of this.itemAcquirePool) {
+        audio.pause();
+        audio.src = "";
+      }
+      this.itemAcquirePool = [];
+      this.itemAcquirePoolIndex = 0;
     }
-    if (this.masterItemAcquireAudio) {
-      this.masterItemAcquireAudio.pause();
-      this.masterItemAcquireAudio.src = "";
-      this.masterItemAcquireAudio = null;
+    if (this.masterItemAcquirePool.length) {
+      for (const audio of this.masterItemAcquirePool) {
+        audio.pause();
+        audio.src = "";
+      }
+      this.masterItemAcquirePool = [];
+      this.masterItemAcquirePoolIndex = 0;
     }
     clearBrowserMediaSession();
   }

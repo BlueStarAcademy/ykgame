@@ -33,6 +33,10 @@ import {
 } from "./gearGenerate";
 import { GearIconCell } from "./GearIconCell";
 import {
+  GachaResultModal,
+  type GachaResultItem,
+} from "./GachaResultModal";
+import {
   equippedBySlot,
   formatChassisStatLines,
   formatDerivedStatLines,
@@ -340,8 +344,9 @@ function GearBubbleCard({
         })}
         {item.masterOption ? (
           <li className="is-master-opt">
-            <span>
-              마스터 {item.masterOption.label}
+            <span className="yanmar-gear-master-marker">마스터</span>
+            <span className="yanmar-gear-master-body">
+              {item.masterOption.label}
               {!item.masterOption.hideValue
                 ? ` ${item.masterOption.value}${
                     item.masterOption.isPercent ? "%" : ""
@@ -421,8 +426,18 @@ export function GearPanel({
   const [bulkDone, setBulkDone] = useState<
     | { kind: "dismantle"; count: number; cores: number }
     | { kind: "sell"; count: number; stars: number }
-    | { kind: "synth"; batches: number; upgraded: number }
     | null
+  >(null);
+  const [bulkSynthRun, setBulkSynthRun] = useState<{
+    materials: GearPanelItem[];
+    batchIndex: number;
+    total: number;
+    reveal: boolean;
+    lastResult: SynthesizeActionResult | null;
+  } | null>(null);
+  const [synthPullOpen, setSynthPullOpen] = useState(false);
+  const [synthPullResults, setSynthPullResults] = useState<
+    GachaResultItem[] | null
   >(null);
   const [synthOpen, setSynthOpen] = useState(false);
   const [synthGrade, setSynthGrade] = useState<ItemGrade | null>(null);
@@ -761,6 +776,9 @@ export function GearPanel({
     setSynthFocusId(null);
     setBulkConfirmOpen(false);
     setBulkDone(null);
+    setBulkSynthRun(null);
+    setSynthPullOpen(false);
+    setSynthPullResults(null);
     setBulkMode(mode);
     setBulkSelected(new Set());
   }
@@ -853,22 +871,82 @@ export function GearPanel({
       return;
     }
 
-    let batches = 0;
-    let upgraded = 0;
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const gatherMs = reducedMotion ? 120 : 720;
+    const revealMs = reducedMotion ? 60 : 380;
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        window.setTimeout(resolve, ms);
+      });
+
+    const pullResults: GachaResultItem[] = [];
+    const totalBatches = Math.floor(targets.length / 3);
+    const itemById = new Map(bulkItems.map((item) => [item.id, item]));
+
+    // 선택 UI는 닫고 합성 연출만 보여 준다.
+    exitBulkMode();
+
     for (let i = 0; i + 2 < targets.length; i += 3) {
       const trio: [string, string, string] = [
         targets[i]!.id,
         targets[i + 1]!.id,
         targets[i + 2]!.id,
       ];
-      const result = await onSynthesize(trio);
-      if (result?.item) {
-        batches += 1;
-        if (result.upgraded) upgraded += 1;
-      }
+      const materials = trio
+        .map((id) => itemById.get(id))
+        .filter((item): item is GearPanelItem => !!item);
+      if (materials.length !== 3) continue;
+
+      const batchIndex = i / 3 + 1;
+      setBulkSynthRun({
+        materials,
+        batchIndex,
+        total: totalBatches,
+        reveal: false,
+        lastResult: null,
+      });
+
+      const apiPromise = (async (): Promise<SynthesizeActionResult | null> => {
+        try {
+          const raw = await onSynthesize(trio);
+          return (raw as SynthesizeActionResult | null | undefined) ?? null;
+        } catch {
+          return null;
+        }
+      })();
+
+      const [, result] = await Promise.all([wait(gatherMs), apiPromise]);
+      if (!result?.item) continue;
+
+      setBulkSynthRun({
+        materials,
+        batchIndex,
+        total: totalBatches,
+        reveal: true,
+        lastResult: result,
+      });
+      await wait(revealMs);
+
+      pullResults.push({
+        nameSnapshot: result.item.nameSnapshot,
+        grade: result.item.grade,
+        slot: result.item.slot,
+        upgraded: result.upgraded,
+      });
     }
-    exitBulkMode();
-    if (batches > 0) setBulkDone({ kind: "synth", batches, upgraded });
+
+    setBulkSynthRun(null);
+    if (pullResults.length > 0) {
+      if (pullResults.length === 1 && pullResults[0]?.grade === "MASTER") {
+        yanmarAudio.playMasterItemAcquire();
+      } else {
+        yanmarAudio.playItemAcquire();
+      }
+      setSynthPullResults(pullResults);
+      setSynthPullOpen(true);
+    }
   }
 
   async function confirmSynthesize() {
@@ -915,6 +993,11 @@ export function GearPanel({
     setSynthSlots([null, null, null]);
     setSynthResult(result);
     setSynthFuseReveal(true);
+    if (result.item.grade === "MASTER") {
+      yanmarAudio.playMasterItemAcquire();
+    } else {
+      yanmarAudio.playItemAcquire();
+    }
     await wait(revealMs);
     setSynthPhase("result");
     setSynthMaterials([]);
@@ -2308,45 +2391,33 @@ export function GearPanel({
           />
           <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--done">
             <p className="yanmar-gear-confirm-eyebrow">
-              {bulkDone.kind === "dismantle"
-                ? "분해 완료"
-                : bulkDone.kind === "sell"
-                  ? "판매 완료"
-                  : "합성 완료"}
+              {bulkDone.kind === "dismantle" ? "분해 완료" : "판매 완료"}
             </p>
             <h3 id="yanmar-gear-bulk-done-title">
               {bulkDone.kind === "dismantle"
                 ? `${bulkDone.count}개 장비를 분해했습니다`
-                : bulkDone.kind === "sell"
-                  ? `${bulkDone.count}개 장비를 판매했습니다`
-                  : `${bulkDone.batches}회 합성했습니다${
-                      bulkDone.upgraded > 0
-                        ? ` (등급 상승 ${bulkDone.upgraded}회)`
-                        : ""
-                    }`}
+                : `${bulkDone.count}개 장비를 판매했습니다`}
             </h3>
-            {bulkDone.kind === "synth" ? null : (
-              <div className="yanmar-gear-confirm-reward">
-                <span className="yanmar-gear-confirm-reward-label">획득</span>
-                {bulkDone.kind === "dismantle" ? (
-                  <span className="yanmar-gear-confirm-reward-value">
-                    <img
-                      src="/images/yanmar/2d/enhance-core.png?v=3"
-                      alt=""
-                      width={22}
-                      height={22}
-                      draggable={false}
-                    />
-                    <strong className="tabular-nums">+{bulkDone.cores}</strong>
-                    <span>강화코어</span>
-                  </span>
-                ) : (
-                  <span className="yanmar-gear-confirm-reward-value">
-                    <StarAmount value={bulkDone.stars} />
-                  </span>
-                )}
-              </div>
-            )}
+            <div className="yanmar-gear-confirm-reward">
+              <span className="yanmar-gear-confirm-reward-label">획득</span>
+              {bulkDone.kind === "dismantle" ? (
+                <span className="yanmar-gear-confirm-reward-value">
+                  <img
+                    src="/images/yanmar/2d/enhance-core.png?v=3"
+                    alt=""
+                    width={22}
+                    height={22}
+                    draggable={false}
+                  />
+                  <strong className="tabular-nums">+{bulkDone.cores}</strong>
+                  <span>강화코어</span>
+                </span>
+              ) : (
+                <span className="yanmar-gear-confirm-reward-value">
+                  <StarAmount value={bulkDone.stars} />
+                </span>
+              )}
+            </div>
             <div className="yanmar-gear-confirm-actions yanmar-gear-confirm-actions--single">
               <button
                 type="button"
@@ -2359,6 +2430,80 @@ export function GearPanel({
           </div>
         </div>
       ) : null}
+
+      {bulkSynthRun ? (
+        <div
+          className="yanmar-gear-confirm-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="yanmar-gear-bulk-synth-title"
+        >
+          <div className="yanmar-gear-confirm-backdrop" aria-hidden />
+          <div className="yanmar-gear-confirm-card yanmar-gear-synth-card">
+            <p className="yanmar-gear-confirm-eyebrow">선택 합성</p>
+            <h3 id="yanmar-gear-bulk-synth-title">
+              {bulkSynthRun.reveal
+                ? `${bulkSynthRun.batchIndex}/${bulkSynthRun.total}회 합성 완료`
+                : `${bulkSynthRun.batchIndex}/${bulkSynthRun.total}회 합성 중…`}
+            </h3>
+            <div
+              className={`yanmar-gear-synth-fuse${
+                bulkSynthRun.reveal ? " is-revealed" : ""
+              }${
+                bulkSynthRun.reveal && bulkSynthRun.lastResult?.upgraded
+                  ? " is-upgraded"
+                  : ""
+              }`}
+            >
+              <div className="yanmar-gear-synth-fuse-stage">
+                <div className="yanmar-gear-synth-fuse-core" aria-hidden />
+                <div className="yanmar-gear-synth-fuse-burst" aria-hidden />
+                {bulkSynthRun.materials.map((material, idx) => (
+                  <div
+                    key={`${material.id}-bulk-fuse-${idx}`}
+                    className={`yanmar-gear-synth-fuse-piece is-slot-${idx}`}
+                  >
+                    <GearIconCell
+                      slot={material.slot}
+                      grade={material.grade}
+                      enhanceLevel={material.enhanceLevel}
+                      size="sm"
+                    />
+                  </div>
+                ))}
+                {bulkSynthRun.reveal && bulkSynthRun.lastResult ? (
+                  <div className="yanmar-gear-synth-fuse-result">
+                    <GearIconCell
+                      slot={bulkSynthRun.lastResult.item.slot}
+                      grade={bulkSynthRun.lastResult.item.grade}
+                      enhanceLevel={bulkSynthRun.lastResult.item.enhanceLevel}
+                      size="md"
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <p className="yanmar-gear-synth-fuse-label">
+                {bulkSynthRun.reveal
+                  ? bulkSynthRun.lastResult?.upgraded
+                    ? "등급 상승!"
+                    : "합성 완료"
+                  : "재료를 모으는 중…"}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <GachaResultModal
+        open={synthPullOpen}
+        onClose={() => {
+          setSynthPullOpen(false);
+          setSynthPullResults(null);
+        }}
+        results={synthPullResults}
+        title="합성 결과"
+        perRevealSfx
+      />
 
       {synthOpen ? (
         <div
@@ -2591,14 +2736,17 @@ export function GearPanel({
                         ) : null}
                         {synthFocusItem.masterOption ? (
                           <p className="yanmar-gear-synth-viewer-master">
-                            마스터 {synthFocusItem.masterOption.label}
-                            {!synthFocusItem.masterOption.hideValue
-                              ? ` ${synthFocusItem.masterOption.value}${
-                                  synthFocusItem.masterOption.isPercent
-                                    ? "%"
-                                    : ""
-                                }`
-                              : ""}
+                            <span className="yanmar-gear-master-marker">마스터</span>
+                            <span className="yanmar-gear-master-body">
+                              {synthFocusItem.masterOption.label}
+                              {!synthFocusItem.masterOption.hideValue
+                                ? ` ${synthFocusItem.masterOption.value}${
+                                    synthFocusItem.masterOption.isPercent
+                                      ? "%"
+                                      : ""
+                                  }`
+                                : ""}
+                            </span>
                           </p>
                         ) : null}
                       </div>

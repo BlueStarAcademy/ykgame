@@ -2989,14 +2989,13 @@ export function ExcavatorGameWrapper({
           setLastGachaBanner(banner);
           setLastGachaResults(data.items);
           setShowGachaResultModal(true);
-          const hasMaster = data.items.some(
-            (item) => item.grade === "MASTER",
-          );
-          if (data.items.length === 1 && hasMaster) {
-            yanmarAudio.playMasterItemAcquire();
-          } else {
-            // Multi-pull: one generic acquire SFX; master SFX plays on reveal.
-            yanmarAudio.playItemAcquire();
+          // Single pull: play immediately. Multi-pull SFX plays per card reveal.
+          if (data.items.length === 1) {
+            if (data.items[0]?.grade === "MASTER") {
+              yanmarAudio.playMasterItemAcquire();
+            } else {
+              yanmarAudio.playItemAcquire();
+            }
           }
         }
         await loadEquipment();

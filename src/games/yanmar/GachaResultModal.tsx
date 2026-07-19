@@ -17,6 +17,8 @@ export type GachaResultItem = {
   nameSnapshot: string;
   grade: string;
   slot?: GearSlot | string;
+  /** 합성 등급 상승 등 — 연속 공개 시 잭팟 연출 */
+  upgraded?: boolean;
 };
 
 /** Banner top tier: STANDARD → 정밀, PREMIUM → 마스터 */
@@ -35,6 +37,10 @@ interface GachaResultModalProps {
   onClose: () => void;
   results: GachaResultItem[] | null;
   banner?: GachaBanner | null;
+  /** 기본: 획득 결과 / 합성: 합성 결과 */
+  title?: string;
+  /** 카드마다 획득 효과음 (기본: 연속 공개 시 항상, 단건도 강제하려면 true) */
+  perRevealSfx?: boolean;
 }
 
 function isGearSlot(v: unknown): v is GearSlot {
@@ -70,6 +76,8 @@ export function GachaResultModal({
   onClose,
   results,
   banner = "STANDARD",
+  title = "획득 결과",
+  perRevealSfx = false,
 }: GachaResultModalProps) {
   const items = results ?? [];
   const count = items.length;
@@ -135,11 +143,16 @@ export function GachaResultModal({
         if (cancelled) return;
 
         if (skipRef.current) {
-          const hasUnrevealedMaster = pullItems
-            .slice(i)
-            .some((item) => normalizeGrade(item.grade) === "MASTER");
-          if (hasUnrevealedMaster && pullItems.length > 1) {
-            yanmarAudio.playMasterItemAcquire();
+          const remaining = pullItems.slice(i);
+          const hasUnrevealedMaster = remaining.some(
+            (item) => normalizeGrade(item.grade) === "MASTER",
+          );
+          if (remaining.length > 0) {
+            if (hasUnrevealedMaster) {
+              yanmarAudio.playMasterItemAcquire();
+            } else {
+              yanmarAudio.playItemAcquire();
+            }
           }
           setJackpotFlash(false);
           setFlashGrade(null);
@@ -150,13 +163,18 @@ export function GachaResultModal({
         }
 
         const grade = normalizeGrade(pullItems[i]?.grade);
-        const isJackpot = grade === jackpotGrade;
+        const isJackpot =
+          grade === jackpotGrade || Boolean(pullItems[i]?.upgraded);
 
         setJustRevealedIndex(i);
         setRevealedCount(i + 1);
 
-        if (grade === "MASTER" && pullItems.length > 1) {
-          yanmarAudio.playMasterItemAcquire();
+        if (pullItems.length > 1 || perRevealSfx) {
+          if (grade === "MASTER") {
+            yanmarAudio.playMasterItemAcquire();
+          } else {
+            yanmarAudio.playItemAcquire();
+          }
         }
 
         if (isJackpot) {
@@ -187,7 +205,7 @@ export function GachaResultModal({
       cancelled = true;
       wakeRef.current?.();
     };
-  }, [open, sessionKey, jackpotGrade]);
+  }, [open, sessionKey, jackpotGrade, perRevealSfx]);
 
   const handleSkip = () => {
     if (phase !== "playing" || count <= 1) return;
@@ -217,7 +235,7 @@ export function GachaResultModal({
         }${phase === "playing" ? " is-playing" : ""}`}
       >
         <div className="yanmar-gacha-result-modal-header">
-          <h2>획득 결과</h2>
+          <h2>{title}</h2>
           <span className="yanmar-gacha-result-modal-count">
             {Math.min(revealedCount, count)}/{count}
           </span>
@@ -253,7 +271,7 @@ export function GachaResultModal({
             const slot = normalizeSlot(r.slot);
             const grade = normalizeGrade(r.grade);
             const revealed = i < revealedCount;
-            const isJackpot = grade === jackpotGrade;
+            const isJackpot = grade === jackpotGrade || Boolean(r.upgraded);
             const popping = justRevealedIndex === i;
 
             return (
