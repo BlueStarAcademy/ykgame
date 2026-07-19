@@ -123,12 +123,16 @@ export const WE = {
     boomMax: 1.42,
     /** Inward fold — keep deep; do not let boom-cyl stroke edits shrink this. */
     armMin: -2.55,
-    armMax: 0.48,
+    /**
+     * Outward / up toward boom — stop a bit before colinear (0) so the arm
+     * cannot fold past a near-horizontal match with the boom.
+     */
+    armMax: -0.48,
     bucketMin: 0.75,
     bucketMax: 3.45,
   },
-  /** Soft fold clearance (arm vs boom tip) — extra arm clamp. */
-  armFoldSoftMax: 0.48,
+  /** Soft fold clearance — matches armMax near-boom-horizontal stop. */
+  armFoldSoftMax: -0.48,
   /** Collision sample fractions along boom/arm kinematic axis. */
   boomCollisionT: [0.12, 0.28, 0.42, 0.55, 0.7, 0.85, 0.96] as const,
   armCollisionT: [0.12, 0.28, 0.45, 0.62, 0.78, 0.92] as const,
