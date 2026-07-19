@@ -82,7 +82,9 @@ export function RepairTent({
   const depth = 10;
   const wallHeightLow = 5.2;
   const wallHeightHigh = 8.4;
-  const roofOverhang = 0.45;
+  const roofOverhangBack = 0.55;
+  const roofOverhangFront = 0.12;
+  const roofOverhangSide = 0.45;
 
   const bayCenters = useMemo(() => {
     const startX = -totalWidth / 2 + officeWidth + bayWidth / 2 + 0.2;
@@ -90,6 +92,15 @@ export function RepairTent({
   }, [totalWidth, officeWidth, bayWidth, bayGap, bayCount]);
 
   const roofPitch = Math.atan2(wallHeightHigh - wallHeightLow, shopWidth + officeWidth * 0.15);
+  /** Roof sits slightly back so the front eave does not cover the sign face. */
+  const roofDepth = depth + roofOverhangBack + roofOverhangFront;
+  const roofCenterZ = (roofOverhangBack - roofOverhangFront) / 2 - 0.2;
+  const roofCenterY = (wallHeightLow + wallHeightHigh) / 2 + 0.28;
+  /** Sign clears the high-side roof ridge. */
+  const signBoardH = 1.55;
+  const signY = wallHeightHigh + 0.55 + signBoardH / 2;
+  const signX = totalWidth / 2 - 4.0;
+  const signZ = depth / 2 - 0.15;
 
   return (
     <group position={[x, 0, z]} rotation={[0, rotationY, 0]}>
@@ -246,25 +257,47 @@ export function RepairTent({
         </group>
       ))}
 
-      {/* Asymmetrical sloping roof (low left → high right) */}
+      {/* Asymmetrical sloping roof (low left → high right), eave pulled back from facade */}
       <group
-        position={[0.4, (wallHeightLow + wallHeightHigh) / 2 + 0.15, 0]}
+        position={[0.4, roofCenterY, roofCenterZ]}
         rotation={[0, 0, roofPitch]}
       >
         <mesh castShadow receiveShadow>
-          <boxGeometry args={[totalWidth + roofOverhang * 2, 0.22, depth + roofOverhang]} />
+          <boxGeometry
+            args={[totalWidth + roofOverhangSide * 2, 0.22, roofDepth]}
+          />
           <meshStandardMaterial color={COLORS.roof} roughness={0.82} metalness={0.2} />
         </mesh>
       </group>
 
-      {/* Rooftop YK건기 sign on the tall (right) end */}
-      <group position={[totalWidth / 2 - 4.2, wallHeightHigh - 0.35, depth / 2 - 0.55]}>
-        <mesh position={[0, 0, -0.08]}>
-          <boxGeometry args={[7.2, 1.65, 0.12]} />
+      {/* Rooftop YK건기 sign — posts clear the roof so the wordmark stays visible */}
+      <group position={[signX, signY, signZ]}>
+        {[-2.85, 2.85].map((px) => (
+          <group key={px}>
+            <mesh position={[px, -signBoardH / 2 - 0.55, -0.12]} castShadow>
+              <boxGeometry args={[0.14, 1.2, 0.14]} />
+              <meshStandardMaterial
+                color={COLORS.metalDark}
+                roughness={0.55}
+                metalness={0.45}
+              />
+            </mesh>
+            <mesh position={[px, -signBoardH / 2 + 0.05, -0.12]}>
+              <boxGeometry args={[0.22, 0.12, 0.22]} />
+              <meshStandardMaterial
+                color={COLORS.doorFrame}
+                roughness={0.6}
+                metalness={0.4}
+              />
+            </mesh>
+          </group>
+        ))}
+        <mesh position={[0, 0, -0.1]} castShadow>
+          <boxGeometry args={[7.0, signBoardH, 0.14]} />
           <meshStandardMaterial color="#d8dce0" roughness={0.55} metalness={0.25} />
         </mesh>
-        <mesh position={[0, 0, 0.02]}>
-          <planeGeometry args={[6.4, 6.4 / YK_GEONGI_LOGO.aspect]} />
+        <mesh position={[0, 0, 0.01]}>
+          <planeGeometry args={[6.2, 6.2 / YK_GEONGI_LOGO.aspect]} />
           <meshBasicMaterial
             map={signTexture}
             transparent

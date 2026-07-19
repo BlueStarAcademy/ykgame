@@ -5806,7 +5806,7 @@ export function ExcavatorGameWrapper({
                           setShowMonumentPanel(false);
                           setShowRepairPanel(true);
                         }}
-                        aria-label="정비소 열기"
+                        aria-label="YK건기 서비스지점 열기"
                       >
                         <span className="yanmar-site-prompt-hud-icon-wrap">
                           <img
@@ -5831,10 +5831,10 @@ export function ExcavatorGameWrapper({
                         </span>
                         <span className="yanmar-site-prompt-hud-copy">
                           <span className="yanmar-site-prompt-hud-eyebrow">
-                            YK정비소
+                            YK건기
                           </span>
                           <span className="yanmar-site-prompt-hud-label">
-                            소모품교환
+                            서비스지점
                           </span>
                         </span>
                       </button>
@@ -6025,7 +6025,7 @@ export function ExcavatorGameWrapper({
                       setShowMonumentPanel(false);
                       setShowRepairPanel(true);
                     }}
-                    aria-label="정비소 열기"
+                    aria-label="YK건기 서비스지점 열기"
                   >
                     <span className="yanmar-site-prompt-hud-icon-wrap">
                       <img
@@ -6048,10 +6048,10 @@ export function ExcavatorGameWrapper({
                     </span>
                     <span className="yanmar-site-prompt-hud-copy">
                       <span className="yanmar-site-prompt-hud-eyebrow">
-                        YK정비소
+                        YK건기
                       </span>
                       <span className="yanmar-site-prompt-hud-label">
-                        소모품교환
+                        서비스지점
                       </span>
                     </span>
                   </button>
