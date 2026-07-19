@@ -65,12 +65,12 @@ import {
   isFacingTruckBedCenter,
 } from "./truckDumpAlign";
 import { checkAttachmentUse, getZoneAt } from "./attachmentZones";
+import { measureAttachmentClearance } from "./attachmentGround";
 import {
   BUCKET_SOIL_HOLD_MIN,
   getArmCollisionSamples,
   getBreakerGroundAngleDeg,
   getBreakerTipWorld,
-  getBucketBodyContactWorld,
   getGrappleClampWorld,
   getGrappleJawSampleWorlds,
   getBucketScraperContactWorld,
@@ -397,55 +397,6 @@ function destroyCarriedRock(rock: HillBoulder) {
   rock.extracted = true;
 }
 
-function bucketClearance(
-  sim: ExcavatorSimState,
-  terrain: TerrainData,
-  boomSwing: number,
-  grappleOpen = 1,
-) {
-  if (sim.attachmentType === "grapple") {
-    const samples = [
-      getGrappleClampWorld(sim, boomSwing),
-      ...getGrappleJawSampleWorlds(sim, boomSwing, grappleOpen),
-    ];
-    let tip = samples[0]!;
-    let groundH = sampleHeight(terrain, tip.x, tip.z);
-    let clearance = tip.y - groundH;
-    for (let i = 1; i < samples.length; i++) {
-      const sample = samples[i]!;
-      const h = sampleHeight(terrain, sample.x, sample.z);
-      const c = sample.y - h;
-      if (c < clearance) {
-        tip = sample;
-        groundH = h;
-        clearance = c;
-      }
-    }
-    return {
-      tip,
-      groundH,
-      depthBelow: groundH - tip.y,
-      clearance,
-    };
-  }
-
-  const tip =
-    sim.attachmentType === "breaker"
-      ? getBreakerTipWorld(sim, boomSwing)
-      : getBucketBodyContactWorld(sim, boomSwing);
-  const groundH =
-    sim.attachmentType === "breaker"
-      ? sampleBreakerContactHeight(terrain, tip.x, tip.z, BREAKER_TIP_PROBE_RADIUS)
-          .height
-      : sampleHeight(terrain, tip.x, tip.z);
-  return {
-    tip,
-    groundH,
-    depthBelow: groundH - tip.y,
-    clearance: tip.y - groundH,
-  };
-}
-
 function constrainExcavatorToMap(sim: ExcavatorSimState, terrain: TerrainData) {
   const bounds = getMapWorldBounds(terrain);
   const nextX = clampControl(
@@ -740,7 +691,7 @@ export function tickExcavatorSim(params: SimTickParams) {
   const workSpeedScale = (stats.workSpeedMultiplier ?? 1) * rpmScale;
   const boomSwing = auxiliary?.boomSwing ?? DEFAULT_BOOM_SWING;
   const grappleOpen = auxiliary?.grappleOpen ?? 1;
-  const beforeControlBucket = bucketClearance(sim, terrain, boomSwing, grappleOpen);
+  const beforeControlBucket = measureAttachmentClearance(sim, terrain, boomSwing, grappleOpen);
   const bucketTipInDigZone = isInDigZone(
     beforeControlBucket.tip.x,
     beforeControlBucket.tip.z,
@@ -956,7 +907,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     constrainExcavatorToMap(sim, terrain);
   }
 
-  let bucketContact = bucketClearance(sim, terrain, boomSwing, grappleOpen);
+  let bucketContact = measureAttachmentClearance(sim, terrain, boomSwing, grappleOpen);
   let { clearance } = bucketContact;
   const bucketContactInDigZone = isInDigZone(
     bucketContact.tip.x,
@@ -995,18 +946,66 @@ export function tickExcavatorSim(params: SimTickParams) {
   // 굴착지 소진으로 지면이 복구되어 버킷이 순간적으로 묻힌 경우,
   // 더 깊게 파고드는 조작만 막고 지면에서 빠져나오는 조작은 허용한다.
   // 짐칸 위에서는 지형 높이(트럭 아래) 기준으로 하역 버켓 개방이 막히지 않게 한다.
+  // 이미 묻힌 상태(브레이커 전환 직후 등)에서는 축을 하나씩 허용해,
+  // 암을 말아 더 박히는 입력이 붐 상승까지 통째로 되돌리지 않게 한다.
   if (
     !bucketOverDumpBed &&
     clearance < minBucketClearance - 0.02 &&
     (!wasAlreadyBelowGround || worsenedGroundPenetration)
   ) {
-    sim.boom = beforeGroundContact.boom;
-    sim.arm = beforeGroundContact.arm;
-    sim.bucket = beforeGroundContact.bucket;
-    if (vel.boom > 0) vel.boom = 0;
-    if (vel.arm > 0) vel.arm = 0;
-    if (vel.bucket > 0) vel.bucket = 0;
-    bucketContact = bucketClearance(sim, terrain, boomSwing, grappleOpen);
+    const afterJoints = {
+      boom: sim.boom,
+      arm: sim.arm,
+      bucket: sim.bucket,
+    };
+    if (wasAlreadyBelowGround && worsenedGroundPenetration) {
+      const baseline = beforeControlBucket.clearance;
+      const clearanceOf = (joints: typeof afterJoints) => {
+        sim.boom = joints.boom;
+        sim.arm = joints.arm;
+        sim.bucket = joints.bucket;
+        return measureAttachmentClearance(sim, terrain, boomSwing, grappleOpen)
+          .clearance;
+      };
+      const keep = { ...beforeGroundContact };
+      if (
+        clearanceOf({ ...keep, boom: afterJoints.boom }) >=
+        baseline - 0.002
+      ) {
+        keep.boom = afterJoints.boom;
+      } else if (afterJoints.boom > beforeGroundContact.boom && vel.boom > 0) {
+        vel.boom = 0;
+      }
+      if (
+        clearanceOf({ ...keep, arm: afterJoints.arm }) >= baseline - 0.002
+      ) {
+        keep.arm = afterJoints.arm;
+      } else if (afterJoints.arm > beforeGroundContact.arm && vel.arm > 0) {
+        vel.arm = 0;
+      }
+      if (
+        clearanceOf({ ...keep, bucket: afterJoints.bucket }) >=
+        baseline - 0.002
+      ) {
+        keep.bucket = afterJoints.bucket;
+      } else if (
+        afterJoints.bucket > beforeGroundContact.bucket &&
+        vel.bucket > 0
+      ) {
+        vel.bucket = 0;
+      }
+      sim.boom = keep.boom;
+      sim.arm = keep.arm;
+      sim.bucket = keep.bucket;
+    } else {
+      sim.boom = beforeGroundContact.boom;
+      sim.arm = beforeGroundContact.arm;
+      sim.bucket = beforeGroundContact.bucket;
+      if (vel.boom > 0) vel.boom = 0;
+      if (vel.arm > 0) vel.arm = 0;
+      if (vel.bucket > 0) vel.bucket = 0;
+    }
+    bucketContact = measureAttachmentClearance(sim, terrain, boomSwing, grappleOpen);
     ({ clearance } = bucketContact);
   }
   if (isAutoArm) {

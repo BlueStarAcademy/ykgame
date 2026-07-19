@@ -36,6 +36,7 @@ import {
   hasManualControlInput,
 } from "./controls";
 import { CockpitOverlay } from "./CockpitOverlay";
+import { resolveAttachmentTipClearance } from "./attachmentGround";
 import {
   ExcavatorScene,
   createInitialSim,
@@ -1307,6 +1308,17 @@ export function ExcavatorGameWrapper({
     Object.assign(dumpTruckStateRef.current, snapshot.dumpTruck);
     dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
     terrainRef.current = applyGameSessionTerrain(snapshot);
+    if (
+      simRef.current.attachmentType === "breaker" ||
+      simRef.current.attachmentType === "grapple"
+    ) {
+      resolveAttachmentTipClearance(
+        simRef.current,
+        terrainRef.current,
+        auxiliaryRef.current.boomSwing,
+        auxiliaryRef.current.grappleOpen,
+      );
+    }
     setAttachmentType(snapshot.sim.attachmentType);
     setTerrainRevision((key) => key + 1);
     arcadeScoreRef.current = snapshot.arcadeScore;
@@ -1923,6 +1935,16 @@ export function ExcavatorGameWrapper({
       }
       simRef.current.attachmentType = next;
       simRef.current.carriedBoulderId = null;
+      // Breaker/grapple tips are longer than the bucket — lift clear so the
+      // ground constraint does not freeze hydraulics/travel on swap.
+      if (next === "breaker" || next === "grapple") {
+        resolveAttachmentTipClearance(
+          simRef.current,
+          terrainRef.current,
+          auxiliaryRef.current.boomSwing,
+          auxiliaryRef.current.grappleOpen,
+        );
+      }
       setAttachmentType(next);
       if (attachmentWarningTimerRef.current != null) {
         window.clearTimeout(attachmentWarningTimerRef.current);
@@ -4152,6 +4174,17 @@ export function ExcavatorGameWrapper({
     if (step?.startAttachment) {
       simRef.current.attachmentType = step.startAttachment;
       simRef.current.carriedBoulderId = null;
+      if (
+        step.startAttachment === "breaker" ||
+        step.startAttachment === "grapple"
+      ) {
+        resolveAttachmentTipClearance(
+          simRef.current,
+          terrainRef.current,
+          auxiliaryRef.current.boomSwing,
+          auxiliaryRef.current.grappleOpen,
+        );
+      }
       setAttachmentType(step.startAttachment);
     }
 
