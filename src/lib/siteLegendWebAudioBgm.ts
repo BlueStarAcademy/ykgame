@@ -59,11 +59,11 @@ function isRunning(ctx: AudioContext | null | undefined): boolean {
 
 /** Invoke resume() synchronously so a surrounding user-gesture stays valid. */
 async function tryResume(ctx: AudioContext): Promise<boolean> {
-  if (ctx.state === "running") return true;
-  if (ctx.state !== "suspended") return false;
+  const before = ctx.state;
+  if (before === "running") return true;
+  if (before !== "suspended") return false;
   try {
-    const resumePromise = ctx.resume();
-    await resumePromise;
+    await ctx.resume();
   } catch {
     // Autoplay blocked until a real user gesture.
   }

@@ -731,7 +731,16 @@ export function missingFilledAtPatch(
   repair: RepairStateRow | null | undefined,
   now = new Date(),
 ): Record<string, Date> {
-  if (!repair) return { ...calendarFillDefaults(now) };
+  if (!repair) {
+    return {
+      engineOilFilledAt: now,
+      engineOilFilterFilledAt: now,
+      hydraulicOilFilledAt: now,
+      hydraulicFilterFilledAt: now,
+      fuelFilterFilledAt: now,
+      gearOilFilledAt: now,
+    };
+  }
   const patch: Record<string, Date> = {};
   for (const id of MAINTENANCE_FLUID_IDS) {
     if (!filledAtForFluid(repair, id)) {
