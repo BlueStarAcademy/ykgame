@@ -26,6 +26,7 @@ import {
   getMonumentUpgradeRequiredPlayerLevel,
   getUpgradeDurationMs,
   instantCompleteStars,
+  isUpgradeTimerReady,
 } from "./upgradeTimers";
 import { formatQuestProgressCurrent } from "./quests/formatProgress";
 import type { WorkshopShopItemId } from "./workshop";
@@ -112,6 +113,7 @@ export function MonumentPanel({
     cost: number;
     durationMs: number;
   } | null>(null);
+  const autoSettleKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -138,6 +140,19 @@ export function MonumentPanel({
   const storageLv = levels.storage_cap ?? 0;
   const speedLv = levels.prod_speed ?? 0;
   const currency = panelState?.currency ?? 0;
+
+  useEffect(() => {
+    if (!open || !pending || !onInstantUpgrade || busy) return;
+    const remainingMs = new Date(pending.completesAt).getTime() - nowMs;
+    if (!isUpgradeTimerReady(remainingMs)) {
+      autoSettleKeyRef.current = null;
+      return;
+    }
+    const key = `${pending.upgradeKey}:${pending.completesAt}`;
+    if (autoSettleKeyRef.current === key) return;
+    autoSettleKeyRef.current = key;
+    void onInstantUpgrade();
+  }, [open, pending, nowMs, onInstantUpgrade, busy]);
   const storageCap = monumentStorageCap(storageLv);
   const intervalMs = monumentIntervalMs(speedLv);
   const starsStored = panelState?.starsStored ?? 0;
@@ -499,6 +514,8 @@ export function MonumentPanel({
                   remainingMs != null
                     ? instantCompleteStars(remainingMs)
                     : 0;
+                const timerReady =
+                  remainingMs != null && isUpgradeTimerReady(remainingMs);
                 const canBuy =
                   !maxed &&
                   !pending &&
@@ -543,12 +560,18 @@ export function MonumentPanel({
                         {isThisPending && onInstantUpgrade ? (
                           <button
                             type="button"
-                            disabled={busy || currency < instantCost}
+                            disabled={
+                              busy || (!timerReady && currency < instantCost)
+                            }
                             className="inline-flex items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
                             onClick={() => void onInstantUpgrade()}
                           >
-                            즉시완료 ★{instantCost.toLocaleString()}
-                            {currency < instantCost ? " (부족)" : ""}
+                            {timerReady
+                              ? "완료"
+                              : `즉시완료 ★${instantCost.toLocaleString()}`}
+                            {!timerReady && currency < instantCost
+                              ? " (부족)"
+                              : ""}
                           </button>
                         ) : (
                           <button

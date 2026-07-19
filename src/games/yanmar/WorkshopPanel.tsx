@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import {
@@ -34,6 +34,7 @@ import {
   getUpgradeDurationMs,
   getWorkshopUpgradeRequiredPlayerLevel,
   instantCompleteStars,
+  isUpgradeTimerReady,
 } from "./upgradeTimers";
 
 type TabId = "quest" | "upgrade" | "shop";
@@ -156,6 +157,7 @@ export function WorkshopPanel({
     cost: number;
     durationMs: number;
   } | null>(null);
+  const autoSettleKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -179,6 +181,19 @@ export function WorkshopPanel({
       : undefined;
   const playerLevel = getPlayerLevelProgress(panelState?.totalXp ?? 0).level;
   const currency = panelState?.currency ?? 0;
+
+  useEffect(() => {
+    if (!open || !pending || !onInstantUpgrade || busy) return;
+    const remainingMs = new Date(pending.completesAt).getTime() - nowMs;
+    if (!isUpgradeTimerReady(remainingMs)) {
+      autoSettleKeyRef.current = null;
+      return;
+    }
+    const key = `${pending.workshopId}:${pending.upgradeKey}:${pending.completesAt}`;
+    if (autoSettleKeyRef.current === key) return;
+    autoSettleKeyRef.current = key;
+    void onInstantUpgrade();
+  }, [open, pending, nowMs, onInstantUpgrade, busy]);
 
   const questRows = useMemo(() => {
     if (!def) return [];
@@ -336,6 +351,8 @@ export function WorkshopPanel({
                   remainingMs != null
                     ? instantCompleteStars(remainingMs)
                     : 0;
+                const timerReady =
+                  remainingMs != null && isUpgradeTimerReady(remainingMs);
                 const canBuy =
                   !maxed &&
                   !pending &&
@@ -379,12 +396,18 @@ export function WorkshopPanel({
                         {isThisPending && onInstantUpgrade ? (
                           <button
                             type="button"
-                            disabled={busy || currency < instantCost}
+                            disabled={
+                              busy || (!timerReady && currency < instantCost)
+                            }
                             className="inline-flex items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
                             onClick={() => void onInstantUpgrade()}
                           >
-                            즉시완료 ★{instantCost.toLocaleString()}
-                            {currency < instantCost ? " (부족)" : ""}
+                            {timerReady
+                              ? "완료"
+                              : `즉시완료 ★${instantCost.toLocaleString()}`}
+                            {!timerReady && currency < instantCost
+                              ? " (부족)"
+                              : ""}
                           </button>
                         ) : (
                           <button

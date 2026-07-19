@@ -3201,12 +3201,12 @@ export function ExcavatorGameWrapper({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workshopId }),
       });
-      const data = await res.json();
-      if (!res.ok) return;
-      if (typeof data.currency === "number") {
+      const data = await res.json().catch(() => null);
+      if (res.ok && typeof data?.currency === "number") {
         currencyRef.current = data.currency;
         setCurrency(data.currency);
       }
+      // Always refresh — timer settle may clear pending even when instant pay fails.
       await loadWorkshopState();
       await loadEquipment();
     } finally {
@@ -3272,9 +3272,8 @@ export function ExcavatorGameWrapper({
       const res = await fetch("/api/monument/yanmar/upgrade/instant", {
         method: "POST",
       });
-      const data = await res.json();
-      if (!res.ok) return;
-      if (typeof data.currency === "number") {
+      const data = await res.json().catch(() => null);
+      if (res.ok && typeof data?.currency === "number") {
         currencyRef.current = data.currency;
         setCurrency(data.currency);
       }

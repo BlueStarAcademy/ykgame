@@ -26,14 +26,42 @@ export async function POST(request: Request) {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      await settleWorkshopPendingUpgrades(tx, session.user.id);
+      const settledCount = await settleWorkshopPendingUpgrades(
+        tx,
+        session.user.id,
+      );
 
       const pending = await findWorkshopPending(
         tx,
         session.user.id,
         workshopId,
       );
-      if (!pending) throw new Error("NO_PENDING");
+
+      const userSelect = {
+        currency: true,
+        dumpWorkshopPoints: true,
+        crashWorkshopPoints: true,
+        hillWorkshopPoints: true,
+      } as const;
+
+      if (!pending) {
+        const refreshed = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: userSelect,
+        });
+        if (!refreshed) throw new Error("USER_NOT_FOUND");
+        return {
+          workshopId,
+          settledByTimer: settledCount > 0,
+          starCost: 0,
+          currency: refreshed.currency,
+          points: {
+            dump: refreshed.dumpWorkshopPoints,
+            crash: refreshed.crashWorkshopPoints,
+            hill: refreshed.hillWorkshopPoints,
+          },
+        };
+      }
 
       const completesAt = new Date(pending.completesAt);
       const remainingMs = completesAt.getTime() - Date.now();
@@ -41,12 +69,7 @@ export async function POST(request: Request) {
 
       const user = await tx.user.findUnique({
         where: { id: session.user.id },
-        select: {
-          currency: true,
-          dumpWorkshopPoints: true,
-          crashWorkshopPoints: true,
-          hillWorkshopPoints: true,
-        },
+        select: userSelect,
       });
       if (!user) throw new Error("USER_NOT_FOUND");
       if (starCost > 0 && user.currency < starCost) {
@@ -81,18 +104,14 @@ export async function POST(request: Request) {
 
       const refreshed = await tx.user.findUnique({
         where: { id: session.user.id },
-        select: {
-          currency: true,
-          dumpWorkshopPoints: true,
-          crashWorkshopPoints: true,
-          hillWorkshopPoints: true,
-        },
+        select: userSelect,
       });
 
       return {
         workshopId,
         upgradeKey: pending.upgradeKey,
         level: upgraded.level,
+        settledByTimer: false,
         starCost,
         currency: refreshed?.currency ?? 0,
         points: {

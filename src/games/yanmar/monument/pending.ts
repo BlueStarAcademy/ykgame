@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@/generated/prisma/client";
+import { UPGRADE_COMPLETE_SKEW_MS } from "../upgradeTimers";
 import { computeProducedStars } from "./economy";
 import type { MonumentPhase, MonumentUpgradeKey } from "./types";
 import { MONUMENT_UNLOCK_LEVEL } from "./types";
@@ -19,9 +20,14 @@ export async function settleMonumentPendingUpgrades(
   tx: Tx,
   userId: string,
   now = new Date(),
-): Promise<void> {
+): Promise<number> {
   const due = await tx.userMonumentUpgrade.findMany({
-    where: { userId, pendingCompletesAt: { lte: now } },
+    where: {
+      userId,
+      pendingCompletesAt: {
+        lte: new Date(now.getTime() + UPGRADE_COMPLETE_SKEW_MS),
+      },
+    },
   });
   for (const row of due) {
     await tx.userMonumentUpgrade.update({
@@ -29,6 +35,7 @@ export async function settleMonumentPendingUpgrades(
       data: { level: row.level + 1, pendingCompletesAt: null },
     });
   }
+  return due.length;
 }
 
 export async function findMonumentPending(

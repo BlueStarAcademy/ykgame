@@ -15,9 +15,25 @@ export async function POST() {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      await settleMonumentPendingUpgrades(tx, session.user.id);
+      const settledCount = await settleMonumentPendingUpgrades(
+        tx,
+        session.user.id,
+      );
       const pending = await findMonumentPending(tx, session.user.id);
-      if (!pending) throw new Error("NO_PENDING");
+
+      if (!pending) {
+        const refreshed = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { currency: true, monumentPoints: true },
+        });
+        if (!refreshed) throw new Error("USER_NOT_FOUND");
+        return {
+          settledByTimer: settledCount > 0,
+          starCost: 0,
+          currency: refreshed.currency,
+          points: refreshed.monumentPoints,
+        };
+      }
 
       const remainingMs = new Date(pending.completesAt).getTime() - Date.now();
       const starCost = instantCompleteStars(remainingMs);
@@ -61,6 +77,7 @@ export async function POST() {
       return {
         upgradeKey: pending.upgradeKey,
         level: upgraded.level,
+        settledByTimer: false,
         starCost,
         currency: refreshed?.currency ?? 0,
         points: refreshed?.monumentPoints ?? 0,

@@ -19,6 +19,9 @@ export const MONUMENT_UPGRADE_MIN_LEVEL = [
 
 export const INSTANT_COMPLETE_STARS_PER_MINUTE = 10;
 
+/** Client/server clock skew: treat as finished within this window. */
+export const UPGRADE_COMPLETE_SKEW_MS = 5_000;
+
 export function getUpgradeDurationMs(targetLevel: number): number | null {
   if (targetLevel < 1 || targetLevel > UPGRADE_DURATION_MS.length) return null;
   return UPGRADE_DURATION_MS[targetLevel - 1]!;
@@ -43,8 +46,12 @@ export function getMonumentUpgradeRequiredPlayerLevel(
 }
 
 export function instantCompleteStars(remainingMs: number): number {
-  if (remainingMs <= 0) return 0;
+  if (remainingMs <= UPGRADE_COMPLETE_SKEW_MS) return 0;
   return Math.ceil(remainingMs / 60_000) * INSTANT_COMPLETE_STARS_PER_MINUTE;
+}
+
+export function isUpgradeTimerReady(remainingMs: number): boolean {
+  return remainingMs <= UPGRADE_COMPLETE_SKEW_MS;
 }
 
 export function formatUpgradeRemaining(ms: number): string {
