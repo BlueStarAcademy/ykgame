@@ -1,6 +1,10 @@
 /**
  * Looping BGM via Web Audio — stays inside the page graph and does not
  * surface as a system / browser media-player session (unlike HTMLAudioElement).
+ *
+ * Autoplay policy: never attach a BufferSource while the AudioContext is
+ * suspended. A silent "playing" source would look successful and drop gesture
+ * unlock handlers, leaving BGM stuck forever.
  */
 
 import { clearBrowserMediaSession } from "@/lib/clearBrowserMediaSession";
@@ -49,6 +53,23 @@ function getSlot(kind: SiteLegendWebAudioBgmKind, srcUrl: string): Slot {
   return slot;
 }
 
+function isRunning(ctx: AudioContext | null | undefined): boolean {
+  return ctx?.state === "running";
+}
+
+/** Invoke resume() synchronously so a surrounding user-gesture stays valid. */
+async function tryResume(ctx: AudioContext): Promise<boolean> {
+  if (ctx.state === "running") return true;
+  if (ctx.state !== "suspended") return false;
+  try {
+    const resumePromise = ctx.resume();
+    await resumePromise;
+  } catch {
+    // Autoplay blocked until a real user gesture.
+  }
+  return ctx.state === "running";
+}
+
 async function ensureContext(slot: Slot): Promise<AudioContext | null> {
   if (typeof window === "undefined") return null;
   const AC =
@@ -59,13 +80,7 @@ async function ensureContext(slot: Slot): Promise<AudioContext | null> {
   if (!slot.ctx || slot.ctx.state === "closed") {
     slot.ctx = new AC();
   }
-  if (slot.ctx.state === "suspended") {
-    try {
-      await slot.ctx.resume();
-    } catch {
-      // ignore
-    }
-  }
+  await tryResume(slot.ctx);
   return slot.ctx;
 }
 
@@ -119,8 +134,10 @@ function disconnectSlotGraph(slot: Slot) {
   }
 }
 
+/** True only when a loop is attached and the context is actually audible. */
 export function isWebAudioBgmPlaying(kind: SiteLegendWebAudioBgmKind): boolean {
-  return Boolean(slots()[kind]?.source);
+  const slot = slots()[kind];
+  return Boolean(slot?.source && isRunning(slot.ctx));
 }
 
 export function setWebAudioBgmGain(
@@ -139,18 +156,32 @@ export async function startWebAudioBgm(
 ): Promise<boolean> {
   if (typeof window === "undefined") return false;
   const slot = getSlot(kind, srcUrl);
-  if (slot.source) {
+
+  // Source exists but context may still be suspended from a blocked autoplay.
+  if (slot.source && slot.ctx) {
     setWebAudioBgmGain(kind, gain0to1);
-    return true;
+    if (isRunning(slot.ctx)) return true;
+    const resumed = await tryResume(slot.ctx);
+    if (resumed) return true;
+    // Drop the silent graph so a later gesture can start cleanly.
+    disconnectSlotGraph(slot);
   }
 
   const ctx = await ensureContext(slot);
   const buffer = await ensureBuffer(slot);
   if (!ctx || !buffer) return false;
+
   // Another start may have won while we awaited.
   if (slot.source) {
     setWebAudioBgmGain(kind, gain0to1);
-    return true;
+    return isRunning(slot.ctx);
+  }
+
+  // Do not attach a BufferSource while autoplay-blocked — that looks "playing"
+  // but produces no sound and prevents gesture unlock.
+  if (!isRunning(ctx)) {
+    const resumed = await tryResume(ctx);
+    if (!resumed) return false;
   }
 
   const gain = ctx.createGain();
@@ -164,6 +195,26 @@ export async function startWebAudioBgm(
   try {
     source.start(0);
   } catch {
+    try {
+      gain.disconnect();
+    } catch {
+      // ignore
+    }
+    return false;
+  }
+
+  if (!isRunning(ctx)) {
+    try {
+      source.onended = null;
+      source.stop();
+    } catch {
+      // ignore
+    }
+    try {
+      source.disconnect();
+    } catch {
+      // ignore
+    }
     try {
       gain.disconnect();
     } catch {
@@ -210,16 +261,10 @@ export function stopAllWebAudioBgms(opts?: { disposeContext?: boolean }) {
 
 export async function resumeWebAudioBgmContext(
   kind: SiteLegendWebAudioBgmKind,
-) {
+): Promise<boolean> {
   const slot = slots()[kind];
-  if (!slot?.ctx) return;
-  if (slot.ctx.state === "suspended") {
-    try {
-      await slot.ctx.resume();
-    } catch {
-      // ignore
-    }
-  }
+  if (!slot?.ctx) return false;
+  return tryResume(slot.ctx);
 }
 
 export async function suspendWebAudioBgmContext(

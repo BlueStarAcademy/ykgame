@@ -298,9 +298,11 @@ model UserRepairState {
   /** @deprecated Use per-fluid freeAvailableAt fields */
   freeRepairAvailableAt DateTime?
   odometerMeters     Float          @default(0)
+  engineOilFilledAt  DateTime?
   engineOilRemaining Float          @default(1)
   engineOilCapacityMult Float       @default(1)
   engineOilFreeAvailableAt DateTime?
+  engineOilFilterFilledAt DateTime?
   engineOilFilterRemaining Float    @default(1)
   engineOilFilterCapacityMult Float @default(1)
   engineOilFilterFreeAvailableAt DateTime?

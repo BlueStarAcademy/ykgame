@@ -183,7 +183,16 @@ import {
 import { defaultFinalStats } from "./gearStats";
 import { GearPanel, type GearPanelItem } from "./GearPanel";
 import { PlayerProfileModal } from "./PlayerProfileModal";
-import { RepairPanel } from "./RepairPanel";
+import {
+  MAINTENANCE_FLUID_ART,
+  MAINTENANCE_FLUID_IDS,
+  MAINTENANCE_FLUIDS,
+  computeMaintenanceSnapshot,
+  formatRemainingDuration,
+  type MaintenanceFluidId,
+  type MaintenanceSnapshot,
+} from "./maintenance";
+import { RepairPanel, type MaintenanceClaimResult } from "./RepairPanel";
 import { WorkshopPanel, type WorkshopPanelState } from "./WorkshopPanel";
 import { MonumentPanel, type MonumentPanelState } from "./MonumentPanel";
 import { isInWorkshopSignRange } from "./WorkshopSign";
@@ -217,12 +226,6 @@ import {
   type MonumentUpgradeKey,
 } from "./monument";
 import { SITE_LAYOUT } from "./siteLayout";
-import {
-  computeMaintenanceSnapshot,
-  type MaintenanceFluidId,
-  type MaintenanceRepairKind,
-  type MaintenanceSnapshot,
-} from "./maintenance";
 import { isInRepairTentRange } from "./RepairTent";
 import type { ChassisModelId } from "./chassisCatalog";
 import { getChassisDef } from "./chassisCatalog";
@@ -1037,6 +1040,20 @@ export function ExcavatorGameWrapper({
   const repairStateRef = useRef<Parameters<typeof computeMaintenanceSnapshot>[0]>(
     null,
   );
+  const maintenanceEligibleRef = useRef<Set<MaintenanceFluidId>>(new Set());
+  const [maintenanceBubbleId, setMaintenanceBubbleId] =
+    useState<MaintenanceFluidId | null>(null);
+  /** serverNow - Date.now() when last synced (fixes countdown / claim skew). */
+  const serverNowOffsetRef = useRef(0);
+  const [serverNowOffsetMs, setServerNowOffsetMs] = useState(0);
+
+  const syncServerNow = useCallback((serverNow: unknown) => {
+    const ts = typeof serverNow === "number" ? serverNow : Number(serverNow);
+    if (!Number.isFinite(ts)) return;
+    const offset = ts - Date.now();
+    serverNowOffsetRef.current = offset;
+    setServerNowOffsetMs(offset);
+  }, []);
   const [nearRepairTent, setNearRepairTent] = useState(false);
   const nearRepairTentRef = useRef(false);
   const [nearWorkshopId, setNearWorkshopId] = useState<WorkshopId | null>(null);
@@ -2529,10 +2546,18 @@ export function ExcavatorGameWrapper({
       if (data.repair) {
         repairStateRef.current = data.repair;
       }
+      if (typeof data.serverNow === "number") {
+        syncServerNow(data.serverNow);
+      }
       if (data.maintenance) {
         setMaintenance(data.maintenance);
       } else if (data.repair) {
-        setMaintenance(computeMaintenanceSnapshot(data.repair));
+        setMaintenance(
+          computeMaintenanceSnapshot(
+            data.repair,
+            Date.now() + serverNowOffsetRef.current,
+          ),
+        );
       }
       if (
         data.repair?.buffExpiresAt &&
@@ -2563,7 +2588,7 @@ export function ExcavatorGameWrapper({
     } catch {
       // Equipment data is optional for unauthenticated previews.
     }
-  }, []);
+  }, [syncServerNow]);
 
   useEffect(() => {
     if (!repairBuffExpiresAt) return;
@@ -2671,6 +2696,7 @@ export function ExcavatorGameWrapper({
         if (!res.ok) return;
         const data = await res.json();
         if (data.repair) repairStateRef.current = data.repair;
+        if (typeof data.serverNow === "number") syncServerNow(data.serverNow);
         if (data.maintenance) setMaintenance(data.maintenance);
         if (data.stats) publishEquipmentStats(data.stats);
       } catch {
@@ -2684,7 +2710,7 @@ export function ExcavatorGameWrapper({
         }
       }
     },
-    [publishEquipmentStats],
+    [publishEquipmentStats, syncServerNow],
   );
 
   const runGearAction = useCallback(
@@ -2905,24 +2931,34 @@ export function ExcavatorGameWrapper({
   );
 
   const handleRepair = useCallback(
-    async (fluid: MaintenanceFluidId, kind: MaintenanceRepairKind) => {
+    async (fluid: MaintenanceFluidId): Promise<MaintenanceClaimResult | null> => {
       setGearBusy(true);
       try {
         const res = await fetch("/api/repair/yanmar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fluid, kind }),
+          body: JSON.stringify({ fluid }),
         });
         const data = await res.json();
-        if (!res.ok) return;
-        if (data.stats) {
-          publishEquipmentStats(data.stats);
+        if (typeof data.serverNow === "number") {
+          syncServerNow(data.serverNow);
+        }
+        if (data.repair) {
+          repairStateRef.current = data.repair;
         }
         if (data.maintenance) {
           setMaintenance(data.maintenance);
         }
-        if (data.repair) {
-          repairStateRef.current = data.repair;
+        if (!res.ok) {
+          if (data.error === "NOT_READY") {
+            showAttachmentWarning("아직 교환 시간이 되지 않았습니다");
+          } else {
+            showAttachmentWarning("교환에 실패했습니다");
+          }
+          return null;
+        }
+        if (data.stats) {
+          publishEquipmentStats(data.stats);
         }
         if (typeof data.currency === "number") {
           currencyRef.current = data.currency;
@@ -2930,12 +2966,19 @@ export function ExcavatorGameWrapper({
           setPreviewStars(data.currency);
         }
         await loadEquipment();
-        setShowRepairPanel(false);
+        if (data.reward?.guaranteed && data.reward?.bonus && data.reward?.buff) {
+          return {
+            guaranteed: data.reward.guaranteed,
+            bonus: data.reward.bonus,
+            buff: data.reward.buff,
+          };
+        }
+        return null;
       } finally {
         setGearBusy(false);
       }
     },
-    [loadEquipment, publishEquipmentStats],
+    [loadEquipment, publishEquipmentStats, showAttachmentWarning, syncServerNow],
   );
 
   const handleGacha = useCallback(
@@ -3386,10 +3429,53 @@ export function ExcavatorGameWrapper({
     const id = window.setInterval(() => {
       const row = repairStateRef.current;
       if (!row) return;
-      setMaintenance(computeMaintenanceSnapshot(row));
-    }, 30_000);
+      const next = computeMaintenanceSnapshot(
+        row,
+        Date.now() + serverNowOffsetRef.current,
+      );
+      const prevEligible = maintenanceEligibleRef.current;
+      const nextEligible = new Set<MaintenanceFluidId>();
+      let toastFluid: MaintenanceFluidId | null = null;
+      let toastHours = Number.POSITIVE_INFINITY;
+
+      for (const fluidId of MAINTENANCE_FLUID_IDS) {
+        const fluid = next.fluids[fluidId];
+        if (!fluid.exchangeEligible) continue;
+        nextEligible.add(fluidId);
+        if (!prevEligible.has(fluidId) && fluid.cycleHours < toastHours) {
+          toastFluid = fluidId;
+          toastHours = fluid.cycleHours;
+        }
+      }
+      maintenanceEligibleRef.current = nextEligible;
+
+      if (toastFluid) {
+        showAttachmentWarning(
+          `${MAINTENANCE_FLUIDS[toastFluid].label} 만료 · 정비소에서 교환`,
+        );
+      }
+
+      // Always refresh so remainingMs / countdowns stay live even when % is unchanged.
+      setMaintenance(next);
+    }, 1000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [showAttachmentWarning]);
+
+  useEffect(() => {
+    if (!maintenanceBubbleId) return;
+    const onPointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest(".yanmar-maintenance-warn-stack")
+      ) {
+        return;
+      }
+      setMaintenanceBubbleId(null);
+    };
+    window.addEventListener("pointerdown", onPointer);
+    return () => window.removeEventListener("pointerdown", onPointer);
+  }, [maintenanceBubbleId]);
 
   useEffect(() => {
     const sessionXp = session?.user?.totalXp;
@@ -5488,10 +5574,10 @@ export function ExcavatorGameWrapper({
         <RepairPanel
           open={showRepairPanel}
           onClose={() => setShowRepairPanel(false)}
-          currency={mode === "game" ? currency : previewStars}
           maintenance={maintenance}
           busy={gearBusy}
-          onRepair={(fluid, kind) => void handleRepair(fluid, kind)}
+          clockOffsetMs={serverNowOffsetMs}
+          onRepair={(fluid) => handleRepair(fluid)}
         />
         <WorkshopPanel
           open={showWorkshopPanel}
@@ -5650,7 +5736,16 @@ export function ExcavatorGameWrapper({
                     {nearRepairTent && !showRepairPanel ? (
                       <button
                         type="button"
-                        className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                        className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
+                          (maintenance
+                            ? MAINTENANCE_FLUID_IDS.filter(
+                                (id) =>
+                                  maintenance.fluids[id].exchangeEligible,
+                              ).length
+                            : 0) > 0
+                            ? " is-claimable"
+                            : ""
+                        }`}
                         onClick={() => {
                           setShowQuestPanel(false);
                           setShowShopPanel(false);
@@ -5662,18 +5757,33 @@ export function ExcavatorGameWrapper({
                         }}
                         aria-label="정비소 열기"
                       >
-                        <img
-                          className="yanmar-site-prompt-hud-icon"
-                          src="/images/yanmar/2d/cockpit/repair-tent-premium.png?v=2"
-                          alt=""
-                          draggable={false}
-                        />
+                        <span className="yanmar-site-prompt-hud-icon-wrap">
+                          <img
+                            className="yanmar-site-prompt-hud-icon"
+                            src="/images/yanmar/2d/cockpit/repair-tent-premium.png?v=2"
+                            alt=""
+                            draggable={false}
+                          />
+                          {(maintenance
+                            ? MAINTENANCE_FLUID_IDS.filter(
+                                (id) =>
+                                  maintenance.fluids[id].exchangeEligible,
+                              ).length
+                            : 0) > 0 ? (
+                            <span className="yanmar-repair-claim-badge">
+                              {MAINTENANCE_FLUID_IDS.filter(
+                                (id) =>
+                                  maintenance!.fluids[id].exchangeEligible,
+                              ).length}
+                            </span>
+                          ) : null}
+                        </span>
                         <span className="yanmar-site-prompt-hud-copy">
                           <span className="yanmar-site-prompt-hud-eyebrow">
-                            정비소
+                            YK정비소
                           </span>
                           <span className="yanmar-site-prompt-hud-label">
-                            정비하기
+                            소모품교환
                           </span>
                         </span>
                       </button>
@@ -5849,7 +5959,15 @@ export function ExcavatorGameWrapper({
                 {nearRepairTent && !showRepairPanel ? (
                   <button
                     type="button"
-                    className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                    className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
+                      (maintenance
+                        ? MAINTENANCE_FLUID_IDS.filter(
+                            (id) => maintenance.fluids[id].exchangeEligible,
+                          ).length
+                        : 0) > 0
+                        ? " is-claimable"
+                        : ""
+                    }`}
                     onClick={() => {
                       setShowEquipmentUpgrade(false);
                       setShowWorkshopPanel(false);
@@ -5858,18 +5976,31 @@ export function ExcavatorGameWrapper({
                     }}
                     aria-label="정비소 열기"
                   >
-                    <img
-                      className="yanmar-site-prompt-hud-icon"
-                      src="/images/yanmar/2d/cockpit/repair-tent-premium.png?v=2"
-                      alt=""
-                      draggable={false}
-                    />
+                    <span className="yanmar-site-prompt-hud-icon-wrap">
+                      <img
+                        className="yanmar-site-prompt-hud-icon"
+                        src="/images/yanmar/2d/cockpit/repair-tent-premium.png?v=2"
+                        alt=""
+                        draggable={false}
+                      />
+                      {(maintenance
+                        ? MAINTENANCE_FLUID_IDS.filter(
+                            (id) => maintenance.fluids[id].exchangeEligible,
+                          ).length
+                        : 0) > 0 ? (
+                        <span className="yanmar-repair-claim-badge">
+                          {MAINTENANCE_FLUID_IDS.filter(
+                            (id) => maintenance!.fluids[id].exchangeEligible,
+                          ).length}
+                        </span>
+                      ) : null}
+                    </span>
                     <span className="yanmar-site-prompt-hud-copy">
                       <span className="yanmar-site-prompt-hud-eyebrow">
-                        정비소
+                        YK정비소
                       </span>
                       <span className="yanmar-site-prompt-hud-label">
-                        정비하기
+                        소모품교환
                       </span>
                     </span>
                   </button>
@@ -6372,16 +6503,76 @@ export function ExcavatorGameWrapper({
             maintenance &&
             maintenance.warnings.length > 0 ? (
               <div className="yanmar-maintenance-warn-stack" aria-live="polite">
-                {maintenance.warnings.map((fluid) => (
-                  <div
-                    key={fluid.id}
-                    className={`yanmar-maintenance-warn${
-                      fluid.depleted ? " is-depleted" : ""
-                    }`}
-                  >
-                    {fluid.label} 교체 {fluid.percent}%
-                  </div>
-                ))}
+                {maintenance.warnings.map((fluid) => {
+                  const ready = fluid.exchangeEligible || fluid.depleted;
+                  const open = maintenanceBubbleId === fluid.id;
+                  return (
+                    <div
+                      key={fluid.id}
+                      className="yanmar-maintenance-icon-wrap"
+                    >
+                      <button
+                        type="button"
+                        className={`yanmar-maintenance-icon-btn${
+                          ready ? " is-ready" : " is-warn"
+                        }`}
+                        aria-label={
+                          ready
+                            ? `${fluid.label} 교환 가능`
+                            : `${fluid.label} 곧 만료`
+                        }
+                        aria-expanded={open}
+                        onClick={() => {
+                          setMaintenanceBubbleId((cur) =>
+                            cur === fluid.id ? null : fluid.id,
+                          );
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={MAINTENANCE_FLUID_ART[fluid.id]}
+                          alt=""
+                          draggable={false}
+                        />
+                      </button>
+                      {open ? (
+                        <div
+                          className="yanmar-maintenance-bubble"
+                          role="dialog"
+                        >
+                          <strong>{fluid.label}</strong>
+                          <span>
+                            {ready
+                              ? "교환 가능"
+                              : `곧 만료 · 남은 ${formatRemainingDuration(fluid.remainingMs)}`}
+                          </span>
+                          <button
+                            type="button"
+                            className="yanmar-maintenance-bubble-action"
+                            onClick={() => {
+                              setMaintenanceBubbleId(null);
+                              if (nearRepairTentRef.current) {
+                                setShowQuestPanel(false);
+                                setShowShopPanel(false);
+                                setShowEquipmentUpgrade(false);
+                                setShowProfileModal(false);
+                                setShowWorkshopPanel(false);
+                                setShowMonumentPanel(false);
+                                setShowRepairPanel(true);
+                              } else {
+                                showAttachmentWarning(
+                                  "정비 텐트로 이동하세요",
+                                );
+                              }
+                            }}
+                          >
+                            정비소에서 교환
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
             </div>

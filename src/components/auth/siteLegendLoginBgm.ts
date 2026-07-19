@@ -77,6 +77,8 @@ class SiteLegendLoginBgmController {
   private storeBound = false;
   private lifecycleBound = false;
   private startToken = 0;
+  /** Set after a user gesture so later sync can resume without waiting again. */
+  private gestureUnlocked = false;
 
   start() {
     if (typeof window === "undefined") return;
@@ -113,6 +115,7 @@ class SiteLegendLoginBgmController {
       exit: () => {
         detachGestureHandler();
         this.startToken += 1;
+        this.gestureUnlocked = false;
         stopWebAudioBgm("login", true);
         clearBrowserMediaSession();
       },
@@ -126,6 +129,9 @@ class SiteLegendLoginBgmController {
 
   handleGesture() {
     if (isPageAudioSealed()) return;
+    this.gestureUnlocked = true;
+    // tryPlay → startWebAudioBgm invokes ctx.resume() synchronously
+    // while still on the user-gesture call stack.
     this.tryPlay();
   }
 
@@ -157,7 +163,11 @@ class SiteLegendLoginBgmController {
     }
 
     this.bindGesture();
-    this.tryPlay();
+    // Avoid creating a suspended context on mount; wait for gesture unless
+    // we already unlocked or audio is already running.
+    if (this.gestureUnlocked || isWebAudioBgmPlaying("login")) {
+      this.tryPlay();
+    }
   }
 
   private tryPlay() {
@@ -168,6 +178,7 @@ class SiteLegendLoginBgmController {
 
     if (isWebAudioBgmPlaying("login")) {
       setWebAudioBgmGain("login", this.volume);
+      detachGestureHandler();
       return;
     }
 
@@ -180,7 +191,12 @@ class SiteLegendLoginBgmController {
         gen !== getSiteLegendBgmPlayGen() ||
         !wantsLoginBgm(this.allowed, this.enabled)
       ) {
-        stopWebAudioBgm("login", false);
+        if (!ok) {
+          // Keep gesture listeners so the next tap can unlock autoplay.
+          this.bindGesture();
+        } else {
+          stopWebAudioBgm("login", false);
+        }
         return;
       }
       detachGestureHandler();

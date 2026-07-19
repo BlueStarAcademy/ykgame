@@ -8587,6 +8587,19 @@ html.pwa-mode [contenteditable="true"] {
   cursor: pointer;
 }
 
+.yanmar-repair-modal-shell {
+  box-sizing: border-box;
+  width: min(28rem, calc(100vw - 1.5rem)) !important;
+  max-width: min(28rem, calc(100vw - 1.5rem)) !important;
+  height: min(42rem, 94svh) !important;
+  max-height: min(42rem, 94svh) !important;
+  min-height: min(42rem, 94svh) !important;
+  overflow: hidden !important;
+  border-radius: 1.15rem;
+  padding: 0 !important;
+  background: transparent;
+}
+
 .yanmar-repair-panel {
   position: relative;
   display: flex;
@@ -8605,6 +8618,609 @@ html.pwa-mode [contenteditable="true"] {
     0 1.25rem 2.5rem rgba(0, 0, 0, 0.55),
     0 0 0 1px rgba(139, 30, 30, 0.2) inset;
   padding: 0.65rem 0.7rem 0.7rem;
+}
+
+.yanmar-repair-panel.is-premium-v2 {
+  --repair-amber: #fbbf24;
+  --repair-crimson: #dc2626;
+  --repair-steel: #94a3b8;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  min-height: 0;
+  max-height: none;
+  gap: 0;
+  padding: 0;
+  animation: yanmar-repair-panel-in 0.28s ease-out;
+  overflow: hidden;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-panel-header {
+  margin: 0;
+  padding: 0.75rem 0.85rem 0.65rem;
+  border-bottom: 1px solid rgba(245, 215, 142, 0.14);
+  flex-shrink: 0;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-panel-titles h2 {
+  font-size: 1.12rem;
+  letter-spacing: 0.01em;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-panel-eyebrow {
+  display: none;
+}
+
+.yanmar-repair-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.55rem 0.85rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.yanmar-repair-panel-footer {
+  flex-shrink: 0;
+  padding: 1.05rem 0.85rem 0.8rem;
+  border-top: 1px solid rgba(245, 215, 142, 0.14);
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.22));
+}
+
+@keyframes yanmar-repair-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.6rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.yanmar-repair-panel-sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: rgba(253, 230, 138, 0.68);
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-fluid-rail {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 100%;
+  flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.05rem 0.1rem 0.3rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-fluid-rail-item {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: 5.25rem;
+  max-width: none;
+  box-sizing: border-box;
+  padding: 0.38rem 0.55rem 0.32rem;
+  gap: 0.28rem;
+  border-radius: 0.65rem;
+  overflow: visible;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-fluid-rail-art {
+  width: 2.55rem;
+  height: 2.55rem;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-fluid-rail-label {
+  display: block;
+  width: max-content;
+  max-width: none;
+  box-sizing: border-box;
+  margin: 0 auto;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  text-align: center;
+}
+
+.yanmar-repair-fluid-rail-item {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: 5.25rem;
+  max-width: none;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.38rem 0.55rem 0.32rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.45);
+  color: #e2e8f0;
+  cursor: pointer;
+  overflow: visible;
+}
+
+.yanmar-repair-fluid-rail-item.is-active {
+  border-color: rgba(251, 191, 36, 0.65);
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.25) inset;
+  background: rgba(120, 53, 15, 0.35);
+}
+
+.yanmar-repair-fluid-rail-art {
+  position: relative;
+  width: 2.55rem;
+  height: 2.55rem;
+  flex-shrink: 0;
+}
+
+.yanmar-repair-fluid-rail-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.yanmar-repair-fluid-dot {
+  position: absolute;
+  top: -0.1rem;
+  right: -0.15rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+}
+
+.yanmar-repair-fluid-dot.is-warn {
+  background: #f59e0b;
+}
+
+.yanmar-repair-fluid-dot.is-dead {
+  background: var(--repair-crimson, #dc2626);
+}
+
+.yanmar-repair-fluid-rail-label {
+  display: block;
+  width: max-content;
+  max-width: none;
+  box-sizing: border-box;
+  margin: 0 auto;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  color: inherit;
+}
+
+.yanmar-repair-fluid-rail-bar {
+  display: block;
+  width: 100%;
+  min-width: 2.5rem;
+  height: 0.14rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.yanmar-repair-fluid-rail-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #fde68a);
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(245, 215, 142, 0.2);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.04), transparent 42%),
+    rgba(8, 10, 16, 0.7);
+}
+
+.yanmar-repair-hero-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.yanmar-repair-hero-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-detail-name-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-detail-name-row h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.15;
+}
+
+.yanmar-repair-meta-line {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.28rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fdba74;
+  line-height: 1.25;
+}
+
+.yanmar-repair-meta-sep {
+  opacity: 0.45;
+}
+
+.yanmar-repair-meta-line strong {
+  color: #fecaca;
+  font-weight: 900;
+}
+
+.yanmar-repair-hero-art {
+  width: 5rem;
+  height: 5rem;
+  padding: 0.28rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(245, 215, 142, 0.28);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(185, 58, 42, 0.22), transparent 60%),
+    rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+}
+
+.yanmar-repair-hero-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.yanmar-repair-gauge-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+  flex-shrink: 0;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-gauge {
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-gauge-ring {
+  inset: 0.38rem;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-gauge-ring strong {
+  font-size: 0.82rem;
+  letter-spacing: -0.03em;
+}
+
+.yanmar-repair-gauge-time {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: #fdba74;
+  line-height: 1;
+}
+
+.yanmar-repair-hero.is-warn .yanmar-repair-gauge {
+  background:
+    radial-gradient(circle at center, rgba(2, 6, 23, 0.92) 56%, transparent 57%),
+    conic-gradient(
+      from -90deg,
+      #fb923c 0 var(--repair-pct),
+      rgba(255, 255, 255, 0.1) var(--repair-pct) 100%
+    );
+}
+
+.yanmar-repair-hero.is-dead .yanmar-repair-gauge {
+  background:
+    radial-gradient(circle at center, rgba(2, 6, 23, 0.92) 56%, transparent 57%),
+    conic-gradient(
+      from -90deg,
+      #f87171 0 var(--repair-pct),
+      rgba(255, 255, 255, 0.1) var(--repair-pct) 100%
+    );
+}
+
+.yanmar-repair-copy-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.yanmar-repair-fluid-blurb {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 650;
+  line-height: 1.45;
+  color: #e2e8f0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.yanmar-repair-fluid-why {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #fde68a;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-reward-preview {
+  margin: 0;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background:
+    linear-gradient(160deg, rgba(251, 191, 36, 0.08), transparent 50%),
+    rgba(15, 23, 42, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.yanmar-repair-panel.is-premium-v2 .yanmar-repair-reward-preview h4 {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fcd34d;
+}
+
+.yanmar-repair-reward-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.yanmar-repair-reward-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.yanmar-repair-reward-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+  padding: 0.38rem 0.48rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  background: rgba(8, 12, 20, 0.65);
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fff7ed;
+  line-height: 1.15;
+}
+
+.yanmar-repair-reward-chip.is-icon {
+  flex: 0 0 auto;
+}
+
+.yanmar-repair-reward-chip img {
+  width: 1.15rem;
+  height: 1.15rem;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.yanmar-repair-reward-amt {
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.yanmar-repair-reward-chip.is-buff {
+  flex: 1 1 100%;
+  border-color: rgba(96, 165, 250, 0.4);
+  color: #bfdbfe;
+  padding: 0.42rem 0.55rem;
+}
+
+.yanmar-repair-reward-chip.is-buff em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.yanmar-repair-reward-chip.is-xp {
+  opacity: 0.72;
+  border-color: rgba(148, 163, 184, 0.25);
+  color: #cbd5e1;
+}
+
+.yanmar-repair-reward-exp-label {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+  line-height: 1;
+}
+
+.yanmar-repair-reward-bonus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.1rem;
+  margin-bottom: 0.25rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(250, 204, 21, 0.55);
+  background:
+    linear-gradient(105deg, rgba(251, 191, 36, 0.28), rgba(120, 53, 15, 0.45));
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.12) inset;
+}
+
+.yanmar-repair-reward-bonus-title {
+  font-size: 0.76rem;
+  font-weight: 900;
+  color: #fef3c7;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.yanmar-repair-reward-bonus-pool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.yanmar-repair-reward-bonus-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0.28rem;
+  box-sizing: border-box;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(254, 243, 199, 0.35);
+  background: rgba(8, 12, 20, 0.55);
+}
+
+.yanmar-repair-reward-bonus-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.yanmar-repair-reward-preview-body.is-compact .yanmar-repair-reward-chip {
+  padding: 0.3rem 0.4rem;
+}
+
+.yanmar-repair-reward-preview-body.is-compact .yanmar-repair-reward-amt {
+  font-size: 0.72rem;
+}
+
+.yanmar-repair-reward-preview-body.is-compact .yanmar-repair-reward-bonus {
+  gap: 0.3rem;
+  margin-bottom: 0.35rem;
+}
+
+.yanmar-repair-reward-preview-body.is-compact .yanmar-repair-reward-bonus-icon {
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0.2rem;
+}
+
+.yanmar-repair-result-bonus {
+  display: flex;
+  justify-content: center;
+  margin: 0.15rem 0 0.1rem;
+}
+
+.yanmar-repair-confirm-item.is-buff {
+  color: #bfdbfe;
+  font-weight: 800;
+}
+
+.yanmar-repair-claim-cta {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 2.55rem;
+  margin: 0;
+  padding: 0.65rem 1rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: linear-gradient(180deg, rgba(70, 40, 12, 0.95), rgba(30, 18, 8, 0.98));
+  color: #fff7ed;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.yanmar-repair-claim-cta.is-ready {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: linear-gradient(180deg, #b45309, #7c2d12);
+  animation: yanmar-maintenance-warn-pulse 2s ease-in-out infinite;
+}
+
+.yanmar-repair-claim-cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  animation: none;
+}
+
+.yanmar-repair-confirm-card.is-result {
+  animation: yanmar-repair-panel-in 0.24s ease-out;
+}
+
+@media (max-width: 420px) {
+  .yanmar-repair-hero-row {
+    gap: 0.45rem;
+  }
+
+  .yanmar-repair-hero-art {
+    width: 4.35rem;
+    height: 4.35rem;
+  }
+
+  .yanmar-repair-panel.is-premium-v2 .yanmar-repair-gauge {
+    width: 4.1rem;
+    height: 4.1rem;
+  }
+
+  .yanmar-repair-panel.is-premium-v2 .yanmar-repair-gauge-ring strong {
+    font-size: 0.76rem;
+  }
+
+  .yanmar-repair-panel.is-premium-v2 .yanmar-repair-detail-name-row h3 {
+    font-size: 0.88rem;
+  }
+
+  .yanmar-repair-reward-bonus {
+    gap: 0.35rem;
+  }
 }
 
 .yanmar-repair-panel-header {
@@ -8930,6 +9546,62 @@ html.pwa-mode [contenteditable="true"] {
   font-size: 1.12rem;
   font-weight: 900;
   color: #fff7ed;
+}
+
+.yanmar-repair-cycle-line,
+.yanmar-repair-remain-line {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fdba74;
+}
+
+.yanmar-repair-remain-line {
+  color: #fde68a;
+  font-variant-numeric: tabular-nums;
+}
+
+.yanmar-repair-reward-preview {
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.yanmar-repair-reward-preview h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fcd34d;
+}
+
+.yanmar-repair-reward-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff7ed;
+}
+
+.yanmar-repair-reward-bonus {
+  color: #fde68a;
+}
+
+.yanmar-repair-reward-xp {
+  opacity: 0.55;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.yanmar-repair-bonus-hit {
+  color: #fde68a !important;
+  font-weight: 900 !important;
 }
 
 .yanmar-repair-status {
@@ -9290,6 +9962,7 @@ html.pwa-mode [contenteditable="true"] {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.45rem;
+  margin-top: 0.85rem;
 }
 
 .yanmar-repair-confirm-cancel,
@@ -9322,40 +9995,132 @@ html.pwa-mode [contenteditable="true"] {
 
 .yanmar-maintenance-warn-stack {
   display: flex;
-  flex-direction: column;
-  gap: 0.28rem;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.35rem;
   width: 100%;
+  justify-content: flex-end;
+  position: relative;
+  z-index: 5;
 }
 
-.yanmar-maintenance-warn {
-  width: 100%;
-  padding: 0.28rem 0.32rem;
-  border-radius: 0.45rem;
-  border: 1px solid rgba(251, 191, 36, 0.45);
-  background: rgba(120, 53, 15, 0.82);
-  color: #ffedd5;
-  font-size: 0.58rem;
-  font-weight: 900;
-  line-height: 1.2;
-  text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+.yanmar-maintenance-icon-wrap {
+  position: relative;
+}
+
+.yanmar-maintenance-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0.2rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(248, 113, 113, 0.7);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(248, 113, 113, 0.35), transparent 65%),
+    rgba(70, 10, 10, 0.92);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
   animation: yanmar-maintenance-warn-pulse 1.6s ease-in-out infinite;
 }
 
-.yanmar-maintenance-warn.is-depleted {
-  border-color: rgba(248, 113, 113, 0.65);
-  background: rgba(127, 29, 29, 0.88);
-  color: #fee2e2;
+.yanmar-maintenance-icon-btn.is-warn {
+  border-color: rgba(251, 146, 60, 0.75);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(251, 146, 60, 0.32), transparent 65%),
+    rgba(90, 40, 10, 0.92);
+}
+
+.yanmar-maintenance-icon-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: sepia(0.35) saturate(1.4) hue-rotate(-20deg) brightness(0.95);
+}
+
+.yanmar-maintenance-icon-btn.is-ready img {
+  filter: sepia(0.2) saturate(1.6) hue-rotate(-35deg) brightness(1.05);
+}
+
+.yanmar-maintenance-bubble {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  z-index: 20;
+  min-width: 9.5rem;
+  max-width: 12rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: linear-gradient(180deg, rgba(40, 24, 14, 0.98), rgba(12, 10, 16, 0.98));
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  color: #fff7ed;
+}
+
+.yanmar-maintenance-bubble strong {
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.yanmar-maintenance-bubble > span {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #fdba74;
+}
+
+.yanmar-maintenance-bubble-action {
+  margin-top: 0.15rem;
+  border: 0;
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.45rem;
+  background: linear-gradient(180deg, #b45309, #7c2d12);
+  color: #fff7ed;
+  font-size: 0.62rem;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 @keyframes yanmar-maintenance-warn-pulse {
   0%,
   100% {
     opacity: 0.92;
+    transform: scale(1);
   }
   50% {
     opacity: 1;
+    transform: scale(1.04);
   }
+}
+
+.yanmar-site-prompt-hud-icon-wrap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.yanmar-repair-claim-badge {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.3rem;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.2rem;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1rem;
+  text-align: center;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+}
+
+.yanmar-site-prompt-hud-btn.is-claimable {
+  animation: yanmar-maintenance-warn-pulse 1.8s ease-in-out infinite;
+  border-color: rgba(248, 113, 113, 0.55);
 }
 
 .yanmar-gear-frame {

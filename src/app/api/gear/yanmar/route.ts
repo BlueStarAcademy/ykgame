@@ -70,6 +70,7 @@ export async function GET() {
     },
     repair: result.loaded.repair,
     maintenance: result.loaded.maintenance,
+    serverNow: Date.now(),
     stats: result.loaded.stats,
     items: result.loaded.items.map((item) => {
       const slot = item.slot as GearSlot;

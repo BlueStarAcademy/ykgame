@@ -6,8 +6,12 @@ import { loadUserFinalStats } from "@/games/yanmar/gearService";
 import {
   applyTravelMeters,
   calendarFillDefaults,
+  missingFilledAtPatch,
 } from "@/games/yanmar/maintenance";
 
+/**
+ * Travel flush — odometer only. Fluid wear is real-time calendar now.
+ */
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -49,21 +53,7 @@ export async function POST(req: Request) {
           },
         }));
 
-      // Backfill calendar start if missing (legacy rows).
-      const calendarPatch: Record<string, Date> = {};
-      if (!repair.hydraulicOilFilledAt) {
-        calendarPatch.hydraulicOilFilledAt = now;
-      }
-      if (!repair.hydraulicFilterFilledAt) {
-        calendarPatch.hydraulicFilterFilledAt = now;
-      }
-      if (!repair.fuelFilterFilledAt) {
-        calendarPatch.fuelFilterFilledAt = now;
-      }
-      if (!repair.gearOilFilledAt) {
-        calendarPatch.gearOilFilledAt = now;
-      }
-
+      const calendarPatch = missingFilledAtPatch(repair, now);
       const travelPatch = applyTravelMeters(repair, travelMeters);
 
       await tx.userRepairState.update({
@@ -77,6 +67,7 @@ export async function POST(req: Request) {
         maintenance: next.maintenance,
         stats: next.stats,
         repair: next.repair,
+        serverNow: Date.now(),
       };
     });
     return NextResponse.json(result);

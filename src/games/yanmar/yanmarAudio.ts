@@ -354,7 +354,11 @@ class YanmarAudioController {
         !this.bgmEnabled ||
         !isSiteLegendBgmMasterEnabled()
       ) {
-        stopWebAudioBgm("ingame", false);
+        if (ok) {
+          stopWebAudioBgm("ingame", false);
+        } else {
+          this.bindBgmGesture();
+        }
         return;
       }
       this.unlocked = true;

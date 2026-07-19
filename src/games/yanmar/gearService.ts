@@ -32,6 +32,7 @@ import {
   levelsByWorkshopFromRows,
   workshopLuckyDropBonus,
 } from "./workshop/effects";
+import { missingFilledAtPatch } from "./maintenance";
 
 type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
@@ -128,6 +129,16 @@ export async function loadUserFinalStats(
       where: { userId },
       select: { workshopId: true, upgradeKey: true, level: true },
     });
+  }
+
+  if (repair) {
+    const fillPatch = missingFilledAtPatch(repair);
+    if (Object.keys(fillPatch).length > 0) {
+      repair = await tx.userRepairState.update({
+        where: { id: repair.id },
+        data: fillPatch,
+      });
+    }
   }
 
   let repairBuff: "NONE" | "SMALL" | "LARGE" = "NONE";

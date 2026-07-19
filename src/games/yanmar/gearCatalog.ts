@@ -350,24 +350,12 @@ export const EXP_GAIN_SUB_CAP = 0.3; // reserved; ability subs no longer grant X
 /** @deprecated dismantle no longer refunds stars */
 export const ENHANCE_DISMANTLE_REFUND_RATE = 0;
 
-/** @deprecated Use FREE_REPAIR_COOLDOWN_MS from maintenance.ts */
-export {
-  FREE_REPAIR_COOLDOWN_MS,
-  PREMIUM_REPAIR_BUFF_MS as SMALL_REPAIR_BUFF_MS,
-  TOP_REPAIR_BUFF_MS as LARGE_REPAIR_BUFF_MS,
-  TOP_REPAIR_COST as LARGE_REPAIR_COST,
-  PREMIUM_REPAIR_COST,
-  TOP_REPAIR_COST,
-} from "./maintenance";
-
 export {
   MAINTENANCE_FLUID_IDS,
   MAINTENANCE_FLUIDS,
   MAINTENANCE_WARN_RATIO,
-  getRepairLabels,
   isMaintenanceFluidId,
   type MaintenanceFluidId,
-  type MaintenanceRepairKind,
 } from "./maintenance";
 
 /** NORMAL 기준 강화 스타 (+1~+10) */

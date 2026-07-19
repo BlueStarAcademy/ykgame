@@ -102,18 +102,41 @@ export async function ensureYanmarGearMigration(
     },
   });
 
+  const fillNow = new Date();
+  const existingRepair = await tx.userRepairState.findUnique({
+    where: { userId_gameId: { userId, gameId } },
+  });
   await tx.userRepairState.upsert({
     where: { userId_gameId: { userId, gameId } },
     create: {
       userId,
       gameId,
       buffKind: "NONE",
-      hydraulicOilFilledAt: new Date(),
-      hydraulicFilterFilledAt: new Date(),
-      fuelFilterFilledAt: new Date(),
-      gearOilFilledAt: new Date(),
+      engineOilFilledAt: fillNow,
+      engineOilFilterFilledAt: fillNow,
+      hydraulicOilFilledAt: fillNow,
+      hydraulicFilterFilledAt: fillNow,
+      fuelFilterFilledAt: fillNow,
+      gearOilFilledAt: fillNow,
     },
-    update: {},
+    update: {
+      ...(!existingRepair?.engineOilFilledAt
+        ? { engineOilFilledAt: fillNow }
+        : {}),
+      ...(!existingRepair?.engineOilFilterFilledAt
+        ? { engineOilFilterFilledAt: fillNow }
+        : {}),
+      ...(!existingRepair?.hydraulicOilFilledAt
+        ? { hydraulicOilFilledAt: fillNow }
+        : {}),
+      ...(!existingRepair?.hydraulicFilterFilledAt
+        ? { hydraulicFilterFilledAt: fillNow }
+        : {}),
+      ...(!existingRepair?.fuelFilterFilledAt
+        ? { fuelFilterFilledAt: fillNow }
+        : {}),
+      ...(!existingRepair?.gearOilFilledAt ? { gearOilFilledAt: fillNow } : {}),
+    },
   });
 
   return { migrated: true as const, refundStars: grantedRefund };
