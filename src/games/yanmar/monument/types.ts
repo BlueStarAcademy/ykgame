@@ -28,7 +28,7 @@ export interface MonumentQuestDef {
   metric: MonumentQuestMetric;
   target: number;
   rewardPoints: number;
-  kind: "daily";
+  kind: "daily" | "repeat";
 }
 
 export interface MonumentBuildQuestDef {

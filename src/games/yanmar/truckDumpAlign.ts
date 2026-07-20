@@ -42,10 +42,12 @@ export const HAUL_TRUCK_ALIGN = {
   /** 붐·암 충돌용 높이·짐칸 공동 (휠 바닥=그룹 원점 기준) */
   solidMinY: 0.5,
   solidMaxY: 3.1,
-  cavityMinY: 1.5,
-  cavityMaxY: 3.1,
-  cavityHalfX: 1.95,
-  cavityHalfZ: 1.45,
+  /** 측판 위쪽만 공동 — 옆에서 뚫지 못하고 위에서 내려놓게 */
+  cavityMinY: 2.05,
+  cavityMaxY: 3.25,
+  /** 반드시 collider half보다 작아야 측판이 고체로 남음 */
+  cavityHalfX: 1.35,
+  cavityHalfZ: 1.15,
   cavityCenterLocalX: -1.05,
   cavityCenterLocalZ: 0,
 } as const;
@@ -234,7 +236,7 @@ export function resolveExcavatorTruckOverlap(
   const hx = target.collider.halfX;
   const hz = target.collider.halfZ;
   const radius = EXCAVATOR_COLLISION_RADIUS;
-  const pad = 0.1;
+  const pad = 0.18;
 
   const closestX = Math.max(-hx, Math.min(hx, lx));
   const closestZ = Math.max(-hz, Math.min(hz, lz));

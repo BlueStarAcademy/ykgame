@@ -3408,7 +3408,7 @@ function DumpTruck({
         outlineWidth={0.035}
         outlineColor="#8a1010"
       >
-        DUMP HERE
+        흙 하역
       </Text>
         </>
       ) : null}

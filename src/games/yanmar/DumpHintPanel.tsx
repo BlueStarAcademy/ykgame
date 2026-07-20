@@ -46,20 +46,16 @@ export function DumpHintPanel({
         : "스윙으로 정면을 짐칸 중심에 맞추세요",
     },
     {
-      ok:
-        truckCooldownRemaining <= 0 &&
-        truckCanAccept &&
-        (canDump || aligned),
-      label:
-        truckCooldownRemaining > 0
-          ? `트럭 복귀 중 ${Math.ceil(truckCooldownRemaining)}초`
-          : !truckCanAccept
-            ? "트럭 만차 — 하역 구역을 벗어나면 출발"
-            : canDump
-              ? "우조이스틱 오른쪽으로 버켓 펴기"
-              : raiseArmForDump
-                ? "먼저 붐·암을 들어올리세요"
-                : "차체 밀착과 정면 방향을 맞춰주세요",
+      ok: canDump || (aligned && !raiseArmForDump),
+      label: raiseArmForDump
+        ? "트럭 위로 붐·암을 높이 올리세요"
+        : canDump
+          ? "우조이스틱 오른쪽으로 버켓 펴기"
+          : truckCooldownRemaining > 0
+            ? `트럭 복귀 중 ${Math.ceil(truckCooldownRemaining)}초`
+            : !truckCanAccept
+              ? "트럭 만차 — 하역 구역을 벗어나면 출발"
+              : "차체 밀착과 정면 방향을 맞춰주세요",
     },
   ];
 

@@ -215,6 +215,9 @@ import {
 } from "./workshop/questState";
 import type { WorkshopQuestMetric } from "./workshop/types";
 import {
+  activateMonumentQuests,
+  claimMonumentRepeatQuest,
+  ensureMonumentQuestsForPhase,
   isInMonumentRange,
   loadMonumentQuestState,
   markMonumentDailyClaimed,
@@ -2078,7 +2081,12 @@ export function ExcavatorGameWrapper({
       ) {
         const mq = monumentQuestStateRef.current;
         if (mq) {
-          const nextMq = pushMonumentQuestProgress(mq, monumentMetric, amount);
+          const nextMq = pushMonumentQuestProgress(
+            mq,
+            monumentMetric,
+            amount,
+            monumentPhaseRef.current === "active",
+          );
           if (nextMq !== mq) {
             monumentQuestStateRef.current = nextMq;
             setMonumentQuestState(nextMq);
@@ -2190,6 +2198,16 @@ export function ExcavatorGameWrapper({
       ) {
         monumentTutorialArmedRef.current = true;
         enqueueUnlockNotices(["MONUMENT"]);
+      }
+
+      const mq = monumentQuestStateRef.current;
+      if (mq) {
+        const synced = ensureMonumentQuestsForPhase(mq, phase);
+        if (synced !== mq) {
+          monumentQuestStateRef.current = synced;
+          setMonumentQuestState(synced);
+          saveMonumentQuestState(synced);
+        }
       }
     } catch {
       /* ignore */
@@ -3292,6 +3310,42 @@ export function ExcavatorGameWrapper({
     [],
   );
 
+  const handleMonumentClaimRepeatQuest = useCallback(
+    async (questId: string, points: number) => {
+      setMonumentBusy(true);
+      try {
+        const eventId = `monument-repeat:${questId}:${crypto.randomUUID()}`;
+        const res = await fetch("/api/monument/yanmar/quest/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventId, questId, points }),
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+        if (typeof data.points === "number") {
+          setMonumentPanelState((prev) =>
+            prev ? { ...prev, points: data.points } : prev,
+          );
+        }
+        const current = monumentQuestStateRef.current;
+        if (current) {
+          const next = claimMonumentRepeatQuest(current, questId);
+          if (next) {
+            monumentQuestStateRef.current = next;
+            setMonumentQuestState(next);
+            saveMonumentQuestState(next);
+          }
+        }
+        if (!data.duplicate && points > 0) {
+          showStandaloneRewardPanelRef.current(0, false, 0, 0, "", 0, points);
+        }
+      } finally {
+        setMonumentBusy(false);
+      }
+    },
+    [],
+  );
+
   const handleMonumentUpgrade = useCallback(
     async (upgradeKey: MonumentUpgradeKey) => {
       setMonumentBusy(true);
@@ -3381,6 +3435,13 @@ export function ExcavatorGameWrapper({
       });
       if (!res.ok) return;
       await loadMonumentState();
+      const current = monumentQuestStateRef.current;
+      if (current && !current.activeDayKey) {
+        const next = activateMonumentQuests(current);
+        monumentQuestStateRef.current = next;
+        setMonumentQuestState(next);
+        saveMonumentQuestState(next);
+      }
     } finally {
       setMonumentBusy(false);
     }
@@ -5749,6 +5810,9 @@ export function ExcavatorGameWrapper({
           onClaimQuest={(questId, points) =>
             void handleMonumentClaimQuest(questId, points)
           }
+          onClaimRepeatQuest={(questId, points) =>
+            void handleMonumentClaimRepeatQuest(questId, points)
+          }
           onUpgrade={(key) => void handleMonumentUpgrade(key)}
           onInstantUpgrade={() => void handleMonumentInstantUpgrade()}
           onShopPurchase={(itemId) => void handleMonumentShopPurchase(itemId)}
@@ -6727,28 +6791,6 @@ export function ExcavatorGameWrapper({
                               ? "교환 가능"
                               : `곧 만료 · 남은 ${formatRemainingDuration(fluid.remainingMs)}`}
                           </span>
-                          <button
-                            type="button"
-                            className="yanmar-maintenance-bubble-action"
-                            onClick={() => {
-                              setMaintenanceBubbleId(null);
-                              if (nearRepairTentRef.current) {
-                                setShowQuestPanel(false);
-                                setShowShopPanel(false);
-                                setShowEquipmentUpgrade(false);
-                                setShowProfileModal(false);
-                                setShowWorkshopPanel(false);
-                                setShowMonumentPanel(false);
-                                setShowRepairPanel(true);
-                              } else {
-                                showAttachmentWarning(
-                                  "정비 텐트로 이동하세요",
-                                );
-                              }
-                            }}
-                          >
-                            정비소에서 교환
-                          </button>
                         </div>
                       ) : null}
                     </div>

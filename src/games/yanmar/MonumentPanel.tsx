@@ -55,6 +55,7 @@ interface MonumentPanelProps {
   questState: MonumentQuestState | null;
   busy?: boolean;
   onClaimQuest: (questId: string, points: number) => void | Promise<void>;
+  onClaimRepeatQuest?: (questId: string, points: number) => void | Promise<void>;
   onUpgrade: (upgradeKey: MonumentUpgradeKey) => void | Promise<void>;
   onInstantUpgrade?: () => void | Promise<void>;
   onShopPurchase: (itemId: WorkshopShopItemId) => void | Promise<void>;
@@ -95,6 +96,7 @@ export function MonumentPanel({
   questState,
   busy,
   onClaimQuest,
+  onClaimRepeatQuest,
   onUpgrade,
   onInstantUpgrade,
   onShopPurchase,
@@ -431,7 +433,11 @@ export function MonumentPanel({
           ) : null}
 
           {showManage && tab === "quest" ? (
-            <ul className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-stone-400">
+                일일 퀘스트
+              </p>
+              <ul className="flex flex-col gap-2">
               {(questState?.daily ?? []).map((q) => {
                 const item = questState?.dailyProgress[q.id] ?? {
                   id: q.id,
@@ -488,7 +494,83 @@ export function MonumentPanel({
                   </li>
                 );
               })}
-            </ul>
+              </ul>
+
+              {(questState?.repeat ?? []).length > 0 ? (
+                <>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-stone-400">
+                    반복 퀘스트
+                  </p>
+                  <ul className="flex flex-col gap-2">
+                    {(questState?.repeat ?? []).map((q) => {
+                      const item = questState?.repeatProgress[q.id] ?? {
+                        id: q.id,
+                        progress: 0,
+                        completed: false,
+                        claimed: false,
+                      };
+                      const canClaim = item.completed;
+                      const pct = Math.min(
+                        100,
+                        (item.progress / q.target) * 100,
+                      );
+                      return (
+                        <li
+                          key={q.id}
+                          className="rounded-xl border border-sky-400/20 bg-black/25 px-3 py-2.5"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-bold">{q.title}</p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-sky-300/80">
+                                  반복
+                                </span>
+                                <PointsAmount
+                                  value={q.rewardPoints}
+                                  size={16}
+                                />
+                              </div>
+                              {canClaim ? (
+                                <button
+                                  type="button"
+                                  disabled={busy || !onClaimRepeatQuest}
+                                  className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
+                                  onClick={() =>
+                                    void onClaimRepeatQuest?.(
+                                      q.id,
+                                      q.rewardPoints,
+                                    )
+                                  }
+                                >
+                                  완료
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                            <div
+                              className="h-full rounded-full bg-sky-400/80"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <p className="mt-1 text-right text-[11px] tabular-nums text-stone-400">
+                            {formatQuestProgressCurrent(
+                              item.progress,
+                              q.target,
+                              q.metric,
+                            ).toLocaleString()}{" "}
+                            / {q.target.toLocaleString()}
+                          </p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              ) : null}
+            </div>
           ) : null}
 
           {showManage && tab === "upgrade" ? (

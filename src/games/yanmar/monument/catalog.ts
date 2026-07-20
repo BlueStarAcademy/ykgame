@@ -15,7 +15,7 @@ import {
 export const MONUMENT_SIGN = {
   x: SITE_LAYOUT.monument[0],
   z: SITE_LAYOUT.monument[1],
-  radius: 12,
+  radius: 28,
   rotationY: Math.PI,
 } as const;
 
@@ -106,6 +106,51 @@ export const MONUMENT_QUEST_POOL: readonly Omit<MonumentQuestDef, "id">[] = [
 ];
 
 export const MONUMENT_DAILY_QUEST_COUNT = 3;
+
+/** Random repeat quest pool — rolled on activation and after each claim. */
+export const MONUMENT_REPEAT_QUEST_POOL: readonly Omit<
+  MonumentQuestDef,
+  "id" | "kind"
+>[] = [
+  {
+    title: "흙 하역",
+    metric: "soilDump",
+    target: 800,
+    rewardPoints: 8,
+  },
+  {
+    title: "덤프트럭 보내기",
+    metric: "dumpTruckDepart",
+    target: 1,
+    rewardPoints: 6,
+  },
+  {
+    title: "아스팔트 크래쉬",
+    metric: "asphaltBreak",
+    target: 3,
+    rewardPoints: 10,
+  },
+  {
+    title: "돌 트럭 보내기",
+    metric: "haulTruckDepart",
+    target: 1,
+    rewardPoints: 8,
+  },
+  {
+    title: "돌 하역",
+    metric: "rockDump",
+    target: 2,
+    rewardPoints: 10,
+  },
+  {
+    title: "주행 거리",
+    metric: "travel",
+    target: 300,
+    rewardPoints: 5,
+  },
+];
+
+export const MONUMENT_REPEAT_ACTIVE_COUNT = 2;
 
 export const MONUMENT_SHOP_ITEMS = WORKSHOP_SHOP_ITEMS;
 export { WORKSHOP_SHOP_PRICES, WORKSHOP_SHOP_WEEKLY_LIMIT };

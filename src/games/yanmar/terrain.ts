@@ -450,8 +450,8 @@ export const DUMP_TRUCK = {
    */
   bedDeckWorldY:
     DUMP_TRUCK_GROUP_Y + DUMP_TRUCK_BODY_LOCAL_Y + 1.05 - 0.36 + 0.08,
-  /** 칸 위에서 하역 판정 최소 높이 (덱 대비) */
-  dumpMinHeightAboveDeck: -0.4,
+  /** 칸 위에서 하역 판정 최소 높이 (덱 대비) — 트럭 위로 암을 올려야 함 */
+  dumpMinHeightAboveDeck: 0.95,
 } as const;
 
 /**

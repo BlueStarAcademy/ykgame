@@ -21,15 +21,15 @@ const PROBE_OFFSETS: ReadonlyArray<readonly [number, number, number]> = [
 ];
 
 /**
- * 암·버킷 충돌용 짐칸 공동.
- * 시각 측판보다 넓혀 프로브(0.32)가 측벽에 걸려 하역 시 버켓이 안 펴지는 문제를 막는다.
- * 캡 등 짐칸 밖 고체는 그대로 막는다.
+ * 암·버킷 충돌용 짐칸 공동 — 시각 측판/바닥 안쪽만 비움.
+ * 옆에서 뚫고 들어오지 못하게 XZ는 측판 안쪽으로 두고,
+ * 위에서 들어올 수 있도록 덱 높이 이상만 공동으로 연다.
  */
 const ARM_BED_CAVITY = {
-  halfX: DUMP_TRUCK.bedWidth / 2 + DUMP_TRUCK_ARM_PROBE_RADIUS + 0.25,
-  halfZ: DUMP_TRUCK.bedDepth / 2 + DUMP_TRUCK_ARM_PROBE_RADIUS + 0.25,
-  minY: Math.min(DUMP_TRUCK_SOLID.cavityMinY, DUMP_TRUCK.bedDeckWorldY - 0.9),
-  maxY: DUMP_TRUCK_SOLID.maxY + 0.2,
+  halfX: DUMP_TRUCK_SOLID.cavityHalfX,
+  halfZ: DUMP_TRUCK_SOLID.cavityHalfZ,
+  minY: DUMP_TRUCK.bedDeckWorldY + 0.12,
+  maxY: DUMP_TRUCK_SOLID.maxY + 0.35,
 } as const;
 
 function isInDumpTruckSolidForArm(
@@ -125,7 +125,7 @@ function restoreJoints(
   }
 }
 
-/** 붐·암·버킷이 트럭 캡 등 고체를 뚫지 않도록 관절 롤백 (짐칸 안 하역은 허용) */
+/** 붐·암·버킷이 트럭 고체를 뚫지 않도록 관절을 롤백한다. */
 export function constrainArmFromDumpTruck(
   sim: ExcavatorSimState,
   vel: HydraulicVelocity,
@@ -135,28 +135,6 @@ export function constrainArmFromDumpTruck(
 ): boolean {
   if (pose && !pose.present) return false;
   if (!armPenetratesDumpTruck(sim, boomSwing, pose)) return false;
-
-  const after = {
-    boom: sim.boom,
-    arm: sim.arm,
-    bucket: sim.bucket,
-  };
-
-  // 버켓만 충돌이면 버켓만 되돌림 → 붐·암 조작은 유지
-  sim.bucket = before.bucket;
-  if (!armPenetratesDumpTruck(sim, boomSwing, pose)) {
-    restoreJoints(sim, vel, before, { bucket: true });
-    return true;
-  }
-
-  // 붐·암만 충돌이면 그쪽만 되돌림 → 버켓 펴기(하역)는 유지
-  sim.boom = before.boom;
-  sim.arm = before.arm;
-  sim.bucket = after.bucket;
-  if (!armPenetratesDumpTruck(sim, boomSwing, pose)) {
-    restoreJoints(sim, vel, before, { boom: true, arm: true });
-    return true;
-  }
 
   restoreJoints(sim, vel, before, { boom: true, arm: true, bucket: true });
   return true;

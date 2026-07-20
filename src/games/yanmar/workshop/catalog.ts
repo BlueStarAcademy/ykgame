@@ -135,7 +135,7 @@ export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
     sign: {
       x: DUMP_ZONE.x - 8,
       z: DUMP_ZONE.z + 6,
-      radius: 3.2,
+      radius: 18,
       rotationY: Math.PI * 0.15,
     },
     promptTitle: "흙 하역장",
@@ -185,7 +185,7 @@ export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
     sign: {
       x: SITE_LAYOUT.crash[0] - 14,
       z: SITE_LAYOUT.crash[1] + 10,
-      radius: 3.2,
+      radius: 18,
       rotationY: -Math.PI * 0.2,
     },
     promptTitle: "브레이커 작업장",
@@ -236,7 +236,7 @@ export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
       // Keep clear of the haul-truck ↔ stone-zone dump path (truck is SE at 42,100).
       x: SITE_LAYOUT.hill[0] - 18,
       z: SITE_LAYOUT.hill[1] + 10,
-      radius: 3.2,
+      radius: 18,
       rotationY: Math.PI * 0.65,
     },
     promptTitle: "돌 하역장",

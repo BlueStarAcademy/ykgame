@@ -318,7 +318,7 @@ export function PremiumDumpTruckModel({
         outlineWidth={0.035}
         outlineColor={COLOR.paintRedDark}
       >
-        DUMP HERE
+        흙 하역
       </Text>
     </group>
   );
