@@ -8,6 +8,7 @@ import {
 import {
   BREAKER_TIP_PROBE_RADIUS,
   BREAKER_TRAVEL_LOCK_CLEARANCE,
+  MIN_BUCKET_GROUND_CLEARANCE,
 } from "./simConstants";
 import { GRAPPLE_TRAVEL_LOCK_CLEARANCE } from "./grappleGrip";
 import { sampleBreakerContactHeight, sampleHeight, type TerrainData } from "./terrain";
@@ -77,13 +78,13 @@ function targetClearanceForAttachment(sim: ExcavatorSimState) {
   if (sim.attachmentType === "grapple") {
     return GRAPPLE_TRAVEL_LOCK_CLEARANCE + 0.08;
   }
-  return 0.12;
+  return MIN_BUCKET_GROUND_CLEARANCE + 0.07;
 }
 
 /**
- * When swapping to breaker/grapple, the tip is longer than the bucket and can
- * spawn underground — freezing travel and fighting the ground constraint.
- * Greedily nudge boom/arm/bucket until the tip clears the target height.
+ * Lift boom/arm/bucket until the active attachment clears the ground.
+ * Used when swapping to breaker/grapple (longer tip) and when a dig mound
+ * snaps away under a buried bucket.
  */
 export function resolveAttachmentTipClearance(
   sim: ExcavatorSimState,
@@ -92,10 +93,6 @@ export function resolveAttachmentTipClearance(
   grappleOpen = 1,
   targetClearance = targetClearanceForAttachment(sim),
 ): boolean {
-  if (sim.attachmentType !== "breaker" && sim.attachmentType !== "grapple") {
-    return true;
-  }
-
   const step = 0.045;
   const maxIters = 96;
   const eps = 1e-4;

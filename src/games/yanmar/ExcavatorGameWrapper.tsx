@@ -5843,7 +5843,12 @@ export function ExcavatorGameWrapper({
               travelRaiseWarn.phase === "fade" ? " is-fading" : ""
             }`}
           >
-            ⚠️ 붐을 더 들어야 움직일 수 있습니다
+            ⚠️{" "}
+            {attachmentType === "breaker"
+              ? "브레이커가 땅에 닿아있어 주행이 불가능합니다."
+              : attachmentType === "grapple"
+                ? "집게가 땅에 닿아있어 주행이 불가능합니다."
+                : "버켓이 땅에 닿아있어 주행이 불가능합니다."}
           </div>
         ) : null}
 

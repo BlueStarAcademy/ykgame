@@ -1,5 +1,7 @@
 export const MIN_BUCKET_GROUND_CLEARANCE = 0.05;
 export const MIN_BUCKET_DIG_ZONE_CLEARANCE = -2.15;
+/** 버켓이 이 높이보다 낮으면(지면 침투) 주행 잠금. 굴착지 여부와 무관. */
+export const BUCKET_TRAVEL_LOCK_CLEARANCE = -0.05;
 /** 집게는 지면 아래로 파고들지 않는다. */
 export const MIN_GRAPPLE_GROUND_CLEARANCE = 0.02;
 /** 브레이커가 아스팔트/지면 위에 올려진 상태로 유지할 최소 여유. */

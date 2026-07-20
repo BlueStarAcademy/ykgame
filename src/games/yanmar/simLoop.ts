@@ -66,7 +66,10 @@ import {
   isFacingTruckBedCenter,
 } from "./truckDumpAlign";
 import { checkAttachmentUse, getZoneAt } from "./attachmentZones";
-import { measureAttachmentClearance } from "./attachmentGround";
+import {
+  measureAttachmentClearance,
+  resolveAttachmentTipClearance,
+} from "./attachmentGround";
 import {
   BUCKET_SOIL_HOLD_MIN,
   getArmCollisionSamples,
@@ -108,6 +111,7 @@ import {
   BREAKER_TIP_PROBE_RADIUS,
   BREAKER_TOUCH_BAND,
   BREAKER_TRAVEL_LOCK_CLEARANCE,
+  BUCKET_TRAVEL_LOCK_CLEARANCE,
   MIN_BREAKER_SURFACE_CLEARANCE,
   MIN_BUCKET_DIG_ZONE_CLEARANCE,
   MIN_BUCKET_GROUND_CLEARANCE,
@@ -703,15 +707,11 @@ export function tickExcavatorSim(params: SimTickParams) {
   const boomSwing = auxiliary?.boomSwing ?? DEFAULT_BOOM_SWING;
   const grappleOpen = auxiliary?.grappleOpen ?? 1;
   const beforeControlBucket = measureAttachmentClearance(sim, terrain, boomSwing, grappleOpen);
-  const bucketTipInDigZone = isInDigZone(
-    beforeControlBucket.tip.x,
-    beforeControlBucket.tip.z,
-    terrain,
-  );
+  // Dig-zone gate removed: after a mound depletes the zone is inactive but the
+  // bucket can still be underground — travel must stay locked until clear.
   const bucketAnchoredToGround =
     sim.attachmentType === "bucket" &&
-    bucketTipInDigZone &&
-    beforeControlBucket.clearance < -0.05;
+    beforeControlBucket.clearance < BUCKET_TRAVEL_LOCK_CLEARANCE;
   const breakerNearGround =
     sim.attachmentType === "breaker" &&
     beforeControlBucket.clearance < BREAKER_TRAVEL_LOCK_CLEARANCE;
@@ -1820,6 +1820,20 @@ export function tickExcavatorSim(params: SimTickParams) {
         consumeDigZoneUnits(terrain, digX, digZ, gainedUnits);
         fb.digZoneRemainingUnits =
           getActiveDigZoneAt(terrain, digX, digZ)?.remainingUnits ?? 0;
+        // Mound snap-to-flat on deplete can bury the bucket that was deep in soil.
+        // Lift clear immediately so the tip is not left underground.
+        const postConsume = measureAttachmentClearance(
+          sim,
+          terrain,
+          boomSwing,
+          grappleOpen,
+        );
+        if (
+          postConsume.clearance < MIN_BUCKET_GROUND_CLEARANCE - 0.02 &&
+          !isInDigZone(postConsume.tip.x, postConsume.tip.z, terrain)
+        ) {
+          resolveAttachmentTipClearance(sim, terrain, boomSwing, grappleOpen);
+        }
       }
     }
 
