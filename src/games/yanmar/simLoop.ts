@@ -778,8 +778,18 @@ export function tickExcavatorSim(params: SimTickParams) {
     haulTruckPresent &&
     Math.hypot(sim.posX - (hillZone?.dropX ?? 0), sim.posZ - (hillZone?.dropZ ?? 0)) <=
       10;
+  const dumpAlignForArmCollision = getDumpTruckAlignTarget(
+    truckPose.groupX,
+    truckPose.groupZ,
+    truckPose.present,
+  );
+  const dumpBodyTouchingForArm = dumpAlignForArmCollision
+    ? isBodyTouchingTruck(sim.posX, sim.posZ, dumpAlignForArmCollision)
+    : false;
   const truckArmCollisionActive =
-    (truckPose.present && isDumpTruckArmCollisionActive(sim, boomSwing, truckPose)) ||
+    (truckPose.present &&
+      !dumpBodyTouchingForArm &&
+      isDumpTruckArmCollisionActive(sim, boomSwing, truckPose)) ||
     haulArmCollisionActive;
   const hydraulicSubsteps = truckArmCollisionActive ? 5 : 1;
   const subDt = dt / hydraulicSubsteps;
@@ -824,7 +834,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     if (isAutoArm) {
       advanceAutoArmPose(sim, vel, autoPose);
     }
-    constrainArmFromDumpTruck(sim, vel, boomSwing, subBefore, truckPose);
+    constrainArmFromDumpTruck(sim, vel, boomSwing, subBefore, truckPose, {
+      freeWhileBodyTouching: dumpBodyTouchingForArm,
+    });
     if (hillZone) {
       constrainArmFromHaulTruck(
         sim,
@@ -959,6 +971,10 @@ export function tickExcavatorSim(params: SimTickParams) {
   // 짐칸 위에서는 지형 높이(트럭 아래) 기준으로 하역 버켓 개방이 막히지 않게 한다.
   // 이미 묻힌 상태(브레이커 전환 직후 등)에서는 축을 하나씩 허용해,
   // 암을 말아 더 박히는 입력이 붐 상승까지 통째로 되돌리지 않게 한다.
+  const buriedOutsideDigZone =
+    sim.attachmentType === "bucket" &&
+    !bucketContactInDigZone &&
+    beforeControlBucket.clearance < MIN_BUCKET_GROUND_CLEARANCE - 0.02;
   if (
     !bucketOverDumpBed &&
     clearance < minBucketClearance - 0.02 &&
@@ -969,7 +985,17 @@ export function tickExcavatorSim(params: SimTickParams) {
       arm: sim.arm,
       bucket: sim.bucket,
     };
-    if (wasAlreadyBelowGround && worsenedGroundPenetration) {
+    if (buriedOutsideDigZone) {
+      // 흙 더미 소진 후: 복합 관절로 빠져나오는 입력을 축별 거부로 막지 않는다.
+      if (worsenedGroundPenetration) {
+        sim.boom = beforeGroundContact.boom;
+        sim.arm = beforeGroundContact.arm;
+        sim.bucket = beforeGroundContact.bucket;
+        if (vel.boom > 0) vel.boom = 0;
+        if (vel.arm > 0) vel.arm = 0;
+        if (vel.bucket > 0) vel.bucket = 0;
+      }
+    } else if (wasAlreadyBelowGround && worsenedGroundPenetration) {
       const baseline = beforeControlBucket.clearance;
       const clearanceOf = (joints: typeof afterJoints) => {
         sim.boom = joints.boom;
@@ -1018,6 +1044,26 @@ export function tickExcavatorSim(params: SimTickParams) {
     }
     bucketContact = measureAttachmentClearance(sim, terrain, boomSwing, grappleOpen);
     ({ clearance } = bucketContact);
+  }
+  // 굴착지 소진으로 평지가 복구된 뒤에도 버킷이 땅속에 남으면 매 프레임 들어 올린다.
+  if (
+    sim.attachmentType === "bucket" &&
+    !bucketOverDumpBed &&
+    clearance < MIN_BUCKET_GROUND_CLEARANCE - 0.02 &&
+    !isInDigZone(bucketContact.tip.x, bucketContact.tip.z, terrain)
+  ) {
+    if (resolveAttachmentTipClearance(sim, terrain, boomSwing, grappleOpen)) {
+      bucketContact = measureAttachmentClearance(
+        sim,
+        terrain,
+        boomSwing,
+        grappleOpen,
+      );
+      ({ clearance } = bucketContact);
+      vel.boom = 0;
+      vel.arm = 0;
+      vel.bucket = 0;
+    }
   }
   if (isAutoArm) {
     advanceAutoArmPose(sim, vel, autoPose);

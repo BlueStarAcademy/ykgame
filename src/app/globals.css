@@ -654,16 +654,17 @@ body {
   max-width: min(88vw, 20rem);
   padding: 1rem 1.35rem;
   border-radius: 1rem;
-  border: 1px solid rgba(251, 191, 36, 0.55);
-  background: linear-gradient(165deg, rgba(30, 41, 59, 0.94) 0%, rgba(15, 23, 42, 0.96) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: linear-gradient(165deg, rgba(30, 41, 59, 0.58) 0%, rgba(15, 23, 42, 0.62) 100%);
   box-shadow:
-    0 0.55rem 1.8rem rgba(0, 0, 0, 0.5),
-    0 0 1.2rem rgba(251, 191, 36, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    0 0.55rem 1.8rem rgba(0, 0, 0, 0.32),
+    0 0 1.2rem rgba(251, 191, 36, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   text-align: center;
   pointer-events: none;
   animation: yanmar-level-up-toast-fade 2.8s ease-out forwards;
   will-change: opacity, transform;
+  backdrop-filter: blur(6px);
 }
 
 .yanmar-level-up-toast-title {
@@ -697,12 +698,12 @@ body {
   width: max-content;
   max-width: calc(100vw - 1rem);
   transform: translate(-50%, -50%);
-  border: 1px solid rgba(251, 146, 60, 0.7);
+  border: 1px solid rgba(251, 146, 60, 0.5);
   border-radius: 0.9rem;
   background: linear-gradient(
     160deg,
-    rgba(124, 45, 18, 0.95),
-    rgba(30, 41, 59, 0.97)
+    rgba(124, 45, 18, 0.58),
+    rgba(30, 41, 59, 0.62)
   );
   padding: 0.75rem 1.1rem;
   color: #fff7ed;
@@ -713,17 +714,18 @@ body {
   white-space: nowrap;
   pointer-events: none;
   box-shadow:
-    0 0.55rem 1.6rem rgba(0, 0, 0, 0.48),
-    0 0 1rem rgba(249, 115, 22, 0.18);
+    0 0.55rem 1.6rem rgba(0, 0, 0, 0.32),
+    0 0 1rem rgba(249, 115, 22, 0.12);
   animation: yanmar-pose-save-toast-fade 2.4s ease-out forwards;
+  backdrop-filter: blur(6px);
 }
 
 .yanmar-attachment-warning-toast--cores {
-  border-color: rgba(251, 191, 36, 0.55);
+  border-color: rgba(251, 191, 36, 0.4);
   background: linear-gradient(
     160deg,
-    rgba(30, 41, 59, 0.88),
-    rgba(15, 23, 42, 0.92)
+    rgba(30, 41, 59, 0.55),
+    rgba(15, 23, 42, 0.58)
   );
   padding: 0.55rem 0.85rem;
 }

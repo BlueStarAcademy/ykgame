@@ -41,6 +41,17 @@ export function getGachaFreeDayKey(now = new Date()) {
   }).format(now);
 }
 
+/** 다음 무료 뽑기 초기화(KST 자정)까지 남은 ms */
+export function getMsUntilNextGachaFreeReset(now = new Date()) {
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const year = kst.getUTCFullYear();
+  const month = kst.getUTCMonth();
+  const day = kst.getUTCDate();
+  const nextMidnightUtc =
+    Date.UTC(year, month, day + 1, 0, 0, 0, 0) - 9 * 60 * 60 * 1000;
+  return Math.max(0, nextMidnightUtc - now.getTime());
+}
+
 function clampUsed(value: number, limit: number) {
   if (!Number.isFinite(value) || value < 0) return 0;
   return Math.min(limit, Math.floor(value));
@@ -116,6 +127,26 @@ export function buildGachaFreeStatus(
       available: premRemaining > 0,
     },
   };
+}
+
+/**
+ * 캐시된 무료 상태가 전날이면 당일 잔여로 다시 계산한다.
+ * (접속 유지 중 0시가 지나도 UI가 즉시 갱신되도록)
+ */
+export function withGachaFreeDayRollover(
+  status: GachaFreeStatus,
+  now = new Date(),
+): GachaFreeStatus {
+  if (status.dayKey === getGachaFreeDayKey(now)) return status;
+  return buildGachaFreeStatus(
+    {
+      gachaFreeDayKey: null,
+      gachaFreeStandardUsed: 0,
+      gachaFreePremiumUsed: 0,
+      gachaFreeStandardCooldownAt: null,
+    },
+    now,
+  );
 }
 
 export const GACHA_FREE_USER_SELECT = {

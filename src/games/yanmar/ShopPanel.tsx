@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
 import {
@@ -17,7 +17,11 @@ import {
   gachaBannerChromeClass,
   preloadAllGearIcons,
 } from "./gearArt";
-import type { GachaFreeStatus } from "./gachaFree";
+import {
+  getGachaFreeDayKey,
+  withGachaFreeDayRollover,
+  type GachaFreeStatus,
+} from "./gachaFree";
 
 export type GachaPayWith = "stars" | "tickets" | "free";
 
@@ -28,6 +32,8 @@ interface ShopPanelProps {
   gachaTicketsStandard?: number;
   gachaTicketsPremium?: number;
   freeGacha?: GachaFreeStatus | null;
+  /** 캐시된 무료 상태가 날짜가 바뀌어 만료됐을 때 서버에서 다시 불러오기 */
+  onRefreshFreeGacha?: () => void;
   activeItemIds?: ReadonlySet<ShopItemId> | readonly ShopItemId[];
   purchasingId?: ShopItemId | null;
   onPurchase?: (itemId: ShopItemId) => void | Promise<void>;
@@ -305,6 +311,7 @@ export function ShopPanel({
   gachaTicketsStandard = 0,
   gachaTicketsPremium = 0,
   freeGacha = null,
+  onRefreshFreeGacha,
   activeItemIds,
   purchasingId = null,
   onPurchase,
@@ -317,6 +324,7 @@ export function ShopPanel({
     remaining: number;
     at: number;
   } | null>(null);
+  const freeRefreshDayKeyRef = useRef<string | null>(null);
   const activeSet =
     activeItemIds instanceof Set
       ? activeItemIds
@@ -335,21 +343,34 @@ export function ShopPanel({
     void preloadAllGearIcons();
   }, [open]);
 
+  // 접속 유지 중 KST 0시가 지나면 무료 횟수를 즉시 반영하고 서버 상태도 갱신
+  const liveFreeGacha = freeGacha
+    ? withGachaFreeDayRollover(freeGacha, new Date(nowMs))
+    : null;
   useEffect(() => {
-    const remaining = freeGacha?.standard.cooldownRemainingMs ?? 0;
+    if (!open || !freeGacha || !onRefreshFreeGacha) return;
+    const today = getGachaFreeDayKey(new Date(nowMs));
+    if (freeGacha.dayKey === today) return;
+    if (freeRefreshDayKeyRef.current === today) return;
+    freeRefreshDayKeyRef.current = today;
+    onRefreshFreeGacha();
+  }, [open, freeGacha, nowMs, onRefreshFreeGacha]);
+
+  useEffect(() => {
+    const remaining = liveFreeGacha?.standard.cooldownRemainingMs ?? 0;
     if (remaining > 0) {
       setCooldownAnchor({ remaining, at: Date.now() });
     } else {
       setCooldownAnchor(null);
     }
-  }, [freeGacha]);
+  }, [liveFreeGacha]);
 
   const liveStandardCooldownMs = cooldownAnchor
     ? Math.max(0, cooldownAnchor.remaining - (nowMs - cooldownAnchor.at))
     : 0;
 
-  const standardRemaining = freeGacha?.standard.remaining ?? 0;
-  const premiumRemaining = freeGacha?.premium.remaining ?? 0;
+  const standardRemaining = liveFreeGacha?.standard.remaining ?? 0;
+  const premiumRemaining = liveFreeGacha?.premium.remaining ?? 0;
 
   return (
     <AppModalOverlay

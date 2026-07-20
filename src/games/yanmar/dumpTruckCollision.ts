@@ -22,14 +22,14 @@ const PROBE_OFFSETS: ReadonlyArray<readonly [number, number, number]> = [
 
 /**
  * 암·버킷 충돌용 짐칸 공동 — 시각 측판/바닥 안쪽만 비움.
- * 옆에서 뚫고 들어오지 못하게 XZ는 측판 안쪽으로 두고,
- * 위에서 들어올 수 있도록 덱 높이 이상만 공동으로 연다.
+ * 하역 때 붐·암·버킷이 칸 안에서 자유롭게 움직이도록
+ * 덱보다 아래·위까지 열고 XZ도 측판 안쪽을 넉넉히 비운다.
  */
 const ARM_BED_CAVITY = {
-  halfX: DUMP_TRUCK_SOLID.cavityHalfX,
-  halfZ: DUMP_TRUCK_SOLID.cavityHalfZ,
-  minY: DUMP_TRUCK.bedDeckWorldY + 0.12,
-  maxY: DUMP_TRUCK_SOLID.maxY + 0.35,
+  halfX: DUMP_TRUCK_SOLID.cavityHalfX + 0.22,
+  halfZ: DUMP_TRUCK_SOLID.cavityHalfZ + 0.18,
+  minY: DUMP_TRUCK_SOLID.cavityMinY,
+  maxY: DUMP_TRUCK_SOLID.maxY + 0.55,
 } as const;
 
 function isInDumpTruckSolidForArm(
@@ -105,37 +105,41 @@ export function armPenetratesDumpTruck(
   );
 }
 
-function restoreJoints(
-  sim: ExcavatorSimState,
-  vel: HydraulicVelocity,
-  joints: { boom: number; arm: number; bucket: number },
-  freeze: { boom?: boolean; arm?: boolean; bucket?: boolean },
-) {
-  if (freeze.boom) {
-    sim.boom = joints.boom;
-    vel.boom = 0;
-  }
-  if (freeze.arm) {
-    sim.arm = joints.arm;
-    vel.arm = 0;
-  }
-  if (freeze.bucket) {
-    sim.bucket = joints.bucket;
-    vel.bucket = 0;
-  }
-}
-
-/** 붐·암·버킷이 트럭 고체를 뚫지 않도록 관절을 롤백한다. */
+/**
+ * 붐·암·버킷이 트럭 고체를 뚫지 않도록 관절을 롤백한다.
+ * 차체가 트럭에 붙은 하역 자세에서는 롤백하지 않아 붐·암·버킷을 자유롭게 쓴다.
+ */
 export function constrainArmFromDumpTruck(
   sim: ExcavatorSimState,
   vel: HydraulicVelocity,
   boomSwing: number,
   before: { boom: number; arm: number; bucket: number },
   pose?: DumpTruckPose,
+  options?: { freeWhileBodyTouching?: boolean },
 ): boolean {
   if (pose && !pose.present) return false;
+  if (options?.freeWhileBodyTouching) return false;
   if (!armPenetratesDumpTruck(sim, boomSwing, pose)) return false;
 
-  restoreJoints(sim, vel, before, { boom: true, arm: true, bucket: true });
-  return true;
+  // 한 축만 트럭에 닿아도 붐·암·버킷 전체를 멈추지 않도록 축별로 허용한다.
+  const after = { boom: sim.boom, arm: sim.arm, bucket: sim.bucket };
+  sim.boom = before.boom;
+  sim.arm = before.arm;
+  sim.bucket = before.bucket;
+
+  const tryAxis = (axis: "boom" | "arm" | "bucket") => {
+    sim[axis] = after[axis];
+    if (!armPenetratesDumpTruck(sim, boomSwing, pose)) return;
+    sim[axis] = before[axis];
+    vel[axis] = 0;
+  };
+  tryAxis("boom");
+  tryAxis("arm");
+  tryAxis("bucket");
+
+  return (
+    sim.boom === before.boom ||
+    sim.arm === before.arm ||
+    sim.bucket === before.bucket
+  );
 }

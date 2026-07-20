@@ -98,6 +98,10 @@ import {
   type HourlyAdClaimResult,
 } from "./hourlyAdReward";
 import type { GachaFreeStatus } from "./gachaFree";
+import {
+  getMsUntilNextGachaFreeReset,
+  withGachaFreeDayRollover,
+} from "./gachaFree";
 import { ActiveShopBuffIcons } from "./ActiveShopBuffIcons";
 import {
   activateShopBuff,
@@ -651,10 +655,10 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
   return (
     <div
       key={panel.pulseKey}
-      className={`yanmar-score-panel relative w-max max-w-[min(20rem,90vw)] rounded-xl border px-4 py-2.5 font-black shadow-xl backdrop-blur-md ${
+      className={`yanmar-score-panel relative w-max max-w-[min(20rem,90vw)] rounded-xl border px-4 py-2.5 font-black shadow-xl backdrop-blur-sm ${
         panel.critical
-          ? "yanmar-score-panel-critical border-yellow-200/80 bg-black/85 text-yellow-300 shadow-[0_0_28px_rgba(250,204,21,0.35)]"
-          : "border-white/25 bg-black/78 text-slate-200"
+          ? "yanmar-score-panel-critical border-yellow-200/55 bg-black/42 text-yellow-300 shadow-[0_0_28px_rgba(250,204,21,0.22)]"
+          : "border-white/20 bg-black/40 text-slate-100"
       }`}
     >
       {panel.critical ? (
@@ -701,7 +705,7 @@ function CouponDiscoveryOverlay({ discovery }: { discovery: CouponDiscoveryState
   return (
     <div
       key={discovery.pulseKey}
-      className="yanmar-coupon-discovery w-max max-w-[min(18rem,90vw)] rounded-2xl border-2 border-yellow-200/80 bg-gradient-to-b from-amber-500/95 via-orange-500/95 to-red-600/95 px-4 py-3.5 text-center text-white shadow-[0_0_32px_rgba(251,191,36,0.45)] backdrop-blur-md"
+      className="yanmar-coupon-discovery w-max max-w-[min(18rem,90vw)] rounded-2xl border-2 border-yellow-200/55 bg-gradient-to-b from-amber-500/55 via-orange-500/50 to-red-600/48 px-4 py-3.5 text-center text-white shadow-[0_0_32px_rgba(251,191,36,0.28)] backdrop-blur-sm"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -755,7 +759,7 @@ function GearDiscoveryOverlay({ discovery }: { discovery: GearDiscoveryState | n
   return (
     <div
       key={discovery.pulseKey}
-      className="yanmar-gear-discovery w-max max-w-[min(16rem,90vw)] rounded-2xl border border-white/20 bg-gradient-to-b from-slate-800/95 via-slate-900/95 to-black/95 px-4 py-3.5 text-center text-white shadow-[0_0_28px_rgba(148,163,184,0.28)] backdrop-blur-md"
+      className="yanmar-gear-discovery w-max max-w-[min(16rem,90vw)] rounded-2xl border border-white/15 bg-gradient-to-b from-slate-800/55 via-slate-900/50 to-black/48 px-4 py-3.5 text-center text-white shadow-[0_0_28px_rgba(148,163,184,0.18)] backdrop-blur-sm"
       role="status"
     >
       <div className="mx-auto flex justify-center">
@@ -2688,6 +2692,32 @@ export function ExcavatorGameWrapper({
     }
   }, [syncServerNow]);
 
+  const refreshFreeGacha = useCallback(async () => {
+    try {
+      const res = await fetch("/api/gacha/yanmar");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.free && typeof data.free === "object") {
+        setFreeGacha(data.free as GachaFreeStatus);
+      }
+      if (typeof data.gachaTicketsStandard === "number") {
+        setGachaTicketsStandard(data.gachaTicketsStandard);
+      }
+      if (typeof data.gachaTicketsPremium === "number") {
+        setGachaTicketsPremium(data.gachaTicketsPremium);
+      }
+      if (typeof data.currency === "number") {
+        currencyRef.current = data.currency;
+        setCurrency(data.currency);
+        if (modeRef.current !== "game") {
+          setPreviewStars(data.currency);
+        }
+      }
+    } catch {
+      // Free status refresh is best-effort while the session stays open.
+    }
+  }, []);
+
   useEffect(() => {
     if (!repairBuffExpiresAt) return;
     const expiresMs = new Date(repairBuffExpiresAt).getTime();
@@ -3585,6 +3615,49 @@ export function ExcavatorGameWrapper({
   useEffect(() => {
     void loadEquipment();
   }, [loadEquipment]);
+
+  // 접속 유지 중 KST 0시에 무료 뽑기 상태를 다시 불러온다.
+  useEffect(() => {
+    if (sessionStatus !== "authenticated" || !session?.user?.id) return;
+
+    let timer: number | null = null;
+    const schedule = () => {
+      const delay = Math.min(
+        getMsUntilNextGachaFreeReset() + 500,
+        24 * 60 * 60 * 1000,
+      );
+      timer = window.setTimeout(() => {
+        setFreeGacha((prev) => (prev ? withGachaFreeDayRollover(prev) : prev));
+        void refreshFreeGacha();
+        schedule();
+      }, Math.max(1000, delay));
+    };
+    schedule();
+
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      setFreeGacha((prev) => (prev ? withGachaFreeDayRollover(prev) : prev));
+      void refreshFreeGacha();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      if (timer != null) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [session?.user?.id, sessionStatus, refreshFreeGacha]);
+
+  useEffect(() => {
+    if (!showShopPanel) return;
+    if (sessionStatus !== "authenticated" || !session?.user?.id) return;
+    setFreeGacha((prev) => (prev ? withGachaFreeDayRollover(prev) : prev));
+    void refreshFreeGacha();
+  }, [
+    showShopPanel,
+    session?.user?.id,
+    sessionStatus,
+    refreshFreeGacha,
+  ]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -6136,6 +6209,9 @@ export function ExcavatorGameWrapper({
                   gachaTicketsStandard={gachaTicketsStandard}
                   gachaTicketsPremium={gachaTicketsPremium}
                   freeGacha={freeGacha}
+                  onRefreshFreeGacha={() => {
+                    void refreshFreeGacha();
+                  }}
                   activeItemIds={activeShopBuffs.map((buff) => buff.id)}
                   purchasingId={purchasingShopItemId}
                   onPurchase={(itemId) => {
