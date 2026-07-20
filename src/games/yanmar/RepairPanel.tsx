@@ -316,6 +316,11 @@ export function RepairPanel({
     onClose();
   }
 
+  function dismissClaimResult() {
+    setClaimResult(null);
+    setClaimPhase("idle");
+  }
+
   return (
     <AppModalOverlay
       open={open}
@@ -514,7 +519,7 @@ export function RepairPanel({
                 <button
                   type="button"
                   className="yanmar-repair-confirm-ok"
-                  onClick={closeAll}
+                  onClick={dismissClaimResult}
                 >
                   확인
                 </button>
