@@ -211,6 +211,7 @@ import {
 } from "./workshop";
 import {
   applyWorkshopQuestMetric,
+  countClaimableWorkshopQuests,
   getClaimableWorkshopIds,
   loadWorkshopQuestState,
   markWorkshopQuestClaimed,
@@ -5724,6 +5725,18 @@ export function ExcavatorGameWrapper({
   const questClaimableCount = questsDisabled
     ? 0
     : countClaimableQuestRewards(questState).total;
+  const workshopClaimableCount =
+    nearWorkshopId && workshopQuestState
+      ? countClaimableWorkshopQuests(workshopQuestState, nearWorkshopId)
+      : 0;
+  const repairClaimableCount = maintenance
+    ? MAINTENANCE_FLUID_IDS.filter(
+        (id) => maintenance.fluids[id].exchangeEligible,
+      ).length
+    : 0;
+  const monumentStarsClaimable =
+    monumentPanelState?.phase === "active" &&
+    (monumentPanelState.starsStored ?? 0) > 0;
   const monumentHudPhase =
     monumentPanelState?.phase ?? monumentPhaseRef.current ?? "locked";
   const showMonumentMinimapProgress = monumentHudPhase === "active";
@@ -6049,7 +6062,11 @@ export function ExcavatorGameWrapper({
                             setShowMonumentPanel(true);
                             void loadMonumentState();
                           }}
-                          aria-label="조형물 입장"
+                          aria-label={
+                            monumentStarsClaimable
+                              ? `조형물 입장, 수령 가능 스타 ${monumentPanelState?.starsStored?.toLocaleString() ?? 0}`
+                              : "조형물 입장"
+                          }
                         >
                           <span className="yanmar-site-prompt-hud-copy">
                             <span className="yanmar-site-prompt-hud-eyebrow">
@@ -6066,6 +6083,12 @@ export function ExcavatorGameWrapper({
                                     : "조형물 입장"}
                             </span>
                           </span>
+                          {monumentStarsClaimable ? (
+                            <span
+                              className="yanmar-quest-notify-badge is-dot"
+                              aria-hidden
+                            />
+                          ) : null}
                         </button>
                         {monumentPanelState?.phase === "claimable" ? (
                           <button
@@ -6093,14 +6116,7 @@ export function ExcavatorGameWrapper({
                       <button
                         type="button"
                         className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
-                          (maintenance
-                            ? MAINTENANCE_FLUID_IDS.filter(
-                                (id) =>
-                                  maintenance.fluids[id].exchangeEligible,
-                              ).length
-                            : 0) > 0
-                            ? " is-claimable"
-                            : ""
+                          repairClaimableCount > 0 ? " is-claimable" : ""
                         }`}
                         onClick={() => {
                           setShowQuestPanel(false);
@@ -6111,7 +6127,11 @@ export function ExcavatorGameWrapper({
                           setShowMonumentPanel(false);
                           setShowRepairPanel(true);
                         }}
-                        aria-label="YK건기 서비스지점 열기"
+                        aria-label={
+                          repairClaimableCount > 0
+                            ? `YK건기 서비스지점 열기, 교환 가능 ${repairClaimableCount}개`
+                            : "YK건기 서비스지점 열기"
+                        }
                       >
                         <span className="yanmar-site-prompt-hud-icon-wrap">
                           <img
@@ -6120,19 +6140,6 @@ export function ExcavatorGameWrapper({
                             alt=""
                             draggable={false}
                           />
-                          {(maintenance
-                            ? MAINTENANCE_FLUID_IDS.filter(
-                                (id) =>
-                                  maintenance.fluids[id].exchangeEligible,
-                              ).length
-                            : 0) > 0 ? (
-                            <span className="yanmar-repair-claim-badge">
-                              {MAINTENANCE_FLUID_IDS.filter(
-                                (id) =>
-                                  maintenance!.fluids[id].exchangeEligible,
-                              ).length}
-                            </span>
-                          ) : null}
                         </span>
                         <span className="yanmar-site-prompt-hud-copy">
                           <span className="yanmar-site-prompt-hud-eyebrow">
@@ -6142,6 +6149,13 @@ export function ExcavatorGameWrapper({
                             서비스지점
                           </span>
                         </span>
+                        {repairClaimableCount > 0 ? (
+                          <span className="yanmar-repair-claim-badge" aria-hidden>
+                            {repairClaimableCount > 9
+                              ? "9+"
+                              : repairClaimableCount}
+                          </span>
+                        ) : null}
                       </button>
                     ) : null}
                     {nearWorkshopId &&
@@ -6150,7 +6164,9 @@ export function ExcavatorGameWrapper({
                     !nearMonument ? (
                       <button
                         type="button"
-                        className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                        className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
+                          workshopClaimableCount > 0 ? " is-claimable" : ""
+                        }`}
                         onClick={() => {
                           setShowQuestPanel(false);
                           setShowShopPanel(false);
@@ -6161,7 +6177,11 @@ export function ExcavatorGameWrapper({
                           setShowWorkshopPanel(true);
                           void loadWorkshopState();
                         }}
-                        aria-label={`${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기`}
+                        aria-label={
+                          workshopClaimableCount > 0
+                            ? `${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기, 완료 퀘스트 ${workshopClaimableCount}개`
+                            : `${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기`
+                        }
                       >
                         <span className="yanmar-site-prompt-hud-copy">
                           <span className="yanmar-site-prompt-hud-eyebrow">
@@ -6171,6 +6191,16 @@ export function ExcavatorGameWrapper({
                             {WORKSHOP_DEFS[nearWorkshopId].promptAction}
                           </span>
                         </span>
+                        {workshopClaimableCount > 0 ? (
+                          <span
+                            className="yanmar-quest-notify-badge is-icon"
+                            aria-hidden
+                          >
+                            {workshopClaimableCount > 9
+                              ? "9+"
+                              : workshopClaimableCount}
+                          </span>
+                        ) : null}
                       </button>
                     ) : null}
                   </div>
@@ -6275,7 +6305,11 @@ export function ExcavatorGameWrapper({
                         setShowMonumentPanel(true);
                         void loadMonumentState();
                       }}
-                      aria-label="조형물 입장"
+                      aria-label={
+                        monumentStarsClaimable
+                          ? `조형물 입장, 수령 가능 스타 ${monumentPanelState?.starsStored?.toLocaleString() ?? 0}`
+                          : "조형물 입장"
+                      }
                     >
                       <span className="yanmar-site-prompt-hud-copy">
                         <span className="yanmar-site-prompt-hud-eyebrow">
@@ -6292,6 +6326,12 @@ export function ExcavatorGameWrapper({
                                 : "조형물 입장"}
                         </span>
                       </span>
+                      {monumentStarsClaimable ? (
+                        <span
+                          className="yanmar-quest-notify-badge is-dot"
+                          aria-hidden
+                        />
+                      ) : null}
                     </button>
                     {monumentPanelState?.phase === "claimable" ? (
                       <button
@@ -6317,13 +6357,7 @@ export function ExcavatorGameWrapper({
                   <button
                     type="button"
                     className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
-                      (maintenance
-                        ? MAINTENANCE_FLUID_IDS.filter(
-                            (id) => maintenance.fluids[id].exchangeEligible,
-                          ).length
-                        : 0) > 0
-                        ? " is-claimable"
-                        : ""
+                      repairClaimableCount > 0 ? " is-claimable" : ""
                     }`}
                     onClick={() => {
                       setShowEquipmentUpgrade(false);
@@ -6331,7 +6365,11 @@ export function ExcavatorGameWrapper({
                       setShowMonumentPanel(false);
                       setShowRepairPanel(true);
                     }}
-                    aria-label="YK건기 서비스지점 열기"
+                    aria-label={
+                      repairClaimableCount > 0
+                        ? `YK건기 서비스지점 열기, 교환 가능 ${repairClaimableCount}개`
+                        : "YK건기 서비스지점 열기"
+                    }
                   >
                     <span className="yanmar-site-prompt-hud-icon-wrap">
                       <img
@@ -6340,17 +6378,6 @@ export function ExcavatorGameWrapper({
                         alt=""
                         draggable={false}
                       />
-                      {(maintenance
-                        ? MAINTENANCE_FLUID_IDS.filter(
-                            (id) => maintenance.fluids[id].exchangeEligible,
-                          ).length
-                        : 0) > 0 ? (
-                        <span className="yanmar-repair-claim-badge">
-                          {MAINTENANCE_FLUID_IDS.filter(
-                            (id) => maintenance!.fluids[id].exchangeEligible,
-                          ).length}
-                        </span>
-                      ) : null}
                     </span>
                     <span className="yanmar-site-prompt-hud-copy">
                       <span className="yanmar-site-prompt-hud-eyebrow">
@@ -6360,6 +6387,13 @@ export function ExcavatorGameWrapper({
                         서비스지점
                       </span>
                     </span>
+                    {repairClaimableCount > 0 ? (
+                      <span className="yanmar-repair-claim-badge" aria-hidden>
+                        {repairClaimableCount > 9
+                          ? "9+"
+                          : repairClaimableCount}
+                      </span>
+                    ) : null}
                   </button>
                 ) : null}
                 {nearWorkshopId &&
@@ -6368,7 +6402,9 @@ export function ExcavatorGameWrapper({
                 !nearMonument ? (
                   <button
                     type="button"
-                    className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                    className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
+                      workshopClaimableCount > 0 ? " is-claimable" : ""
+                    }`}
                     onClick={() => {
                       setShowEquipmentUpgrade(false);
                       setShowRepairPanel(false);
@@ -6376,7 +6412,11 @@ export function ExcavatorGameWrapper({
                       setShowWorkshopPanel(true);
                       void loadWorkshopState();
                     }}
-                    aria-label={`${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기`}
+                    aria-label={
+                      workshopClaimableCount > 0
+                        ? `${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기, 완료 퀘스트 ${workshopClaimableCount}개`
+                        : `${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기`
+                    }
                   >
                     <span className="yanmar-site-prompt-hud-copy">
                       <span className="yanmar-site-prompt-hud-eyebrow">
@@ -6386,6 +6426,16 @@ export function ExcavatorGameWrapper({
                         {WORKSHOP_DEFS[nearWorkshopId].promptAction}
                       </span>
                     </span>
+                    {workshopClaimableCount > 0 ? (
+                      <span
+                        className="yanmar-quest-notify-badge is-icon"
+                        aria-hidden
+                      >
+                        {workshopClaimableCount > 9
+                          ? "9+"
+                          : workshopClaimableCount}
+                      </span>
+                    ) : null}
                   </button>
                 ) : null}
               </div>

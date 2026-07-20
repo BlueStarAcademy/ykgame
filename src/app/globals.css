@@ -500,6 +500,7 @@ body {
 }
 
 .yanmar-site-prompt-hud-btn {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -2571,6 +2572,22 @@ body {
   height: 1.15rem;
   padding: 0 0.32rem;
   font-size: 0.62rem;
+  box-shadow:
+    0 0 0 1.5px rgba(15, 23, 42, 0.95),
+    0 0.1rem 0.25rem rgba(0, 0, 0, 0.45);
+}
+
+.yanmar-quest-notify-badge.is-dot {
+  position: absolute;
+  top: -0.12rem;
+  right: -0.12rem;
+  z-index: 2;
+  min-width: 0.72rem;
+  width: 0.72rem;
+  height: 0.72rem;
+  padding: 0;
+  border-radius: 999px;
+  background: #ef4444;
   box-shadow:
     0 0 0 1.5px rgba(15, 23, 42, 0.95),
     0 0.1rem 0.25rem rgba(0, 0, 0, 0.45);
@@ -10444,19 +10461,23 @@ html.pwa-mode [contenteditable="true"] {
 
 .yanmar-repair-claim-badge {
   position: absolute;
-  top: -0.25rem;
-  right: -0.3rem;
-  min-width: 1rem;
-  height: 1rem;
-  padding: 0 0.2rem;
+  top: -0.22rem;
+  right: -0.28rem;
+  z-index: 2;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.32rem;
   border-radius: 999px;
-  background: #dc2626;
+  background: #ef4444;
   color: #fff;
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   font-weight: 900;
-  line-height: 1rem;
+  line-height: 1.15rem;
   text-align: center;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 0 0 1.5px rgba(15, 23, 42, 0.95),
+    0 0.1rem 0.25rem rgba(0, 0, 0, 0.45);
+  pointer-events: none;
 }
 
 .yanmar-site-prompt-hud-btn.is-claimable {

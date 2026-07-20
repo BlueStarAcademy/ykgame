@@ -164,13 +164,19 @@ export function workshopHasClaimable(
   state: WorkshopQuestState,
   workshopId: WorkshopId,
 ): boolean {
+  return countClaimableWorkshopQuests(state, workshopId) > 0;
+}
+
+export function countClaimableWorkshopQuests(
+  state: WorkshopQuestState,
+  workshopId: WorkshopId,
+): number {
   const defs = WORKSHOP_DEFS[workshopId].quests;
-  return state.byWorkshop[workshopId].some((item) => {
+  return state.byWorkshop[workshopId].filter((item) => {
     const def = defs.find((d) => d.id === item.id);
     if (!def) return false;
-    if (def.kind === "daily") return item.completed && !item.claimed;
     return item.completed && !item.claimed;
-  });
+  }).length;
 }
 
 export function getClaimableWorkshopIds(
