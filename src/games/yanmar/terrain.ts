@@ -608,9 +608,9 @@ export function randomDigCapacityUnits() {
 export function digZoneLabel(zoneId: string, index = 0) {
   const match = zoneId.match(/(\d+)\s*$/);
   const n = match ? Number(match[1]) : index + 1;
-  if (n === 1) return "굴착 I";
-  if (n === 2) return "굴착 II";
-  return `굴착 ${n}`;
+  if (n === 1) return "흙더미 I";
+  if (n === 2) return "흙더미 II";
+  return `흙더미 ${n}`;
 }
 
 export function getDigZoneRespawnEtaSec(zone: DigZone, now = Date.now()) {

@@ -47,7 +47,7 @@ export const MONUMENT_BUILD_QUESTS: readonly MonumentBuildQuestDef[] = [
   },
   {
     id: "build-asphalt-9",
-    title: "아스팔트 9개 크래쉬",
+    title: "파쇄 9개",
     metric: "asphaltBreak",
     target: 9,
   },
@@ -76,7 +76,7 @@ export const MONUMENT_QUEST_POOL: readonly Omit<MonumentQuestDef, "id">[] = [
     kind: "daily",
   },
   {
-    title: "아스팔트 크래쉬",
+    title: "파쇄",
     metric: "asphaltBreak",
     target: 6,
     rewardPoints: 30,
@@ -125,7 +125,7 @@ export const MONUMENT_REPEAT_QUEST_POOL: readonly Omit<
     rewardPoints: 6,
   },
   {
-    title: "아스팔트 크래쉬",
+    title: "파쇄",
     metric: "asphaltBreak",
     target: 3,
     rewardPoints: 10,

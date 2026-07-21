@@ -10,9 +10,9 @@ import type { MonumentPhase } from "./monument/types";
 import type { WorldPickupsState } from "./worldPickups";
 
 const LEGEND = [
-  { label: "굴착", tone: "dig" },
+  { label: "흙더미", tone: "dig" },
   { label: "하역", tone: "dump" },
-  { label: "철거", tone: "crash" },
+  { label: "파쇄", tone: "crash" },
   { label: "석재", tone: "hill" },
   { label: "정비", tone: "repair" },
   { label: "조형", tone: "monument" },

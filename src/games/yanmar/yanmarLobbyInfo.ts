@@ -25,7 +25,7 @@ export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSection[] = [
       },
       {
         label: "튜토리얼",
-        desc: "주행 → 스윙 → 암 → 붐 → 버켓 → 굴착 → 하역 → 브레이커 → 돌 적재 → 돌 하역 순으로 단계별 학습합니다.",
+        desc: "주행 → 스윙 → 암 → 붐 → 버켓 → 흙더미 → 하역 → 브레이커 → 돌 적재 → 돌 하역 순으로 단계별 학습합니다.",
       },
       {
         label: "탑승 체험",
@@ -67,12 +67,12 @@ export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSection[] = [
     intro: "구역에 맞는 부착물을 장착해야 작업할 수 있습니다. 버켓에 흙이 남아 있으면 부착물을 바꿀 수 없습니다.",
     items: [
       {
-        label: "버켓 · 굴착/하역",
-        desc: "주황 구역에서 흙을 담고, 덤프 트럭에 하역합니다.",
+        label: "버켓 · 흙더미/하역",
+        desc: "주황 흙더미 구역에서 흙을 담고, 덤프 트럭에 하역합니다.",
       },
       {
         label: "브레이커 · 파쇄",
-        desc: "아스팔트 구역에서 타일을 깨뜨립니다. 깨진 타일은 일정 시간 후 재생됩니다.",
+        desc: "파쇄 구역에서 노면 타일을 깨뜨립니다. 깨진 타일은 일정 시간 후 재생됩니다.",
       },
       {
         label: "집게 · 석재",
@@ -89,7 +89,7 @@ export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSection[] = [
         desc: "적재량 단위마다 점수와 스타(1~3)를 받습니다. 크리티컬이 나면 점수가 배율로 오릅니다.",
       },
       {
-        label: "아스팔트 파쇄",
+        label: "파쇄",
         desc: "타일당 점수·스타(5~15)·경험치를 받습니다.",
       },
       {
@@ -112,11 +112,11 @@ export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSection[] = [
     items: [
       {
         label: "1단계 (Lv.1~)",
-        desc: "굴착·하역 구역을 이용합니다.",
+        desc: "흙더미·하역 구역을 이용합니다.",
       },
       {
         label: "2단계 (Lv.10~)",
-        desc: "브레이커·아스팔트 구역과 관련 퀘스트가 해금됩니다.",
+        desc: "브레이커·파쇄 구역과 관련 퀘스트가 해금됩니다.",
       },
       {
         label: "3단계 (Lv.15~)",
@@ -163,7 +163,7 @@ export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSection[] = [
     items: [
       {
         label: "작업장",
-        desc: "덤프·파쇄·석재 작업장에서 포인트를 모아 업그레이드하고, 티켓·코어 등을 구매합니다.",
+        desc: "흙더미·파쇄·석재 작업장에서 포인트를 모아 업그레이드하고, 티켓·코어 등을 구매합니다.",
       },
       {
         label: "상점 버프",
@@ -180,7 +180,7 @@ export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSection[] = [
       },
       {
         label: "속도 버프",
-        desc: "필드 속도 아이템을 주우면 약 30초간 이동속도가 2배가 됩니다. 약 10분마다 등장하며 시간당 최대 5회.",
+        desc: "필드 속도 아이템을 주우면 약 30초간 이동속도가 2배가 됩니다. 약 3분마다 등장하며 시간당 최대 10회.",
       },
       {
         label: "정비 텐트",

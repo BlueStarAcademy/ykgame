@@ -486,7 +486,7 @@ function CrashAsphaltHpPanel({
     <div className="relative w-[8.25rem] rounded-xl border border-white/20 bg-black/55 px-2 py-1.5 shadow-lg backdrop-blur-sm">
       <div className="flex items-center justify-between gap-1">
         <span className="text-[8px] font-black uppercase tracking-[0.12em] text-white/70">
-          아스팔트
+          파쇄
         </span>
         <span className="text-[9px] font-black tabular-nums text-white">
           ({Math.round(hp).toLocaleString()}
@@ -834,8 +834,8 @@ function AttachmentUnlockOverlay({
               <li>
                 <span className="yanmar-unlock-perk-index">02</span>
                 <div>
-                  <strong>아스팔트 9개 크래쉬</strong>
-                  <span>브레이커로 아스팔트를 부수세요</span>
+                  <strong>파쇄 9개</strong>
+                  <span>브레이커로 노면을 파쇄하세요</span>
                 </div>
               </li>
               <li>
@@ -862,7 +862,7 @@ function AttachmentUnlockOverlay({
   const breaker = unlock === "BREAKER";
   const level = breaker ? 10 : 15;
   const attachmentLabel = breaker ? "브레이커" : "집게";
-  const zoneLabel = breaker ? "Crash 철거 작업장" : "Hill 운반 작업장";
+  const zoneLabel = breaker ? "파쇄 작업장" : "석재 운반 작업장";
   const machineSrc = breaker
     ? "/images/yanmar/2d/excavator-side-diagram-breaker.png"
     : "/images/yanmar/2d/excavator-side-diagram-grapple.png";
@@ -6854,7 +6854,7 @@ export function ExcavatorGameWrapper({
                   ))}
                   {digFeedback.crashCooldownEtaSec > 0 ? (
                     <li className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85">
-                      <span className="truncate">아스팔트</span>
+                      <span className="truncate">파쇄</span>
                       <span className="shrink-0 tabular-nums text-orange-200">
                         {formatDumpTruckReturnTime(
                           digFeedback.crashCooldownEtaSec,

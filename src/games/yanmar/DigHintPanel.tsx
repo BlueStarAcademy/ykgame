@@ -40,7 +40,7 @@ export function DigHintContent({
   const steps = [
     {
       ok: feedback.inDigZone,
-      label: feedback.inDigZone ? "주황 굴착 구역 안" : "주행·스윙으로 주황 구역 이동",
+      label: feedback.inDigZone ? "주황 흙더미 구역 안" : "주행·스윙으로 주황 구역 이동",
     },
     {
       ok: feedback.bucketOpenReady,
@@ -83,7 +83,7 @@ export function DigHintContent({
 
   return (
     <div className={compact ? "text-white" : "rounded-lg bg-black/70 px-2 py-1.5 text-white"}>
-      <p className="text-[10px] font-bold text-orange-300">굴착 방법</p>
+      <p className="text-[10px] font-bold text-orange-300">흙더미 작업</p>
       <p className="mt-0.5 text-[8px] text-white/50">
         우레버 앞=붐↓ · 뒤=붐↑ · 좌=버켓말기
       </p>

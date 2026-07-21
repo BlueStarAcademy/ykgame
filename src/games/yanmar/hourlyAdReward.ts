@@ -76,7 +76,7 @@ export const HOURLY_AD_REWARD_POOL: readonly HourlyAdRewardPoolEntry[] = [
   },
   {
     kind: "crashPoints",
-    label: "아스팔트 작업장 포인트",
+    label: "파쇄 작업장 포인트",
     icon: "/images/yanmar/2d/workshop-coin-crash.svg",
     fixedAmount: null,
     min: 100,

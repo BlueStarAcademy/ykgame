@@ -91,7 +91,7 @@ export function getGameProbabilityReport() {
           label: "기본 획득 판정",
           value: pct(WORK_GEAR_DROP_BASE_CHANCE),
           detail:
-            "흙 하역 / 아스팔트 제거 / 돌 하역 / 트럭 만재 시 독립 판정 · 마스터 옵션 보유 시 상대 +10%",
+            "흙 하역 / 파쇄 / 돌 하역 / 트럭 만재 시 독립 판정 · 마스터 옵션 보유 시 상대 +10%",
         },
         {
           label: "등급 확률 (성공 시)",
@@ -253,7 +253,7 @@ export function getGameProbabilityReport() {
     },
     {
       label: "적용 구역",
-      value: "흙 하역 · 아스팔트 파괴 · 돌 트럭 적재/하역",
+      value: "흙 하역 · 파쇄 · 돌 트럭 적재/하역",
       detail: "dump / crash / hill 보상 API 공통 드롭 모델",
     },
   ];
@@ -291,7 +291,7 @@ export function getGameProbabilityReport() {
           items: sharedDropRewardItems,
         },
         {
-          title: "Crash 아스팔트 파괴 보상 (타일 1개)",
+          title: "파쇄 보상 (타일 1개)",
           items: [
             {
               label: "기본 점수",
@@ -315,7 +315,7 @@ export function getGameProbabilityReport() {
             {
               label: "구역 재생성",
               value: "9칸 전부 파괴 후 5분",
-              detail: "같은 자리에 아스팔트 9칸 일괄 리젠",
+              detail: "같은 자리에 파쇄 타일 9칸 일괄 리젠",
             },
           ],
         },

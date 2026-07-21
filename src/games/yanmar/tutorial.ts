@@ -109,7 +109,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: "dig",
-    title: "6. 굴착",
+    title: "6. 흙더미",
     instruction: "흙을 버켓에 100%까지 적재합니다",
     highlight: "both",
     allowed: { ...ALL_CONTROLS },
@@ -124,7 +124,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "breaker",
     title: "8. 브레이커",
-    instruction: "아스팔트에 대고 발판을 유지해 깨뜨립니다",
+    instruction: "파쇄 구역에 대고 발판을 유지해 깨뜨립니다",
     highlight: "breaker",
     allowed: { ...ALL_CONTROLS },
     startAttachment: "breaker",
@@ -250,8 +250,8 @@ export function getTutorialInstruction(
         : "트럭에서 비켜나면 트럭이 출발합니다 — 출발할 때까지 확인";
     case "breaker":
       return progress.phase === 0
-        ? "Crash 구역에서 브레이커 팁을 아스팔트에 수직에 가깝게 대세요"
-        : "하이라이트된 발판을 클릭한 채 유지 — 아스팔트가 깨질 때까지";
+        ? "파쇄 구역에서 브레이커 팁을 노면에 수직에 가깝게 대세요"
+        : "하이라이트된 발판을 클릭한 채 유지 — 파쇄가 끝날 때까지";
     case "rockLoad":
       switch (progress.phase) {
         case 0:
@@ -331,7 +331,7 @@ export function getTutorialPhaseSuccessLabel(
     case "dump":
       return completedPhase === 0 ? "하역 성공!" : "트럭 출발 확인!";
     case "breaker":
-      return completedPhase === 0 ? "접촉 성공!" : "아스팔트 파괴 성공!";
+      return completedPhase === 0 ? "접촉 성공!" : "파쇄 성공!";
     case "rockLoad":
       return (
         ["돌 집기 성공!", "밀착감 최대!", "적재 판정 확인!"][completedPhase] ??

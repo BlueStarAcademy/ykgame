@@ -23,7 +23,7 @@ function taskKindLabel(kind: string) {
     case "soilDump":
       return "흙 하역";
     case "asphaltBreak":
-      return "아스팔트 크래쉬";
+      return "파쇄";
     case "rockLoad":
       return "돌 적재 성공";
     case "horn":
@@ -198,12 +198,12 @@ export function getQuestAdminReport() {
           {
             label: "레벨 10~14",
             value: `최대 D${getMissionMaxDifficulty("lv10")} · 선택 ${getMissionOptionalCount("lv10")}개`,
-            detail: "흙 하역·아스팔트 필수 + 선택 2개",
+            detail: "흙 하역·파쇄 필수 + 선택 2개",
           },
           {
             label: "레벨 15+",
             value: `최대 D${getMissionMaxDifficulty("lv15")} · 선택 ${getMissionOptionalCount("lv15")}개`,
-            detail: "흙 하역·아스팔트·돌 적재 필수 + 선택 2개",
+            detail: "흙 하역·파쇄·돌 적재 필수 + 선택 2개",
           },
         ],
       },

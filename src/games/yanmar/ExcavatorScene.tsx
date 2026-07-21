@@ -2355,9 +2355,9 @@ const GROUND_PAINT_LIFT = 0.055;
 type NavGuideLabel = "DIG" | "DUMP" | "CRASH" | "STONE";
 
 const NAV_GUIDE_LABELS: Record<NavGuideLabel, string> = {
-  DIG: "굴착",
+  DIG: "흙더미",
   DUMP: "하역",
-  CRASH: "철거",
+  CRASH: "파쇄",
   STONE: "석재",
 };
 

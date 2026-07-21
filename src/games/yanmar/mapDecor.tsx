@@ -620,7 +620,8 @@ function PremiumSiteInfrastructure({
       ) : null}
       {terrain.mapTier >= 3 ? (
         <KoreanSafetySign
-          position={[7, 2.05, 83]}
+          position={[20, 2.05, 64]}
+          rotation={Math.PI * 0.35}
           title="석재 운반 작업구역"
         />
       ) : null}

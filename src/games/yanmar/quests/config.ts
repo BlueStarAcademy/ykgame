@@ -25,7 +25,7 @@ export const REPEAT_QUEST_DEFS: readonly RepeatQuestDef[] = [
   },
   {
     id: "repeat-asphalt-10",
-    title: "아스팔트 부수기 10개",
+    title: "파쇄하기 10개",
     metric: "asphaltBreak",
     target: 10,
     minLevel: 10,
@@ -92,7 +92,7 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
   },
   {
     id: "daily-asphalt-9",
-    title: (t) => `아스팔트 부수기 ${t}회`,
+    title: (t) => `파쇄하기 ${t}회`,
     metric: "asphaltBreak",
     target: 9,
     minLevel: 10,
@@ -241,7 +241,7 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
     {
       kind: "asphaltBreak",
       metric: "asphaltBreak",
-      label: (t) => `아스팔트 크래쉬 ${t}개`,
+      label: (t) => `파쇄 ${t}개`,
       min: 3,
       max: 5,
       required: true,
@@ -283,7 +283,7 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
     {
       kind: "asphaltBreak",
       metric: "asphaltBreak",
-      label: (t) => `아스팔트 크래쉬 ${t}개`,
+      label: (t) => `파쇄 ${t}개`,
       min: 3,
       max: 5,
       required: true,

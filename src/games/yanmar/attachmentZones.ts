@@ -48,7 +48,7 @@ function objectParticle(label: string): "을" | "를" {
 }
 
 const ZONE_LABELS: Record<Exclude<SiteZoneKind, "neutral">, string> = {
-  dig: "굴착",
+  dig: "흙더미",
   crash: "파쇄",
   hill: "석재",
   dump: "하역",

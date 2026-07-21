@@ -195,7 +195,7 @@ export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
       {
         id: "crash-daily-asphalt-9",
         kind: "daily",
-        title: "아스팔트 9개 파괴",
+        title: "파쇄 9개",
         metric: "asphaltBreak",
         target: 9,
         rewardPoints: 40,
@@ -203,7 +203,7 @@ export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
       {
         id: "crash-daily-asphalt-18",
         kind: "daily",
-        title: "아스팔트 18개 파괴",
+        title: "파쇄 18개",
         metric: "asphaltBreak",
         target: 18,
         rewardPoints: 30,
@@ -211,7 +211,7 @@ export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
       {
         id: "crash-repeat-asphalt-3",
         kind: "repeat",
-        title: "아스팔트 3개 파괴",
+        title: "파쇄 3개",
         metric: "asphaltBreak",
         target: 3,
         rewardPoints: 12,
@@ -219,7 +219,7 @@ export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
       {
         id: "crash-repeat-asphalt-6",
         kind: "repeat",
-        title: "아스팔트 6개 파괴",
+        title: "파쇄 6개",
         metric: "asphaltBreak",
         target: 6,
         rewardPoints: 18,
@@ -233,11 +233,11 @@ export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
     pointsIcon: "/images/yanmar/2d/workshop-coin-hill.svg",
     minMapTier: 3,
     sign: {
-      // Keep clear of the haul-truck ↔ stone-zone dump path (truck is SE at 42,100).
-      x: SITE_LAYOUT.hill[0] - 18,
-      z: SITE_LAYOUT.hill[1] + 10,
+      // Hill road (10,34)→(42,100): inner (west) side toward stone zone (22,112).
+      x: 26,
+      z: 78,
       radius: 18,
-      rotationY: Math.PI * 0.65,
+      rotationY: Math.PI * 0.35,
     },
     promptTitle: "돌 하역장",
     promptAction: "관리하기",

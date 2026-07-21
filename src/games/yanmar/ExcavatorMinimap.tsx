@@ -543,9 +543,9 @@ export function ExcavatorMinimap({
   if (!visible) return null;
 
   const legendItems = [
-    { label: "굴착", swatch: "bg-amber-400 ring-1 ring-amber-200/80" },
+    { label: "흙더미", swatch: "bg-amber-400 ring-1 ring-amber-200/80" },
     { label: "하역", swatch: "bg-emerald-400 ring-1 ring-emerald-200/70" },
-    { label: "철거", swatch: "bg-amber-500 ring-1 ring-yellow-300/70" },
+    { label: "파쇄", swatch: "bg-amber-500 ring-1 ring-yellow-300/70" },
     { label: "석재", swatch: "bg-slate-300 ring-1 ring-slate-100/70" },
     { label: "정비", swatch: "bg-amber-200 ring-1 ring-yellow-100/80" },
     { label: "조형", swatch: "bg-amber-200 ring-1 ring-yellow-100/90" },
