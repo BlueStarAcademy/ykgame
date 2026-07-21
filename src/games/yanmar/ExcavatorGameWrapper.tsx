@@ -2882,7 +2882,11 @@ export function ExcavatorGameWrapper({
   );
 
   const runGearAction = useCallback(
-    async (action: string, itemId: string) => {
+    async (
+      action: string,
+      itemId: string,
+      opts?: { deferApply?: boolean },
+    ) => {
       setGearBusy(true);
       try {
         const res = await fetch("/api/gear/yanmar/action", {
@@ -2892,22 +2896,43 @@ export function ExcavatorGameWrapper({
         });
         const data = await res.json();
         if (!res.ok) return null;
-        if (data.stats) {
-          publishEquipmentStats(data.stats);
+        if (!opts?.deferApply) {
+          if (data.stats) {
+            publishEquipmentStats(data.stats);
+          }
+          if (typeof data.currency === "number") {
+            currencyRef.current = data.currency;
+            setCurrency(data.currency);
+            setPreviewStars(data.currency);
+          }
+          if (typeof data.enhanceCores === "number") {
+            setEnhanceCores(data.enhanceCores);
+          }
+          await loadEquipment();
         }
-        if (typeof data.currency === "number") {
-          currencyRef.current = data.currency;
-          setCurrency(data.currency);
-          setPreviewStars(data.currency);
-        }
-        if (typeof data.enhanceCores === "number") {
-          setEnhanceCores(data.enhanceCores);
-        }
-        await loadEquipment();
         return data as Record<string, unknown>;
       } finally {
         setGearBusy(false);
       }
+    },
+    [loadEquipment, publishEquipmentStats],
+  );
+
+  const applyGearActionResult = useCallback(
+    async (data: Record<string, unknown> | null | undefined) => {
+      if (!data) return;
+      if (data.stats) {
+        publishEquipmentStats(data.stats);
+      }
+      if (typeof data.currency === "number") {
+        currencyRef.current = data.currency;
+        setCurrency(data.currency);
+        setPreviewStars(data.currency);
+      }
+      if (typeof data.enhanceCores === "number") {
+        setEnhanceCores(data.enhanceCores);
+      }
+      await loadEquipment();
     },
     [loadEquipment, publishEquipmentStats],
   );
@@ -5884,7 +5909,12 @@ export function ExcavatorGameWrapper({
           equipmentStats={equipmentStats}
           onEquip={(id) => void runGearAction("equip", id)}
           onUnequip={(id) => void runGearAction("unequip", id)}
-          onEnhance={(id) => runGearAction("enhance", id)}
+          onEnhance={(id) =>
+            runGearAction("enhance", id, { deferApply: true })
+          }
+          onApplyEnhanceResult={(result) =>
+            applyGearActionResult(result as Record<string, unknown>)
+          }
           onDismantle={async (id) => {
             const data = await runGearAction("dismantle", id);
             if (!data || typeof data.cores !== "number") return null;

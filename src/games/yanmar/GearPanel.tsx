@@ -143,6 +143,10 @@ interface GearPanelProps {
   onEnhance: (
     itemId: string,
   ) => Promise<EnhanceActionResult | null | void> | EnhanceActionResult | null | void;
+  /** Apply enhance side-effects (inventory/currency) after the reveal animation. */
+  onApplyEnhanceResult?: (
+    result: EnhanceActionResult,
+  ) => void | Promise<void>;
   onDismantle: (
     itemId: string,
   ) =>
@@ -382,6 +386,7 @@ export function GearPanel({
   onEquip,
   onUnequip,
   onEnhance,
+  onApplyEnhanceResult,
   onDismantle,
   onSell,
   onSynthesize,
@@ -403,6 +408,8 @@ export function GearPanel({
   const [enhanceProgress, setEnhanceProgress] = useState(0);
   const [enhanceResult, setEnhanceResult] =
     useState<EnhanceActionResult | null>(null);
+  const [enhanceFreezeItem, setEnhanceFreezeItem] =
+    useState<GearPanelItem | null>(null);
   const [pendingDismantleId, setPendingDismantleId] = useState<string | null>(
     null,
   );
@@ -532,6 +539,7 @@ export function GearPanel({
       setEnhancePhase("idle");
       setEnhanceResult(null);
       setEnhanceProgress(0);
+      setEnhanceFreezeItem(null);
       setSynthOpen(false);
       setSynthGrade(null);
       setSynthSlots([null, null, null]);
@@ -553,6 +561,10 @@ export function GearPanel({
   const enhanceItem = enhanceItemId
     ? (items.find((i) => i.id === enhanceItemId) ?? null)
     : null;
+  const enhanceViewItem =
+    enhancePhase !== "idle" && enhanceFreezeItem
+      ? enhanceFreezeItem
+      : enhanceItem;
   const pendingDismantle = pendingDismantleId
     ? (items.find((i) => i.id === pendingDismantleId) ?? null)
     : null;
@@ -663,6 +675,7 @@ export function GearPanel({
     setEnhancePhase("idle");
     setEnhanceResult(null);
     setEnhanceProgress(0);
+    setEnhanceFreezeItem(null);
   };
   const closeDismantleConfirm = () => setPendingDismantleId(null);
   const closeDismantleResult = () => setDismantleResult(null);
@@ -769,6 +782,9 @@ export function GearPanel({
     setBubble(null);
     setFilterOpen(false);
     setEnhanceItemId(null);
+    setEnhancePhase("idle");
+    setEnhanceResult(null);
+    setEnhanceFreezeItem(null);
     setPendingDismantleId(null);
     setPendingSellId(null);
     setSynthOpen(false);
@@ -1012,11 +1028,13 @@ export function GearPanel({
     setEnhancePhase("idle");
     setEnhanceResult(null);
     setEnhanceProgress(0);
+    setEnhanceFreezeItem(null);
   };
 
   const runEnhanceAttempt = async () => {
     if (!enhanceItem || enhanceNextCost == null || !canAffordEnhance) return;
     if (enhancePhase !== "idle") return;
+    setEnhanceFreezeItem(enhanceItem);
     setEnhancePhase("progress");
     setEnhanceProgress(0);
     setEnhanceResult(null);
@@ -1061,10 +1079,18 @@ export function GearPanel({
     if (!result || typeof result.success !== "boolean") {
       setEnhancePhase("idle");
       setEnhanceProgress(0);
+      setEnhanceFreezeItem(null);
       if (fill) {
         fill.style.transform = "scaleX(0)";
       }
       return;
+    }
+
+    // Reveal only after the progress animation finishes.
+    try {
+      await onApplyEnhanceResult?.(result);
+    } catch {
+      /* keep showing result even if refresh fails */
     }
     yanmarAudio.playEnhanceResult(result.success);
     setEnhanceResult(result);
@@ -1630,7 +1656,7 @@ export function GearPanel({
         </div>
       ) : null}
 
-      {enhanceItem ? (
+      {enhanceItem || enhanceFreezeItem ? (
         <div className="yanmar-gear-enhance-layer">
           <button
             type="button"
@@ -1668,51 +1694,53 @@ export function GearPanel({
                 </button>
               </div>
             </div>
-            <div
-              className={`yanmar-gear-mgr-detail${
-                enhancePhase === "progress"
-                  ? " yanmar-gear-enhance-pulse"
-                  : ""
-              }`}
-            >
-              <GearIconCell
-                slot={enhanceItem.slot}
-                grade={enhanceItem.grade}
-                enhanceLevel={enhanceItem.enhanceLevel}
-                size="md"
-                equipped={!!enhanceItem.equippedSlot}
-              />
-              <div className="yanmar-gear-mgr-detail-meta">
-                <p
-                  className={`yanmar-gear-mgr-name ${gradeTextClass(
-                    enhanceItem.grade,
-                  )}`}
-                >
-                  {enhanceItem.nameSnapshot}
-                  {enhanceItem.enhanceLevel > 0
-                    ? ` +${enhanceItem.enhanceLevel}`
-                    : ""}
-                </p>
-                <p
-                  className={`yanmar-gear-mgr-grade ${gradeTextClass(
-                    enhanceItem.grade,
-                  )}`}
-                >
-                  [{ITEM_GRADE_LABEL[enhanceItem.grade]}] ·{" "}
-                  {GEAR_SLOT_LABEL[enhanceItem.slot]}
-                  {" · "}
-                  <EquipLevelText
-                    grade={enhanceItem.grade}
-                    playerLevel={playerLevel}
-                  />
-                </p>
-                <p className="yanmar-gear-mgr-main">
-                  <span className="yanmar-gear-mgr-attr-main">
-                    {formatMain(enhanceItem)}
-                  </span>
-                </p>
+            {enhanceViewItem ? (
+              <div
+                className={`yanmar-gear-mgr-detail${
+                  enhancePhase === "progress"
+                    ? " yanmar-gear-enhance-pulse"
+                    : ""
+                }`}
+              >
+                <GearIconCell
+                  slot={enhanceViewItem.slot}
+                  grade={enhanceViewItem.grade}
+                  enhanceLevel={enhanceViewItem.enhanceLevel}
+                  size="md"
+                  equipped={!!enhanceViewItem.equippedSlot}
+                />
+                <div className="yanmar-gear-mgr-detail-meta">
+                  <p
+                    className={`yanmar-gear-mgr-name ${gradeTextClass(
+                      enhanceViewItem.grade,
+                    )}`}
+                  >
+                    {enhanceViewItem.nameSnapshot}
+                    {enhanceViewItem.enhanceLevel > 0
+                      ? ` +${enhanceViewItem.enhanceLevel}`
+                      : ""}
+                  </p>
+                  <p
+                    className={`yanmar-gear-mgr-grade ${gradeTextClass(
+                      enhanceViewItem.grade,
+                    )}`}
+                  >
+                    [{ITEM_GRADE_LABEL[enhanceViewItem.grade]}] ·{" "}
+                    {GEAR_SLOT_LABEL[enhanceViewItem.slot]}
+                    {" · "}
+                    <EquipLevelText
+                      grade={enhanceViewItem.grade}
+                      playerLevel={playerLevel}
+                    />
+                  </p>
+                  <p className="yanmar-gear-mgr-main">
+                    <span className="yanmar-gear-mgr-attr-main">
+                      {formatMain(enhanceViewItem)}
+                    </span>
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : null}
 
             {enhancePhase === "result" && enhanceResult ? (
               <div className="yanmar-gear-enhance-result">
@@ -1734,7 +1762,11 @@ export function GearPanel({
                     <ul className="yanmar-gear-enhance-result-stats">
                       <li>
                         <strong>
-                          {MAIN_OPTION_BY_SLOT[enhanceItem.slot].label}
+                          {
+                            MAIN_OPTION_BY_SLOT[
+                              (enhanceViewItem ?? enhanceItem)!.slot
+                            ].label
+                          }
                         </strong>
                         <span>
                           +{Math.round(enhanceResult.before.mainOption.value)} → +
@@ -1849,7 +1881,7 @@ export function GearPanel({
                   />
                 </div>
               </div>
-            ) : enhanceNextCost == null ? (
+            ) : !enhanceItem || enhanceNextCost == null ? (
               <p className="yanmar-gear-enhance-max">최대 강화에 도달했습니다.</p>
             ) : (
               <div className="yanmar-gear-enhance-panels">
@@ -1940,7 +1972,7 @@ export function GearPanel({
               </div>
             )}
 
-            {enhancePhase === "idle" ? (
+            {enhancePhase === "idle" && enhanceItem ? (
               <div className="yanmar-gear-enhance-actions">
                 <button
                   type="button"
