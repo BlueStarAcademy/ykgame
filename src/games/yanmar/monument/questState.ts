@@ -151,6 +151,18 @@ export function createMonumentQuestState(ownerId: string): MonumentQuestState {
   };
 }
 
+function trimRepeatQuests(state: MonumentQuestState): MonumentQuestState {
+  if (state.repeat.length <= MONUMENT_REPEAT_ACTIVE_COUNT) return state;
+  const kept = state.repeat.slice(0, MONUMENT_REPEAT_ACTIVE_COUNT);
+  const keptIds = new Set(kept.map((q) => q.id));
+  const repeatProgress: Record<string, MonumentQuestProgressItem> = {};
+  for (const id of keptIds) {
+    const item = state.repeatProgress[id];
+    if (item) repeatProgress[id] = item;
+  }
+  return { ...state, repeat: kept, repeatProgress };
+}
+
 function normalizeMonumentQuestState(
   parsed: MonumentQuestState,
   ownerId: string,
@@ -170,7 +182,7 @@ function normalizeMonumentQuestState(
   }
 
   parsed.ownerId = ownerId;
-  return parsed;
+  return trimRepeatQuests(parsed);
 }
 
 export function loadMonumentQuestState(ownerId: string): MonumentQuestState {
@@ -178,12 +190,13 @@ export function loadMonumentQuestState(ownerId: string): MonumentQuestState {
   try {
     const raw = window.localStorage.getItem(storageKey(ownerId));
     if (!raw) return createMonumentQuestState(ownerId);
-    const parsed = normalizeMonumentQuestState(
-      JSON.parse(raw) as MonumentQuestState,
-      ownerId,
-    );
+    const before = JSON.parse(raw) as MonumentQuestState;
+    const parsed = normalizeMonumentQuestState(before, ownerId);
     if (!parsed || parsed.ownerId !== ownerId) {
       return createMonumentQuestState(ownerId);
+    }
+    if ((before.repeat?.length ?? 0) > MONUMENT_REPEAT_ACTIVE_COUNT) {
+      saveMonumentQuestState(parsed);
     }
     return parsed;
   } catch {
@@ -229,12 +242,13 @@ export function ensureMonumentQuestsForPhase(
   if (phase !== "active") return state;
   if (!state.activeDayKey) return activateMonumentQuests(state);
 
+  const trimmed = trimRepeatQuests(state);
   const today = dayKeyKst();
-  if (state.dayKey === today) return state;
+  if (trimmed.dayKey === today) return trimmed;
 
-  const daily = rollDailyQuests(today, state.ownerId);
+  const daily = rollDailyQuests(today, trimmed.ownerId);
   return {
-    ...state,
+    ...trimmed,
     dayKey: today,
     daily,
     dailyProgress: emptyDailyProgress(daily),

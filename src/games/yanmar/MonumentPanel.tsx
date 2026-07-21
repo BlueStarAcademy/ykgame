@@ -210,111 +210,93 @@ export function MonumentPanel({
       panelClassName="!max-w-[min(96vw,26rem)] !overflow-hidden landscape:!max-h-[min(94dvh,32rem)]"
     >
       <div className="yanmar-workshop-panel flex h-[min(88dvh,36rem)] w-full flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md landscape:h-[min(92dvh,26rem)]">
-        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-black tracking-tight">YK 조형물</h2>
-            <p className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold text-amber-200">
-              <span className="text-stone-400">조형물 포인트</span>
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+          <h2 className="min-w-0 flex-1 truncate text-lg font-black tracking-tight">
+            YK 조형물
+          </h2>
+          <div className="flex shrink-0 items-center gap-2">
+            <div
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-sm font-black text-amber-100 shadow-inner"
+              title="조형물 포인트"
+            >
               <PointsAmount value={panelState.points} size={20} />
-            </p>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 rounded-lg px-2 py-1 text-sm text-stone-300 hover:bg-white/10"
+              onClick={onClose}
+            >
+              닫기
+            </button>
           </div>
-          <button
-            type="button"
-            className="shrink-0 rounded-lg px-2 py-1 text-sm text-stone-300 hover:bg-white/10"
-            onClick={onClose}
-          >
-            닫기
-          </button>
         </header>
 
         {showManage ? (
-          <div className="shrink-0 border-b border-white/10 px-3 pb-2.5 pt-2.5">
-            <div className="relative overflow-hidden rounded-2xl border border-amber-300/30 bg-gradient-to-br from-amber-500/18 via-[#241c14]/96 to-[#12161d] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
-              <div
-                className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-amber-300/12 blur-3xl"
-                aria-hidden
-              />
-              <div className="relative flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="inline-flex items-center gap-1.5 text-[1.65rem] font-black leading-none tracking-tight tabular-nums text-amber-50">
-                      <img
-                        src="/images/star-currency.svg"
-                        alt=""
-                        width={26}
-                        height={26}
-                        className="yanmar-score-panel-star shrink-0"
-                        draggable={false}
-                      />
-                      {starsStored.toLocaleString()}
+          <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline gap-1.5">
+                <span className="inline-flex items-center gap-1 text-sm font-black tabular-nums text-amber-100">
+                  <img
+                    src="/images/star-currency.svg"
+                    alt=""
+                    width={16}
+                    height={16}
+                    className="yanmar-score-panel-star shrink-0"
+                    draggable={false}
+                  />
+                  {starsStored.toLocaleString()}
+                </span>
+                <span className="text-[11px] font-semibold tabular-nums text-stone-400">
+                  / {storageCap.toLocaleString()}
+                </span>
+                {!storageFull ? (
+                  <span className="truncate text-[10px] font-semibold text-stone-400">
+                    · 다음{" "}
+                    <span className="tabular-nums text-amber-100/90">
+                      {formatUpgradeRemaining(nextProdRemainingMs)}
                     </span>
-                    <span className="text-xs font-semibold tabular-nums text-stone-400">
-                      / {storageCap.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-black/40">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-amber-500 via-amber-300 to-yellow-200 transition-[width] duration-500"
-                      style={{ width: `${storagePct}%` }}
-                    />
-                  </div>
-                  <div className="mt-2 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10px] font-semibold tracking-wide text-stone-300">
-                    {storageFull ? (
-                      <span className="truncate text-amber-200/90">
-                        저장이 가득 찼습니다
-                      </span>
-                    ) : (
-                      <>
-                        <span className="shrink-0 text-stone-400">다음 생산</span>
-                        <span className="shrink-0 tabular-nums text-amber-100">
-                          {formatUpgradeRemaining(nextProdRemainingMs)}
-                        </span>
-                        <span className="shrink-0 text-stone-600" aria-hidden>
-                          ·
-                        </span>
-                        <span className="inline-flex min-w-0 items-center gap-0.5 truncate tabular-nums text-stone-400">
-                          <img
-                            src="/images/star-currency.svg"
-                            alt=""
-                            width={11}
-                            height={11}
-                            className="yanmar-score-panel-star shrink-0"
-                            draggable={false}
-                          />
-                          {MONUMENT_STARS_PER_TICK}/
-                          {intervalMs >= 60_000
-                            ? `${Math.round(intervalMs / 60_000)}분`
-                            : `${Math.round(intervalMs / 1000)}초`}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={busy || !canClaimStars || !onClaimStars}
-                  onClick={() => void onClaimStars?.()}
-                  className="inline-flex shrink-0 items-center justify-center gap-1 rounded-xl border border-amber-200/45 bg-gradient-to-b from-amber-200 to-amber-500 px-3.5 py-2.5 text-sm font-black text-[#3b2208] shadow-[0_8px_18px_rgba(245,158,11,0.26)] transition enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-none disabled:bg-white/10 disabled:text-stone-500 disabled:shadow-none"
-                >
-                  {canClaimStars ? (
-                    <>
-                      수령
-                      <img
-                        src="/images/star-currency.svg"
-                        alt=""
-                        width={14}
-                        height={14}
-                        className="yanmar-score-panel-star shrink-0"
-                        draggable={false}
-                      />
-                      {starsStored.toLocaleString()}
-                    </>
-                  ) : (
-                    "수령"
-                  )}
-                </button>
+                    {" · "}
+                    {MONUMENT_STARS_PER_TICK}/
+                    {intervalMs >= 60_000
+                      ? `${Math.round(intervalMs / 60_000)}분`
+                      : `${Math.round(intervalMs / 1000)}초`}
+                  </span>
+                ) : (
+                  <span className="truncate text-[10px] font-semibold text-amber-200/90">
+                    · 저장 가득 참
+                  </span>
+                )}
+              </div>
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-black/40">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-500 via-amber-300 to-yellow-200 transition-[width] duration-500"
+                  style={{ width: `${storagePct}%` }}
+                />
               </div>
             </div>
+            <button
+              type="button"
+              disabled={busy || !canClaimStars || !onClaimStars}
+              onClick={() => void onClaimStars?.()}
+              className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-amber-200/45 bg-gradient-to-b from-amber-200 to-amber-500 px-2.5 py-1.5 text-xs font-black text-[#3b2208] transition enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-none disabled:bg-white/10 disabled:text-stone-500"
+            >
+              {canClaimStars ? (
+                <>
+                  수령
+                  <img
+                    src="/images/star-currency.svg"
+                    alt=""
+                    width={12}
+                    height={12}
+                    className="yanmar-score-panel-star shrink-0"
+                    draggable={false}
+                  />
+                  {starsStored.toLocaleString()}
+                </>
+              ) : (
+                "수령"
+              )}
+            </button>
           </div>
         ) : null}
 
@@ -433,11 +415,7 @@ export function MonumentPanel({
           ) : null}
 
           {showManage && tab === "quest" ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-stone-400">
-                일일 퀘스트
-              </p>
-              <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-2">
               {(questState?.daily ?? []).map((q) => {
                 const item = questState?.dailyProgress[q.id] ?? {
                   id: q.id,
@@ -456,7 +434,7 @@ export function MonumentPanel({
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold">{q.title}</p>
                       </div>
-                      <div className="flex flex-col items-end gap-1.5">
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs text-stone-400">일일</span>
                           <PointsAmount value={q.rewardPoints} size={16} />
@@ -473,7 +451,9 @@ export function MonumentPanel({
                             완료
                           </button>
                         ) : item.claimed ? (
-                          <span className="text-xs text-stone-500">수령됨</span>
+                          <span className="text-xs font-semibold text-stone-500">
+                            수령됨
+                          </span>
                         ) : null}
                       </div>
                     </div>
@@ -494,83 +474,61 @@ export function MonumentPanel({
                   </li>
                 );
               })}
-              </ul>
-
-              {(questState?.repeat ?? []).length > 0 ? (
-                <>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-stone-400">
-                    반복 퀘스트
-                  </p>
-                  <ul className="flex flex-col gap-2">
-                    {(questState?.repeat ?? []).map((q) => {
-                      const item = questState?.repeatProgress[q.id] ?? {
-                        id: q.id,
-                        progress: 0,
-                        completed: false,
-                        claimed: false,
-                      };
-                      const canClaim = item.completed;
-                      const pct = Math.min(
-                        100,
-                        (item.progress / q.target) * 100,
-                      );
-                      return (
-                        <li
-                          key={q.id}
-                          className="rounded-xl border border-sky-400/20 bg-black/25 px-3 py-2.5"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-bold">{q.title}</p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs text-sky-300/80">
-                                  반복
-                                </span>
-                                <PointsAmount
-                                  value={q.rewardPoints}
-                                  size={16}
-                                />
-                              </div>
-                              {canClaim ? (
-                                <button
-                                  type="button"
-                                  disabled={busy || !onClaimRepeatQuest}
-                                  className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
-                                  onClick={() =>
-                                    void onClaimRepeatQuest?.(
-                                      q.id,
-                                      q.rewardPoints,
-                                    )
-                                  }
-                                >
-                                  완료
-                                </button>
-                              ) : null}
-                            </div>
-                          </div>
-                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                            <div
-                              className="h-full rounded-full bg-sky-400/80"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <p className="mt-1 text-right text-[11px] tabular-nums text-stone-400">
-                            {formatQuestProgressCurrent(
-                              item.progress,
-                              q.target,
-                              q.metric,
-                            ).toLocaleString()}{" "}
-                            / {q.target.toLocaleString()}
-                          </p>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </>
-              ) : null}
-            </div>
+              {(questState?.repeat ?? []).map((q) => {
+                const item = questState?.repeatProgress[q.id] ?? {
+                  id: q.id,
+                  progress: 0,
+                  completed: false,
+                  claimed: false,
+                };
+                const canClaim = item.completed;
+                const pct = Math.min(100, (item.progress / q.target) * 100);
+                return (
+                  <li
+                    key={q.id}
+                    className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold">{q.title}</p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-stone-400">반복</span>
+                          <PointsAmount value={q.rewardPoints} size={16} />
+                        </div>
+                        {canClaim ? (
+                          <button
+                            type="button"
+                            disabled={busy || !onClaimRepeatQuest}
+                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
+                            onClick={() =>
+                              void onClaimRepeatQuest?.(q.id, q.rewardPoints)
+                            }
+                          >
+                            완료
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-amber-400/80"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-right text-[11px] tabular-nums text-stone-400">
+                      {formatQuestProgressCurrent(
+                        item.progress,
+                        q.target,
+                        q.metric,
+                      ).toLocaleString()}{" "}
+                      / {q.target.toLocaleString()}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
           ) : null}
 
           {showManage && tab === "upgrade" ? (
