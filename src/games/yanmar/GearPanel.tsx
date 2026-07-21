@@ -222,9 +222,12 @@ function formatSub(sub: GearPanelItem["subOptions"][number]) {
   const def = SUB_OPTION_POOL.find((s) => s.key === sub.key);
   const label = def?.label ?? sub.key;
   const unit = sub.isPercent ? "%" : "";
+  const tier = Math.max(1, Math.floor(Number(sub.tier) || 1));
+  const rangeMin = Math.round(sub.rollMin) * tier;
+  const rangeMax = Math.round(sub.rollMax) * tier;
   return {
     text: `${label} +${Math.round(sub.value)}${unit}`,
-    range: `[${Math.round(sub.rollMin)}~${Math.round(sub.rollMax)}] (T${sub.tier})`,
+    range: `[${rangeMin}~${rangeMax}][티어${tier}]`,
   };
 }
 
@@ -337,8 +340,10 @@ function GearBubbleCard({
           const row = formatSub(sub);
           return (
             <li key={`${sub.key}-${sub.tier}-${sub.value}`}>
-              <span>{row.text}</span>
-              <span className="yanmar-gear-muted">{row.range}</span>
+              <span className="yanmar-gear-mgr-attr-stat">{row.text}</span>
+              <span className="yanmar-gear-mgr-attr-range yanmar-gear-muted">
+                {row.range}
+              </span>
             </li>
           );
         })}
@@ -1754,7 +1759,7 @@ export function GearPanel({
                                 <strong>{label}</strong>
                                 <span className="is-new">
                                   신규 +{Math.round(after.value)}
-                                  {unit} (T{after.tier})
+                                  {unit} [티어{after.tier}]
                                 </span>
                               </li>,
                             );
@@ -1769,7 +1774,7 @@ export function GearPanel({
                                 <span>
                                   +{Math.round(before.value)}
                                   {beforeUnit} → +{Math.round(after.value)}
-                                  {unit} (T{before.tier}→T{after.tier})
+                                  {unit} [티어{before.tier}→티어{after.tier}]
                                 </span>
                               </li>,
                             );
@@ -1778,7 +1783,8 @@ export function GearPanel({
                               <li key={`same-${after.key}-${i}`}>
                                 <strong>{label}</strong>
                                 <span className="is-muted">
-                                  +{Math.round(after.value)}% (T{after.tier})
+                                  +{Math.round(after.value)}
+                                  {unit} [티어{after.tier}]
                                 </span>
                               </li>,
                             );
