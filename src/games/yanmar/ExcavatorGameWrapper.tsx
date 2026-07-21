@@ -128,6 +128,8 @@ import {
   loadQuestState,
   questClaimEventId,
   saveQuestState,
+  getMsUntilNextQuestReset,
+  getQuestDayKey,
   type YanmarQuestState,
 } from "./quests/questState";
 import type { QuestMetric } from "./quests/types";
@@ -2103,6 +2105,43 @@ export function ExcavatorGameWrapper({
     [],
   );
 
+  /** 접속 유지 중 KST 0시가 지나면 일일 퀘스트를 갱신하고 로그인 미션을 즉시 완료한다. */
+  const syncQuestDayRollover = useCallback(() => {
+    const ownerId =
+      session?.user?.id ?? questStateRef.current?.ownerId ?? "local";
+    const today = getQuestDayKey();
+    const current = questStateRef.current;
+    const level = getPlayerLevelProgress(totalXpRef.current).level;
+
+    if (!current || current.dayKey !== today) {
+      const next = loadQuestState(ownerId, level);
+      questStateRef.current = next;
+      setQuestState(next);
+      saveQuestState(next);
+
+      const wq = loadWorkshopQuestState(ownerId);
+      workshopQuestStateRef.current = wq;
+      setWorkshopQuestState(wq);
+
+      const mq = monumentQuestStateRef.current;
+      if (mq) {
+        const synced = ensureMonumentQuestsForPhase(
+          mq,
+          monumentPhaseRef.current,
+        );
+        if (synced !== mq) {
+          monumentQuestStateRef.current = synced;
+          setMonumentQuestState(synced);
+          saveMonumentQuestState(synced);
+        }
+      }
+    }
+
+    if (session?.user?.id) {
+      pushQuestProgress("login", 1);
+    }
+  }, [session?.user?.id, pushQuestProgress]);
+
   const loadWorkshopState = useCallback(async () => {
     try {
       const res = await fetch("/api/workshop/yanmar/state");
@@ -3647,6 +3686,41 @@ export function ExcavatorGameWrapper({
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [session?.user?.id, sessionStatus, refreshFreeGacha]);
+
+  // 접속 유지 중 KST 0시에 일일 퀘스트를 리셋하고 로그인 미션을 클리어한다.
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+
+    let timer: number | null = null;
+    const schedule = () => {
+      const delay = Math.min(
+        getMsUntilNextQuestReset() + 500,
+        24 * 60 * 60 * 1000,
+      );
+      timer = window.setTimeout(() => {
+        syncQuestDayRollover();
+        schedule();
+      }, Math.max(1000, delay));
+    };
+    schedule();
+
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      syncQuestDayRollover();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      if (timer != null) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [sessionStatus, session?.user?.id, syncQuestDayRollover]);
+
+  useEffect(() => {
+    if (!showQuestPanel) return;
+    if (sessionStatus === "loading") return;
+    syncQuestDayRollover();
+  }, [showQuestPanel, sessionStatus, syncQuestDayRollover]);
 
   useEffect(() => {
     if (!showShopPanel) return;
