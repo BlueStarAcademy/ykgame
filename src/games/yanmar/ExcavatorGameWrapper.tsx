@@ -2922,7 +2922,7 @@ export function ExcavatorGameWrapper({
     async (data: Record<string, unknown> | null | undefined) => {
       if (!data) return;
       if (data.stats) {
-        publishEquipmentStats(data.stats);
+        publishEquipmentStats(data.stats as YanmarEquipmentStats);
       }
       if (typeof data.currency === "number") {
         currencyRef.current = data.currency;
