@@ -16,6 +16,7 @@ const LEGEND = [
   { label: "석재", tone: "hill" },
   { label: "정비", tone: "repair" },
   { label: "조형", tone: "monument" },
+  { label: "운동회", tone: "sports" },
 ] as const;
 
 function useExpandedMapSize(open: boolean) {
@@ -53,6 +54,7 @@ export function ExcavatorMapModal({
   tutorialWaypointRef,
   worldPickupsRef,
   monumentPhase = "locked",
+  sportsMeetUnlocked = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -62,8 +64,12 @@ export function ExcavatorMapModal({
   tutorialWaypointRef?: React.RefObject<TutorialWaypoint | null>;
   worldPickupsRef?: React.RefObject<WorldPickupsState | null>;
   monumentPhase?: MonumentPhase;
+  sportsMeetUnlocked?: boolean;
 }) {
   const mapSize = useExpandedMapSize(open);
+  const legend = sportsMeetUnlocked
+    ? LEGEND
+    : LEGEND.filter((item) => item.tone !== "sports");
 
   return (
     <AppModalOverlay
@@ -115,12 +121,13 @@ export function ExcavatorMapModal({
               embedded
               displaySize={mapSize}
               monumentPhase={monumentPhase}
+              sportsMeetUnlocked={sportsMeetUnlocked}
               showLegend={false}
             />
           </div>
 
           <ul className="yanmar-map-modal-legend" aria-label="맵 범례">
-            {LEGEND.map((item) => (
+            {legend.map((item) => (
               <li
                 key={item.label}
                 className={`yanmar-map-modal-legend-item is-${item.tone}`}

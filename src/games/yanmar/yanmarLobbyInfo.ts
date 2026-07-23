@@ -122,6 +122,10 @@ export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSection[] = [
         label: "3단계 (Lv.15~)",
         desc: "집게·석재 구역과 관련 퀘스트가 해금됩니다.",
       },
+      {
+        label: "굴착기 운동회 (Lv.25~)",
+        desc: "미니맵 좌측 하단 포탈. 일일 도전권 1회 랭킹·무제한 연습. 월요일 0시(KST) 코스 변경 및 지난주 순위 스타 우편.",
+      },
     ],
   },
   {

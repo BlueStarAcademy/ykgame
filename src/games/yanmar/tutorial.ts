@@ -4,7 +4,15 @@ import { ALL_CONTROLS, JOINT_LIMITS } from "./controls";
 import type { AttachmentType } from "./types";
 
 export type { ControlMask };
-export type GameMode = "intro" | "ride" | "practice" | "tutorial" | "gameReady" | "game";
+export type GameMode =
+  | "intro"
+  | "ride"
+  | "practice"
+  | "tutorial"
+  | "gameReady"
+  | "game"
+  | "sportsRanked"
+  | "sportsPractice";
 
 export type TutorialHighlight =
   | "left"

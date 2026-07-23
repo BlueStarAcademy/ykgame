@@ -11,26 +11,29 @@ export interface SiteRoad {
 
 export const SITE_LAYOUT = {
   spawn: [-18, -22] as SitePoint,
-  dig: [4, 18] as SitePoint,
+  /** Near dump truck (~21m) for short dig↔haul loops */
+  dig: [18, 2] as SitePoint,
   dump: [33.27, -12.68] as SitePoint,
   crash: [108, 12] as SitePoint,
   hill: [22, 112] as SitePoint,
   /** North edge (minimap 12 o'clock) — Yanmar pylon monument */
   monument: [48, 132] as SitePoint,
+  /** Minimap bottom-left (world SE) — excavator sports meet portal */
+  sportsPortal: [78, -38] as SitePoint,
   coreMaxX: 80,
   coreMaxZ: 80,
   roads: [
     {
       id: "entry",
       from: [-18, -22],
-      to: [4, 18],
+      to: [18, 2],
       width: 5.6,
       unlockTier: 1,
       surface: "compacted",
     },
     {
       id: "dump",
-      from: [4, 18],
+      from: [18, 2],
       to: [33.27, -12.68],
       width: 4.8,
       unlockTier: 1,

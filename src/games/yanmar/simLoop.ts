@@ -44,7 +44,7 @@ import {
   sampleBreakerContactHeight,
   sampleCrashContactHeight,
   sampleHeight,
-  updateDigZoneRespawns,
+  regenDigZones,
   updateSpecialZones,
   fastForwardHaulTruckState,
   worldToDumpTruckLocal,
@@ -388,15 +388,21 @@ function placeCarriedRockOnGround(
   rock: HillBoulder,
   tip: { x: number; z: number },
   terrain: TerrainData,
+  forceReuse = false,
 ): "placed" | "destroyed" {
   const bounds = getMapWorldBounds(terrain);
-  const x = clampControl(tip.x, bounds.minX + 1, bounds.maxX - 1);
-  const z = clampControl(tip.z, bounds.minZ + 1, bounds.maxZ - 1);
+  let x = clampControl(tip.x, bounds.minX + 1, bounds.maxX - 1);
+  let z = clampControl(tip.z, bounds.minZ + 1, bounds.maxZ - 1);
   const hill = terrain.hillZone;
   if (hill?.active && !isInsideHillZoneCore(hill, x, z)) {
-    destroyCarriedRock(rock);
-    tryClearHillZone(terrain);
-    return "destroyed";
+    if (forceReuse) {
+      x = hill.centerX;
+      z = hill.centerZ;
+    } else {
+      destroyCarriedRock(rock);
+      tryClearHillZone(terrain);
+      return "destroyed";
+    }
   }
   rock.x = x;
   rock.z = z;
@@ -1132,7 +1138,7 @@ export function tickExcavatorSim(params: SimTickParams) {
   const scraperGroundH = sampleHeight(terrain, scraper.x, scraper.z);
   const scraperDepthBelow = scraperGroundH - scraper.y;
   if (!systemsFrozen) {
-    updateDigZoneRespawns(terrain);
+    regenDigZones(terrain, dt);
   }
   const activeDigZones = getActiveDigZones(terrain);
   const scraperInDigZone = isInDigZone(scraper.x, scraper.z, terrain);
@@ -1346,6 +1352,7 @@ export function tickExcavatorSim(params: SimTickParams) {
             rock,
             grappleClamp,
             terrain,
+            Boolean(stats.sportsMeetForceRockReuse),
           );
           sim.carriedBoulderId = null;
           resetGrappleGrip(runtime.grappleGrip);
@@ -1436,12 +1443,15 @@ export function tickExcavatorSim(params: SimTickParams) {
         const rock = terrain.hillZone?.boulders.find(
           (item) => item.id === sim.carriedBoulderId,
         );
-        const safeLoad = Math.random() < stats.hillSafeLoadChance;
+        const safeLoad =
+          Boolean(stats.sportsMeetForceRockReuse) ||
+          Math.random() < stats.hillSafeLoadChance;
         if (rock && safeLoad) {
           const result = placeCarriedRockOnGround(
             rock,
             grappleClamp,
             terrain,
+            Boolean(stats.sportsMeetForceRockReuse),
           );
           sim.carriedBoulderId = null;
           runtime.digDust.active = true;

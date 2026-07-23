@@ -4,6 +4,7 @@ export const PLAYER_UNLOCKS = {
   BREAKER: 10,
   GRAPPLE: 15,
   MONUMENT: 20,
+  SPORTS_MEET: 25,
 } as const;
 
 /** 연습·튜토리얼에서 맵/부착물을 전부 열 때 쓰는 유효 레벨 */

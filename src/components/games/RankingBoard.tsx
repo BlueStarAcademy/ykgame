@@ -222,6 +222,49 @@ function RankingList({
   );
 }
 
+function useSportsMeetRankings(active: boolean, week: "current" | "previous") {
+  const [rankings, setRankings] = useState<
+    Array<{ rank: number; nickname: string; bestTimeMs: number }>
+  >([]);
+  const [myStats, setMyStats] = useState<{
+    rank: number | null;
+    bestTimeMs: number | null;
+    rewardStars: number | null;
+  } | null>(null);
+  const [meta, setMeta] = useState<{
+    weekKey: string;
+    patternName: string;
+    stageOrderLabel: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!active) return;
+    setLoading(true);
+    fetch(`/api/sports-meet/yanmar/rankings?week=${week}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setRankings(data.rankings ?? []);
+        setMyStats(data.myStats ?? null);
+        setMeta({
+          weekKey: data.weekKey ?? "",
+          patternName: data.patternName ?? "",
+          stageOrderLabel: data.stageOrderLabel ?? "",
+        });
+      })
+      .finally(() => setLoading(false));
+  }, [active, week]);
+
+  return { rankings, myStats, meta, loading };
+}
+
+function formatSportsTimeMs(ms: number) {
+  const totalSec = ms / 1000;
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec - m * 60;
+  return `${m}:${s.toFixed(2).padStart(5, "0")}`;
+}
+
 export function RankingBoardPanel({
   gameId,
   highlightNickname: _highlightNickname,
@@ -230,15 +273,35 @@ export function RankingBoardPanel({
   onClose,
 }: RankingBoardPanelProps) {
   const game = getGameById(gameId);
+  const isYanmar = gameId === "yanmar";
+  const [boardTab, setBoardTab] = useState<"season" | "sports">("season");
+  const [sportsWeek, setSportsWeek] = useState<"current" | "previous">(
+    "current",
+  );
+
   const { rankings, myStats, seasonLabel, seasonEndsAt, loading } = useRankings(
     gameId,
-    active,
+    active && (!isYanmar || boardTab === "season"),
   );
-  const seasonRemaining = useSeasonRemaining(seasonEndsAt, active);
+  const sports = useSportsMeetRankings(
+    active && isYanmar && boardTab === "sports",
+    sportsWeek,
+  );
+  const seasonRemaining = useSeasonRemaining(
+    seasonEndsAt,
+    active && (!isYanmar || boardTab === "season"),
+  );
 
   const headerColor = game?.headerColor ?? "#1565C0";
   const brandColor = game?.color ?? headerColor;
-  const periodTitle = seasonLabel ? `${seasonLabel} 랭킹` : "시즌 랭킹";
+  const periodTitle =
+    isYanmar && boardTab === "sports"
+      ? sportsWeek === "previous"
+        ? "지난주 운동회"
+        : "주간 굴착기 운동회"
+      : seasonLabel
+        ? `${seasonLabel} 랭킹`
+        : "시즌 랭킹";
   const brandVars = {
     "--ranking-brand": brandColor,
     "--ranking-header": headerColor,
@@ -249,7 +312,9 @@ export function RankingBoardPanel({
       <div className="ranking-modal-header-glow" aria-hidden />
       <div className="ranking-modal-header-grid" aria-hidden />
       <div className="ranking-modal-header-top">
-        <p className="ranking-modal-eyebrow">Season Ranking</p>
+        <p className="ranking-modal-eyebrow">
+          {isYanmar && boardTab === "sports" ? "Sports Meet" : "Season Ranking"}
+        </p>
         {onClose ? (
           <button
             type="button"
@@ -268,27 +333,123 @@ export function RankingBoardPanel({
         >
           {periodTitle}
         </h3>
-        {seasonRemaining ? (
+        {boardTab === "season" && seasonRemaining ? (
           <span className="ranking-modal-timer" title="시즌 종료까지">
             <span className="ranking-modal-timer-dot" aria-hidden />
             {seasonRemaining}
           </span>
         ) : null}
       </div>
-      <p className="ranking-modal-subtitle">Top 10 · 실시간 누적 순위</p>
+      {isYanmar ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            className={`rounded-md px-2.5 py-1 text-[11px] font-bold ${
+              boardTab === "season"
+                ? "bg-white/20 text-white"
+                : "bg-black/25 text-white/70"
+            }`}
+            onClick={() => setBoardTab("season")}
+          >
+            시즌 누적
+          </button>
+          <button
+            type="button"
+            className={`rounded-md px-2.5 py-1 text-[11px] font-bold ${
+              boardTab === "sports"
+                ? "bg-white/20 text-white"
+                : "bg-black/25 text-white/70"
+            }`}
+            onClick={() => setBoardTab("sports")}
+          >
+            주간 운동회
+          </button>
+          {boardTab === "sports" ? (
+            <button
+              type="button"
+              className="ml-auto rounded-md bg-black/25 px-2.5 py-1 text-[11px] font-semibold text-white/80"
+              onClick={() =>
+                setSportsWeek((w) =>
+                  w === "current" ? "previous" : "current",
+                )
+              }
+            >
+              {sportsWeek === "current" ? "지난주 보기" : "이번 주 보기"}
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <p className="ranking-modal-subtitle">Top 10 · 실시간 누적 순위</p>
+      )}
+      {isYanmar && boardTab === "sports" && sports.meta ? (
+        <p className="ranking-modal-subtitle mt-1">
+          {sports.meta.weekKey} · {sports.meta.patternName} ·{" "}
+          {sports.meta.stageOrderLabel}
+        </p>
+      ) : isYanmar && boardTab === "season" ? (
+        <p className="ranking-modal-subtitle">Top 10 · 시즌 누적 점수</p>
+      ) : null}
     </header>
   );
 
-  const body = (
+  const sportsBody = (
     <div className="ranking-modal-body">
-      <RankingList
-        rankings={rankings}
-        myStats={myStats}
-        loading={loading}
-        gameId={gameId}
-      />
+      {sports.loading ? (
+        <p className="ranking-modal-empty-inline">불러오는 중…</p>
+      ) : (
+        <>
+          {sports.myStats?.rank != null ? (
+            <p className="mb-2 text-sm font-bold text-amber-100">
+              내 순위 {sports.myStats.rank}위 ·{" "}
+              {sports.myStats.bestTimeMs != null
+                ? formatSportsTimeMs(sports.myStats.bestTimeMs)
+                : "-"}
+              {sports.myStats.rewardStars != null
+                ? ` · 보상 ${sports.myStats.rewardStars}★`
+                : ""}
+            </p>
+          ) : null}
+          {sports.rankings.length === 0 ? (
+            <p className="ranking-modal-empty-inline">아직 기록이 없습니다.</p>
+          ) : (
+            <ul className="ranking-modal-list">
+              {sports.rankings.slice(0, 10).map((row, index) => (
+                <li
+                  key={`${row.rank}-${row.nickname}`}
+                  className="ranking-modal-row flex items-center justify-between gap-3"
+                  style={{ animationDelay: `${Math.min(index, 9) * 28}ms` }}
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <RankBadge rank={row.rank} tone="light" />
+                    <p className="ranking-modal-row-name truncate">
+                      {row.nickname}
+                    </p>
+                  </div>
+                  <p className="ranking-modal-row-score tabular-nums">
+                    {formatSportsTimeMs(row.bestTimeMs)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
     </div>
   );
+
+  const body =
+    isYanmar && boardTab === "sports" ? (
+      sportsBody
+    ) : (
+      <div className="ranking-modal-body">
+        <RankingList
+          rankings={rankings}
+          myStats={myStats}
+          loading={loading}
+          gameId={gameId}
+        />
+      </div>
+    );
 
   return (
     <div

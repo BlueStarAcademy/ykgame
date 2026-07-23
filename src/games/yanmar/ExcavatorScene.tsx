@@ -130,6 +130,8 @@ import {
 } from "./simLoop";
 import { WorldPickupMeshes } from "./WorldPickupMeshes";
 import type { WorldPickup, WorldPickupsState } from "./worldPickups";
+import { SportsMeetPortal } from "./SportsMeetPortal";
+import { SportsMeetPickups } from "./SportsMeetPickups";
 
 export type { CameraMode, DumpScorePopup, ExcavatorSimState };
 
@@ -174,6 +176,9 @@ interface ExcavatorSceneProps {
   monumentPhase?: import("./monument/types").MonumentPhase;
   monumentStarsStored?: number;
   monumentStorageCap?: number;
+  sportsMeetPortalVisible?: boolean;
+  sportsMeetRunRef?: React.RefObject<import("./sportsMeet/types").SportsMeetRunState | null>;
+  sportsMeetPickupRevision?: number;
 }
 
 function TerrainMesh({
@@ -3709,6 +3714,13 @@ function SceneContent(props: ExcavatorSceneProps) {
         mapTier={props.terrainRef.current.mapTier}
         claimableIds={props.workshopClaimableIds ?? []}
       />
+      <SportsMeetPortal visible={Boolean(props.sportsMeetPortalVisible)} />
+      {props.sportsMeetRunRef ? (
+        <SportsMeetPickups
+          runRef={props.sportsMeetRunRef}
+          revision={props.sportsMeetPickupRevision ?? 0}
+        />
+      ) : null}
       <MonumentPylon
         phase={props.monumentPhase ?? "locked"}
         starsStored={props.monumentStarsStored ?? 0}

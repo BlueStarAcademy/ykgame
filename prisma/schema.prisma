@@ -149,6 +149,51 @@ model User {
   workshopShopPurchases UserWorkshopShopPurchase[]
   monumentUpgrades     UserMonumentUpgrade[]
   monumentShopPurchases UserMonumentShopPurchase[]
+  /** KST day key for daily sports-meet ranked challenge ticket */
+  sportsMeetDayKey            String?
+  sportsMeetAttemptsUsed      Int       @default(0)
+  sportsMeetScores            YanmarSportsMeetScore[]
+  sportsMeetRewardGrants      YanmarSportsMeetRewardGrant[]
+}
+
+/** Weekly excavator sports-meet best clear time (lower is better). */
+model YanmarSportsMeetScore {
+  id          String   @id @default(cuid())
+  userId      String
+  weekKey     String
+  patternId   Int
+  bestTimeMs  Int
+  playCount   Int      @default(1)
+  lastRunId   String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekKey])
+  @@index([weekKey, bestTimeMs])
+  @@index([userId, weekKey])
+}
+
+/** Idempotent weekly ranking settlement marker. */
+model YanmarSportsMeetWeekSettlement {
+  weekKey           String   @id
+  settledAt         DateTime @default(now())
+  participantCount  Int      @default(0)
+}
+
+/** Per-user weekly reward grant (prevents duplicate mail). */
+model YanmarSportsMeetRewardGrant {
+  id        String   @id @default(cuid())
+  userId    String
+  weekKey   String
+  rank      Int
+  stars     Int
+  mailId    String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekKey])
+  @@index([weekKey])
 }
 
 model GameScore {

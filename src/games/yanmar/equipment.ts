@@ -183,6 +183,8 @@ export interface YanmarEquipmentStats {
   gripAdhesionBonus: number;
   /** 돌 적재 실패 시 돌이 깨지지 않을 확률. */
   hillSafeLoadChance: number;
+  /** 운동회: 적재 실패 시 돌을 항상 구역 안에 복구 */
+  sportsMeetForceRockReuse?: boolean;
   /** 마스터옵션: 브레이커 3회마다 데미지 배수 (없으면 1) */
   breakerEvery3HitMult?: number;
   /** 블레이드 주옵션 효율 (기본 1) */

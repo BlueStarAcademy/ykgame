@@ -294,6 +294,38 @@ import {
   PRACTICE_FULL_UNLOCK_LEVEL,
   type PlayerUnlockKind,
 } from "@/lib/playerUnlocks";
+import {
+  SportsMeetHud,
+  SportsMeetModePanel,
+  SportsMeetRankingsPanel,
+  SportsMeetResultPanel,
+} from "./SportsMeetPanels";
+import {
+  beginSportsMeetRun,
+  currentSportsStage,
+  getSportsMeetMissionForWeek,
+  getSportsMeetPattern,
+  getSportsMeetWeekKey,
+  isInSportsMeetPortalRange,
+  noteSportsAsphaltBreak,
+  noteSportsDumpDepart,
+  noteSportsDumpFill,
+  noteSportsRockDump,
+  SPORTS_MEET_UNLOCK_LEVEL,
+  sportsMeetElapsedMs,
+  sportsMeetStageWaypoint,
+  STAGE_LABEL_KO,
+  startSportsMeetCountdown,
+  tickSportsMeetCountdown,
+  tryCollectNearbySportsPickups,
+  type SportsMeetPlayMode,
+  type SportsMeetRunState,
+} from "./sportsMeet";
+import {
+  applySportsMeetEquipmentOverrides,
+  createSportsMeetTerrain,
+  heightAtTerrain,
+} from "./sportsMeet/sessionSetup";
 
 interface ExcavatorGameWrapperProps {
   onEnd: (result: GameResult) => void;
@@ -861,6 +893,72 @@ function AttachmentUnlockOverlay({
     );
   }
 
+  if (unlock === "SPORTS_MEET") {
+    return (
+      <div className="yanmar-unlock-overlay" role="presentation">
+        <div
+          className="yanmar-unlock-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-label="레벨 25 굴착기 운동회 개방 안내"
+        >
+          <div className="yanmar-unlock-panel-glow" aria-hidden />
+          <div className="yanmar-unlock-panel-frame" aria-hidden />
+          <header className="yanmar-unlock-brand">
+            <span className="yanmar-unlock-brand-mark">YANMAR</span>
+            <span className="yanmar-unlock-brand-rule" aria-hidden />
+            <span className="yanmar-unlock-brand-sub">
+              SV08-1 · SPORTS MEET UNLOCK
+            </span>
+          </header>
+          <div className="yanmar-unlock-body">
+            <p className="yanmar-unlock-level">
+              <span>LEVEL</span> 25
+            </p>
+            <h2 className="yanmar-unlock-title">
+              굴착기 운동회가 개방되었습니다
+            </h2>
+            <p className="yanmar-unlock-lead">
+              미니맵 좌측 하단 포탈에서 주간 타임어택에 도전하세요. 매일
+              도전권 1회, 연습 모드는 무제한입니다. 월요일 0시(KST)에 코스가
+              바뀌고 지난주 순위로 스타 우편이 지급됩니다.
+            </p>
+            <ul className="yanmar-unlock-perks">
+              <li>
+                <span className="yanmar-unlock-perk-index">01</span>
+                <div>
+                  <strong>랭킹 · 연습</strong>
+                  <span>도전권(1/1)으로 랭킹, 연습은 기록 미반영</span>
+                </div>
+              </li>
+              <li>
+                <span className="yanmar-unlock-perk-index">02</span>
+                <div>
+                  <strong>주간 코스</strong>
+                  <span>5종 패턴이 월요일마다 자동 로테이션</span>
+                </div>
+              </li>
+              <li>
+                <span className="yanmar-unlock-perk-index">03</span>
+                <div>
+                  <strong>주간 보상</strong>
+                  <span>1위 3000★ ~ 참가 100★ 우편 지급</span>
+                </div>
+              </li>
+            </ul>
+            <button
+              type="button"
+              className="yanmar-unlock-cta"
+              onClick={onClose}
+            >
+              포탈로 이동
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const breaker = unlock === "BREAKER";
   const level = breaker ? 10 : 15;
   const attachmentLabel = breaker ? "브레이커" : "집게";
@@ -1005,6 +1103,23 @@ export function ExcavatorGameWrapper({
   const [unlockQueue, setUnlockQueue] = useState<PlayerUnlockKind[]>([]);
   const unlockSeenOwnerRef = useRef("local");
   const unlockAnnouncedRef = useRef<Set<PlayerUnlockKind>>(new Set());
+  const [showSportsMeetPanel, setShowSportsMeetPanel] = useState(false);
+  const [showSportsMeetRankings, setShowSportsMeetRankings] = useState(false);
+  const [sportsMeetRankingsWeek, setSportsMeetRankingsWeek] = useState<
+    "current" | "previous"
+  >("current");
+  const [nearSportsMeet, setNearSportsMeet] = useState(false);
+  const nearSportsMeetRef = useRef(false);
+  const sportsMeetRunRef = useRef<SportsMeetRunState | null>(null);
+  const [sportsMeetRun, setSportsMeetRun] = useState<SportsMeetRunState | null>(
+    null,
+  );
+  const [sportsMeetPickupRevision, setSportsMeetPickupRevision] = useState(0);
+  const sportsMainTerrainRef = useRef<TerrainData | null>(null);
+  const sportsEquipmentSnapRef = useRef<YanmarEquipmentStats | null>(null);
+  const sportsHudTickRef = useRef(0);
+  const [sportsHudTick, setSportsHudTick] = useState(0);
+  const [sportsResultSubmitted, setSportsResultSubmitted] = useState(false);
   const [terrainRevision, setTerrainRevision] = useState(0);
   const [savePoseCooldownUntil, setSavePoseCooldownUntil] = useState(0);
   const [executePoseCooldownUntil, setExecutePoseCooldownUntil] = useState(0);
@@ -1922,13 +2037,19 @@ export function ExcavatorGameWrapper({
 
   const isAdmin = session?.user?.role === "ADMIN";
   const practiceUnlocksAll =
-    mode === "practice" || mode === "tutorial" || isAdmin;
+    mode === "practice" ||
+    mode === "tutorial" ||
+    mode === "sportsRanked" ||
+    mode === "sportsPractice" ||
+    isAdmin;
 
   const handleAttachmentChange = useCallback(
     (next: AttachmentType) => {
       const unlockAll =
         modeRef.current === "practice" ||
         modeRef.current === "tutorial" ||
+        modeRef.current === "sportsRanked" ||
+        modeRef.current === "sportsPractice" ||
         sessionRoleRef.current === "ADMIN";
       const playerLevel = getPlayerLevelProgress(totalXpRef.current).level;
       if (!isAttachmentUnlocked(next, playerLevel, { unlockAll })) {
@@ -2044,7 +2165,9 @@ export function ExcavatorGameWrapper({
         modeNow === "intro" ||
         modeNow === "ride" ||
         modeNow === "practice" ||
-        modeNow === "tutorial"
+        modeNow === "tutorial" ||
+        modeNow === "sportsRanked" ||
+        modeNow === "sportsPractice"
       ) {
         return;
       }
@@ -2191,6 +2314,111 @@ export function ExcavatorGameWrapper({
     if (velocity) velocity.travel = 0;
   }, []);
 
+  const warpToSportsMeetPortal = useCallback(() => {
+    const sim = simRef.current;
+    if (!sim) return;
+    sim.posX = SITE_LAYOUT.sportsPortal[0] - 6;
+    sim.posZ = SITE_LAYOUT.sportsPortal[1];
+    sim.heading = Math.PI * 0.5;
+    const velocity = velRef.current;
+    if (velocity) velocity.travel = 0;
+  }, []);
+
+  const syncSportsMeetRun = useCallback((next: SportsMeetRunState | null) => {
+    sportsMeetRunRef.current = next;
+    setSportsMeetRun(next);
+    setSportsMeetPickupRevision((n) => n + 1);
+  }, []);
+
+  const exitSportsMeet = useCallback(() => {
+    const main = sportsMainTerrainRef.current;
+    if (main) {
+      terrainRef.current = main;
+      sportsMainTerrainRef.current = null;
+      setTerrainRevision((k) => k + 1);
+    }
+    if (sportsEquipmentSnapRef.current) {
+      equipmentStatsRef.current = sportsEquipmentSnapRef.current;
+      setEquipmentStats(sportsEquipmentSnapRef.current);
+      sportsEquipmentSnapRef.current = null;
+    }
+    setSportsResultSubmitted(false);
+    syncSportsMeetRun(null);
+    setMode("game");
+    modeRef.current = "game";
+  }, [syncSportsMeetRun]);
+
+  const enterSportsMeet = useCallback(
+    async (playMode: SportsMeetPlayMode) => {
+      setShowSportsMeetPanel(false);
+      setSportsResultSubmitted(false);
+      let runId: string | null = null;
+      if (playMode === "ranked") {
+        const res = await fetch("/api/sports-meet/yanmar/ticket", {
+          method: "POST",
+        });
+        if (!res.ok) {
+          showAttachmentWarning("도전권이 없거나 시작할 수 없습니다.");
+          return;
+        }
+        const data = (await res.json()) as { runId?: string };
+        runId = data.runId ?? null;
+      }
+
+      const weekKey = getSportsMeetWeekKey();
+      const pattern = getSportsMeetPattern(weekKey);
+      const mission = getSportsMeetMissionForWeek(weekKey);
+      sportsMainTerrainRef.current = terrainRef.current;
+      sportsEquipmentSnapRef.current = { ...equipmentStatsRef.current };
+
+      terrainRef.current = createSportsMeetTerrain(pattern, mission);
+
+      const nextStats = applySportsMeetEquipmentOverrides(
+        equipmentStatsRef.current,
+        mission,
+      );
+      equipmentStatsRef.current = nextStats;
+      setEquipmentStats(nextStats);
+      resetDumpTruckState(dumpTruckStateRef.current);
+      setTerrainRevision((k) => k + 1);
+
+      const run = beginSportsMeetRun(
+        playMode,
+        weekKey,
+        (x, z) => heightAtTerrain(terrainRef.current, x, z),
+        runId,
+      );
+      syncSportsMeetRun(run);
+
+      const stage = run.stageOrder[0]!;
+      const spawn = sportsMeetStageWaypoint(pattern, stage);
+      const sim = simRef.current;
+      if (sim) {
+        sim.posX = spawn.x;
+        sim.posZ = spawn.z;
+        sim.heading = 0;
+        sim.bucketLoad = 0;
+        sim.carriedBoulderId = null;
+        if (stage === "drive" || stage === "dig") sim.attachmentType = "bucket";
+        else if (stage === "crash") sim.attachmentType = "breaker";
+        else sim.attachmentType = "grapple";
+        setAttachmentType(sim.attachmentType);
+      }
+
+      const nextMode =
+        playMode === "ranked" ? "sportsRanked" : "sportsPractice";
+      setMode(nextMode);
+      modeRef.current = nextMode;
+    },
+    [showAttachmentWarning, syncSportsMeetRun],
+  );
+
+  const startSportsCountdown = useCallback(() => {
+    const run = sportsMeetRunRef.current;
+    if (!run || run.phase !== "ready") return;
+    syncSportsMeetRun(startSportsMeetCountdown(run));
+  }, [syncSportsMeetRun]);
+
   const loadMonumentState = useCallback(async () => {
     try {
       const res = await fetch("/api/monument/yanmar/state");
@@ -2286,6 +2514,18 @@ export function ExcavatorGameWrapper({
     loadWorkshopState,
     loadMonumentState,
   ]);
+
+  /** Lv.25+ : soft-trigger weekly sports-meet settlement (lazy settle backup). */
+  useEffect(() => {
+    if (sessionStatus === "loading" || !session?.user?.id) return;
+    const level = getPlayerLevelProgress(
+      session.user.totalXp ?? totalXpRef.current,
+    ).level;
+    if (level < SPORTS_MEET_UNLOCK_LEVEL && session?.user?.role !== "ADMIN") {
+      return;
+    }
+    void fetch("/api/sports-meet/yanmar/ticket").catch(() => undefined);
+  }, [session?.user?.id, session?.user?.totalXp, session?.user?.role, sessionStatus]);
 
   // If the player force-quit after claim (before pressing 확인), restore wallets
   // from the persisted grant + server state so the reward stays received.
@@ -3640,6 +3880,20 @@ export function ExcavatorGameWrapper({
         if (!nearMon) setShowMonumentPanel(false);
       }
 
+      const playerLevel = getPlayerLevelProgress(totalXpRef.current).level;
+      if (playerLevel >= SPORTS_MEET_UNLOCK_LEVEL) {
+        const nearSm = isInSportsMeetPortalRange(sim.posX, sim.posZ);
+        if (nearSm !== nearSportsMeetRef.current) {
+          nearSportsMeetRef.current = nearSm;
+          setNearSportsMeet(nearSm);
+          if (!nearSm) setShowSportsMeetPanel(false);
+        }
+      } else if (nearSportsMeetRef.current) {
+        nearSportsMeetRef.current = false;
+        setNearSportsMeet(false);
+        setShowSportsMeetPanel(false);
+      }
+
       const terrain = terrainRef.current;
       const mapTier = terrain.mapTier;
       let found: WorkshopId | null = null;
@@ -4490,6 +4744,99 @@ export function ExcavatorGameWrapper({
     }
 
     const modeNow = modeRef.current;
+    const isSports =
+      modeNow === "sportsRanked" || modeNow === "sportsPractice";
+
+    if (isSports) {
+      let run = sportsMeetRunRef.current;
+      if (run) {
+        const now = Date.now();
+        const beforePhase = run.phase;
+        const beforeStage = run.stageIndex;
+        const beforeStars = run.starsCollected;
+        run = tickSportsMeetCountdown(run, now);
+        run = tryCollectNearbySportsPickups(
+          run,
+          simRef.current.posX,
+          simRef.current.posZ,
+          now,
+        );
+        run = noteSportsDumpFill(
+          run,
+          dumpTruckStateRef.current.fillUnits,
+        );
+        if (pickups) {
+          pickups.speedBuffUntilMs = run.speedBuffUntilMs;
+        }
+        if (
+          run !== sportsMeetRunRef.current ||
+          run.phase !== beforePhase ||
+          run.stageIndex !== beforeStage ||
+          run.starsCollected !== beforeStars
+        ) {
+          const stageChanged = run.stageIndex !== beforeStage;
+          sportsMeetRunRef.current = run;
+          setSportsMeetRun(run);
+          if (
+            run.starsCollected !== beforeStars ||
+            run.speedBuffs.some((b, i) => {
+              const prev = sportsMeetRunRef.current?.speedBuffs[i];
+              return b.collected !== prev?.collected;
+            })
+          ) {
+            setSportsMeetPickupRevision((n) => n + 1);
+          }
+          if (stageChanged && run.phase === "racing") {
+            const stage = run.stageOrder[run.stageIndex];
+            if (stage) {
+              const pattern = getSportsMeetPattern(run.weekKey);
+              const spawn = sportsMeetStageWaypoint(pattern, stage);
+              const sim = simRef.current;
+              sim.posX = spawn.x;
+              sim.posZ = spawn.z;
+              if (stage === "drive" || stage === "dig") {
+                sim.attachmentType = "bucket";
+              } else if (stage === "crash") {
+                sim.attachmentType = "breaker";
+              } else {
+                sim.attachmentType = "grapple";
+              }
+              setAttachmentType(sim.attachmentType);
+              showAttachmentWarning(
+                `${STAGE_LABEL_KO[stage]} 코스 시작!`,
+              );
+            }
+          }
+          if (run.phase === "finished" && beforePhase !== "finished") {
+            void (async () => {
+              if (run.playMode === "ranked") {
+                try {
+                  await fetch("/api/sports-meet/yanmar/score", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      weekKey: run.weekKey,
+                      patternId: run.patternId,
+                      clearTimeMs: run.finalTimeMs,
+                      runId: run.runId,
+                      mode: "ranked",
+                    }),
+                  });
+                } finally {
+                  setSportsResultSubmitted(true);
+                }
+              } else {
+                setSportsResultSubmitted(true);
+              }
+            })();
+          }
+        }
+        sportsHudTickRef.current += 1;
+        if (sportsHudTickRef.current % 6 === 0) {
+          setSportsHudTick((n) => n + 1);
+        }
+      }
+    }
 
     if (modeNow !== "intro" && modeNow !== "ride" && modeNow !== "gameReady") {
       const sim = simRef.current;
@@ -4547,6 +4894,16 @@ export function ExcavatorGameWrapper({
           track.dumpTruckPhase !== ""
         ) {
           pushQuestProgress("dumpTruckDepart", 1);
+          if (isSports && sportsMeetRunRef.current) {
+            const next = noteSportsDumpDepart(
+              sportsMeetRunRef.current,
+              Date.now(),
+            );
+            if (next !== sportsMeetRunRef.current) {
+              sportsMeetRunRef.current = next;
+              setSportsMeetRun(next);
+            }
+          }
         }
         track.dumpTruckPhase = dumpPhase;
 
@@ -5276,6 +5633,12 @@ export function ExcavatorGameWrapper({
   const handleDumpScore = useCallback(
     (popup: Omit<DumpScorePopup, "id">) => {
       if (modeRef.current === "ride") return;
+      if (
+        modeRef.current === "sportsRanked" ||
+        modeRef.current === "sportsPractice"
+      ) {
+        return;
+      }
       pushQuestProgress(
         "soilDump",
         equipmentStatsRef.current.scoreChunkUnits,
@@ -5609,6 +5972,18 @@ export function ExcavatorGameWrapper({
       if (modeRef.current === "tutorial") {
         tutorialCrashHitsRef.current += 1;
       }
+      const isSports =
+        modeRef.current === "sportsRanked" ||
+        modeRef.current === "sportsPractice";
+      if (isSports && sportsMeetRunRef.current) {
+        const next = noteSportsAsphaltBreak(
+          sportsMeetRunRef.current,
+          Date.now(),
+        );
+        sportsMeetRunRef.current = next;
+        setSportsMeetRun(next);
+        return;
+      }
       pushQuestProgress("asphaltBreak", 1);
       void claimSpecialReward("crash", tileId);
     },
@@ -5619,6 +5994,15 @@ export function ExcavatorGameWrapper({
     (rockId: string) => {
       if (modeRef.current === "tutorial") {
         tutorialHillDeliverRef.current += 1;
+      }
+      const isSports =
+        modeRef.current === "sportsRanked" ||
+        modeRef.current === "sportsPractice";
+      if (isSports && sportsMeetRunRef.current) {
+        const next = noteSportsRockDump(sportsMeetRunRef.current, Date.now());
+        sportsMeetRunRef.current = next;
+        setSportsMeetRun(next);
+        return;
       }
       pushQuestProgress("rockDump", 1);
       void claimSpecialReward("hill", rockId);
@@ -5821,7 +6205,14 @@ export function ExcavatorGameWrapper({
   const loadOverlayPercent = Math.max(0, Math.min(100, hud.bucketLoad * 100));
   const loadOverlayUnits = getLoadUnits(hud.bucketLoad, equipmentStats.maxLoadUnits);
   const showBucketLoad = attachmentType === "bucket" && loadOverlayUnits > 0;
-  const questsDisabled = mode === "practice" || mode === "tutorial";
+  const questsDisabled =
+    mode === "practice" ||
+    mode === "tutorial" ||
+    mode === "sportsRanked" ||
+    mode === "sportsPractice";
+  const sportsMeetUnlocked =
+    getPlayerLevelProgress(totalXp).level >= SPORTS_MEET_UNLOCK_LEVEL ||
+    isAdmin;
   const questClaimableCount = questsDisabled
     ? 0
     : countClaimableQuestRewards(questState).total;
@@ -6025,6 +6416,7 @@ export function ExcavatorGameWrapper({
           monumentPhase={
             monumentPanelState?.phase ?? monumentPhaseRef.current ?? "locked"
           }
+          sportsMeetUnlocked={sportsMeetUnlocked}
         />
 
         {mode !== "intro" && mode !== "gameReady" && travelRaiseWarn ? (
@@ -6216,6 +6608,35 @@ export function ExcavatorGameWrapper({
                           </button>
                         ) : null}
                       </div>
+                    ) : null}
+                    {nearSportsMeet &&
+                    !showSportsMeetPanel &&
+                    !nearRepairTent &&
+                    sportsMeetUnlocked ? (
+                      <button
+                        type="button"
+                        className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                        onClick={() => {
+                          setShowQuestPanel(false);
+                          setShowShopPanel(false);
+                          setShowEquipmentUpgrade(false);
+                          setShowProfileModal(false);
+                          setShowRepairPanel(false);
+                          setShowWorkshopPanel(false);
+                          setShowMonumentPanel(false);
+                          setShowSportsMeetPanel(true);
+                        }}
+                        aria-label="굴착기 운동회 입장"
+                      >
+                        <span className="yanmar-site-prompt-hud-copy">
+                          <span className="yanmar-site-prompt-hud-eyebrow">
+                            운동회
+                          </span>
+                          <span className="yanmar-site-prompt-hud-label">
+                            포탈 입장
+                          </span>
+                        </span>
+                      </button>
                     ) : null}
                     {nearRepairTent && !showRepairPanel ? (
                       <button
@@ -6896,6 +7317,7 @@ export function ExcavatorGameWrapper({
                     monumentPhaseRef.current ??
                     "locked"
                   }
+                  sportsMeetUnlocked={sportsMeetUnlocked}
                   onExpand={() => {
                     clearFreeLook();
                     setShowMapModal(true);
@@ -7159,10 +7581,90 @@ export function ExcavatorGameWrapper({
                 });
                 void loadMonumentState();
               }
+              if (closed === "SPORTS_MEET") {
+                warpToSportsMeetPortal();
+              }
             }
             setUnlockQueue((queue) => queue.slice(1));
           }}
         />
+        <SportsMeetModePanel
+          open={showSportsMeetPanel}
+          onClose={() => setShowSportsMeetPanel(false)}
+          onEnter={(m) => void enterSportsMeet(m)}
+          onOpenRankings={(week) => {
+            setSportsMeetRankingsWeek(week);
+            setShowSportsMeetRankings(true);
+          }}
+        />
+        <SportsMeetRankingsPanel
+          open={showSportsMeetRankings}
+          week={sportsMeetRankingsWeek}
+          onClose={() => setShowSportsMeetRankings(false)}
+          onSwitchWeek={setSportsMeetRankingsWeek}
+        />
+        {(mode === "sportsRanked" || mode === "sportsPractice") &&
+        sportsMeetRun ? (
+          <SportsMeetHud
+            key={`sports-hud-${sportsHudTick}`}
+            stageLabel={
+              sportsMeetRun.phase === "finished"
+                ? "완주!"
+                : `${STAGE_LABEL_KO[currentSportsStage(sportsMeetRun) ?? "drive"]} 코스`
+            }
+            progressLabel={(() => {
+              const stage = currentSportsStage(sportsMeetRun);
+              if (!stage) return "";
+              if (stage === "drive") {
+                return `별 ${sportsMeetRun.starsCollected}/${sportsMeetRun.mission.drive.starCount}`;
+              }
+              if (stage === "dig") {
+                return `하역 ${Math.floor(sportsMeetRun.dumpFillUnits)}/${sportsMeetRun.mission.dig.dumpTruckCapacity}`;
+              }
+              if (stage === "crash") {
+                return `파쇄 ${sportsMeetRun.asphaltBroken}/${sportsMeetRun.mission.crash.asphaltTileCount}`;
+              }
+              return `돌 ${sportsMeetRun.rocksDumped}/${sportsMeetRun.mission.hill.successfulDumpsRequired}`;
+            })()}
+            elapsedMs={sportsMeetElapsedMs(sportsMeetRun)}
+            countdownSec={
+              sportsMeetRun.phase === "countdown"
+                ? Math.max(
+                    0,
+                    Math.ceil(
+                      (sportsMeetRun.countdownEndsAtMs - Date.now()) / 1000,
+                    ),
+                  )
+                : null
+            }
+            phase={sportsMeetRun.phase}
+            patternName={sportsMeetRun.patternNameKo}
+            onStart={startSportsCountdown}
+            onExit={exitSportsMeet}
+          />
+        ) : null}
+        {sportsMeetRun?.phase === "finished" ? (
+          <SportsMeetResultPanel
+            open
+            playMode={sportsMeetRun.playMode}
+            patternName={sportsMeetRun.patternNameKo}
+            finalTimeMs={sportsMeetRun.finalTimeMs}
+            splits={sportsMeetRun.splits.map((s) => ({
+              stage: s.stage,
+              clearTimeMs: s.clearTimeMs,
+              label: STAGE_LABEL_KO[s.stage],
+            }))}
+            submitted={
+              sportsMeetRun.playMode === "practice" || sportsResultSubmitted
+            }
+            onRetryPractice={() => void enterSportsMeet("practice")}
+            onExit={exitSportsMeet}
+            onOpenRankings={() => {
+              setSportsMeetRankingsWeek("current");
+              setShowSportsMeetRankings(true);
+            }}
+          />
+        ) : null}
 
         <YanmarGameSettingsMenu
           immersive={immersive}
@@ -7266,7 +7768,11 @@ export function ExcavatorGameWrapper({
               activeChassisId={String(activeChassisId)}
               onSceneReady={handleSceneReady}
               worldPickupsRef={
-                mode === "game" && session?.user?.id ? worldPickupsRef : undefined
+                (mode === "game" && session?.user?.id) ||
+                mode === "sportsRanked" ||
+                mode === "sportsPractice"
+                  ? worldPickupsRef
+                  : undefined
               }
               worldPickupRevision={worldPickupRevision}
               onWorldPickup={handleWorldPickup}
@@ -7284,6 +7790,13 @@ export function ExcavatorGameWrapper({
               monumentStorageCap={monumentStorageCap(
                 monumentPanelState?.levels?.storage_cap ?? 0,
               )}
+              sportsMeetPortalVisible={
+                sportsMeetUnlocked &&
+                mode !== "sportsRanked" &&
+                mode !== "sportsPractice"
+              }
+              sportsMeetRunRef={sportsMeetRunRef}
+              sportsMeetPickupRevision={sportsMeetPickupRevision}
             />
           </div>
         )}

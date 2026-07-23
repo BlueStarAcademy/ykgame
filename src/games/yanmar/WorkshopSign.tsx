@@ -3,7 +3,7 @@
 import { Billboard, Text } from "@react-three/drei";
 import type { WorkshopId } from "./workshop/types";
 import { WORKSHOP_DEFS } from "./workshop/catalog";
-import { isInDumpZone, type TerrainData } from "./terrain";
+import { isInDumpZone, isInsideDigZoneBounds, type TerrainData } from "./terrain";
 
 const POST_COLOR = "#6b4f2e";
 const BOARD_COLOR = "#c4a574";
@@ -117,7 +117,9 @@ export function isInWorkshopSignRange(
   if (!terrain) return false;
 
   if (workshopId === "dump") {
-    return isInDumpZone(posX, posZ);
+    return (
+      isInDumpZone(posX, posZ) || isInsideDigZoneBounds(terrain, posX, posZ)
+    );
   }
 
   if (workshopId === "crash") {

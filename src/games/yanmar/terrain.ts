@@ -13,12 +13,16 @@ import {
 
 export const GRID_SIZE = 64;
 export const CELL_SIZE = 2;
-export const DIG_ZONE_CAPACITY_UNITS = 8000;
-export const DIG_ZONE_CAPACITY_MIN = 8000;
-export const DIG_ZONE_CAPACITY_MAX = 8000;
+export const DIG_ZONE_CAPACITY_UNITS = 10000;
+export const DIG_ZONE_CAPACITY_MIN = 10000;
+export const DIG_ZONE_CAPACITY_MAX = 10000;
 export const DIG_ZONE_CAPACITY_STEP = 100;
-export const DIG_ZONE_COUNT = 2;
+/** Fixed single dig mound (legacy constant kept for callers). */
+export const DIG_ZONE_COUNT = 1;
+/** Full refill time when empty — also used for continuous regen rate. */
 export const DIG_ZONE_RESPAWN_MS = 60 * 1000;
+export const DIG_ZONE_REGEN_UNITS_PER_SEC =
+  DIG_ZONE_CAPACITY_UNITS / (DIG_ZONE_RESPAWN_MS / 1000);
 /** 아스팔트·돌 구역: 이탈 후(또는 전량 소진 후) 풀 리젠까지 대기. */
 export const CRASH_ZONE_RESPAWN_MS = 5 * 60 * 1000;
 export const CRASH_TILE_MAX_HP = 2000;
@@ -164,9 +168,7 @@ export function createTerrain(
   const mapTier = getMapTierForLevel(playerLevel);
   const { gridSizeX, gridSizeZ } = getGridSizeForTier(mapTier);
   const heights = new Float32Array(gridSizeX * gridSizeZ);
-  const digZones = dynamicDigZones
-    ? createRandomDigZones(originX, originZ, gridSizeX, gridSizeZ)
-    : [createDigZone("practice-dig", DIG_ZONE.x, DIG_ZONE.z)];
+  const digZones = [createDigZone("site-dig", DIG_ZONE.x, DIG_ZONE.z)];
   const crashZone = mapTier >= 2 ? createCrashZone() : null;
   const hillZone = mapTier >= 3 ? createHillZone() : null;
   for (let gz = 0; gz < gridSizeZ; gz++) {
@@ -377,9 +379,7 @@ export function consumeDigZoneUnits(
   if (!zone) return 0;
   const consumed = Math.min(zone.remainingUnits, units);
   zone.remainingUnits = Math.max(0, zone.remainingUnits - consumed);
-  if (zone.remainingUnits <= 0 && zone.active) {
-    depleteDigZone(terrain, zone);
-  }
+  // Stay active at fixed location — continuous regen refills stock.
   return consumed;
 }
 
@@ -411,8 +411,8 @@ export function sampleHeight(terrain: TerrainData, wx: number, wz: number): numb
   return top + (bottom - top) * tz;
 }
 
-/** 굴착·덤프 구역 (확장 맵 기준) */
-export const DIG_ZONE = { x: 4, z: 18, radius: 12 };
+/** 굴착 구역 — 덤프 트럭(33.27, -12.68) 근처 고정 */
+export const DIG_ZONE = { x: 18, z: 2, radius: 12 };
 
 /**
  * 덤프트럭 주차 패드 지형 높이 (applyTruckDeparturePad target).
@@ -606,6 +606,7 @@ export function randomDigCapacityUnits() {
 }
 
 export function digZoneLabel(zoneId: string, index = 0) {
+  if (zoneId === "site-dig" || zoneId === "practice-dig") return "흙더미";
   const match = zoneId.match(/(\d+)\s*$/);
   const n = match ? Number(match[1]) : index + 1;
   if (n === 1) return "흙더미 I";
@@ -751,44 +752,6 @@ function truckPadContext() {
   };
 }
 
-function findOverlappingActiveZone(
-  terrain: TerrainData,
-  wx: number,
-  wz: number,
-  ignoreId?: string,
-) {
-  return (
-    terrain.digZones.find(
-      (item) =>
-        item.id !== ignoreId &&
-        item.active &&
-        distance(wx, wz, item.x, item.z) < item.radius,
-    ) ?? null
-  );
-}
-
-function restoreGroundAtZone(terrain: TerrainData, zone: DigZone) {
-  const dumpPad = dumpPadContext();
-  const truck = truckPadContext();
-  for (let gz = 0; gz < terrain.gridSizeZ; gz++) {
-    for (let gx = 0; gx < terrain.gridSizeX; gx++) {
-      const idx = gz * terrain.gridSizeX + gx;
-      const wx = terrain.originX + (gx + 0.5) * terrain.cellSize;
-      const wz = terrain.originZ + (gz + 0.5) * terrain.cellSize;
-      if (distance(wx, wz, zone.x, zone.z) >= zone.radius) continue;
-      const otherZone = findOverlappingActiveZone(terrain, wx, wz, zone.id);
-      const next = applyTruckDeparturePad(
-        wx,
-        wz,
-        computeBaseTerrainHeight(wx, wz, otherZone, dumpPad),
-        truck,
-      );
-      terrain.heights[idx] = next;
-      terrain.baseHeights[idx] = next;
-    }
-  }
-}
-
 function addMoundAtZone(terrain: TerrainData, zone: DigZone) {
   for (let gz = 0; gz < terrain.gridSizeZ; gz++) {
     for (let gx = 0; gx < terrain.gridSizeX; gx++) {
@@ -802,12 +765,120 @@ function addMoundAtZone(terrain: TerrainData, zone: DigZone) {
   }
 }
 
-function depleteDigZone(terrain: TerrainData, zone: DigZone, now = Date.now()) {
-  restoreGroundAtZone(terrain, zone);
-  zone.active = false;
-  zone.remainingUnits = 0;
-  zone.depletedAt = now;
-  zone.respawnAt = now + DIG_ZONE_RESPAWN_MS;
+/** Snap dig zones to the fixed site mound; preserves fill ratio when capacity changes. */
+export function normalizeFixedDigZones(terrain: TerrainData) {
+  const prev = terrain.digZones[0];
+  let remaining = DIG_ZONE_CAPACITY_UNITS;
+  if (prev) {
+    if (prev.capacityUnits > 0 && prev.capacityUnits !== DIG_ZONE_CAPACITY_UNITS) {
+      remaining = Math.round(
+        (prev.remainingUnits / prev.capacityUnits) * DIG_ZONE_CAPACITY_UNITS,
+      );
+    } else {
+      remaining = prev.remainingUnits;
+    }
+  }
+  remaining = Math.max(0, Math.min(DIG_ZONE_CAPACITY_UNITS, remaining));
+  const zone = createDigZone("site-dig", DIG_ZONE.x, DIG_ZONE.z);
+  zone.remainingUnits = remaining;
+  zone.active = true;
+  zone.depletedAt = null;
+  zone.respawnAt = null;
+  terrain.digZones = [zone];
+}
+
+/** Softly raise dug cells toward a fill-ratio mound (no full reset pop). */
+function nudgeDigZoneMoundTowardFill(terrain: TerrainData, zone: DigZone) {
+  const fill =
+    zone.capacityUnits > 0
+      ? Math.max(0, Math.min(1, zone.remainingUnits / zone.capacityUnits))
+      : 0;
+  if (fill <= 0) return;
+  const dumpPad = dumpPadContext();
+  const truck = truckPadContext();
+  const minGx = Math.max(
+    0,
+    Math.floor((zone.x - zone.radius - terrain.originX) / terrain.cellSize),
+  );
+  const maxGx = Math.min(
+    terrain.gridSizeX - 1,
+    Math.floor((zone.x + zone.radius - terrain.originX) / terrain.cellSize),
+  );
+  const minGz = Math.max(
+    0,
+    Math.floor((zone.z - zone.radius - terrain.originZ) / terrain.cellSize),
+  );
+  const maxGz = Math.min(
+    terrain.gridSizeZ - 1,
+    Math.floor((zone.z + zone.radius - terrain.originZ) / terrain.cellSize),
+  );
+  for (let gz = minGz; gz <= maxGz; gz++) {
+    for (let gx = minGx; gx <= maxGx; gx++) {
+      const idx = gz * terrain.gridSizeX + gx;
+      const wx = terrain.originX + (gx + 0.5) * terrain.cellSize;
+      const wz = terrain.originZ + (gz + 0.5) * terrain.cellSize;
+      if (distance(wx, wz, zone.x, zone.z) >= zone.radius) continue;
+      const flat = applyTruckDeparturePad(
+        wx,
+        wz,
+        computeBaseTerrainHeight(wx, wz, null, dumpPad),
+        truck,
+      );
+      const full = applyZoneMoundHeight(wx, wz, zone, flat);
+      const target = flat + (full - flat) * fill;
+      const current = terrain.heights[idx];
+      if (current >= target - 0.001) continue;
+      const next = Math.min(
+        target,
+        current + Math.max((target - current) * 0.06, 0.0015),
+      );
+      terrain.heights[idx] = next;
+      terrain.baseHeights[idx] = Math.max(terrain.baseHeights[idx], next);
+    }
+  }
+}
+
+/**
+ * Continuous in-place soil regen. Replaces random relocate respawn.
+ * @param dt seconds
+ */
+export function regenDigZones(terrain: TerrainData, dt: number) {
+  if (!terrain.dynamicDigZones || dt <= 0) return;
+  for (const zone of terrain.digZones) {
+    // Legacy snapshots: revive at fixed site coords without relocating.
+    if (!zone.active) {
+      zone.x = DIG_ZONE.x;
+      zone.z = DIG_ZONE.z;
+      zone.radius = DIG_ZONE.radius;
+      zone.capacityUnits = DIG_ZONE_CAPACITY_UNITS;
+      zone.active = true;
+      zone.depletedAt = null;
+      zone.respawnAt = null;
+    }
+    if (zone.remainingUnits >= zone.capacityUnits) continue;
+    const before = zone.remainingUnits;
+    zone.remainingUnits = Math.min(
+      zone.capacityUnits,
+      zone.remainingUnits + DIG_ZONE_REGEN_UNITS_PER_SEC * dt,
+    );
+    if (zone.remainingUnits > before) {
+      nudgeDigZoneMoundTowardFill(terrain, zone);
+    }
+  }
+}
+
+/** @deprecated Prefer regenDigZones — kept for session restore callers. */
+export function updateDigZoneRespawns(terrain: TerrainData, _now = Date.now()) {
+  normalizeFixedDigZones(terrain);
+  for (const zone of terrain.digZones) {
+    zone.active = true;
+    zone.depletedAt = null;
+    zone.respawnAt = null;
+    if (zone.remainingUnits <= 0) {
+      zone.remainingUnits = DIG_ZONE_CAPACITY_UNITS;
+    }
+    addMoundAtZone(terrain, zone);
+  }
 }
 
 export function getActiveDigZones(terrain: TerrainData) {
@@ -826,28 +897,15 @@ export function getActiveDigZoneAt(
   );
 }
 
-export function updateDigZoneRespawns(terrain: TerrainData, now = Date.now()) {
-  if (!terrain.dynamicDigZones) return;
-  for (const zone of terrain.digZones) {
-    if (zone.active || !zone.respawnAt || now < zone.respawnAt) continue;
-    const pos = randomDigZonePosition(
-      terrain.originX,
-      terrain.originZ,
-      terrain.digZones,
-      terrain.gridSizeX,
-      terrain.gridSizeZ,
-      zone.id,
-    );
-    const capacity = DIG_ZONE_CAPACITY_UNITS;
-    zone.x = pos.x;
-    zone.z = pos.z;
-    zone.capacityUnits = capacity;
-    zone.remainingUnits = capacity;
-    zone.active = true;
-    zone.depletedAt = null;
-    zone.respawnAt = null;
-    addMoundAtZone(terrain, zone);
-  }
+/** Dig footprint for workshop manage entry (ignores active / stock). */
+export function isInsideDigZoneBounds(
+  terrain: TerrainData,
+  wx: number,
+  wz: number,
+): boolean {
+  return terrain.digZones.some(
+    (zone) => distance(wx, wz, zone.x, zone.z) < zone.radius,
+  );
 }
 
 export function cloneDigZones(zones: DigZone[]): DigZone[] {
@@ -892,21 +950,25 @@ export function isInDigZone(wx: number, wz: number, terrain?: TerrainData): bool
 function createCrashZone(
   centerX = 108,
   centerZ = 12,
+  tileCount = 9,
 ): CrashZone {
   const cycleId = `crash-${Date.now().toString(36)}-${Math.floor(
     Math.random() * 1_000_000,
   ).toString(36)}`;
+  const count = Math.max(1, Math.floor(tileCount));
+  const cols = count <= 9 ? 3 : 4;
+  const rows = Math.ceil(count / cols);
   return {
     id: cycleId,
     centerX,
     centerZ,
-    width: 24,
-    depth: 24,
+    width: Math.max(24, cols * 8),
+    depth: Math.max(24, rows * 8),
     active: true,
-    tiles: Array.from({ length: 9 }, (_, index) => ({
+    tiles: Array.from({ length: count }, (_, index) => ({
       id: `${cycleId}-tile-${index + 1}`,
-      row: Math.floor(index / 3),
-      col: index % 3,
+      row: Math.floor(index / cols),
+      col: index % cols,
       hp: CRASH_TILE_MAX_HP,
       maxHp: CRASH_TILE_MAX_HP,
       active: true,
@@ -914,6 +976,15 @@ function createCrashZone(
     clearedAt: null,
     respawnAt: null,
   };
+}
+
+/** Sports-meet / custom asphalt pad with configurable tile count. */
+export function createSportsCrashZone(
+  centerX: number,
+  centerZ: number,
+  tileCount: number,
+): CrashZone {
+  return createCrashZone(centerX, centerZ, tileCount);
 }
 
 function createHillBoulders(
@@ -968,6 +1039,16 @@ function createHillZone(
     clearedAt: null,
     respawnAt: null,
   };
+}
+
+/** Sports-meet hill pad with configurable boulder count. */
+export function createSportsHillZone(
+  centerX: number,
+  centerZ: number,
+  boulderCount: number,
+  haulTruck?: HaulTruckState,
+): HillZone {
+  return createHillZone(centerX, centerZ, haulTruck, boulderCount);
 }
 
 export function isInCrashZone(

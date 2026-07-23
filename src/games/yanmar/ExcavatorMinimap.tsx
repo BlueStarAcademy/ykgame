@@ -26,6 +26,8 @@ interface ExcavatorMinimapProps {
   showLegend?: boolean;
   /** 탭/클릭 시 맵 확대 */
   onExpand?: () => void;
+  /** Lv.25+ sports meet portal marker */
+  sportsMeetUnlocked?: boolean;
 }
 
 const DEFAULT_DISPLAY_SIZE = 120;
@@ -174,6 +176,7 @@ export function ExcavatorMinimap({
   monumentPhase = "locked",
   showLegend = true,
   onExpand,
+  sportsMeetUnlocked = false,
 }: ExcavatorMinimapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -348,6 +351,28 @@ export function ExcavatorMinimap({
       context.strokeStyle = "#8b1e1e";
       context.lineWidth = Math.max(1, 1.2 * repairScale);
       context.stroke();
+
+      if (sportsMeetUnlocked) {
+        const portal = worldToMinimap(
+          SITE_LAYOUT.sportsPortal[0],
+          SITE_LAYOUT.sportsPortal[1],
+          bounds,
+          size,
+          pad,
+        );
+        const pr = 5 * repairScale;
+        context.beginPath();
+        context.arc(portal.px, portal.py, pr, 0, Math.PI * 2);
+        context.fillStyle = "#38bdf8";
+        context.fill();
+        context.strokeStyle = "#0ea5e9";
+        context.lineWidth = Math.max(1, 1.4 * repairScale);
+        context.stroke();
+        context.beginPath();
+        context.arc(portal.px, portal.py, pr * 0.45, 0, Math.PI * 2);
+        context.fillStyle = "#fbbf24";
+        context.fill();
+      }
 
       if (monumentPhase !== "locked") {
         const mon = worldToMinimap(
@@ -538,7 +563,7 @@ export function ExcavatorMinimap({
         dprQuery.removeListener(onDprChange);
       }
     };
-  }, [visible, displaySize, monumentPhase, simRef, terrainRef, tutorialStepRef, tutorialWaypointRef, worldPickupsRef]);
+  }, [visible, displaySize, monumentPhase, sportsMeetUnlocked, simRef, terrainRef, tutorialStepRef, tutorialWaypointRef, worldPickupsRef]);
 
   if (!visible) return null;
 
@@ -549,6 +574,9 @@ export function ExcavatorMinimap({
     { label: "석재", swatch: "bg-slate-300 ring-1 ring-slate-100/70" },
     { label: "정비", swatch: "bg-amber-200 ring-1 ring-yellow-100/80" },
     { label: "조형", swatch: "bg-amber-200 ring-1 ring-yellow-100/90" },
+    ...(sportsMeetUnlocked
+      ? [{ label: "운동회", swatch: "bg-sky-400 ring-1 ring-sky-200/80" }]
+      : []),
   ] as const;
 
   return (
