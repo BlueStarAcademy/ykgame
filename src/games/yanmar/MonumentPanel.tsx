@@ -192,6 +192,20 @@ export function MonumentPanel({
     return MONUMENT_BUILD_QUESTS.every((q) => questState.build[q.id]?.completed);
   }, [questState]);
 
+  const claimableQuestCount = useMemo(() => {
+    if (!questState) return 0;
+    let count = 0;
+    for (const q of questState.daily) {
+      const item = questState.dailyProgress[q.id];
+      if (item?.completed && !item.claimed) count += 1;
+    }
+    for (const q of questState.repeat) {
+      const item = questState.repeatProgress[q.id];
+      if (item?.completed) count += 1;
+    }
+    return count;
+  }, [questState]);
+
   if (!open || !panelState) return null;
 
   const phase = panelState.phase;
@@ -312,7 +326,7 @@ export function MonumentPanel({
               <button
                 key={id}
                 type="button"
-                className={`flex-1 rounded-t-lg px-2 py-2 text-sm font-bold ${
+                className={`relative flex-1 rounded-t-lg px-2 py-2 text-sm font-bold ${
                   tab === id
                     ? "bg-white/15 text-white"
                     : "text-stone-400 hover:bg-white/5"
@@ -320,6 +334,12 @@ export function MonumentPanel({
                 onClick={() => setTab(id)}
               >
                 {label}
+                {id === "quest" && claimableQuestCount > 0 ? (
+                  <span
+                    className="yanmar-quest-notify-badge is-dot"
+                    aria-label={`미수령 보상 ${claimableQuestCount}개`}
+                  />
+                ) : null}
               </button>
             ))}
           </div>
@@ -443,12 +463,16 @@ export function MonumentPanel({
                           <button
                             type="button"
                             disabled={busy}
-                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
+                            className="relative rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
                             onClick={() =>
                               void onClaimQuest(q.id, q.rewardPoints)
                             }
                           >
                             완료
+                            <span
+                              className="yanmar-quest-notify-badge is-dot"
+                              aria-hidden
+                            />
                           </button>
                         ) : item.claimed ? (
                           <span className="text-xs font-semibold text-stone-500">
@@ -501,12 +525,16 @@ export function MonumentPanel({
                           <button
                             type="button"
                             disabled={busy || !onClaimRepeatQuest}
-                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
+                            className="relative rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
                             onClick={() =>
                               void onClaimRepeatQuest?.(q.id, q.rewardPoints)
                             }
                           >
                             완료
+                            <span
+                              className="yanmar-quest-notify-badge is-dot"
+                              aria-hidden
+                            />
                           </button>
                         ) : null}
                       </div>

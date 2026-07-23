@@ -3640,11 +3640,12 @@ export function ExcavatorGameWrapper({
         if (!nearMon) setShowMonumentPanel(false);
       }
 
-      const mapTier = terrainRef.current.mapTier;
+      const terrain = terrainRef.current;
+      const mapTier = terrain.mapTier;
       let found: WorkshopId | null = null;
       for (const wid of WORKSHOP_IDS) {
         if (mapTier < WORKSHOP_DEFS[wid].minMapTier) continue;
-        if (isInWorkshopSignRange(wid, sim.posX, sim.posZ)) {
+        if (isInWorkshopSignRange(wid, sim.posX, sim.posZ, terrain)) {
           found = wid;
           break;
         }

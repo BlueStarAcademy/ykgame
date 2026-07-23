@@ -208,6 +208,11 @@ export function WorkshopPanel({
     });
   }, [def, questItems]);
 
+  const claimableQuestCount = useMemo(
+    () => questRows.filter(({ item }) => item.completed && !item.claimed).length,
+    [questRows],
+  );
+
   if (!open || !workshopId || !def) return null;
 
   const coin = def.pointsIcon;
@@ -257,7 +262,7 @@ export function WorkshopPanel({
             <button
               key={id}
               type="button"
-              className={`flex-1 rounded-t-lg px-2 py-2 text-sm font-bold ${
+              className={`relative flex-1 rounded-t-lg px-2 py-2 text-sm font-bold ${
                 tab === id
                   ? "bg-white/15 text-white"
                   : "text-stone-400 hover:bg-white/5"
@@ -265,6 +270,12 @@ export function WorkshopPanel({
               onClick={() => setTab(id)}
             >
               {label}
+              {id === "quest" && claimableQuestCount > 0 ? (
+                <span
+                  className="yanmar-quest-notify-badge is-dot"
+                  aria-label={`미수령 보상 ${claimableQuestCount}개`}
+                />
+              ) : null}
             </button>
           ))}
         </div>
@@ -300,10 +311,14 @@ export function WorkshopPanel({
                           <button
                             type="button"
                             disabled={busy}
-                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
+                            className="relative rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
                             onClick={() => void onClaimQuest(q.id)}
                           >
                             완료
+                            <span
+                              className="yanmar-quest-notify-badge is-dot"
+                              aria-hidden
+                            />
                           </button>
                         ) : item.claimed && q.kind === "daily" ? (
                           <span className="text-xs font-semibold text-stone-500">

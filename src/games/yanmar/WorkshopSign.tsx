@@ -3,6 +3,7 @@
 import { Billboard, Text } from "@react-three/drei";
 import type { WorkshopId } from "./workshop/types";
 import { WORKSHOP_DEFS } from "./workshop/catalog";
+import { isInDumpZone, type TerrainData } from "./terrain";
 
 const POST_COLOR = "#6b4f2e";
 const BOARD_COLOR = "#c4a574";
@@ -101,15 +102,37 @@ export function WorkshopSign({
   );
 }
 
+/** 팻말 근접 또는 해당 작업 지역(흙/아스팔트/돌) 안이면 관리 입장 가능. */
 export function isInWorkshopSignRange(
   workshopId: WorkshopId,
   posX: number,
   posZ: number,
+  terrain?: TerrainData | null,
 ) {
   const { x, z, radius } = WORKSHOP_DEFS[workshopId].sign;
   const dx = posX - x;
   const dz = posZ - z;
-  return dx * dx + dz * dz <= radius * radius;
+  if (dx * dx + dz * dz <= radius * radius) return true;
+
+  if (!terrain) return false;
+
+  if (workshopId === "dump") {
+    return isInDumpZone(posX, posZ);
+  }
+
+  if (workshopId === "crash") {
+    const zone = terrain.crashZone;
+    if (!zone) return false;
+    // 리스폰 중에도 지역 경계 안이면 관리 가능 (active 무시)
+    return (
+      Math.abs(posX - zone.centerX) <= zone.width / 2 &&
+      Math.abs(posZ - zone.centerZ) <= zone.depth / 2
+    );
+  }
+
+  const zone = terrain.hillZone;
+  if (!zone) return false;
+  return Math.hypot(posX - zone.centerX, posZ - zone.centerZ) <= zone.radius + 8;
 }
 
 export function WorkshopSigns({

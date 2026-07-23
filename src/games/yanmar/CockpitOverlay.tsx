@@ -2,7 +2,7 @@
 
 /* eslint-disable react-hooks/immutability */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type {
   AuxiliaryControlState,
   ControlMask,
@@ -140,6 +140,10 @@ const TRAVEL_BASELINE =
   "calc(100% - var(--yanmar-travel-baseline, 4.55rem))";
 const FOOT_PEDAL_BASELINE =
   "calc(100% - var(--yanmar-foot-pedal-baseline, 1.35rem))";
+/** 주행 레버 터치 세로 배율(시각 스틱 대비). 1.5 = +50%, 위쪽으로만 확장. */
+const TRAVEL_TOUCH_HEIGHT_SCALE = 1.5;
+const TRAVEL_HITBOX_STICK_MULT = 2.4;
+const TRAVEL_HITBOX_LANDSCAPE_PCT = 68;
 
 const AUTO_POSE_SLOT_ORDER = Array.from(
   { length: AUTO_POSE_SLOT_COUNT },
@@ -780,11 +784,42 @@ function activateOnPointerDown(handler: () => void) {
 
 function travelAxisFromClientY(zone: HTMLElement, clientY: number) {
   const rect = zone.getBoundingClientRect();
-  const cy = rect.top + rect.height / 2;
-  const maxR = Math.max(rect.height / 2, 1);
+  // Hitbox is taller upward (1.5×); keep control center at the old midpoint
+  // (2/3 from top) so throw feel / reverse range stay the same.
+  const cy = rect.top + (rect.height * 2) / 3;
+  const maxR = Math.max(rect.height / 3, 1);
   const dy = Math.max(-maxR, Math.min(maxR, clientY - cy));
   const raw = Math.max(-1, Math.min(1, -dy / maxR));
   return Math.abs(raw) < TRAVEL_INPUT_DEADZONE ? 0 : raw;
+}
+
+function travelLeverHitboxStyle(args: {
+  cxPct: string;
+  /** Landscape: e.g. `42%`. Portrait uses TRAVEL_BASELINE internally. */
+  centerY: string;
+  isPortrait: boolean;
+  width: string;
+  centerOffsetX?: string;
+}): CSSProperties {
+  const heightScale = TRAVEL_TOUCH_HEIGHT_SCALE;
+  const stickMult = TRAVEL_HITBOX_STICK_MULT;
+  const landscapePct = TRAVEL_HITBOX_LANDSCAPE_PCT;
+  const height = args.isPortrait
+    ? `calc(var(--yanmar-travel-stick-h, 2.45rem) * ${stickMult * heightScale})`
+    : `${landscapePct * heightScale}%`;
+  // Shift up by 25% of the original height so the extra 50% is only above.
+  const top = args.isPortrait
+    ? `calc(100% - var(--yanmar-travel-baseline, 4.55rem) - var(--yanmar-travel-stick-h, 2.45rem) * ${stickMult * 0.25})`
+    : `calc(${args.centerY} - ${landscapePct * 0.25}%)`;
+  return {
+    left: args.centerOffsetX
+      ? `calc(${args.cxPct} + ${args.centerOffsetX})`
+      : args.cxPct,
+    top,
+    width: args.width,
+    height,
+    transform: "translate(-50%, -50%)",
+  };
 }
 
 interface GameJoystickProps {
@@ -999,23 +1034,19 @@ function TravelLever({
       ? "-2.4%"
       : "2.4%";
   const hitboxWidth = isPortrait ? "10%" : "6.6%";
-  // 스틱 행정에 맞춘 높이 — 덱 높이 %로 잡으면 하단이 과도하게 후진 구역이 됨
-  const hitboxHeight = isPortrait
-    ? "calc(var(--yanmar-travel-stick-h, 2.45rem) * 2.4)"
-    : "68%";
 
   return (
     <>
       <div
         ref={zoneRef}
         className={`absolute z-40 touch-none rounded-xl ${!enabled ? "pointer-events-none" : "pointer-events-auto"}`}
-        style={{
-          left: `calc(${layout.cx * 100}% + ${hitboxCenterOffset})`,
-          top: isPortrait ? TRAVEL_BASELINE : `calc(${layout.cy * 100}%)`,
+        style={travelLeverHitboxStyle({
+          cxPct: `${layout.cx * 100}%`,
+          centerY: `${layout.cy * 100}%`,
+          isPortrait,
           width: hitboxWidth,
-          height: hitboxHeight,
-          transform: "translate(-50%, -50%)",
-        }}
+          centerOffsetX: hitboxCenterOffset,
+        })}
         onPointerDown={handleStart}
         onPointerMove={handleMove}
         onPointerUp={handleEnd}
@@ -1118,15 +1149,12 @@ function DualTravelCenter({
     <div
       ref={zoneRef}
       className={`absolute z-30 touch-none rounded-xl ${!enabled ? "pointer-events-none" : "pointer-events-auto"}`}
-      style={{
-        left: `${layout.cx * 100}%`,
-        top: isPortrait ? TRAVEL_BASELINE : `calc(${layout.cy * 100}%)`,
+      style={travelLeverHitboxStyle({
+        cxPct: `${layout.cx * 100}%`,
+        centerY: `${layout.cy * 100}%`,
+        isPortrait,
         width: isPortrait ? "10%" : "12.5%",
-        height: isPortrait
-          ? "calc(var(--yanmar-travel-stick-h, 2.45rem) * 2.4)"
-          : "68%",
-        transform: "translate(-50%, -50%)",
-      }}
+      })}
       onPointerDown={handleStart}
       onPointerMove={handleMove}
       onPointerUp={handleEnd}
