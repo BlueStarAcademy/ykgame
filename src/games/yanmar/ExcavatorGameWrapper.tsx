@@ -172,12 +172,18 @@ import {
 } from "./auxiliarySettingsPersistence";
 import {
   createDumpTruckState,
+  fastForwardDumpTruckState,
   formatDumpTruckReturnTime,
   getDumpTruckPose,
   resetDumpTruckState,
   type DumpTruckPose,
+  type DumpTruckRuntimeState,
 } from "./dumpTruckState";
-import { expandTerrainForLevel, type TerrainData } from "./terrain";
+import {
+  expandTerrainForLevel,
+  fastForwardHaulTruckState,
+  type TerrainData,
+} from "./terrain";
 import {
   YANMAR_REWARD_CONFIG,
   YANMAR_CRASH_REWARD_CONFIG,
@@ -1127,6 +1133,9 @@ export function ExcavatorGameWrapper({
   });
   const sportsMainTerrainRef = useRef<TerrainData | null>(null);
   const sportsEquipmentSnapRef = useRef<YanmarEquipmentStats | null>(null);
+  const sportsDumpTruckSnapRef = useRef<DumpTruckRuntimeState | null>(null);
+  /** Wall-clock when main-map trucks were frozen for sports (offline-style resume). */
+  const sportsWorldAwayAtMsRef = useRef<number | null>(null);
   const sportsHudTickRef = useRef(0);
   const [sportsHudTick, setSportsHudTick] = useState(0);
   const [sportsResultSubmitted, setSportsResultSubmitted] = useState(false);
@@ -1389,7 +1398,15 @@ export function ExcavatorGameWrapper({
     const userId = dumpTruckUserIdRef.current;
     if (!userId) return;
     // Ranked game sessions own truck state via full session persistence.
-    if (modeRef.current === "game") return;
+    // Sports meet uses an isolated dump truck — never write main-map cooldown.
+    const mode = modeRef.current;
+    if (
+      mode === "game" ||
+      mode === "sportsRanked" ||
+      mode === "sportsPractice"
+    ) {
+      return;
+    }
 
     const now = Date.now();
     if (!force && now - dumpTruckLastSavedAtRef.current < 1000) return;
@@ -2425,17 +2442,45 @@ export function ExcavatorGameWrapper({
   );
 
   const exitSportsMeet = useCallback(() => {
+    const awayAtMs = sportsWorldAwayAtMsRef.current;
+    sportsWorldAwayAtMsRef.current = null;
+    const elapsedSec =
+      awayAtMs != null ? Math.max(0, (Date.now() - awayAtMs) / 1000) : 0;
+
+    const equipmentSnap = sportsEquipmentSnapRef.current;
+    if (equipmentSnap) {
+      equipmentStatsRef.current = equipmentSnap;
+      setEquipmentStats(equipmentSnap);
+      sportsEquipmentSnapRef.current = null;
+    }
+
     const main = sportsMainTerrainRef.current;
     if (main) {
+      if (elapsedSec > 0 && main.hillZone?.haulTruck) {
+        fastForwardHaulTruckState(
+          main.hillZone.haulTruck,
+          elapsedSec,
+          equipmentStatsRef.current.haulTruckCooldownSec,
+        );
+      }
       terrainRef.current = main;
       sportsMainTerrainRef.current = null;
       setTerrainRevision((k) => k + 1);
     }
-    if (sportsEquipmentSnapRef.current) {
-      equipmentStatsRef.current = sportsEquipmentSnapRef.current;
-      setEquipmentStats(sportsEquipmentSnapRef.current);
-      sportsEquipmentSnapRef.current = null;
+
+    if (sportsDumpTruckSnapRef.current) {
+      Object.assign(dumpTruckStateRef.current, sportsDumpTruckSnapRef.current);
+      sportsDumpTruckSnapRef.current = null;
+      if (elapsedSec > 0) {
+        fastForwardDumpTruckState(
+          dumpTruckStateRef.current,
+          elapsedSec,
+          equipmentStatsRef.current.truckCooldownSec,
+        );
+      }
+      dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
     }
+
     yanmarAudio.setSportsMeetBgm(false);
     setSportsResultSubmitted(false);
     syncSportsMeetRun(null);
@@ -2481,6 +2526,8 @@ export function ExcavatorGameWrapper({
       const mission = getSportsMeetMissionForWeek(weekKey);
       sportsMainTerrainRef.current = terrainRef.current;
       sportsEquipmentSnapRef.current = { ...equipmentStatsRef.current };
+      sportsDumpTruckSnapRef.current = { ...dumpTruckStateRef.current };
+      sportsWorldAwayAtMsRef.current = Date.now();
 
       terrainRef.current = createSportsMeetTerrain(pattern, mission);
 
@@ -2491,6 +2538,7 @@ export function ExcavatorGameWrapper({
       equipmentStatsRef.current = nextStats;
       setEquipmentStats(nextStats);
       resetDumpTruckState(dumpTruckStateRef.current);
+      dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
       setTerrainRevision((k) => k + 1);
 
       const run = beginSportsMeetRun(
