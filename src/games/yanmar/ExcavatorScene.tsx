@@ -107,6 +107,15 @@ import {
   type ScatterRock,
 } from "./terrainScatter";
 import { MapSiteDecor } from "./mapDecor";
+import { SportsMeetCourseDecor } from "./SportsMeetCourseDecor";
+import { SportsMeetFinishGate } from "./SportsMeetFinishGate";
+import { SportsMeetStartGrid } from "./SportsMeetStartGrid";
+import {
+  getSportsMeetPatternById,
+  getSportsMeetStartPaddock,
+  isSportsMeetStartLocked,
+  currentSportsStage,
+} from "./sportsMeet";
 import { RepairTent } from "./RepairTent";
 import { REPAIR_TENT } from "./gearCatalog";
 import { WorkshopSigns } from "./WorkshopSign";
@@ -177,8 +186,15 @@ interface ExcavatorSceneProps {
   monumentStarsStored?: number;
   monumentStorageCap?: number;
   sportsMeetPortalVisible?: boolean;
+  sportsMeetTicketRemaining?: number;
+  sportsMeetTicketLimit?: number;
   sportsMeetRunRef?: React.RefObject<import("./sportsMeet/types").SportsMeetRunState | null>;
   sportsMeetPickupRevision?: number;
+  /** Dedicated sports-meet arena look (sky / decor / hide main-site props). */
+  sportsArenaActive?: boolean;
+  sportsMeetPattern?: import("./sportsMeet/patterns").SportsMeetPattern | null;
+  /** Start-gate open after countdown GO (false while ready/countdown). */
+  sportsMeetGateOpen?: boolean;
 }
 
 function TerrainMesh({
@@ -2227,6 +2243,7 @@ function SimLoop({
   activeChassisId,
   worldPickupsRef,
   onWorldPickup,
+  sportsMeetRunRef,
 }: ExcavatorSceneProps) {
   const runtimeRef = useRef(createSimLoopRuntime());
   const dustRef = useRef<THREE.Group>(null);
@@ -2239,6 +2256,21 @@ function SimLoop({
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
+    const sportsRun = sportsMeetRunRef?.current ?? null;
+    const startLocked = isSportsMeetStartLocked(sportsRun?.phase);
+    const sportsPattern =
+      startLocked && sportsRun
+        ? getSportsMeetPatternById(sportsRun.patternId)
+        : null;
+    const sportsMeetStartPaddock =
+      sportsPattern != null ? getSportsMeetStartPaddock(sportsPattern) : null;
+    const sportsMeetStage =
+      sportsRun &&
+      (modeRef.current === "sportsRanked" ||
+        modeRef.current === "sportsPractice")
+        ? currentSportsStage(sportsRun)
+        : null;
+
     tickExcavatorSim({
       dt,
       sim: simRef.current,
@@ -2268,6 +2300,8 @@ function SimLoop({
       dozerBladeReach,
       worldPickups: worldPickupsRef?.current ?? null,
       onWorldPickup,
+      sportsMeetStartPaddock,
+      sportsMeetStage,
     });
 
     const dust = runtimeRef.current.digDust;
@@ -3642,6 +3676,113 @@ function SunnySky() {
   );
 }
 
+/** Warm festival sky for the sports-meet arena — distinct from the worksite day sky. */
+function SportsMeetSky() {
+  return (
+    <>
+      <Billboard position={[62, 42, -70]} follow lockX={false} lockY={false} lockZ={false}>
+        <mesh renderOrder={-8}>
+          <circleGeometry args={[14, 48]} />
+          <meshBasicMaterial
+            color="#ff8a3c"
+            transparent
+            opacity={0.14}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh renderOrder={-7}>
+          <circleGeometry args={[8.5, 48]} />
+          <meshBasicMaterial
+            color="#ffb347"
+            transparent
+            opacity={0.28}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh renderOrder={-6}>
+          <circleGeometry args={[5.2, 48]} />
+          <meshBasicMaterial
+            color="#ffd27a"
+            transparent
+            opacity={0.62}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh renderOrder={-5}>
+          <circleGeometry args={[2.8, 48]} />
+          <meshBasicMaterial
+            color="#fff4d6"
+            transparent
+            opacity={0.96}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      </Billboard>
+      <Cloud x={-36} y={22} z={-48} scale={2.8} opacity={0.55} />
+      <Cloud x={12} y={28} z={-70} scale={2.4} opacity={0.5} />
+      <Cloud x={58} y={24} z={-36} scale={2.6} opacity={0.48} />
+      <Cloud x={88} y={30} z={20} scale={2.2} opacity={0.42} />
+    </>
+  );
+}
+
+function SportsMeetBackdrop() {
+  const loadedTexture = useLoader(
+    THREE.TextureLoader,
+    PREMIUM_SITE_TEXTURES.sportsMeetBackdrop,
+  );
+  const texture = useMemo(() => loadedTexture.clone(), [loadedTexture]);
+  const skyVaultTexture = useMemo(() => createSkyVaultTexture(), []);
+  useLayoutEffect(() => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.MirroredRepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.repeat.set(4, 1);
+    texture.anisotropy = 8;
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.needsUpdate = true;
+    return () => {
+      texture.dispose();
+      skyVaultTexture.dispose();
+    };
+  }, [texture, skyVaultTexture]);
+
+  return (
+    <group>
+      <mesh
+        position={[48, 62, 48]}
+        rotation={[0, Math.PI * 0.18, 0]}
+        renderOrder={-10}
+      >
+        <cylinderGeometry args={[170, 170, 130, 128, 1, true]} />
+        <meshBasicMaterial
+          map={texture}
+          color="#ffffff"
+          fog={false}
+          toneMapped={false}
+          side={THREE.BackSide}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh position={[48, 127, 48]} scale={[1, 0.55, 1]} renderOrder={-11}>
+        <sphereGeometry args={[170, 64, 28, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
+        <meshBasicMaterial
+          map={skyVaultTexture}
+          fog={false}
+          toneMapped={false}
+          side={THREE.BackSide}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
 function AuxiliarySceneEffects({
   auxiliaryRef: _auxiliaryRef,
 }: {
@@ -3671,16 +3812,26 @@ function SceneReadySignal({ onReady }: { onReady?: () => void }) {
 
 function SceneContent(props: ExcavatorSceneProps) {
   const terrainRevision = props.terrainRevision ?? 0;
+  const sportsArena = Boolean(props.sportsArenaActive);
   return (
     <>
-      <color attach="background" args={["#8ec6e8"]} />
-      <fog attach="fog" args={["#c5dce8", 140, 310]} />
-      <hemisphereLight args={["#f1f7f7", "#8f6644", 0.86]} />
-      <ambientLight intensity={0.28} />
+      <color attach="background" args={[sportsArena ? "#f0b56a" : "#8ec6e8"]} />
+      <fog
+        attach="fog"
+        args={sportsArena ? ["#f6d4a0", 110, 280] : ["#c5dce8", 140, 310]}
+      />
+      <hemisphereLight
+        args={
+          sportsArena
+            ? ["#ffe7c2", "#7a5530", 0.92]
+            : ["#f1f7f7", "#8f6644", 0.86]
+        }
+      />
+      <ambientLight intensity={sportsArena ? 0.34 : 0.28} />
       <directionalLight
-        position={[-42, 58, -54]}
-        intensity={3.15}
-        color="#fff0c9"
+        position={sportsArena ? [54, 48, -28] : [-42, 58, -54]}
+        intensity={sportsArena ? 2.85 : 3.15}
+        color={sportsArena ? "#ffd39a" : "#fff0c9"}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -3693,44 +3844,81 @@ function SceneContent(props: ExcavatorSceneProps) {
         shadow-bias={-0.00022}
         shadow-normalBias={0.035}
       />
-      <directionalLight position={[72, 30, 48]} intensity={0.62} color="#b9d8ef" />
-      <pointLight position={[18, 20, -28]} intensity={0.38} color="#ffe9b0" distance={78} />
-      <SunnySky />
-      <CinematicBackdrop />
+      <directionalLight
+        position={sportsArena ? [-48, 24, 62] : [72, 30, 48]}
+        intensity={sportsArena ? 0.55 : 0.62}
+        color={sportsArena ? "#ffb070" : "#b9d8ef"}
+      />
+      <pointLight
+        position={[18, 20, -28]}
+        intensity={sportsArena ? 0.48 : 0.38}
+        color="#ffe9b0"
+        distance={78}
+      />
+      {!sportsArena ? <SunnySky /> : <SportsMeetSky />}
+      {!sportsArena ? <CinematicBackdrop /> : <SportsMeetBackdrop />}
       <TerrainMesh terrainRef={props.terrainRef} terrainRevision={terrainRevision} />
-      <MapSiteDecor
-        key={`decor-${terrainRevision}`}
-        terrainRef={props.terrainRef}
-        simRef={props.simRef}
+      {sportsArena && props.sportsMeetPattern ? (
+        <>
+          <SportsMeetCourseDecor
+            key={`sports-course-${terrainRevision}`}
+            pattern={props.sportsMeetPattern}
+          />
+          <SportsMeetStartGrid
+            key={`sports-start-${terrainRevision}`}
+            pattern={props.sportsMeetPattern}
+            gateOpen={props.sportsMeetGateOpen !== false}
+          />
+          <SportsMeetFinishGate
+            key={`sports-finish-${terrainRevision}`}
+            pattern={props.sportsMeetPattern}
+          />
+        </>
+      ) : (
+        <MapSiteDecor
+          key={`decor-${terrainRevision}`}
+          terrainRef={props.terrainRef}
+          simRef={props.simRef}
+        />
+      )}
+      {!sportsArena ? (
+        <RepairTent
+          x={REPAIR_TENT.x}
+          z={REPAIR_TENT.z}
+          radius={REPAIR_TENT.radius}
+          rotationY={REPAIR_TENT.rotationY}
+        />
+      ) : null}
+      {!sportsArena ? (
+        <WorkshopSigns
+          key={`workshop-signs-${terrainRevision}`}
+          mapTier={props.terrainRef.current.mapTier}
+          claimableIds={props.workshopClaimableIds ?? []}
+        />
+      ) : null}
+      <SportsMeetPortal
+        visible={Boolean(props.sportsMeetPortalVisible)}
+        ticketRemaining={props.sportsMeetTicketRemaining ?? 1}
+        ticketLimit={props.sportsMeetTicketLimit ?? 1}
       />
-      <RepairTent
-        x={REPAIR_TENT.x}
-        z={REPAIR_TENT.z}
-        radius={REPAIR_TENT.radius}
-        rotationY={REPAIR_TENT.rotationY}
-      />
-      <WorkshopSigns
-        key={`workshop-signs-${terrainRevision}`}
-        mapTier={props.terrainRef.current.mapTier}
-        claimableIds={props.workshopClaimableIds ?? []}
-      />
-      <SportsMeetPortal visible={Boolean(props.sportsMeetPortalVisible)} />
       {props.sportsMeetRunRef ? (
         <SportsMeetPickups
           runRef={props.sportsMeetRunRef}
           revision={props.sportsMeetPickupRevision ?? 0}
         />
       ) : null}
-      <MonumentPylon
-        phase={props.monumentPhase ?? "locked"}
-        starsStored={props.monumentStarsStored ?? 0}
-        storageCap={props.monumentStorageCap}
-      />
+      {!sportsArena ? (
+        <MonumentPylon
+          phase={props.monumentPhase ?? "locked"}
+          starsStored={props.monumentStarsStored ?? 0}
+          storageCap={props.monumentStorageCap}
+        />
+      ) : null}
       <TerrainRockScatter key={`rocks-${terrainRevision}`} terrainRef={props.terrainRef} />
       <ContactShadows
         position={[48, 0.12, 48]}
         scale={205}
-        opacity={0.24}
+        opacity={sportsArena ? 0.3 : 0.24}
         blur={2.8}
         far={38}
         resolution={512}
@@ -3745,11 +3933,13 @@ function SceneContent(props: ExcavatorSceneProps) {
         simRef={props.simRef}
         equipmentStatsRef={props.equipmentStatsRef}
       />
-      <TierBoundaryBarriers
-        key={`tier-barriers-${terrainRevision}`}
-        terrainRef={props.terrainRef}
-        terrainRevision={terrainRevision}
-      />
+      {!sportsArena ? (
+        <TierBoundaryBarriers
+          key={`tier-barriers-${terrainRevision}`}
+          terrainRef={props.terrainRef}
+          terrainRevision={terrainRevision}
+        />
+      ) : null}
       <ExcavatorGroundContact
         simRef={props.simRef}
         terrainRef={props.terrainRef}
@@ -3781,7 +3971,7 @@ function SceneContent(props: ExcavatorSceneProps) {
         inputRef={props.inputRef}
         terrainRef={props.terrainRef}
       />
-      {props.worldPickupsRef ? (
+      {props.worldPickupsRef && !sportsArena ? (
         <WorldPickupMeshes
           pickupsRef={props.worldPickupsRef}
           revision={props.worldPickupRevision ?? 0}

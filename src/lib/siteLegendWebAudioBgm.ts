@@ -40,7 +40,15 @@ function getSlot(kind: SiteLegendWebAudioBgmKind, srcUrl: string): Slot {
   const all = slots();
   const existing = all[kind];
   if (existing && existing.srcUrl === srcUrl) return existing;
-  if (existing) stopWebAudioBgm(kind, true);
+  // Swap track without closing AudioContext — closing would drop a running
+  // context and force a new suspended one (autoplay-blocked after async work).
+  if (existing) {
+    disconnectSlotGraph(existing);
+    existing.buffer = null;
+    existing.loading = null;
+    existing.srcUrl = srcUrl;
+    return existing;
+  }
   const slot: Slot = {
     ctx: null,
     buffer: null,
@@ -138,6 +146,12 @@ function disconnectSlotGraph(slot: Slot) {
 export function isWebAudioBgmPlaying(kind: SiteLegendWebAudioBgmKind): boolean {
   const slot = slots()[kind];
   return Boolean(slot?.source && isRunning(slot.ctx));
+}
+
+export function getWebAudioBgmSrcUrl(
+  kind: SiteLegendWebAudioBgmKind,
+): string | null {
+  return slots()[kind]?.srcUrl ?? null;
 }
 
 export function setWebAudioBgmGain(

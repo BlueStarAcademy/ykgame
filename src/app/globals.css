@@ -542,6 +542,14 @@ body {
   transform: scale(0.96);
 }
 
+.yanmar-site-prompt-hud-btn--sports {
+  height: auto;
+  min-height: 2.75rem;
+  gap: 0.18rem;
+  padding-top: 0.32rem;
+  padding-bottom: 0.32rem;
+}
+
 .yanmar-site-prompt-hud-icon {
   display: none;
 }
@@ -8839,6 +8847,644 @@ html.pwa-mode [contenteditable="true"] {
   color: rgba(214, 208, 196, 0.68);
 }
 
+.yanmar-sports-meet-entry {
+  position: relative;
+  width: min(28rem, 94vw);
+  max-width: 28rem;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings {
+  width: min(28rem, 94vw) !important;
+  max-width: 28rem !important;
+  height: min(34rem, 86vh) !important;
+  min-height: min(34rem, 86vh) !important;
+  max-height: min(34rem, 86vh) !important;
+  display: flex !important;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-title {
+  margin: 0 0 0.65rem;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-meta {
+  flex: 0 0 4.8rem;
+  min-height: 4.8rem;
+  max-height: 4.8rem;
+  overflow: hidden;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-meta
+  .yanmar-unlock-lead {
+  margin-top: 0;
+  max-width: none;
+  text-align: left;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-mine {
+  margin: 0.35rem 0 0;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fde68a;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-empty {
+  margin: 0.35rem 0 0;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 0.65rem;
+  overflow: auto;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  margin: 0;
+  padding: 1rem;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.72rem;
+  color: rgba(255, 248, 236, 0.92);
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-table
+  thead {
+  position: sticky;
+  top: 0;
+  background: rgba(8, 10, 14, 0.96);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-table
+  th,
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-table
+  td {
+  padding: 0.55rem 0.65rem;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-table
+  tbody
+  tr {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-table
+  .is-rank {
+  font-weight: 900;
+  width: 3rem;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-table
+  .is-time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  flex: 0 0 auto;
+  align-items: stretch;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-action-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 2.75rem !important;
+  min-height: 2.75rem !important;
+  max-height: 2.75rem !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+  border-radius: 0.85rem;
+  padding: 0 0.75rem !important;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    filter 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-action-btn:active {
+  transform: scale(0.985);
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-action-btn--switch {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.03)
+  );
+  color: #fff8ec;
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-action-btn--switch:hover {
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-action-btn--close {
+  border: 0;
+  color: #1a1208;
+  background: linear-gradient(
+    180deg,
+    #e8d19a 0%,
+    #d4b56a 42%,
+    #a8843d 100%
+  );
+  box-shadow:
+    0 0.35rem 0.85rem rgba(168, 132, 61, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.yanmar-unlock-panel.yanmar-sports-meet-rankings
+  .yanmar-sports-meet-rankings-action-btn--close:active {
+  filter: brightness(0.96);
+}
+
+.yanmar-sports-meet-entry-body {
+  text-align: left;
+  padding-top: 1rem;
+}
+
+.yanmar-sports-meet-entry-title {
+  text-align: center;
+  margin: 0 0 0.85rem;
+  font-size: 1.15rem;
+  padding: 0 2.2rem;
+}
+
+.yanmar-sports-meet-entry-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 0.55rem;
+  align-items: stretch;
+}
+
+.yanmar-sports-meet-entry-card {
+  padding: 0.65rem 0.7rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(212, 181, 106, 0.18);
+  background: linear-gradient(
+    160deg,
+    rgba(212, 181, 106, 0.1),
+    rgba(255, 255, 255, 0.03) 55%,
+    rgba(0, 0, 0, 0.18)
+  );
+}
+
+.yanmar-sports-meet-entry-course {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100%;
+}
+
+.yanmar-sports-meet-entry-rewards-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 12.5rem;
+}
+
+.yanmar-sports-meet-entry-card-title {
+  margin: 0;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(232, 209, 154, 0.9);
+}
+
+.yanmar-sports-meet-entry-card-name {
+  margin: 0.45rem 0 0;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 900;
+  line-height: 1.25;
+  color: #fff8ec;
+}
+
+.yanmar-sports-meet-entry-card-text {
+  margin: 0.4rem 0 0;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: rgba(236, 230, 218, 0.82);
+  word-break: keep-all;
+}
+
+.yanmar-sports-meet-entry-reward-rows {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.32rem;
+  flex: 1 1 auto;
+}
+
+.yanmar-sports-meet-entry-reward-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  min-height: 1.35rem;
+  padding: 0.22rem 0.35rem;
+  border-radius: 0.45rem;
+}
+
+.yanmar-sports-meet-entry-reward-row.is-podium-1 {
+  background: linear-gradient(
+    90deg,
+    rgba(251, 191, 36, 0.28),
+    rgba(251, 191, 36, 0.06)
+  );
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.yanmar-sports-meet-entry-reward-row.is-podium-2 {
+  background: linear-gradient(
+    90deg,
+    rgba(203, 213, 225, 0.22),
+    rgba(203, 213, 225, 0.05)
+  );
+  border: 1px solid rgba(203, 213, 225, 0.4);
+}
+
+.yanmar-sports-meet-entry-reward-row.is-podium-3 {
+  background: linear-gradient(
+    90deg,
+    rgba(217, 119, 6, 0.24),
+    rgba(217, 119, 6, 0.05)
+  );
+  border: 1px solid rgba(217, 119, 6, 0.4);
+}
+
+.yanmar-sports-meet-entry-reward-row.is-rest {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.yanmar-sports-meet-entry-reward-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: rgba(236, 230, 218, 0.82);
+  white-space: nowrap;
+}
+
+.yanmar-sports-meet-entry-reward-rank.is-podium-1 {
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #fde68a;
+}
+
+.yanmar-sports-meet-entry-reward-rank.is-podium-2 {
+  font-size: 0.7rem;
+  font-weight: 900;
+  color: #e2e8f0;
+}
+
+.yanmar-sports-meet-entry-reward-rank.is-podium-3 {
+  font-size: 0.7rem;
+  font-weight: 900;
+  color: #fdba74;
+}
+
+.yanmar-sports-meet-entry-medal {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  font-family: "Bebas Neue", "Arial Narrow", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #1a1208;
+  box-shadow: 0 0.08rem 0.18rem rgba(0, 0, 0, 0.35);
+}
+
+.is-podium-1 .yanmar-sports-meet-entry-medal {
+  background: linear-gradient(160deg, #fde68a, #f59e0b 55%, #b45309);
+}
+
+.is-podium-2 .yanmar-sports-meet-entry-medal {
+  background: linear-gradient(160deg, #f8fafc, #94a3b8 55%, #64748b);
+  color: #0f172a;
+}
+
+.is-podium-3 .yanmar-sports-meet-entry-medal {
+  background: linear-gradient(160deg, #fdba74, #d97706 55%, #9a3412);
+}
+
+.yanmar-sports-meet-entry-reward-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #fff6d6;
+  font-variant-numeric: tabular-nums;
+}
+
+.yanmar-sports-meet-entry-reward-row.is-podium-1
+  .yanmar-sports-meet-entry-reward-stars {
+  font-size: 0.78rem;
+}
+
+.yanmar-sports-meet-entry-reward-stars img {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0.05rem 0.08rem rgba(0, 0, 0, 0.4));
+}
+
+.yanmar-sports-meet-entry-reward-row.is-podium-1
+  .yanmar-sports-meet-entry-reward-stars
+  img {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.yanmar-sports-meet-entry-reward-note {
+  margin: 0.55rem 0 0;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.58rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: rgba(232, 209, 154, 0.78);
+}
+
+.yanmar-sports-meet-entry-rankings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.yanmar-sports-meet-entry-rank-btn {
+  border-radius: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.28);
+  padding: 0.62rem 0.5rem;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: rgba(255, 248, 236, 0.92);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 120ms ease;
+}
+
+.yanmar-sports-meet-entry-rank-btn:hover {
+  border-color: rgba(232, 209, 154, 0.45);
+  background: rgba(212, 181, 106, 0.12);
+}
+
+.yanmar-sports-meet-entry-rank-btn:active {
+  transform: scale(0.985);
+}
+
+.yanmar-sports-meet-entry-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+  align-items: stretch;
+}
+
+.yanmar-sports-meet-entry-enter,
+.yanmar-sports-meet-entry-practice {
+  min-height: 3.6rem;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.yanmar-sports-meet-entry-enter {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22rem;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0.85rem;
+  padding: 0.45rem 0.4rem;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  color: #1a1208;
+  background: linear-gradient(
+    180deg,
+    #e8d19a 0%,
+    #d4b56a 42%,
+    #a8843d 100%
+  );
+  box-shadow:
+    0 0.45rem 1rem rgba(168, 132, 61, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.yanmar-sports-meet-entry-enter:active {
+  transform: scale(0.985);
+  filter: brightness(0.96);
+}
+
+.yanmar-sports-meet-entry-enter-label {
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+
+.yanmar-sports-meet-entry-enter-ticket {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.92;
+}
+
+.yanmar-sports-meet-entry-enter-ticket img {
+  display: block;
+  width: 1.05rem;
+  height: 1.05rem;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.yanmar-sports-meet-entry-enter:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+  box-shadow: none;
+}
+
+.yanmar-sports-meet-entry-practice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.03)
+  );
+  padding: 0.45rem 0.4rem;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #fff8ec;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 120ms ease;
+}
+
+.yanmar-sports-meet-entry-practice:hover {
+  border-color: rgba(255, 255, 255, 0.38);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.05)
+  );
+}
+
+.yanmar-sports-meet-entry-practice:active {
+  transform: scale(0.985);
+}
+
+.yanmar-sports-meet-entry-close {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 5;
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(255, 248, 236, 0.88);
+  text-decoration: none;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 120ms ease;
+}
+
+.yanmar-sports-meet-entry-close:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.yanmar-sports-meet-entry-close:active {
+  transform: scale(0.94);
+}
+
+@media (max-width: 420px) {
+  .yanmar-sports-meet-entry-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .yanmar-sports-meet-entry-rewards-panel {
+    min-height: 0;
+  }
+}
+
 .yanmar-unlock-cta {
   position: relative;
   overflow: hidden;
@@ -10457,6 +11103,32 @@ html.pwa-mode [contenteditable="true"] {
   position: relative;
   display: inline-grid;
   place-items: center;
+}
+
+.yanmar-sports-meet-ticket-icon {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  object-fit: contain;
+  filter: drop-shadow(0 0.08rem 0.12rem rgba(0, 0, 0, 0.45));
+}
+
+.yanmar-sports-meet-prompt-ticket {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22rem;
+  line-height: 1;
+}
+
+.yanmar-sports-meet-ticket-count {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: rgba(255, 246, 214, 0.95);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-shadow: 0 0.05rem 0.1rem rgba(0, 0, 0, 0.55);
 }
 
 .yanmar-repair-claim-badge {

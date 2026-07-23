@@ -7,18 +7,53 @@ import {
   SPORTS_MEET_SPEED_BUFF_MS,
 } from "./coursePickups";
 import {
+  getDrivePathForStage,
+  getSportsMeetFinishGate,
   getSportsMeetMissionForWeek,
   getSportsMeetPattern,
+  isSportsMeetFinishDriveStage,
+  sportsMeetDriveStarQuota,
   type SportsMeetPattern,
   type SportsMeetStageKind,
 } from "./patterns";
 import type { SportsMeetMissionBalance } from "./missionBalance";
+import { getSportsMeetStartPaddock } from "./startPaddock";
 import {
   createInitialSportsMeetRunState,
   type SportsMeetPlayMode,
   type SportsMeetRunState,
   type SportsMeetSplit,
 } from "./types";
+
+function rebuildDriveStars(
+  state: SportsMeetRunState,
+  pattern: SportsMeetPattern,
+  heightAt: (x: number, z: number) => number,
+): SportsMeetRunState {
+  const quota = sportsMeetDriveStarQuota(
+    state.mission,
+    state.stageOrder,
+    state.stageIndex,
+  );
+  if (quota <= 0) {
+    return {
+      ...state,
+      courseStars: [],
+      starsCollected: 0,
+    };
+  }
+  const path = getDrivePathForStage(pattern, state.stageIndex);
+  return {
+    ...state,
+    courseStars: buildCourseStars(
+      path,
+      quota,
+      heightAt,
+      `course-star-s${state.stageIndex}`,
+    ),
+    starsCollected: 0,
+  };
+}
 
 export function beginSportsMeetRun(
   playMode: SportsMeetPlayMode,
@@ -28,20 +63,44 @@ export function beginSportsMeetRun(
 ): SportsMeetRunState {
   const pattern = getSportsMeetPattern(weekKey);
   const mission = getSportsMeetMissionForWeek(weekKey);
-  const state = createInitialSportsMeetRunState(
+  let state = createInitialSportsMeetRunState(
     playMode,
     pattern,
     mission,
     weekKey,
   );
   state.runId = runId;
-  state.courseStars = buildCourseStars(pattern.drivePath, mission, heightAt);
+  state = rebuildDriveStars(state, pattern, heightAt);
+  // Speed buffs once along the full corridor for the whole run.
   state.speedBuffs = buildSpeedBuffPickups(
     pattern.drivePath,
     mission,
     heightAt,
   );
   return state;
+}
+
+/** Rebuild stars when entering a drive leg (after stage advance). */
+export function prepareSportsMeetStageContent(
+  state: SportsMeetRunState,
+  pattern: SportsMeetPattern,
+  heightAt: (x: number, z: number) => number,
+): SportsMeetRunState {
+  const stage = state.stageOrder[state.stageIndex];
+  if (stage !== "drive") return state;
+  const quota = sportsMeetDriveStarQuota(
+    state.mission,
+    state.stageOrder,
+    state.stageIndex,
+  );
+  if (
+    state.courseStars.length === quota &&
+    state.starsCollected === 0 &&
+    (quota === 0 || state.courseStars.every((s) => !s.collected))
+  ) {
+    return state;
+  }
+  return rebuildDriveStars(state, pattern, heightAt);
 }
 
 export function startSportsMeetCountdown(
@@ -97,11 +156,34 @@ function advanceStage(
       finalTimeMs: elapsed,
     };
   }
-  return {
+
+  const nextStage = state.stageOrder[nextIndex]!;
+  let next: SportsMeetRunState = {
     ...state,
     splits,
     stageIndex: nextIndex,
   };
+
+  // Per-stage progress — multiple drive legs need fresh star counters.
+  if (nextStage === "drive") {
+    next = {
+      ...next,
+      starsCollected: 0,
+      courseStars: [],
+    };
+  } else if (nextStage === "dig") {
+    next = {
+      ...next,
+      dumpFillUnits: 0,
+      dumpDeparted: false,
+    };
+  } else if (nextStage === "crash") {
+    next = { ...next, asphaltBroken: 0 };
+  } else if (nextStage === "hill") {
+    next = { ...next, rocksDumped: 0 };
+  }
+
+  return next;
 }
 
 export function collectSportsMeetStar(
@@ -111,12 +193,18 @@ export function collectSportsMeetStar(
 ): SportsMeetRunState {
   if (state.phase !== "racing") return state;
   if (state.stageOrder[state.stageIndex] !== "drive") return state;
+  const quota = sportsMeetDriveStarQuota(
+    state.mission,
+    state.stageOrder,
+    state.stageIndex,
+  );
+  if (quota <= 0) return state;
   const stars = state.courseStars.map((s) =>
     s.id === starId && !s.collected ? { ...s, collected: true } : s,
   );
   const starsCollected = stars.filter((s) => s.collected).length;
   let next: SportsMeetRunState = { ...state, courseStars: stars, starsCollected };
-  if (starsCollected >= state.mission.drive.starCount) {
+  if (starsCollected >= quota) {
     next = advanceStage(next, "drive", now);
   }
   return next;
@@ -143,6 +231,7 @@ export function tryCollectNearbySportsPickups(
   posX: number,
   posZ: number,
   now = Date.now(),
+  pattern?: SportsMeetPattern,
 ): SportsMeetRunState {
   if (state.phase !== "racing") return state;
   let next = state;
@@ -160,7 +249,27 @@ export function tryCollectNearbySportsPickups(
       next = collectSportsMeetSpeedBuff(next, buff.id, now);
     }
   }
+  if (pattern) {
+    next = tryCrossSportsFinishGate(next, pattern, posX, posZ, now);
+  }
   return next;
+}
+
+/** Finish sprint: crossing the FINISH gate stops the clock. */
+export function tryCrossSportsFinishGate(
+  state: SportsMeetRunState,
+  pattern: SportsMeetPattern,
+  posX: number,
+  posZ: number,
+  now = Date.now(),
+): SportsMeetRunState {
+  if (state.phase !== "racing") return state;
+  if (!isSportsMeetFinishDriveStage(state.stageOrder, state.stageIndex)) {
+    return state;
+  }
+  const gate = getSportsMeetFinishGate(pattern);
+  if (distanceXZ(posX, posZ, gate.x, gate.z) > gate.radius) return state;
+  return advanceStage(state, "drive", now);
 }
 
 export function noteSportsDumpFill(
@@ -216,11 +325,28 @@ export function noteSportsRockDump(
 export function sportsMeetStageWaypoint(
   pattern: SportsMeetPattern,
   stage: SportsMeetStageKind,
-): { x: number; z: number } {
+  stageIndex = 0,
+): { x: number; z: number; heading?: number } {
   switch (stage) {
     case "drive": {
-      const p = pattern.drivePath[0];
-      return p ? { x: p[0], z: p[1] } : { x: -18, z: -22 };
+      // First leg starts inside the locked start paddock.
+      if (stageIndex === 0) {
+        const paddock = getSportsMeetStartPaddock(pattern);
+        return {
+          x: paddock.centerX,
+          z: paddock.centerZ,
+          heading: paddock.heading,
+        };
+      }
+      const path = getDrivePathForStage(pattern, stageIndex);
+      const p = path[0];
+      if (!p) return { x: -18, z: -22 };
+      const next = path[1];
+      const heading =
+        next != null
+          ? Math.atan2(next[0] - p[0], next[1] - p[1])
+          : undefined;
+      return { x: p[0], z: p[1], heading };
     }
     case "dig":
       return { x: pattern.zones.dig[0], z: pattern.zones.dig[1] };

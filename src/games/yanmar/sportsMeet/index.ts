@@ -1,6 +1,11 @@
 export {
   SPORTS_MEET_MISSION_DEFAULTS,
+  SPORTS_MEET_STAR_REWARD_MIN,
+  SPORTS_MEET_STAR_REWARD_MAX,
   resolveSportsMeetMission,
+  formatSportsMeetMissionSummaryKo,
+  rollSportsMeetStarReward,
+  sportsMeetStarEventId,
 } from "./missionBalance";
 export type {
   SportsMeetMissionBalance,
@@ -20,10 +25,17 @@ export {
 } from "./weekKey";
 export {
   SPORTS_MEET_PATTERNS,
+  SPORTS_MEET_LINEAR_STAGE_ORDER,
   resolveSportsMeetPatternId,
   getSportsMeetPattern,
   getSportsMeetPatternById,
   getSportsMeetMissionForWeek,
+  getDrivePathForStage,
+  getSportsMeetFinishGate,
+  getSportsMeetTrackSegments,
+  driveLegIndexAtStage,
+  isSportsMeetFinishDriveStage,
+  sportsMeetDriveStarQuota,
   STAGE_LABEL_KO,
   formatStageOrderKo,
 } from "./patterns";
@@ -44,16 +56,31 @@ export {
 } from "./coursePickups";
 export {
   beginSportsMeetRun,
+  prepareSportsMeetStageContent,
   startSportsMeetCountdown,
   tickSportsMeetCountdown,
   sportsMeetElapsedMs,
   tryCollectNearbySportsPickups,
+  tryCrossSportsFinishGate,
   noteSportsDumpFill,
   noteSportsDumpDepart,
   noteSportsAsphaltBreak,
   noteSportsRockDump,
   sportsMeetStageWaypoint,
 } from "./runState";
+export {
+  getSportsMeetStartPaddock,
+  constrainSportsMeetStartPaddock,
+  isSportsMeetStartLocked,
+  SPORTS_MEET_START_PADDOCK,
+} from "./startPaddock";
+export type { SportsMeetStartPaddock } from "./startPaddock";
+export {
+  getSportsMeetAllowedAttachment,
+  isSportsMeetWorkAllowed,
+  sportsMeetStageLockMessage,
+} from "./stageGate";
+export type { SportsMeetWorkKind } from "./stageGate";
 export type {
   SportsMeetPlayMode,
   SportsMeetRunPhase,

@@ -17,6 +17,7 @@ import {
   isSiteLegendBgmMasterEnabled,
 } from "@/lib/siteLegendBgmRegistry";
 import {
+  getWebAudioBgmSrcUrl,
   isWebAudioBgmPlaying,
   setWebAudioBgmGain,
   startWebAudioBgm,
@@ -45,6 +46,7 @@ const BUFF_ACQUIRE_SRC = `${SOUND_BASE}/buff-acquire.ogg`;
 const ITEM_ACQUIRE_SRC = `${SOUND_BASE}/item-acquire.ogg`;
 const MASTER_ITEM_ACQUIRE_SRC = `${SOUND_BASE}/master-item-acquire.ogg`;
 const INGAME_BGM_SRC = "/sounds/site-legend/ingame-bgm.ogg";
+const SPORTS_MEET_BGM_SRC = "/sounds/yanmar/sports-meet-bgm.ogg";
 const HORN_BASE_VOLUME = 0.88;
 const BREAKER_BASE_GAIN = 0.92;
 const ENHANCE_SFX_BASE_VOLUME = 0.9;
@@ -92,6 +94,7 @@ class YanmarAudioController {
   private bgmVolume = 28;
   private sfxVolume = 85;
   private active = false;
+  private sportsMeetBgm = false;
   private bgmGestureBound = false;
   private storeSubscribed = false;
   private bgmStartToken = 0;
@@ -205,6 +208,25 @@ class YanmarAudioController {
     }
     this.applySettings(getSoundSettings());
     this.syncBgm();
+  }
+
+  /** Swap to sports-meet BGM while arena is active; restores worksite BGM on exit. */
+  setSportsMeetBgm(enabled: boolean) {
+    this.ensureStoreSubscription();
+    if (this.sportsMeetBgm === enabled) {
+      if (enabled && this.active) this.syncBgm();
+      return;
+    }
+    this.sportsMeetBgm = enabled;
+    // Soft-stop graph only — keep AudioContext alive for the track swap.
+    this.stopBgm(false);
+    if (this.active) {
+      this.syncBgm();
+    }
+  }
+
+  private getBgmSrc() {
+    return this.sportsMeetBgm ? SPORTS_MEET_BGM_SRC : INGAME_BGM_SRC;
   }
 
   setBgmEnabled(enabled: boolean) {
@@ -334,7 +356,11 @@ class YanmarAudioController {
     ) {
       return;
     }
-    if (isWebAudioBgmPlaying("ingame")) {
+    const wantedSrc = this.getBgmSrc();
+    if (
+      isWebAudioBgmPlaying("ingame") &&
+      getWebAudioBgmSrcUrl("ingame") === wantedSrc
+    ) {
       this.applyBgmVolume();
       return;
     }
@@ -342,7 +368,7 @@ class YanmarAudioController {
     const token = ++this.bgmStartToken;
     void startWebAudioBgm(
       "ingame",
-      INGAME_BGM_SRC,
+      wantedSrc,
       bgmVolumeToGain(this.bgmVolume),
     ).then((ok) => {
       if (
@@ -679,6 +705,7 @@ class YanmarAudioController {
 
   /** Soft teardown when leaving a play session — keeps decoded buffers for next run. */
   deactivate() {
+    this.sportsMeetBgm = false;
     this.active = false;
     this.breakerWanted = false;
     this.stopBreakerImmediate();

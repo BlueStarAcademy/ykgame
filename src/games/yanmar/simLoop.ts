@@ -125,6 +125,13 @@ import {
   type WorldPickup,
   type WorldPickupsState,
 } from "./worldPickups";
+import { constrainSportsMeetStartPaddock } from "./sportsMeet/startPaddock";
+import {
+  isSportsMeetWorkAllowed,
+  sportsMeetStageLockMessage,
+  type SportsMeetWorkKind,
+} from "./sportsMeet/stageGate";
+import type { SportsMeetStageKind } from "./sportsMeet/patterns";
 import {
   computeComAlignFactor,
   computeGrappleAdhesion,
@@ -254,6 +261,13 @@ export interface SimTickParams {
   /** Arcade world pickups (stars / speed). Game mode + logged-in only. */
   worldPickups?: WorldPickupsState | null;
   onWorldPickup?: (pickup: WorldPickup) => void;
+  /**
+   * Sports-meet start paddock lock — when set, excavator cannot leave the
+   * start grid until countdown finishes (caller clears this for racing).
+   */
+  sportsMeetStartPaddock?: import("./sportsMeet/startPaddock").SportsMeetStartPaddock | null;
+  /** Current sports-meet stage — gates dig/dump/crash/hill work. */
+  sportsMeetStage?: SportsMeetStageKind | null;
 }
 
 function clampControl(value: number, min = -1, max = 1) {
@@ -862,6 +876,15 @@ export function tickExcavatorSim(params: SimTickParams) {
     vel.trackLeft = 0;
     vel.trackRight = 0;
   }
+  if (
+    params.sportsMeetStartPaddock &&
+    constrainSportsMeetStartPaddock(sim, params.sportsMeetStartPaddock)
+  ) {
+    vel.travel = 0;
+    vel.trackTurn = 0;
+    vel.trackLeft = 0;
+    vel.trackRight = 0;
+  }
   // Height samples are cell-based. Dividing a cell-boundary height jump by the
   // tiny per-frame travel distance creates a false near-vertical slope and
   // repeatedly zeroes travel velocity. Probe across a full terrain cell instead.
@@ -927,6 +950,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     vel.trackLeft = 0;
     vel.trackRight = 0;
     constrainExcavatorToMap(sim, terrain);
+    if (params.sportsMeetStartPaddock) {
+      constrainSportsMeetStartPaddock(sim, params.sportsMeetStartPaddock);
+    }
   }
   if (constrainExcavatorToTruckTarget(sim, beforeTravel, haulAlignForCollision)) {
     vel.travel = 0;
@@ -934,6 +960,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     vel.trackLeft = 0;
     vel.trackRight = 0;
     constrainExcavatorToMap(sim, terrain);
+    if (params.sportsMeetStartPaddock) {
+      constrainSportsMeetStartPaddock(sim, params.sportsMeetStartPaddock);
+    }
   }
 
   let bucketContact = measureAttachmentClearance(sim, terrain, boomSwing, grappleOpen);
@@ -1176,10 +1205,29 @@ export function tickExcavatorSim(params: SimTickParams) {
     }
   };
 
+  const isSportsMode =
+    mode === "sportsRanked" || mode === "sportsPractice";
+  const sportsStage = params.sportsMeetStage ?? null;
+  const sportsWorkAllowed = (work: SportsMeetWorkKind) =>
+    !isSportsMode || isSportsMeetWorkAllowed(sportsStage, work);
+  const warnSportsWorkBlocked = (work: SportsMeetWorkKind) => {
+    if (!isSportsMode || isSportsMeetWorkAllowed(sportsStage, work)) {
+      return false;
+    }
+    warnAttachment(
+      sportsMeetStageLockMessage(sportsStage),
+      `sports-gate-${work}`,
+    );
+    return true;
+  };
+
   if (
     sim.attachmentType === "breaker" &&
     (auxiliary?.attachmentPedal ?? 0) !== 0
   ) {
+    if (warnSportsWorkBlocked("crash")) {
+      // Stage-locked: no asphalt damage until crash stage.
+    } else {
     const permission = checkAttachmentUse("breaker", toolZone, "strike");
     if (!permission.allowed) {
       // Latch while the pedal is held outside the crash zone. Do not clear on
@@ -1218,8 +1266,10 @@ export function tickExcavatorSim(params: SimTickParams) {
         }
       }
     }
+    }
   } else {
     clearWarningLatch("breaker-zone");
+    clearWarningLatch("sports-gate-crash");
   }
 
   const grapplePedal =
@@ -1271,7 +1321,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     }
 
     if (canGrabHere && runtime.attachmentActionCooldown <= 0) {
-      if (hillForGrapple?.active && !sim.carriedBoulderId && closing) {
+      if (warnSportsWorkBlocked("hill")) {
+        // Stage-locked: no rock grab/dump until hill stage.
+      } else if (hillForGrapple?.active && !sim.carriedBoulderId && closing) {
         // 접힌 채 닫기·공중 집기 불가. 지면 자세 + (70%↑ 열린 뒤 접기)만 허용.
         if (wrappableRock && runtime.grappleGrabArmed && groundPickup) {
           if (!angleReady) {
@@ -1817,6 +1869,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     sim.bucketLoad < 1 &&
     soilRetention >= BUCKET_SOIL_HOLD_MIN
   ) {
+    if (warnSportsWorkBlocked("dig")) {
+      // Stage-locked: no soil load until dig stage.
+    } else {
     const scrape = Math.max(0.38, scraperDepthBelow + 0.9);
     const digX = scraperInDigZone ? scraper.x : tipInDigZone ? bucketTip.x : scraper.x;
     const digZ = scraperInDigZone ? scraper.z : tipInDigZone ? bucketTip.z : scraper.z;
@@ -1901,7 +1956,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     } else {
       runtime.digDust.active = false;
     }
+    }
   } else {
+    clearWarningLatch("sports-gate-dig");
     runtime.digDust.active = false;
   }
 
@@ -1969,7 +2026,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     sim.bucketLoad > 0 &&
     bucketDumpOpen
   ) {
-    if (inTruckDumpTarget && !truckCanAccept) {
+    if (warnSportsWorkBlocked("dump") && inTruckDumpTarget) {
+      // Stage-locked: do not accept dump into truck until dig stage.
+    } else if (inTruckDumpTarget && !truckCanAccept) {
       // 복귀 중/만차 트럭 위에 버킷을 펴도 적재를 소모하지 않음
     } else {
       const spillRate = 1.65;
@@ -1978,10 +2037,12 @@ export function tickExcavatorSim(params: SimTickParams) {
         remainingLoad < 0.025
           ? remainingLoad
           : Math.min(remainingLoad, remainingLoad * spillRate * dt);
+      // Outside dig stage, still allow ground spill but never truck score fill.
+      const allowTruckFill = sportsWorkAllowed("dump");
       sim.bucketLoad = Math.max(0, sim.bucketLoad - dumpAmount);
       fb.soilSpilling = dumpAmount > 0.001;
 
-      if (inTruckDumpTarget && truckCanAccept) {
+      if (inTruckDumpTarget && truckCanAccept && allowTruckFill) {
         applyTruckDump(dumpAmount, dumpParams);
       } else if (dumpAmount > 0.001) {
         runtime.dumpSoilVisual.active = true;

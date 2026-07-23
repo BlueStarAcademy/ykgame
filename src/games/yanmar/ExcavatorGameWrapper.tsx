@@ -307,17 +307,23 @@ import {
   getSportsMeetPattern,
   getSportsMeetWeekKey,
   isInSportsMeetPortalRange,
+  isSportsMeetFinishDriveStage,
   noteSportsAsphaltBreak,
   noteSportsDumpDepart,
   noteSportsDumpFill,
   noteSportsRockDump,
+  prepareSportsMeetStageContent,
   SPORTS_MEET_UNLOCK_LEVEL,
+  sportsMeetDriveStarQuota,
   sportsMeetElapsedMs,
   sportsMeetStageWaypoint,
   STAGE_LABEL_KO,
   startSportsMeetCountdown,
   tickSportsMeetCountdown,
   tryCollectNearbySportsPickups,
+  getSportsMeetAllowedAttachment,
+  sportsMeetStageLockMessage,
+  rollSportsMeetStarReward,
   type SportsMeetPlayMode,
   type SportsMeetRunState,
 } from "./sportsMeet";
@@ -1115,6 +1121,10 @@ export function ExcavatorGameWrapper({
     null,
   );
   const [sportsMeetPickupRevision, setSportsMeetPickupRevision] = useState(0);
+  const [sportsMeetTicket, setSportsMeetTicket] = useState({
+    remaining: 1,
+    limit: 1,
+  });
   const sportsMainTerrainRef = useRef<TerrainData | null>(null);
   const sportsEquipmentSnapRef = useRef<YanmarEquipmentStats | null>(null);
   const sportsHudTickRef = useRef(0);
@@ -2045,11 +2055,12 @@ export function ExcavatorGameWrapper({
 
   const handleAttachmentChange = useCallback(
     (next: AttachmentType) => {
+      const modeNow = modeRef.current;
       const unlockAll =
-        modeRef.current === "practice" ||
-        modeRef.current === "tutorial" ||
-        modeRef.current === "sportsRanked" ||
-        modeRef.current === "sportsPractice" ||
+        modeNow === "practice" ||
+        modeNow === "tutorial" ||
+        modeNow === "sportsRanked" ||
+        modeNow === "sportsPractice" ||
         sessionRoleRef.current === "ADMIN";
       const playerLevel = getPlayerLevelProgress(totalXpRef.current).level;
       if (!isAttachmentUnlocked(next, playerLevel, { unlockAll })) {
@@ -2059,6 +2070,21 @@ export function ExcavatorGameWrapper({
             : "집게는 유저 레벨 15에 개방됩니다.",
         );
         return;
+      }
+      if (
+        modeNow === "sportsRanked" ||
+        modeNow === "sportsPractice"
+      ) {
+        const run = sportsMeetRunRef.current;
+        const stage = run ? currentSportsStage(run) : null;
+        const allowed = getSportsMeetAllowedAttachment(stage);
+        if (allowed && next !== allowed) {
+          showAttachmentWarning(
+            sportsMeetStageLockMessage(stage) ||
+              "이 코스에서는 해당 부착물을 쓸 수 없습니다.",
+          );
+          return;
+        }
       }
       if (simRef.current.bucketLoad > 0.01 && next !== "bucket") {
         showAttachmentWarning("버켓에 흙이 남아 있어 다른 부착물로 전환할 수 없습니다.");
@@ -2324,11 +2350,79 @@ export function ExcavatorGameWrapper({
     if (velocity) velocity.travel = 0;
   }, []);
 
+  const refreshSportsMeetTicket = useCallback(async () => {
+    try {
+      const res = await fetch("/api/sports-meet/yanmar/ticket");
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        ticket?: { remaining?: number; limit?: number };
+      };
+      const remaining = data.ticket?.remaining;
+      const limit = data.ticket?.limit;
+      if (typeof remaining === "number" && typeof limit === "number") {
+        setSportsMeetTicket({ remaining, limit });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const syncSportsMeetRun = useCallback((next: SportsMeetRunState | null) => {
     sportsMeetRunRef.current = next;
     setSportsMeetRun(next);
     setSportsMeetPickupRevision((n) => n + 1);
   }, []);
+
+  /** After dig/crash/hill/star clear advances a stage — spawn stars/warp/attachment. */
+  const finalizeSportsMeetStageAdvance = useCallback(
+    (before: SportsMeetRunState, next: SportsMeetRunState) => {
+      if (next.stageIndex === before.stageIndex || next.phase !== "racing") {
+        return next;
+      }
+      const pattern = getSportsMeetPattern(next.weekKey);
+      let prepared = prepareSportsMeetStageContent(
+        next,
+        pattern,
+        (x, z) => heightAtTerrain(terrainRef.current, x, z),
+      );
+      const stage = prepared.stageOrder[prepared.stageIndex];
+      if (stage) {
+        const spawn = sportsMeetStageWaypoint(
+          pattern,
+          stage,
+          prepared.stageIndex,
+        );
+        const sim = simRef.current;
+        if (sim) {
+          sim.posX = spawn.x;
+          sim.posZ = spawn.z;
+          if (spawn.heading != null) sim.heading = spawn.heading;
+          if (stage === "drive" || stage === "dig") {
+            sim.attachmentType = "bucket";
+          } else if (stage === "crash") {
+            sim.attachmentType = "breaker";
+          } else {
+            sim.attachmentType = "grapple";
+          }
+          setAttachmentType(sim.attachmentType);
+          if (stage === "dig") {
+            resetDumpTruckState(dumpTruckStateRef.current);
+          }
+        }
+        showAttachmentWarning(
+          isSportsMeetFinishDriveStage(
+            prepared.stageOrder,
+            prepared.stageIndex,
+          )
+            ? "골인 주행 시작! FINISH로 달리세요"
+            : `${STAGE_LABEL_KO[stage]} 코스 시작!`,
+        );
+      }
+      setSportsMeetPickupRevision((n) => n + 1);
+      return prepared;
+    },
+    [showAttachmentWarning],
+  );
 
   const exitSportsMeet = useCallback(() => {
     const main = sportsMainTerrainRef.current;
@@ -2342,27 +2436,44 @@ export function ExcavatorGameWrapper({
       setEquipmentStats(sportsEquipmentSnapRef.current);
       sportsEquipmentSnapRef.current = null;
     }
+    yanmarAudio.setSportsMeetBgm(false);
     setSportsResultSubmitted(false);
     syncSportsMeetRun(null);
     setMode("game");
     modeRef.current = "game";
-  }, [syncSportsMeetRun]);
+    warpToSportsMeetPortal();
+    void refreshSportsMeetTicket();
+  }, [refreshSportsMeetTicket, syncSportsMeetRun, warpToSportsMeetPortal]);
 
   const enterSportsMeet = useCallback(
     async (playMode: SportsMeetPlayMode) => {
       setShowSportsMeetPanel(false);
       setSportsResultSubmitted(false);
+      // Arm sports BGM on the click gesture before any await (autoplay policy).
+      yanmarAudio.unlock();
+      yanmarAudio.setSportsMeetBgm(true);
+
       let runId: string | null = null;
       if (playMode === "ranked") {
         const res = await fetch("/api/sports-meet/yanmar/ticket", {
           method: "POST",
         });
         if (!res.ok) {
+          yanmarAudio.setSportsMeetBgm(false);
           showAttachmentWarning("도전권이 없거나 시작할 수 없습니다.");
           return;
         }
-        const data = (await res.json()) as { runId?: string };
+        const data = (await res.json()) as {
+          runId?: string;
+          ticket?: { remaining?: number; limit?: number };
+        };
         runId = data.runId ?? null;
+        if (typeof data.ticket?.remaining === "number") {
+          setSportsMeetTicket({
+            remaining: data.ticket.remaining,
+            limit: data.ticket.limit ?? 1,
+          });
+        }
       }
 
       const weekKey = getSportsMeetWeekKey();
@@ -2391,12 +2502,12 @@ export function ExcavatorGameWrapper({
       syncSportsMeetRun(run);
 
       const stage = run.stageOrder[0]!;
-      const spawn = sportsMeetStageWaypoint(pattern, stage);
+      const spawn = sportsMeetStageWaypoint(pattern, stage, 0);
       const sim = simRef.current;
       if (sim) {
         sim.posX = spawn.x;
         sim.posZ = spawn.z;
-        sim.heading = 0;
+        sim.heading = spawn.heading ?? 0;
         sim.bucketLoad = 0;
         sim.carriedBoulderId = null;
         if (stage === "drive" || stage === "dig") sim.attachmentType = "bucket";
@@ -2418,6 +2529,55 @@ export function ExcavatorGameWrapper({
     if (!run || run.phase !== "ready") return;
     syncSportsMeetRun(startSportsMeetCountdown(run));
   }, [syncSportsMeetRun]);
+
+  const grantSportsMeetCourseStar = useCallback(
+    (run: SportsMeetRunState, starId: string) => {
+      yanmarAudio.playStarAcquire();
+      if (run.playMode !== "ranked" || !run.runId) {
+        // Practice: SFX only — currency does not increase.
+        return;
+      }
+      const optimistic = rollSportsMeetStarReward();
+      const before = currencyRef.current;
+      currencyRef.current = clampUserCurrency(before + optimistic);
+      setCurrency(currencyRef.current);
+      setPreviewStars(currencyRef.current);
+      showAttachmentWarning(`스타 +${optimistic}`, { stars: optimistic });
+
+      void (async () => {
+        try {
+          const res = await fetch("/api/sports-meet/yanmar/star", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ runId: run.runId, starId }),
+          });
+          if (!res.ok) {
+            currencyRef.current = before;
+            setCurrency(before);
+            setPreviewStars(before);
+            return;
+          }
+          const data = (await res.json()) as {
+            stars?: number;
+            currency?: number;
+          };
+          if (typeof data.currency === "number") {
+            syncSessionBalances(data, { syncPreviewCurrency: true });
+          } else if (typeof data.stars === "number") {
+            const corrected = clampUserCurrency(before + data.stars);
+            currencyRef.current = corrected;
+            setCurrency(corrected);
+            setPreviewStars(corrected);
+          }
+        } catch {
+          currencyRef.current = before;
+          setCurrency(before);
+          setPreviewStars(before);
+        }
+      })();
+    },
+    [showAttachmentWarning, syncSessionBalances],
+  );
 
   const loadMonumentState = useCallback(async () => {
     try {
@@ -2524,8 +2684,14 @@ export function ExcavatorGameWrapper({
     if (level < SPORTS_MEET_UNLOCK_LEVEL && session?.user?.role !== "ADMIN") {
       return;
     }
-    void fetch("/api/sports-meet/yanmar/ticket").catch(() => undefined);
-  }, [session?.user?.id, session?.user?.totalXp, session?.user?.role, sessionStatus]);
+    void refreshSportsMeetTicket();
+  }, [
+    session?.user?.id,
+    session?.user?.totalXp,
+    session?.user?.role,
+    sessionStatus,
+    refreshSportsMeetTicket,
+  ]);
 
   // If the player force-quit after claim (before pressing 확인), restore wallets
   // from the persisted grant + server state so the reward stays received.
@@ -4760,6 +4926,7 @@ export function ExcavatorGameWrapper({
           simRef.current.posX,
           simRef.current.posZ,
           now,
+          getSportsMeetPattern(run.weekKey),
         );
         run = noteSportsDumpFill(
           run,
@@ -4775,37 +4942,37 @@ export function ExcavatorGameWrapper({
           run.starsCollected !== beforeStars
         ) {
           const stageChanged = run.stageIndex !== beforeStage;
-          sportsMeetRunRef.current = run;
-          setSportsMeetRun(run);
-          if (
-            run.starsCollected !== beforeStars ||
-            run.speedBuffs.some((b, i) => {
-              const prev = sportsMeetRunRef.current?.speedBuffs[i];
-              return b.collected !== prev?.collected;
-            })
-          ) {
-            setSportsMeetPickupRevision((n) => n + 1);
+          const prevCourseStars = sportsMeetRunRef.current?.courseStars;
+          const prevBuffCollected = sportsMeetRunRef.current?.speedBuffs.map(
+            (b) => b.collected,
+          );
+          if (run.starsCollected !== beforeStars) {
+            const newlyCollected = run.courseStars.filter(
+              (star) =>
+                star.collected &&
+                !prevCourseStars?.some((p) => p.id === star.id && p.collected),
+            );
+            for (const star of newlyCollected) {
+              grantSportsMeetCourseStar(run, star.id);
+            }
           }
           if (stageChanged && run.phase === "racing") {
-            const stage = run.stageOrder[run.stageIndex];
-            if (stage) {
-              const pattern = getSportsMeetPattern(run.weekKey);
-              const spawn = sportsMeetStageWaypoint(pattern, stage);
-              const sim = simRef.current;
-              sim.posX = spawn.x;
-              sim.posZ = spawn.z;
-              if (stage === "drive" || stage === "dig") {
-                sim.attachmentType = "bucket";
-              } else if (stage === "crash") {
-                sim.attachmentType = "breaker";
-              } else {
-                sim.attachmentType = "grapple";
-              }
-              setAttachmentType(sim.attachmentType);
-              showAttachmentWarning(
-                `${STAGE_LABEL_KO[stage]} 코스 시작!`,
-              );
-            }
+            run = finalizeSportsMeetStageAdvance(
+              { ...run, stageIndex: beforeStage },
+              run,
+            );
+          }
+          sportsMeetRunRef.current = run;
+          setSportsMeetRun(run);
+          const buffChanged = run.speedBuffs.some(
+            (b, i) => b.collected !== prevBuffCollected?.[i],
+          );
+          if (
+            stageChanged ||
+            run.starsCollected !== beforeStars ||
+            buffChanged
+          ) {
+            setSportsMeetPickupRevision((n) => n + 1);
           }
           if (run.phase === "finished" && beforePhase !== "finished") {
             void (async () => {
@@ -4895,11 +5062,10 @@ export function ExcavatorGameWrapper({
         ) {
           pushQuestProgress("dumpTruckDepart", 1);
           if (isSports && sportsMeetRunRef.current) {
-            const next = noteSportsDumpDepart(
-              sportsMeetRunRef.current,
-              Date.now(),
-            );
-            if (next !== sportsMeetRunRef.current) {
+            const before = sportsMeetRunRef.current;
+            let next = noteSportsDumpDepart(before, Date.now());
+            if (next !== before) {
+              next = finalizeSportsMeetStageAdvance(before, next);
               sportsMeetRunRef.current = next;
               setSportsMeetRun(next);
             }
@@ -4997,7 +5163,9 @@ export function ExcavatorGameWrapper({
       }
     }
   }, [
+    finalizeSportsMeetStageAdvance,
     flushMaintenanceTravel,
+    grantSportsMeetCourseStar,
     persistDumpTruckCooldown,
     persistGameSession,
     pushQuestProgress,
@@ -5976,10 +6144,9 @@ export function ExcavatorGameWrapper({
         modeRef.current === "sportsRanked" ||
         modeRef.current === "sportsPractice";
       if (isSports && sportsMeetRunRef.current) {
-        const next = noteSportsAsphaltBreak(
-          sportsMeetRunRef.current,
-          Date.now(),
-        );
+        const before = sportsMeetRunRef.current;
+        let next = noteSportsAsphaltBreak(before, Date.now());
+        next = finalizeSportsMeetStageAdvance(before, next);
         sportsMeetRunRef.current = next;
         setSportsMeetRun(next);
         return;
@@ -5987,7 +6154,11 @@ export function ExcavatorGameWrapper({
       pushQuestProgress("asphaltBreak", 1);
       void claimSpecialReward("crash", tileId);
     },
-    [claimSpecialReward, pushQuestProgress],
+    [
+      claimSpecialReward,
+      finalizeSportsMeetStageAdvance,
+      pushQuestProgress,
+    ],
   );
 
   const handleHillRockDelivered = useCallback(
@@ -5999,7 +6170,9 @@ export function ExcavatorGameWrapper({
         modeRef.current === "sportsRanked" ||
         modeRef.current === "sportsPractice";
       if (isSports && sportsMeetRunRef.current) {
-        const next = noteSportsRockDump(sportsMeetRunRef.current, Date.now());
+        const before = sportsMeetRunRef.current;
+        let next = noteSportsRockDump(before, Date.now());
+        next = finalizeSportsMeetStageAdvance(before, next);
         sportsMeetRunRef.current = next;
         setSportsMeetRun(next);
         return;
@@ -6007,7 +6180,11 @@ export function ExcavatorGameWrapper({
       pushQuestProgress("rockDump", 1);
       void claimSpecialReward("hill", rockId);
     },
-    [claimSpecialReward, pushQuestProgress],
+    [
+      claimSpecialReward,
+      finalizeSportsMeetStageAdvance,
+      pushQuestProgress,
+    ],
   );
 
   const claimTruckFullReward = useCallback(
@@ -6615,7 +6792,7 @@ export function ExcavatorGameWrapper({
                     sportsMeetUnlocked ? (
                       <button
                         type="button"
-                        className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
+                        className="yanmar-site-prompt-hud-btn yanmar-site-prompt-hud-btn--sports touch-none active:scale-95"
                         onClick={() => {
                           setShowQuestPanel(false);
                           setShowShopPanel(false);
@@ -6624,16 +6801,29 @@ export function ExcavatorGameWrapper({
                           setShowRepairPanel(false);
                           setShowWorkshopPanel(false);
                           setShowMonumentPanel(false);
+                          void refreshSportsMeetTicket();
                           setShowSportsMeetPanel(true);
                         }}
-                        aria-label="굴착기 운동회 입장"
+                        aria-label={`운동회 입장, 입장권 ${sportsMeetTicket.remaining}/${sportsMeetTicket.limit}`}
                       >
                         <span className="yanmar-site-prompt-hud-copy">
-                          <span className="yanmar-site-prompt-hud-eyebrow">
-                            운동회
-                          </span>
                           <span className="yanmar-site-prompt-hud-label">
-                            포탈 입장
+                            운동회 입장
+                          </span>
+                        </span>
+                        <span className="yanmar-sports-meet-prompt-ticket">
+                          <img
+                            className="yanmar-sports-meet-ticket-icon"
+                            src="/images/yanmar/2d/sports-meet-ticket.svg"
+                            alt=""
+                            draggable={false}
+                          />
+                          <span
+                            className="yanmar-sports-meet-ticket-count"
+                            aria-hidden
+                          >
+                            ({sportsMeetTicket.remaining}/
+                            {sportsMeetTicket.limit})
                           </span>
                         </span>
                       </button>
@@ -6787,35 +6977,38 @@ export function ExcavatorGameWrapper({
               </>
             ) : null}
             {questsDisabled ? (
-              <div className="pointer-events-auto flex max-w-full flex-wrap items-start gap-1.5">
-                <button
-                  type="button"
-                  className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
-                    showEquipmentUpgrade ? " is-open" : ""
-                  }`}
-                  onClick={() => {
-                    setShowEquipmentUpgrade((open) => !open);
-                  }}
-                  aria-expanded={showEquipmentUpgrade}
-                  aria-label={
-                    showEquipmentUpgrade ? "장비강화 닫기" : "장비강화 열기"
-                  }
-                >
-                  <img
-                    className="yanmar-upgrade-hud-button-icon"
-                    src="/images/yanmar/2d/cockpit/upgrade-anvil-premium.png?v=2"
-                    alt=""
-                    draggable={false}
-                  />
-                  <span className="yanmar-upgrade-hud-button-label">장비</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowTutorialMenu(true)}
-                  className="h-[2.75rem] rounded-lg border border-white/20 bg-black/70 px-2.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
-                >
-                  튜토리얼
-                </button>
+              <div className="pointer-events-auto flex max-w-full flex-col items-start gap-1.5">
+                <div className="flex max-w-full flex-wrap items-start gap-1.5">
+                  <button
+                    type="button"
+                    className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
+                      showEquipmentUpgrade ? " is-open" : ""
+                    }`}
+                    onClick={() => {
+                      setShowEquipmentUpgrade((open) => !open);
+                    }}
+                    aria-expanded={showEquipmentUpgrade}
+                    aria-label={
+                      showEquipmentUpgrade ? "장비강화 닫기" : "장비강화 열기"
+                    }
+                  >
+                    <img
+                      className="yanmar-upgrade-hud-button-icon"
+                      src="/images/yanmar/2d/cockpit/upgrade-anvil-premium.png?v=2"
+                      alt=""
+                      draggable={false}
+                    />
+                    <span className="yanmar-upgrade-hud-button-label">장비</span>
+                  </button>
+                  {mode !== "sportsRanked" && mode !== "sportsPractice" ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowTutorialMenu(true)}
+                      className="h-[2.75rem] rounded-lg border border-white/20 bg-black/70 px-2.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
+                    >
+                      튜토리얼
+                    </button>
+                  ) : null}
                 {nearMonument &&
                 !showMonumentPanel &&
                 !nearRepairTent &&
@@ -6964,6 +7157,73 @@ export function ExcavatorGameWrapper({
                     ) : null}
                   </button>
                 ) : null}
+                </div>
+                {(mode === "sportsRanked" || mode === "sportsPractice") &&
+                sportsMeetRun ? (
+                  <div className="w-[9rem]">
+                    <SportsMeetHud
+                      key={`sports-hud-${sportsHudTick}`}
+                      stageLabel={
+                        sportsMeetRun.phase === "finished"
+                          ? "완주!"
+                          : isSportsMeetFinishDriveStage(
+                                sportsMeetRun.stageOrder,
+                                sportsMeetRun.stageIndex,
+                              )
+                            ? "골인 주행"
+                            : `${STAGE_LABEL_KO[currentSportsStage(sportsMeetRun) ?? "drive"]} 코스`
+                      }
+                      progressLabel={(() => {
+                        const stage = currentSportsStage(sportsMeetRun);
+                        if (!stage) return "";
+                        if (stage === "drive") {
+                          if (
+                            isSportsMeetFinishDriveStage(
+                              sportsMeetRun.stageOrder,
+                              sportsMeetRun.stageIndex,
+                            )
+                          ) {
+                            return "FINISH 골인";
+                          }
+                          const quota = sportsMeetDriveStarQuota(
+                            sportsMeetRun.mission,
+                            sportsMeetRun.stageOrder,
+                            sportsMeetRun.stageIndex,
+                          );
+                          return `별 ${sportsMeetRun.starsCollected}/${quota}`;
+                        }
+                        if (stage === "dig") {
+                          return `하역 ${Math.floor(sportsMeetRun.dumpFillUnits)}/${sportsMeetRun.mission.dig.dumpTruckCapacity}`;
+                        }
+                        if (stage === "crash") {
+                          return `파쇄 ${sportsMeetRun.asphaltBroken}/${sportsMeetRun.mission.crash.asphaltTileCount}`;
+                        }
+                        return `돌 ${sportsMeetRun.rocksDumped}/${sportsMeetRun.mission.hill.successfulDumpsRequired}`;
+                      })()}
+                      elapsedMs={sportsMeetElapsedMs(sportsMeetRun)}
+                      countdownSec={
+                        sportsMeetRun.phase === "countdown"
+                          ? Math.max(
+                              0,
+                              Math.ceil(
+                                (sportsMeetRun.countdownEndsAtMs - Date.now()) /
+                                  1000,
+                              ),
+                            )
+                          : null
+                      }
+                      phase={sportsMeetRun.phase}
+                      patternName={sportsMeetRun.patternNameKo}
+                      stageIndex={Math.min(
+                        sportsMeetRun.stageIndex,
+                        Math.max(0, sportsMeetRun.stageOrder.length - 1),
+                      )}
+                      stageTotal={sportsMeetRun.stageOrder.length}
+                      onStart={startSportsCountdown}
+                      onExit={exitSportsMeet}
+                    />
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -6974,11 +7234,19 @@ export function ExcavatorGameWrapper({
             {!(immersive && headerHudReady) ? (
               <div className="flex min-w-[5.5rem] flex-col items-center rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-white shadow-lg backdrop-blur-sm">
                 <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/70">
-                  {mode === "game" ? "누적 점수" : "점수"}
+                  {mode === "game" ||
+                  mode === "sportsRanked" ||
+                  mode === "sportsPractice"
+                    ? "누적 점수"
+                    : "점수"}
                 </span>
                 <span className="mt-0.5 text-sm font-black tabular-nums text-yellow-100">
                   {(
-                    mode === "game" ? seasonScoreBase + hud.score : hud.score
+                    mode === "game" ||
+                    mode === "sportsRanked" ||
+                    mode === "sportsPractice"
+                      ? seasonScoreBase + hud.score
+                      : hud.score
                   ).toLocaleString()}
                 </span>
               </div>
@@ -7102,22 +7370,35 @@ export function ExcavatorGameWrapper({
               );
               const rightTarget = document.getElementById(GAME_IMMERSIVE_HEADER_RIGHT_ID);
               if (!leftTarget && !centerTarget && !rightTarget) return null;
-              const ownedStars = mode === "game" ? currency : previewStars;
+              const isSportsMeet =
+                mode === "sportsRanked" || mode === "sportsPractice";
+              // Sports meet keeps the same header chrome as game mode; score
+              // does not increase during the meet (sim only awards in "game").
+              const headerLikeGame = mode === "game" || isSportsMeet;
+              const ownedStars = mode === "game" || isSportsMeet
+                ? currency
+                : previewStars;
               const xpProgress = getPlayerLevelProgress(
-                mode === "game" ? totalXp : session?.user?.totalXp ?? totalXp,
+                mode === "game" || isSportsMeet
+                  ? totalXp
+                  : session?.user?.totalXp ?? totalXp,
               );
               const nickname =
                 session?.user?.nickname ?? session?.user?.loginId ?? "PLAYER";
               const nickLen = nicknameCharLength(nickname);
               const displayScore =
-                mode === "game" ? seasonScoreBase + hud.score : hud.score;
+                mode === "game"
+                  ? seasonScoreBase + hud.score
+                  : isSportsMeet
+                    ? seasonScoreBase + hud.score
+                    : hud.score;
               const bonusRemaining = Math.max(
                 0,
                 xpProgress.level - spentAbilityPoints(abilityAlloc),
               );
               return (
                 <>
-                  {leftTarget && mode === "game"
+                  {leftTarget && headerLikeGame
                     ? createPortal(
                         <button
                           type="button"
@@ -7196,7 +7477,7 @@ export function ExcavatorGameWrapper({
                     ? createPortal(
                         <div className="inline-flex h-8 w-max min-w-[6.5rem] max-w-[10.5rem] flex-col items-center justify-center rounded-lg border border-white/20 bg-black/30 px-2.5 text-white shadow-sm">
                           <span className="text-[8px] font-bold uppercase leading-none tracking-[0.12em] text-white/75">
-                            {mode === "game" ? "누적 점수" : "점수"}
+                            {headerLikeGame ? "누적 점수" : "점수"}
                           </span>
                           <span className="mt-0.5 max-w-full truncate text-[13px] font-black leading-none tabular-nums text-yellow-100">
                             {displayScore.toLocaleString()}
@@ -7603,57 +7884,27 @@ export function ExcavatorGameWrapper({
           onClose={() => setShowSportsMeetRankings(false)}
           onSwitchWeek={setSportsMeetRankingsWeek}
         />
-        {(mode === "sportsRanked" || mode === "sportsPractice") &&
-        sportsMeetRun ? (
-          <SportsMeetHud
-            key={`sports-hud-${sportsHudTick}`}
-            stageLabel={
-              sportsMeetRun.phase === "finished"
-                ? "완주!"
-                : `${STAGE_LABEL_KO[currentSportsStage(sportsMeetRun) ?? "drive"]} 코스`
-            }
-            progressLabel={(() => {
-              const stage = currentSportsStage(sportsMeetRun);
-              if (!stage) return "";
-              if (stage === "drive") {
-                return `별 ${sportsMeetRun.starsCollected}/${sportsMeetRun.mission.drive.starCount}`;
-              }
-              if (stage === "dig") {
-                return `하역 ${Math.floor(sportsMeetRun.dumpFillUnits)}/${sportsMeetRun.mission.dig.dumpTruckCapacity}`;
-              }
-              if (stage === "crash") {
-                return `파쇄 ${sportsMeetRun.asphaltBroken}/${sportsMeetRun.mission.crash.asphaltTileCount}`;
-              }
-              return `돌 ${sportsMeetRun.rocksDumped}/${sportsMeetRun.mission.hill.successfulDumpsRequired}`;
-            })()}
-            elapsedMs={sportsMeetElapsedMs(sportsMeetRun)}
-            countdownSec={
-              sportsMeetRun.phase === "countdown"
-                ? Math.max(
-                    0,
-                    Math.ceil(
-                      (sportsMeetRun.countdownEndsAtMs - Date.now()) / 1000,
-                    ),
-                  )
-                : null
-            }
-            phase={sportsMeetRun.phase}
-            patternName={sportsMeetRun.patternNameKo}
-            onStart={startSportsCountdown}
-            onExit={exitSportsMeet}
-          />
-        ) : null}
         {sportsMeetRun?.phase === "finished" ? (
           <SportsMeetResultPanel
             open
             playMode={sportsMeetRun.playMode}
             patternName={sportsMeetRun.patternNameKo}
             finalTimeMs={sportsMeetRun.finalTimeMs}
-            splits={sportsMeetRun.splits.map((s) => ({
-              stage: s.stage,
-              clearTimeMs: s.clearTimeMs,
-              label: STAGE_LABEL_KO[s.stage],
-            }))}
+            splits={(() => {
+              let driveN = 0;
+              return sportsMeetRun.splits.map((s) => {
+                let label = STAGE_LABEL_KO[s.stage];
+                if (s.stage === "drive") {
+                  driveN += 1;
+                  label = `주행 ${driveN}`;
+                }
+                return {
+                  stage: s.stage,
+                  clearTimeMs: s.clearTimeMs,
+                  label,
+                };
+              });
+            })()}
             submitted={
               sportsMeetRun.playMode === "practice" || sportsResultSubmitted
             }
@@ -7768,9 +8019,7 @@ export function ExcavatorGameWrapper({
               activeChassisId={String(activeChassisId)}
               onSceneReady={handleSceneReady}
               worldPickupsRef={
-                (mode === "game" && session?.user?.id) ||
-                mode === "sportsRanked" ||
-                mode === "sportsPractice"
+                mode === "game" && session?.user?.id
                   ? worldPickupsRef
                   : undefined
               }
@@ -7795,8 +8044,23 @@ export function ExcavatorGameWrapper({
                 mode !== "sportsRanked" &&
                 mode !== "sportsPractice"
               }
+              sportsMeetTicketRemaining={sportsMeetTicket.remaining}
+              sportsMeetTicketLimit={sportsMeetTicket.limit}
               sportsMeetRunRef={sportsMeetRunRef}
               sportsMeetPickupRevision={sportsMeetPickupRevision}
+              sportsArenaActive={
+                mode === "sportsRanked" || mode === "sportsPractice"
+              }
+              sportsMeetPattern={
+                sportsMeetRun
+                  ? getSportsMeetPattern(sportsMeetRun.weekKey)
+                  : null
+              }
+              sportsMeetGateOpen={
+                !sportsMeetRun ||
+                (sportsMeetRun.phase !== "ready" &&
+                  sportsMeetRun.phase !== "countdown")
+              }
             />
           </div>
         )}

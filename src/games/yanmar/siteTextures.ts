@@ -8,6 +8,7 @@ export const PREMIUM_SITE_TEXTURES = {
   asphaltNormal: "/images/yanmar/2d/site/asphalt-normal.webp",
   asphaltRoughness: "/images/yanmar/2d/site/asphalt-roughness.webp",
   backdrop: "/images/yanmar/2d/site/premium-skyline-backdrop.png",
+  sportsMeetBackdrop: "/images/yanmar/2d/site/sports-meet-skyline-backdrop.png",
 } as const;
 
 export function configureSiteTexture(

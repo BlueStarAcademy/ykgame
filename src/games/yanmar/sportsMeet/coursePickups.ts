@@ -34,12 +34,13 @@ export function samplePathPoints(
 
 export function buildCourseStars(
   path: readonly SitePoint[],
-  mission: SportsMeetMissionBalance,
+  starCount: number,
   heightAt: (x: number, z: number) => number,
+  idPrefix = "course-star",
 ): SportsMeetCourseStar[] {
-  const points = samplePathPoints(path, mission.drive.starCount);
+  const points = samplePathPoints(path, starCount);
   return points.map((p, i) => ({
-    id: `course-star-${i}`,
+    id: `${idPrefix}-${i}`,
     x: p[0],
     y: heightAt(p[0], p[1]) + 1.15,
     z: p[1],

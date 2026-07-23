@@ -1,15 +1,15 @@
 "use client";
 
-import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
-import { useFrame, useLoader } from "@react-three/fiber";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
 import * as THREE from "three";
-import { SPORTS_MEET_PORTAL } from "./sportsMeet/coursePickups";
+import { getSportsMeetFinishGate } from "./sportsMeet/patterns";
+import type { SportsMeetPattern } from "./sportsMeet/patterns";
 
 const GATE_HALF = 3.4;
 const POST_H = 5.2;
 const BEAM_Y = POST_H + 0.15;
-const TICKET_ICON = "/images/yanmar/2d/sports-meet-ticket.svg";
 
 function createCheckeredTexture(cols: number, rows: number) {
   if (typeof document === "undefined") return null;
@@ -121,72 +121,23 @@ function CheckeredBanner() {
   );
 }
 
-function TicketCountPlaque({
-  remaining,
-  limit,
-}: {
-  remaining: number;
-  limit: number;
-}) {
-  const ticketTexture = useLoader(THREE.TextureLoader, TICKET_ICON);
-  useLayoutEffect(() => {
-    ticketTexture.colorSpace = THREE.SRGBColorSpace;
-    ticketTexture.anisotropy = 8;
-    ticketTexture.needsUpdate = true;
-  }, [ticketTexture]);
-
-  return (
-    <group position={[0, BEAM_Y + 0.55, 0]}>
-      <mesh position={[0, 0, 0.05]} castShadow>
-        <boxGeometry args={[2.55, 0.78, 0.12]} />
-        <meshStandardMaterial color="#0f172a" roughness={0.5} metalness={0.2} />
-      </mesh>
-      <mesh position={[-0.62, 0, 0.13]}>
-        <planeGeometry args={[0.58, 0.58]} />
-        <meshStandardMaterial
-          map={ticketTexture}
-          transparent
-          roughness={0.55}
-          metalness={0.05}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      <Text
-        key={`${remaining}-${limit}`}
-        position={[0.38, 0, 0.13]}
-        fontSize={0.38}
-        color="#fef3c7"
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.022}
-        outlineColor="#0f172a"
-      >
-        {`(${remaining}/${limit})`}
-      </Text>
-    </group>
-  );
-}
-
-/** Racing finish-line gate for the sports-meet entrance. */
-export function SportsMeetPortal({
+/** Arena finish gate — same racing look as the entrance portal. */
+export function SportsMeetFinishGate({
+  pattern,
   visible = true,
-  ticketRemaining = 1,
-  ticketLimit = 1,
 }: {
+  pattern: SportsMeetPattern;
   visible?: boolean;
-  ticketRemaining?: number;
-  ticketLimit?: number;
 }) {
   const groundCheck = useMemo(() => createCheckeredTexture(12, 2), []);
   if (!visible) return null;
-  const { x, z, rotationY } = SPORTS_MEET_PORTAL;
+  const { x, z, rotationY } = getSportsMeetFinishGate(pattern);
 
   return (
     <group position={[x, 0, z]} rotation={[0, rotationY, 0]}>
       <RacingPost x={-GATE_HALF} />
       <RacingPost x={GATE_HALF} />
 
-      {/* Top crossbeam */}
       <mesh position={[0, BEAM_Y, 0]} castShadow>
         <boxGeometry args={[GATE_HALF * 2 + 0.9, 0.28, 0.36]} />
         <meshStandardMaterial color="#1e293b" roughness={0.45} metalness={0.4} />
@@ -196,7 +147,6 @@ export function SportsMeetPortal({
         <meshStandardMaterial color="#fbbf24" roughness={0.55} metalness={0.2} />
       </mesh>
 
-      {/* Hanging ropes */}
       {([-2.2, -0.75, 0.75, 2.2] as const).map((lx) => (
         <mesh key={lx} position={[lx, BEAM_Y - 0.45, 0.05]}>
           <cylinderGeometry args={[0.025, 0.025, 0.9, 6]} />
@@ -206,28 +156,23 @@ export function SportsMeetPortal({
 
       <CheckeredBanner />
 
-      <Suspense fallback={null}>
-        <TicketCountPlaque remaining={ticketRemaining} limit={ticketLimit} />
-      </Suspense>
-
-      {/* Title plaque */}
-      <mesh position={[0, BEAM_Y + 1.15, 0]} castShadow>
-        <boxGeometry args={[4.2, 0.55, 0.1]} />
-        <meshStandardMaterial color="#1e3a5f" roughness={0.55} />
+      <mesh position={[0, BEAM_Y + 0.55, 0.05]} castShadow>
+        <boxGeometry args={[3.4, 0.7, 0.12]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.5} metalness={0.2} />
       </mesh>
       <Text
-        position={[0, BEAM_Y + 1.15, 0.08]}
-        fontSize={0.28}
-        color="#fef3c7"
+        position={[0, BEAM_Y + 0.55, 0.13]}
+        fontSize={0.42}
+        color="#f8fafc"
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.018}
-        outlineColor="#0f172a"
+        outlineWidth={0.02}
+        outlineColor="#dc2626"
+        letterSpacing={0.08}
       >
-        굴착기 운동회
+        FINISH
       </Text>
 
-      {/* Ground finish stripe */}
       <mesh
         position={[0, 0.03, 0.9]}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -240,19 +185,6 @@ export function SportsMeetPortal({
           <meshStandardMaterial color="#111827" roughness={0.95} />
         )}
       </mesh>
-
-      {/* Approach lane markers */}
-      {([-1.6, 1.6] as const).map((lx) => (
-        <mesh
-          key={`lane-${lx}`}
-          position={[lx, 0.04, 2.4]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          receiveShadow
-        >
-          <planeGeometry args={[0.28, 2.2]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.9} />
-        </mesh>
-      ))}
     </group>
   );
 }
