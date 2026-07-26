@@ -16,6 +16,7 @@ import type { GameResult } from "@/games/shared/types";
 import { YanmarGuideModal } from "@/games/yanmar/YanmarInfoModals";
 import { InGameBackProvider } from "@/hooks/useInGameBackNavigation";
 import { GameResultScreen } from "./GameResultScreen";
+import { yanmarAudio } from "@/games/yanmar/yanmarAudio";
 
 const PhaserGameWrapper = dynamic(
   () =>
@@ -153,6 +154,9 @@ export function GamePlayClient({
       window.cancelAnimationFrame(entryRevealRafRef.current);
       entryRevealRafRef.current = null;
     }
+    // Unlock BGM AudioContext on this click — scene-ready unlock is too late
+    // for autoplay policy (menu taps were the only later gesture that worked).
+    yanmarAudio.unlock();
     setEntryLoading(true);
     void (async () => {
       try {

@@ -3,7 +3,7 @@
 export const SPORTS_MEET_MISSION_DEFAULTS = {
   drive: {
     /** Stars required per drive leg (course has multiple drive stages). */
-    starCount: 5,
+    starCount: 8,
     speedBuffCount: 2,
   },
   dig: {

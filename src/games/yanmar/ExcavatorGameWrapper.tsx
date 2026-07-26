@@ -330,6 +330,7 @@ import {
   getSportsMeetAllowedAttachment,
   sportsMeetStageLockMessage,
   rollSportsMeetStarReward,
+  type SportsMeetMissionBalance,
   type SportsMeetPlayMode,
   type SportsMeetRunState,
 } from "./sportsMeet";
@@ -1134,6 +1135,10 @@ export function ExcavatorGameWrapper({
   const sportsMainTerrainRef = useRef<TerrainData | null>(null);
   const sportsEquipmentSnapRef = useRef<YanmarEquipmentStats | null>(null);
   const sportsDumpTruckSnapRef = useRef<DumpTruckRuntimeState | null>(null);
+  /** While set, equipment republish keeps sports mission overrides (e.g. dump 8000). */
+  const sportsMeetMissionOverrideRef = useRef<SportsMeetMissionBalance | null>(
+    null,
+  );
   /** Wall-clock when main-map trucks were frozen for sports (offline-style resume). */
   const sportsWorldAwayAtMsRef = useRef<number | null>(null);
   const sportsHudTickRef = useRef(0);
@@ -1371,10 +1376,15 @@ export function ExcavatorGameWrapper({
 
   const publishEquipmentStats = useCallback((base: YanmarEquipmentStats) => {
     baseEquipmentStatsRef.current = base;
-    const effective = applyShopBuffsToStats(
+    let effective = applyShopBuffsToStats(
       base,
       activeShopBuffIds(activeShopBuffsRef.current),
     );
+    const sportsMission = sportsMeetMissionOverrideRef.current;
+    if (sportsMission) {
+      // Keep player ability/gear stats; force sports dump/hill mission values.
+      effective = applySportsMeetEquipmentOverrides(effective, sportsMission);
+    }
     equipmentStatsRef.current = effective;
     setEquipmentStats(effective);
   }, []);
@@ -2447,6 +2457,7 @@ export function ExcavatorGameWrapper({
     const elapsedSec =
       awayAtMs != null ? Math.max(0, (Date.now() - awayAtMs) / 1000) : 0;
 
+    sportsMeetMissionOverrideRef.current = null;
     const equipmentSnap = sportsEquipmentSnapRef.current;
     if (equipmentSnap) {
       equipmentStatsRef.current = equipmentSnap;
@@ -2494,7 +2505,7 @@ export function ExcavatorGameWrapper({
     async (playMode: SportsMeetPlayMode) => {
       setShowSportsMeetPanel(false);
       setSportsResultSubmitted(false);
-      // Arm sports BGM on the click gesture before any await (autoplay policy).
+      // Prime AudioContext + swap track on this click before any await.
       yanmarAudio.unlock();
       yanmarAudio.setSportsMeetBgm(true);
 
@@ -2531,12 +2542,10 @@ export function ExcavatorGameWrapper({
 
       terrainRef.current = createSportsMeetTerrain(pattern, mission);
 
-      const nextStats = applySportsMeetEquipmentOverrides(
-        equipmentStatsRef.current,
-        mission,
-      );
-      equipmentStatsRef.current = nextStats;
-      setEquipmentStats(nextStats);
+      // Persist mission overrides across equipment/buff republish (ranked ticket
+      // await + loadEquipment often wiped truckCapacityUnits back to workshop).
+      sportsMeetMissionOverrideRef.current = mission;
+      publishEquipmentStatsRef.current(baseEquipmentStatsRef.current);
       resetDumpTruckState(dumpTruckStateRef.current);
       dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
       setTerrainRevision((k) => k + 1);
@@ -4384,6 +4393,10 @@ export function ExcavatorGameWrapper({
       boom: sim.boom,
       arm: sim.arm,
       bucket: sim.bucket,
+      grappleOpen: Math.max(
+        0,
+        Math.min(1, auxiliaryRef.current.grappleOpen),
+      ),
     };
     autoPoseRef.current.slots = autoPoseRef.current.slots.map((existing, index) =>
       index === slot ? pose : existing,

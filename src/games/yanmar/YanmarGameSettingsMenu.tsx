@@ -652,16 +652,20 @@ export function YanmarGameSettingsMenu({
         ref={buttonRef}
         type="button"
         onClick={() => onOpenChange(!open)}
-        className="relative z-[70] flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20 text-white hover:bg-white/30"
+        className={`yanmar-settings-menu-trigger${open ? " is-open" : ""}`}
         aria-label="메뉴"
         aria-expanded={open}
       >
-        <img
-          src="/images/yanmar/2d/cockpit/menu-premium.png?v=1"
-          alt=""
-          draggable={false}
-          className="pointer-events-none h-5 w-5 object-contain"
-        />
+        <span className="yanmar-settings-menu-trigger-glyph" aria-hidden>
+          <svg viewBox="0 0 24 24" fill="none" className="yanmar-settings-menu-trigger-svg">
+            <path
+              d="M4.5 7.25h15M4.5 12h15M4.5 16.75h15"
+              stroke="currentColor"
+              strokeWidth="2.15"
+              strokeLinecap="round"
+            />
+          </svg>
+        </span>
       </button>
     </div>
   );

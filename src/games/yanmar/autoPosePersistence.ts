@@ -49,11 +49,34 @@ function isFiniteNumber(value: unknown): value is number {
 function isValidPose(value: unknown): value is SavedArmPose {
   if (!value || typeof value !== "object") return false;
   const pose = value as Partial<SavedArmPose>;
-  return (
-    isFiniteNumber(pose.boom) &&
-    isFiniteNumber(pose.arm) &&
-    isFiniteNumber(pose.bucket)
-  );
+  if (
+    !isFiniteNumber(pose.boom) ||
+    !isFiniteNumber(pose.arm) ||
+    !isFiniteNumber(pose.bucket)
+  ) {
+    return false;
+  }
+  if (
+    pose.grappleOpen !== undefined &&
+    (!isFiniteNumber(pose.grappleOpen) ||
+      pose.grappleOpen < 0 ||
+      pose.grappleOpen > 1)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function normalizePose(value: SavedArmPose): SavedArmPose {
+  const pose: SavedArmPose = {
+    boom: value.boom,
+    arm: value.arm,
+    bucket: value.bucket,
+  };
+  if (isFiniteNumber(value.grappleOpen)) {
+    pose.grappleOpen = Math.max(0, Math.min(1, value.grappleOpen));
+  }
+  return pose;
 }
 
 function emptySlots(): AutoPoseSlots {
@@ -95,10 +118,10 @@ export function normalizeAutoPoseSlotLabels(value: unknown): AutoPoseSlotLabels 
 
 function cloneSlots(slots: AutoPoseSlots): AutoPoseSlots {
   return [
-    slots[0] ? { ...slots[0] } : null,
-    slots[1] ? { ...slots[1] } : null,
-    slots[2] ? { ...slots[2] } : null,
-    slots[3] ? { ...slots[3] } : null,
+    slots[0] ? normalizePose(slots[0]) : null,
+    slots[1] ? normalizePose(slots[1]) : null,
+    slots[2] ? normalizePose(slots[2]) : null,
+    slots[3] ? normalizePose(slots[3]) : null,
   ];
 }
 
@@ -106,7 +129,7 @@ function normalizeSlots(value: unknown): AutoPoseSlots {
   if (!Array.isArray(value)) return emptySlots();
   const slots = emptySlots();
   for (let i = 0; i < AUTO_POSE_SLOT_COUNT; i++) {
-    slots[i] = isValidPose(value[i]) ? { ...value[i] } : null;
+    slots[i] = isValidPose(value[i]) ? normalizePose(value[i]) : null;
   }
   return slots;
 }

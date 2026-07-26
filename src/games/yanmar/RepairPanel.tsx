@@ -15,6 +15,7 @@ import {
   pointKindLabel,
   type FluidSnapshot,
   type MaintenanceBonusOutcome,
+  type MaintenanceBonusSpec,
   type MaintenanceClaimBuff,
   type MaintenanceFluidId,
   type MaintenancePointKind,
@@ -36,32 +37,129 @@ const POINT_ICONS: Record<MaintenancePointKind, string> = {
   monument: "/images/yanmar/2d/workshop-coin-monument.svg",
 };
 
-function bonusPoolIcons(
+function bonusOutcomeBounds(
+  outcome: MaintenanceBonusSpec,
+): { min: number; max: number } | null {
+  if (outcome.gachaTicketsStandardRange) {
+    return {
+      min: outcome.gachaTicketsStandardRange[0],
+      max: outcome.gachaTicketsStandardRange[1],
+    };
+  }
+  if (outcome.gachaTicketsPremiumRange) {
+    return {
+      min: outcome.gachaTicketsPremiumRange[0],
+      max: outcome.gachaTicketsPremiumRange[1],
+    };
+  }
+  if (outcome.stars) return { min: outcome.stars, max: outcome.stars };
+  if (outcome.workshopPoints) {
+    return { min: outcome.workshopPoints, max: outcome.workshopPoints };
+  }
+  if (outcome.enhanceCores) {
+    return { min: outcome.enhanceCores, max: outcome.enhanceCores };
+  }
+  if (outcome.gachaTicketsStandard) {
+    return {
+      min: outcome.gachaTicketsStandard,
+      max: outcome.gachaTicketsStandard,
+    };
+  }
+  if (outcome.gachaTicketsPremium) {
+    return {
+      min: outcome.gachaTicketsPremium,
+      max: outcome.gachaTicketsPremium,
+    };
+  }
+  return null;
+}
+
+function formatBonusAmountLabel(
+  min: number,
+  max: number,
+  asCount: boolean,
+): string {
+  if (min === max) {
+    return asCount
+      ? `${min.toLocaleString()}개`
+      : `+${min.toLocaleString()}`;
+  }
+  return asCount
+    ? `${min.toLocaleString()}~${max.toLocaleString()}개`
+    : `+${min.toLocaleString()}~${max.toLocaleString()}`;
+}
+
+function bonusPoolPreview(
   fluidId: MaintenanceFluidId,
-): { src: string; label: string }[] {
+): { key: string; src: string; label: string; amountLabel: string }[] {
   const pointKind = MAINTENANCE_FLUIDS[fluidId].pointKind;
-  const seen = new Set<string>();
-  const icons: { src: string; label: string }[] = [];
+  type Acc = {
+    key: string;
+    src: string;
+    label: string;
+    asCount: boolean;
+    min: number;
+    max: number;
+  };
+  const byKey = new Map<string, Acc>();
+
   for (const entry of bonusTableForFluid(fluidId)) {
     const o = entry.outcome;
-    const add = (key: string, src: string, label: string) => {
-      if (seen.has(key)) return;
-      seen.add(key);
-      icons.push({ src, label });
-    };
-    if (o.stars) add("stars", STAR_ICON, "스타");
-    if (o.workshopPoints) {
-      add("points", POINT_ICONS[pointKind], pointKindLabel(pointKind));
+    const bounds = bonusOutcomeBounds(o);
+    if (!bounds) continue;
+
+    let key: string;
+    let src: string;
+    let label: string;
+    let asCount = false;
+    if (o.stars) {
+      key = "stars";
+      src = STAR_ICON;
+      label = "스타";
+    } else if (o.workshopPoints) {
+      key = "points";
+      src = POINT_ICONS[pointKind];
+      label = pointKindLabel(pointKind);
+    } else if (o.enhanceCores) {
+      key = "cores";
+      src = CORE_ICON;
+      label = "강화코어";
+    } else if (o.gachaTicketsStandard || o.gachaTicketsStandardRange) {
+      key = "ticket-std";
+      src = TICKET_STANDARD_ICON;
+      label = "일반 뽑기권";
+      asCount = true;
+    } else if (o.gachaTicketsPremium || o.gachaTicketsPremiumRange) {
+      key = "ticket-prem";
+      src = TICKET_PREMIUM_ICON;
+      label = "고급 뽑기권";
+      asCount = true;
+    } else {
+      continue;
     }
-    if (o.enhanceCores) add("cores", CORE_ICON, "강화코어");
-    if (o.gachaTicketsStandard || o.gachaTicketsStandardRange) {
-      add("ticket-std", TICKET_STANDARD_ICON, "일반 뽑기권");
-    }
-    if (o.gachaTicketsPremium || o.gachaTicketsPremiumRange) {
-      add("ticket-prem", TICKET_PREMIUM_ICON, "고급 뽑기권");
+
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, {
+        key,
+        src,
+        label,
+        asCount,
+        min: bounds.min,
+        max: bounds.max,
+      });
+    } else {
+      prev.min = Math.min(prev.min, bounds.min);
+      prev.max = Math.max(prev.max, bounds.max);
     }
   }
-  return icons;
+
+  return [...byKey.values()].map((item) => ({
+    key: item.key,
+    src: item.src,
+    label: item.label,
+    amountLabel: formatBonusAmountLabel(item.min, item.max, item.asCount),
+  }));
 }
 
 function RewardIconChip({
@@ -137,7 +235,7 @@ function RewardPreview({
   const reward = MAINTENANCE_REWARDS[fluidId];
   const def = MAINTENANCE_FLUIDS[fluidId];
   const buff = MAINTENANCE_CLAIM_BUFF[fluidId];
-  const bonusIcons = bonusPoolIcons(fluidId);
+  const bonusItems = bonusPoolPreview(fluidId);
   return (
     <div
       className={`yanmar-repair-reward-preview-body${compact ? " is-compact" : ""}`}
@@ -199,14 +297,20 @@ function RewardPreview({
             보너스 뽑기(1개 획득)
           </strong>
           <div className="yanmar-repair-reward-bonus-pool">
-            {bonusIcons.map((icon) => (
+            {bonusItems.map((item) => (
               <span
-                key={icon.src}
-                className="yanmar-repair-reward-bonus-icon"
-                title={icon.label}
+                key={item.key}
+                className="yanmar-repair-reward-bonus-item"
+                title={`${item.label} ${item.amountLabel}`}
+                aria-label={`${item.label} ${item.amountLabel}`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={icon.src} alt={icon.label} draggable={false} />
+                <span className="yanmar-repair-reward-bonus-icon">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.src} alt="" draggable={false} />
+                </span>
+                <strong className="yanmar-repair-reward-bonus-amt">
+                  {item.amountLabel}
+                </strong>
               </span>
             ))}
           </div>

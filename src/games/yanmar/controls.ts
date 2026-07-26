@@ -1,7 +1,13 @@
 /** 얀마 SV08-1 조작 매핑 — YK건기 조작 도면 기준 */
 
 import { FACTORY_JOINT_LIMITS } from "./workEquipment/workEquipmentStructure";
-import type { AutoPoseSlotIndex, AutoPoseState } from "./types";
+import type {
+  AutoPoseSlotIndex,
+  AutoPoseState,
+  ExcavatorSimState,
+  SavedArmPose,
+} from "./types";
+import { clampGrappleOpenAgainstArm } from "./grappleArmClearance";
 
 export const YANMAR_ASSETS = {
   controlsGuide: "/images/yanmar/controls-guide.webp",
@@ -469,7 +475,11 @@ export function getActiveAutoPoseJoint(
   if (!autoPose.executing || autoPose.saved == null || autoPose.phase == null) {
     return null;
   }
-  return AUTO_POSE_JOINT_ORDER[autoPose.phase] ?? null;
+  const phase = autoPose.phase;
+  if (phase === 0 || phase === 1 || phase === 2) {
+    return AUTO_POSE_JOINT_ORDER[phase];
+  }
+  return null;
 }
 
 /**
@@ -509,17 +519,72 @@ export function buildAutoArmControlInput(
   }
 }
 
+function wantsAutoPoseGrapplePhase(
+  sim: Pick<ExcavatorSimState, "attachmentType">,
+  target: SavedArmPose,
+) {
+  return (
+    sim.attachmentType === "grapple" &&
+    typeof target.grappleOpen === "number" &&
+    Number.isFinite(target.grappleOpen)
+  );
+}
+
+function finishAutoArmPose(autoPose: AutoPoseState) {
+  autoPose.executing = false;
+  autoPose.phase = null;
+}
+
+function holdCompletedAutoPoseJoints(
+  sim: Pick<ExcavatorSimState, "boom" | "arm" | "bucket">,
+  vel: HydraulicVelocity,
+  target: SavedArmPose,
+) {
+  holdAutoPoseJoint(sim, vel, "arm", target.arm);
+  holdAutoPoseJoint(sim, vel, "boom", target.boom);
+  holdAutoPoseJoint(sim, vel, "bucket", target.bucket);
+}
+
 /** 완료된 축은 잠그고, 현재 phase 관절이 목표에 닿으면 다음 축으로 넘긴다. */
 export function advanceAutoArmPose(
-  sim: { boom: number; arm: number; bucket: number },
+  sim: Pick<
+    ExcavatorSimState,
+    "boom" | "arm" | "bucket" | "attachmentType"
+  >,
   vel: HydraulicVelocity,
   autoPose: AutoPoseState,
+  auxiliary?: AuxiliaryControlState | null,
 ) {
   if (!autoPose.executing || !autoPose.saved || autoPose.phase == null) return;
 
   const target = autoPose.saved;
 
-  while (autoPose.phase != null) {
+  // Phase 3: 집게 벌림 (관절 완료 후, 집게 모드 + 저장된 값일 때만)
+  if (autoPose.phase === 3) {
+    holdCompletedAutoPoseJoints(sim, vel, target);
+    const rawGoal = target.grappleOpen;
+    if (
+      rawGoal == null ||
+      !Number.isFinite(rawGoal) ||
+      sim.attachmentType !== "grapple" ||
+      !auxiliary
+    ) {
+      finishAutoArmPose(autoPose);
+      return;
+    }
+    // Settle against the arm-safe open so curl limits cannot stall completion.
+    const goal = clampGrappleOpenAgainstArm(
+      sim as ExcavatorSimState,
+      rawGoal,
+    );
+    if (isAutoPoseJointSettled(auxiliary.grappleOpen, goal)) {
+      auxiliary.grappleOpen = goal;
+      finishAutoArmPose(autoPose);
+    }
+    return;
+  }
+
+  while (autoPose.phase != null && autoPose.phase < 3) {
     const phase = autoPose.phase;
 
     for (let i = 0; i < phase; i += 1) {
@@ -537,13 +602,24 @@ export function advanceAutoArmPose(
       continue;
     }
 
-    holdAutoPoseJoint(sim, vel, "arm", target.arm);
-    holdAutoPoseJoint(sim, vel, "boom", target.boom);
-    holdAutoPoseJoint(sim, vel, "bucket", target.bucket);
-    autoPose.executing = false;
-    autoPose.phase = null;
+    holdCompletedAutoPoseJoints(sim, vel, target);
+    if (wantsAutoPoseGrapplePhase(sim, target)) {
+      autoPose.phase = 3;
+      return;
+    }
+    finishAutoArmPose(autoPose);
     return;
   }
+}
+
+/** 자동 실행 중 집게 벌림 phase인지. */
+export function isAutoPoseGrapplePhase(autoPose: AutoPoseState) {
+  return (
+    autoPose.executing &&
+    autoPose.phase === 3 &&
+    autoPose.saved != null &&
+    typeof autoPose.saved.grappleOpen === "number"
+  );
 }
 
 /** 자동 실행 중 굴착 구역에서 순차 이동·저장 자세 도달 시 흙 적재를 허용한다. */

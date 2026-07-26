@@ -75,28 +75,33 @@ const LINEAR_ZONES: SportsMeetZoneLayout = {
 
 const LINEAR_DRIVE_1: SitePoint[] = [
   [-28, -22],
-  [-14, -18],
-  [-2, -10],
+  [-18, -20],
+  [-8, -14],
+  [2, -6],
   [8, -2],
 ];
 
-/** dig exit → crash approach with S-curves (stars sit on this road). */
+/** dig exit → crash approach with S-curves (stars sit on bends). */
 const LINEAR_DRIVE_2: SitePoint[] = [
   [28, 0],
-  [42, -14],
-  [58, 6],
-  [74, -8],
-  [90, 10],
+  [38, -12],
+  [48, -16],
+  [60, 8],
+  [72, -10],
+  [84, 8],
+  [94, 14],
   [100, 12],
 ];
 
 /** crash exit → hill with sweeping curves. */
 const LINEAR_DRIVE_3: SitePoint[] = [
   [108, 28],
-  [92, 42],
-  [108, 58],
-  [78, 72],
-  [52, 88],
+  [96, 38],
+  [88, 48],
+  [106, 60],
+  [90, 70],
+  [68, 80],
+  [48, 92],
   [34, 100],
 ];
 
@@ -118,24 +123,29 @@ const LINEAR_PATHS = [
 /** Slight path wiggles for weekly visual variety — same zones & stage order. */
 const WIDE_DRIVE_1: SitePoint[] = [
   [-30, -26],
-  [-12, -20],
-  [0, -12],
+  [-20, -24],
+  [-8, -16],
+  [2, -8],
   [10, -2],
 ];
 const WIDE_DRIVE_2: SitePoint[] = [
   [30, -4],
-  [48, -18],
-  [64, 10],
-  [82, -6],
-  [96, 14],
+  [42, -16],
+  [54, -20],
+  [66, 12],
+  [78, -8],
+  [90, 10],
+  [100, 16],
   [104, 12],
 ];
 const WIDE_DRIVE_3: SitePoint[] = [
   [110, 30],
-  [88, 46],
-  [112, 62],
-  [74, 78],
-  [48, 94],
+  [96, 40],
+  [84, 50],
+  [110, 64],
+  [92, 74],
+  [68, 84],
+  [46, 96],
   [32, 104],
 ];
 const WIDE_DRIVE_4: SitePoint[] = [
@@ -147,24 +157,29 @@ const WIDE_DRIVE_4: SitePoint[] = [
 
 const TIGHT_DRIVE_1: SitePoint[] = [
   [-24, -18],
-  [-10, -14],
-  [2, -6],
+  [-14, -16],
+  [-4, -10],
+  [4, -2],
   [10, 0],
 ];
 const TIGHT_DRIVE_2: SitePoint[] = [
   [26, 2],
-  [40, -10],
-  [56, 4],
-  [72, -6],
-  [88, 8],
+  [36, -8],
+  [46, -12],
+  [58, 6],
+  [70, -8],
+  [82, 6],
+  [92, 12],
   [100, 12],
 ];
 const TIGHT_DRIVE_3: SitePoint[] = [
   [106, 26],
-  [90, 40],
-  [104, 54],
-  [76, 68],
-  [50, 86],
+  [94, 36],
+  [86, 46],
+  [102, 56],
+  [86, 66],
+  [66, 76],
+  [48, 90],
   [36, 98],
 ];
 const TIGHT_DRIVE_4: SitePoint[] = [
@@ -182,24 +197,29 @@ const MIRROR_ZONES: SportsMeetZoneLayout = {
 
 const MIRROR_DRIVE_1: SitePoint[] = [
   [-26, -20],
-  [-10, -16],
-  [2, -8],
+  [-16, -18],
+  [-4, -12],
+  [4, -4],
   [10, -1],
 ];
 const MIRROR_DRIVE_2: SitePoint[] = [
   [28, 4],
-  [44, -8],
-  [58, 16],
-  [74, 4],
-  [88, 22],
+  [40, -6],
+  [50, -10],
+  [62, 18],
+  [74, 2],
+  [86, 20],
+  [94, 30],
   [96, 28],
 ];
 const MIRROR_DRIVE_3: SitePoint[] = [
   [98, 42],
-  [78, 56],
-  [96, 72],
-  [68, 88],
-  [52, 100],
+  [84, 52],
+  [74, 60],
+  [94, 74],
+  [78, 84],
+  [60, 94],
+  [50, 104],
   [44, 108],
 ];
 const MIRROR_DRIVE_4: SitePoint[] = [

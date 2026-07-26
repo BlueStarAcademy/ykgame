@@ -185,9 +185,10 @@ class SiteLegendLoginBgmController {
     const gen = getSiteLegendBgmPlayGen();
     const token = ++this.startToken;
     void startWebAudioBgm("login", LOGIN_BGM_SRC, this.volume).then((ok) => {
+      // Stale attempt — do not tear down a newer successful start.
+      if (token !== this.startToken) return;
       if (
         !ok ||
-        token !== this.startToken ||
         gen !== getSiteLegendBgmPlayGen() ||
         !wantsLoginBgm(this.allowed, this.enabled)
       ) {
@@ -196,6 +197,7 @@ class SiteLegendLoginBgmController {
           this.bindGesture();
         } else {
           stopWebAudioBgm("login", false);
+          this.bindGesture();
         }
         return;
       }

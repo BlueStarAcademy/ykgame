@@ -77,12 +77,17 @@ export interface SavedArmPose {
   boom: number;
   arm: number;
   bucket: number;
+  /** 집게 벌림 (0=닫힘, 1=열림). 구버전 슬롯에는 없을 수 있음. */
+  grappleOpen?: number;
 }
 
 export const AUTO_POSE_SLOT_COUNT = 4;
 export type AutoPoseSlotIndex = 0 | 1 | 2 | 3;
 
 export type AutoPoseJoint = "arm" | "boom" | "bucket";
+
+/** 암→붐→버킷(0~2) 후 집게 벌림(3). 완료 시 null */
+export type AutoPosePhase = 0 | 1 | 2 | 3 | null;
 
 export interface AutoPoseState {
   /** 저장 슬롯 (최대 4개) */
@@ -97,8 +102,8 @@ export interface AutoPoseState {
   /** 현재 실행 대상 자세 (= slots[activeSlot]) */
   saved: SavedArmPose | null;
   executing: boolean;
-  /** 암 → 붐 → 버킷 순차 실행 인덱스 (0~2). 완료 시 null */
-  phase: 0 | 1 | 2 | null;
+  /** 암 → 붐 → 버킷 →(집게) 순차 실행 인덱스. 완료 시 null */
+  phase: AutoPosePhase;
 }
 
 export interface DumpScorePanelState {

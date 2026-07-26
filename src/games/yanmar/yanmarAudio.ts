@@ -19,6 +19,8 @@ import {
 import {
   getWebAudioBgmSrcUrl,
   isWebAudioBgmPlaying,
+  preloadWebAudioBgm,
+  primeWebAudioBgmContext,
   setWebAudioBgmGain,
   startWebAudioBgm,
   stopWebAudioBgm,
@@ -103,6 +105,8 @@ class YanmarAudioController {
     if (!this.active || !this.bgmEnabled || !isSiteLegendBgmMasterEnabled()) {
       return;
     }
+    // Resume on the gesture stack before any async decode/start.
+    primeWebAudioBgmContext("ingame");
     this.startBgm();
   };
   private breakerWanted = false;
@@ -214,12 +218,20 @@ class YanmarAudioController {
   setSportsMeetBgm(enabled: boolean) {
     this.ensureStoreSubscription();
     if (this.sportsMeetBgm === enabled) {
-      if (enabled && this.active) this.syncBgm();
+      if (this.active) {
+        primeWebAudioBgmContext("ingame");
+        this.syncBgm();
+      }
       return;
     }
     this.sportsMeetBgm = enabled;
     // Soft-stop graph only — keep AudioContext alive for the track swap.
     this.stopBgm(false);
+    // Keep/resume context on the caller gesture before async decode of the new track.
+    primeWebAudioBgmContext("ingame");
+    if (enabled) {
+      void preloadWebAudioBgm("ingame", SPORTS_MEET_BGM_SRC);
+    }
     if (this.active) {
       this.syncBgm();
     }
@@ -295,7 +307,12 @@ class YanmarAudioController {
   unlock() {
     if (typeof window === "undefined") return;
     this.ensureStoreSubscription();
+    // Critical: resume the BGM AudioContext while the gesture is still live.
+    // Scene-ready / rAF unlocks cannot create an audible context on their own.
+    primeWebAudioBgmContext("ingame");
     void this.ensureAudioContext();
+    void preloadWebAudioBgm("ingame", INGAME_BGM_SRC);
+    void preloadWebAudioBgm("ingame", SPORTS_MEET_BGM_SRC);
     this.syncBgm();
     if (this.unlocked) return;
     const probe = new Audio(HORN_SRC[this.hornId]);
@@ -371,18 +388,20 @@ class YanmarAudioController {
       wantedSrc,
       bgmVolumeToGain(this.bgmVolume),
     ).then((ok) => {
+      // A newer start/stop superseded this attempt — leave the current graph alone.
+      if (token !== this.bgmStartToken) return;
       if (
         !ok ||
-        token !== this.bgmStartToken ||
         gen !== getSiteLegendBgmPlayGen() ||
         isPageAudioSealed() ||
         !this.active ||
         !this.bgmEnabled ||
         !isSiteLegendBgmMasterEnabled()
       ) {
-        if (ok) {
-          stopWebAudioBgm("ingame", false);
+        if (!ok) {
+          this.bindBgmGesture();
         } else {
+          stopWebAudioBgm("ingame", false);
           this.bindBgmGesture();
         }
         return;

@@ -8,6 +8,8 @@ import {
   getAutoDigPoseReadiness,
   hasManualControlInput,
   isAutoPoseDigLoadingActive,
+  isAutoPoseGrapplePhase,
+  AUTO_ARM_POSE_ARRIVE_EPS,
   CONTROL_SPEED,
   DEFAULT_BOOM_SWING,
   RIDE_CONTROL_SPEED,
@@ -852,7 +854,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       if (vel.boom < 0) vel.boom = 0;
     }
     if (isAutoArm) {
-      advanceAutoArmPose(sim, vel, autoPose);
+      advanceAutoArmPose(sim, vel, autoPose, auxiliary);
     }
     constrainArmFromDumpTruck(sim, vel, boomSwing, subBefore, truckPose, {
       freeWhileBodyTouching: dumpBodyTouchingForArm,
@@ -1101,19 +1103,38 @@ export function tickExcavatorSim(params: SimTickParams) {
     }
   }
   if (isAutoArm) {
-    advanceAutoArmPose(sim, vel, autoPose);
+    advanceAutoArmPose(sim, vel, autoPose, auxiliary);
   }
   const scraper = getBucketScraperContactWorld(sim, boomSwing);
   const bucketTip = getBucketTipWorld(sim, boomSwing);
   const grappleClamp = getGrappleClampWorld(sim, boomSwing);
   if (sim.attachmentType === "grapple" && auxiliary) {
-    const pedal = auxiliary.attachmentPedal;
-    // 발판 +: 닫기·집기 / −: 열기 (풀오픈 → 닫으며 집기)
     const openRate = 0.9;
-    if (pedal > 0) {
-      auxiliary.grappleOpen = Math.max(0, auxiliary.grappleOpen - openRate * dt);
-    } else if (pedal < 0) {
-      auxiliary.grappleOpen = Math.min(1, auxiliary.grappleOpen + openRate * dt);
+    const autoGrappleRaw =
+      isAutoArm && isAutoPoseGrapplePhase(autoPose)
+        ? autoPose.saved?.grappleOpen
+        : undefined;
+    if (
+      typeof autoGrappleRaw === "number" &&
+      Number.isFinite(autoGrappleRaw)
+    ) {
+      // 자동 실행: 발판과 동일한 속도로 저장 벌림까지 맞춤 (암 한도 반영).
+      const autoGrappleGoal = clampGrappleOpenAgainstArm(sim, autoGrappleRaw);
+      const delta = autoGrappleGoal - auxiliary.grappleOpen;
+      if (Math.abs(delta) <= AUTO_ARM_POSE_ARRIVE_EPS) {
+        auxiliary.grappleOpen = autoGrappleGoal;
+      } else {
+        const step = Math.min(Math.abs(delta), openRate * dt);
+        auxiliary.grappleOpen += Math.sign(delta) * step;
+      }
+    } else {
+      const pedal = auxiliary.attachmentPedal;
+      // 발판 +: 닫기·집기 / −: 열기 (풀오픈 → 닫으며 집기)
+      if (pedal > 0) {
+        auxiliary.grappleOpen = Math.max(0, auxiliary.grappleOpen - openRate * dt);
+      } else if (pedal < 0) {
+        auxiliary.grappleOpen = Math.min(1, auxiliary.grappleOpen + openRate * dt);
+      }
     }
     // 버켓 관통·암 충돌·컬 한도까지. 말면/암에 닿으면 자동으로 조금 닫힘.
     auxiliary.grappleOpen = clampGrappleOpenAgainstArm(sim, auxiliary.grappleOpen);
@@ -1130,6 +1151,10 @@ export function tickExcavatorSim(params: SimTickParams) {
         }
       }
     }
+  }
+  if (isAutoArm) {
+    // 집게 벌림이 같은 프레임에 목표에 도달하면 실행을 즉시 종료한다.
+    advanceAutoArmPose(sim, vel, autoPose, auxiliary);
   }
   const grappleJawSamples =
     sim.attachmentType === "grapple"
