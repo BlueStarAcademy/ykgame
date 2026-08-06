@@ -11136,12 +11136,13 @@ html.pwa-mode [contenteditable="true"] {
 }
 
 .yanmar-maintenance-status-layer {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 220;
   display: grid;
   place-items: center;
-  padding: 1rem;
+  padding: 0.75rem;
+  pointer-events: auto;
 }
 
 .yanmar-maintenance-status-backdrop {
@@ -11155,11 +11156,11 @@ html.pwa-mode [contenteditable="true"] {
 .yanmar-maintenance-status-card {
   position: relative;
   z-index: 1;
-  width: min(100%, 22rem);
-  max-height: min(78vh, 34rem);
+  width: min(100%, 21rem);
+  max-height: min(58vh, 22rem);
   overflow: auto;
-  padding: 1rem 1rem 0.9rem;
-  border-radius: 0.9rem;
+  padding: 0.7rem 0.7rem 0.65rem;
+  border-radius: 0.8rem;
   border: 1px solid rgba(251, 191, 36, 0.35);
   background:
     linear-gradient(165deg, rgba(255, 255, 255, 0.08), transparent 42%),
@@ -11170,15 +11171,15 @@ html.pwa-mode [contenteditable="true"] {
 
 .yanmar-maintenance-status-eyebrow {
   margin: 0;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   color: #fbbf24;
 }
 
 .yanmar-maintenance-status-card h3 {
-  margin: 0.2rem 0 0.75rem;
-  font-size: 1.05rem;
+  margin: 0.12rem 0 0.5rem;
+  font-size: 0.92rem;
   font-weight: 900;
   color: #f8fafc;
 }
@@ -11187,20 +11188,23 @@ html.pwa-mode [contenteditable="true"] {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
 }
 
 .yanmar-maintenance-status-row {
   display: grid;
-  grid-template-columns: 2.4rem 1fr auto;
+  grid-template-columns: 1.85rem minmax(0, 1fr);
+  grid-template-rows: auto auto;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.45rem 0.5rem;
-  border-radius: 0.55rem;
+  column-gap: 0.35rem;
+  row-gap: 0.1rem;
+  padding: 0.35rem 0.4rem;
+  border-radius: 0.45rem;
   border: 1px solid rgba(148, 163, 184, 0.2);
   background: rgba(255, 255, 255, 0.03);
+  min-width: 0;
 }
 
 .yanmar-maintenance-status-row.is-warn {
@@ -11214,37 +11218,47 @@ html.pwa-mode [contenteditable="true"] {
 }
 
 .yanmar-maintenance-status-art {
-  width: 2.4rem;
-  height: 2.4rem;
+  grid-row: 1 / span 2;
+  width: 1.85rem;
+  height: 1.85rem;
   object-fit: contain;
 }
 
 .yanmar-maintenance-status-meta {
   display: flex;
   flex-direction: column;
-  gap: 0.12rem;
+  gap: 0.06rem;
   min-width: 0;
 }
 
 .yanmar-maintenance-status-meta strong {
-  font-size: 0.82rem;
+  font-size: 0.68rem;
   font-weight: 800;
   color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .yanmar-maintenance-status-meta span {
-  font-size: 0.68rem;
+  font-size: 0.58rem;
   font-weight: 700;
   color: rgba(226, 232, 240, 0.72);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .yanmar-maintenance-status-pill {
-  font-size: 0.62rem;
+  grid-column: 2;
+  justify-self: start;
+  font-size: 0.55rem;
   font-weight: 900;
-  padding: 0.2rem 0.4rem;
+  padding: 0.12rem 0.32rem;
   border-radius: 999px;
   background: rgba(148, 163, 184, 0.2);
   color: #cbd5e1;
+  line-height: 1.2;
 }
 
 .yanmar-maintenance-status-row.is-warn .yanmar-maintenance-status-pill {
@@ -11258,16 +11272,22 @@ html.pwa-mode [contenteditable="true"] {
 }
 
 .yanmar-maintenance-status-hint {
-  margin: 0.7rem 0 0.55rem;
-  font-size: 0.68rem;
+  margin: 0.45rem 0 0.4rem;
+  font-size: 0.6rem;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.3;
   color: rgba(226, 232, 240, 0.65);
 }
 
 .yanmar-maintenance-status-actions {
   display: flex;
   justify-content: center;
+}
+
+.yanmar-maintenance-status-actions .yanmar-gear-btn {
+  min-width: 6.5rem;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.75rem;
 }
 
 .yanmar-maintenance-bubble {
