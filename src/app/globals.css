@@ -139,20 +139,21 @@ body {
 }
 
 .yanmar-score-panel {
-  animation: yanmar-score-panel-enter 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  /* Enter once when mounted — do not remount the shell on every chunk. */
+  animation: yanmar-score-panel-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
 }
 
 .yanmar-score-panel-critical {
-  animation: yanmar-score-panel-critical-enter 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: yanmar-score-panel-critical-enter 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .yanmar-score-panel-value {
-  animation: yanmar-score-panel-value-bump 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: yanmar-score-panel-value-bump 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .yanmar-score-panel-critical .yanmar-score-panel-value {
-  animation: yanmar-score-panel-value-bump 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: yanmar-score-panel-value-bump 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .yanmar-score-critical-label {

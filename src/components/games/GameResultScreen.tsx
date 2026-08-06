@@ -26,6 +26,8 @@ interface GameResultScreenProps {
   onStay?: () => void;
   onExit?: () => void;
   onScoreSaved?: (score: number) => void;
+  /** Prior season total (HUD uses seasonScoreBase + session arcadeScore). */
+  seasonScoreBase?: number;
 }
 
 function getDurableScoreSessionId(
@@ -61,6 +63,7 @@ export function GameResultScreen({
   onStay,
   onExit,
   onScoreSaved,
+  seasonScoreBase = 0,
 }: GameResultScreenProps) {
   const game = getGameById(gameId);
   const isYanmar = gameId === "yanmar";
@@ -198,8 +201,15 @@ export function GameResultScreen({
   const homeLabel = isRide ? "탑승 홈으로" : isYanmar ? "나가기" : "홈으로";
   const savePending = isYanmarArcade && !saved && !saveFailed;
   const yRankingRows = rankings.slice(0, 10);
+  const sessionArcadeScore = result.arcadeScore ?? 0;
+  const projectedSeasonTotal = Math.max(
+    0,
+    seasonScoreBase + sessionArcadeScore,
+  );
+  // Prefer the projected total so the modal matches the in-game HUD from frame 1.
+  // Rankings may refine it after save, but never flash the raw session-only score.
   const yanmarDisplayScore =
-    myTotalScore ?? result.arcadeScore ?? 0;
+    typeof myTotalScore === "number" ? myTotalScore : projectedSeasonTotal;
   const accent = game?.color ?? "#E53935";
   const accentDeep = game?.headerColor ?? "#C62828";
 
@@ -309,6 +319,9 @@ export function GameResultScreen({
           <p className="mt-2 text-[11px] font-medium text-white/45">
             플레이 {result.playTime}초
             {result.timeLeft > 0 ? ` · 남은 ${result.timeLeft}초` : ""}
+            {result.mode === "game" && sessionArcadeScore > 0
+              ? ` · 이번 운행 +${sessionArcadeScore.toLocaleString()}`
+              : ""}
             {result.mode === "game" && myRank ? ` · 시즌 #${myRank}` : ""}
           </p>
           {result.mode === "practice" ? (

@@ -1,5 +1,6 @@
 export const DUMP_REWARD_BATCH_MAX_CHUNKS = 20;
-export const DUMP_REWARD_BATCH_DEBOUNCE_MS = 400;
+/** Keep batches snappy so HUD reconcile does not lag behind dumps. */
+export const DUMP_REWARD_BATCH_DEBOUNCE_MS = 150;
 
 const STORAGE_PREFIX = "ykgame:yanmar:dump-reward-outbox:v1";
 const EVENT_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;

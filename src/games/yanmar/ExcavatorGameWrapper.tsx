@@ -703,7 +703,6 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
 
   return (
     <div
-      key={panel.pulseKey}
       className={`yanmar-score-panel relative w-max max-w-[min(20rem,90vw)] rounded-xl border px-4 py-2.5 font-black shadow-xl backdrop-blur-sm ${
         panel.critical
           ? "yanmar-score-panel-critical border-yellow-200/55 bg-black/42 text-yellow-300 shadow-[0_0_28px_rgba(250,204,21,0.22)]"
@@ -721,6 +720,7 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
       ) : null}
       {valueParts.length > 0 ? (
         <div
+          key={`vals-${panel.pulseKey}`}
           className={`yanmar-score-panel-value flex items-center justify-center gap-2.5 whitespace-nowrap tabular-nums ${
             panel.critical ? "text-base" : "text-sm"
           }`}
@@ -1361,6 +1361,10 @@ export function ExcavatorGameWrapper({
   const dumpOutboxDebounceTimerRef = useRef<number | null>(null);
   const dumpOutboxInFlightRef = useRef<Set<string>>(new Set());
   const dumpOutboxFlushOwnersRef = useRef<Set<string>>(new Set());
+  const dumpOutboxFlushChainRef = useRef<Promise<void>>(Promise.resolve());
+  const sealAndFlushDumpRewardOutboxRef = useRef<() => Promise<void>>(
+    async () => undefined,
+  );
   const dumpOutboxOptimisticRef = useRef<Map<string, DumpRewardOutboxBatch>>(
     new Map(),
   );
@@ -4674,31 +4678,48 @@ export function ExcavatorGameWrapper({
     if (endedRef.current) return;
     endedRef.current = true;
     clearAllInput();
-    persistGameSession(true);
-    persistDumpTruckCooldown(true);
-    const ownerId = resolveAutoPoseStorageOwner(
-      session?.user?.id ?? gameSessionUserIdRef.current,
-    );
-    saveSavedArmPoseSlots(ownerId, autoPoseRef.current.slots);
 
-    const currentMode = modeRef.current;
-    const score = scoreRef.current;
-    onEnd({
-      gameId: "yanmar",
-      progress: getProgress(score),
-      playTime: Math.max(1, Math.round(elapsedRef.current)),
-      timeLeft: config.duration > 0 ? Math.ceil(score.timeLeft) : 0,
-      completed: isComplete(score),
-      arcadeScore: arcadeScoreRef.current,
-      dumpUnits: Math.round(Math.max(0, score.dumped) * equipmentStats.maxLoadUnits),
-      rewardStars: rewardStarsRef.current,
-      mode:
-        currentMode === "game" || currentMode === "tutorial"
-          ? currentMode
-          : currentMode === "ride"
-            ? "ride"
-            : "practice",
-    });
+    void (async () => {
+      // Seal open dump batches and wait for score reconcile before capturing result.
+      try {
+        await Promise.race([
+          sealAndFlushDumpRewardOutboxRef.current(),
+          new Promise<void>((resolve) => {
+            window.setTimeout(resolve, 2500);
+          }),
+        ]);
+      } catch {
+        // Best-effort — still exit with the latest local score.
+      }
+
+      persistGameSession(true);
+      persistDumpTruckCooldown(true);
+      const ownerId = resolveAutoPoseStorageOwner(
+        session?.user?.id ?? gameSessionUserIdRef.current,
+      );
+      saveSavedArmPoseSlots(ownerId, autoPoseRef.current.slots);
+
+      const currentMode = modeRef.current;
+      const score = scoreRef.current;
+      onEnd({
+        gameId: "yanmar",
+        progress: getProgress(score),
+        playTime: Math.max(1, Math.round(elapsedRef.current)),
+        timeLeft: config.duration > 0 ? Math.ceil(score.timeLeft) : 0,
+        completed: isComplete(score),
+        arcadeScore: arcadeScoreRef.current,
+        dumpUnits: Math.round(
+          Math.max(0, score.dumped) * equipmentStats.maxLoadUnits,
+        ),
+        rewardStars: rewardStarsRef.current,
+        mode:
+          currentMode === "game" || currentMode === "tutorial"
+            ? currentMode
+            : currentMode === "ride"
+              ? "ride"
+              : "practice",
+      });
+    })();
   }, [
     clearAllInput,
     config.duration,
@@ -5585,13 +5606,14 @@ export function ExcavatorGameWrapper({
       > = {},
       pendingCompleted = 1,
     ) => {
-      const previous = dumpScorePanelRef.current;
-      if (!previous) return;
-
+      // Always reconcile session score — do not drop deltas when the panel hid.
       if (scoreDelta !== 0) {
         arcadeScoreRef.current += scoreDelta;
         setHud((h) => ({ ...h, score: arcadeScoreRef.current }));
       }
+
+      const previous = dumpScorePanelRef.current;
+      if (!previous) return;
 
       const next: DumpScorePanelState = {
         ...previous,
@@ -5614,161 +5636,177 @@ export function ExcavatorGameWrapper({
 
   const flushDumpRewardOutbox = useCallback(async () => {
     const userId = session?.user?.id;
-    if (
-      !userId ||
-      dumpOutboxOwnerRef.current !== userId ||
-      dumpOutboxFlushOwnersRef.current.has(userId)
-    ) {
+    if (!userId || dumpOutboxOwnerRef.current !== userId) {
       return;
     }
 
-    dumpOutboxFlushOwnersRef.current.add(userId);
-    const storageKey = dumpRewardOutboxStorageKey(userId);
-    const attemptedEventIds = new Set<string>();
-    try {
-      while (dumpOutboxOwnerRef.current === userId) {
-        const batches = parseDumpRewardOutbox(
-          window.localStorage.getItem(storageKey),
-        );
-        const openEventId = dumpOutboxOpenBatchRef.current?.eventId;
-        const batch = batches.find(
-          (item) =>
-            item.eventId !== openEventId &&
-            !attemptedEventIds.has(item.eventId) &&
-            !dumpOutboxInFlightRef.current.has(`${userId}:${item.eventId}`),
-        );
-        if (!batch) break;
-
-        const runtimeKey = `${userId}:${batch.eventId}`;
-        dumpOutboxInFlightRef.current.add(runtimeKey);
-        try {
-          const res = await fetch("/api/rewards/yanmar-dump", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chunkCount: batch.chunkCount,
-              eventId: batch.eventId,
-            }),
-            keepalive: true,
-          });
-          if (!res.ok) {
-            attemptedEventIds.add(batch.eventId);
-            if (
-              res.status === 401 ||
-              res.status === 408 ||
-              res.status === 429 ||
-              res.status >= 500
-            ) {
-              break;
-            }
-            continue;
-          }
-
-          const data = (await res.json()) as {
-            events?: DumpRewardApiEvent[];
-            currency?: number;
-            totalXp?: number;
-            xpGained?: number;
-            gearDrops?: {
-              nameSnapshot: string;
-              grade: string;
-              slot?: string;
-              mailed?: boolean;
-            }[];
-            coresDropped?: number;
-            enhanceCores?: number;
-          };
-          if (data.gearDrops && data.gearDrops.length > 0) {
-            data.gearDrops.forEach((drop, index) => {
-              notifyGearDrop(drop, { playSound: index === 0 });
-            });
-          }
-          const coresDropped = notifyCoresDrop(
-            data.coresDropped,
-            data.enhanceCores,
-          );
-          if (coresDropped > 0) {
-            appendEnhanceCoresToRewardPanel(coresDropped);
-          }
-          const remaining = removeDumpRewardOutboxBatch(
-            parseDumpRewardOutbox(window.localStorage.getItem(storageKey)),
-            batch.eventId,
-          );
-          if (remaining.length > 0) {
-            window.localStorage.setItem(
-              storageKey,
-              serializeDumpRewardOutbox(remaining),
-            );
-          } else {
-            window.localStorage.removeItem(storageKey);
-          }
-
-          const optimistic = dumpOutboxOptimisticRef.current.get(runtimeKey);
-          dumpOutboxOptimisticRef.current.delete(runtimeKey);
-          if (dumpOutboxOwnerRef.current !== userId) continue;
-
-          const pendingOptimisticStars = Array.from(
-            dumpOutboxOptimisticRef.current.entries(),
-          ).reduce(
-            (sum, [key, item]) =>
-              key.startsWith(`${userId}:`) ? sum + item.optimisticStars : sum,
-            0,
-          );
-          syncSessionBalances(data, {
-            displayCurrency:
-              typeof data.currency === "number"
-                ? data.currency + pendingOptimisticStars
-                : undefined,
-          });
-          if (!optimistic) continue;
-
-          const events = Array.isArray(data.events) ? data.events : [];
-          const actualScore = events.reduce((sum, event) => sum + event.score, 0);
-          const actualStars = events.reduce(
-            (sum, event) => sum + (event.kind === "stars" ? event.stars : 0),
-            0,
-          );
-          const actualXp =
-            typeof data.xpGained === "number"
-              ? data.xpGained
-              : optimistic.optimisticXp;
-          const starDelta = actualStars - optimistic.optimisticStars;
-          const xpDelta = actualXp - optimistic.optimisticXp;
-          rewardStarsRef.current = Math.max(
-            0,
-            rewardStarsRef.current + starDelta,
-          );
-          for (const event of events) {
-            if (event.kind === "coupon") {
-              showCouponDiscovery(event.couponType, event.discountPct);
-            }
-          }
-          adjustDumpScorePanel(
-            actualScore - optimistic.optimisticScore,
-            {
-              critical:
-                events.some((event) => event.critical) ||
-                dumpScorePanelRef.current?.critical,
-              earnedStars: Math.max(
-                0,
-                (dumpScorePanelRef.current?.earnedStars ?? 0) + starDelta,
-              ),
-              earnedXp: Math.max(
-                0,
-                (dumpScorePanelRef.current?.earnedXp ?? 0) + xpDelta,
-              ),
-            },
-            optimistic.chunkCount,
-          );
-        } finally {
-          dumpOutboxInFlightRef.current.delete(runtimeKey);
-        }
+    const runFlush = async () => {
+      if (dumpOutboxFlushOwnersRef.current.has(userId)) {
+        return;
       }
-    } catch {
-      // Durable outbox remains in localStorage and retries on the next trigger.
-    } finally {
-      dumpOutboxFlushOwnersRef.current.delete(userId);
-    }
+
+      dumpOutboxFlushOwnersRef.current.add(userId);
+      const storageKey = dumpRewardOutboxStorageKey(userId);
+      const attemptedEventIds = new Set<string>();
+      try {
+        while (dumpOutboxOwnerRef.current === userId) {
+          const batches = parseDumpRewardOutbox(
+            window.localStorage.getItem(storageKey),
+          );
+          const openEventId = dumpOutboxOpenBatchRef.current?.eventId;
+          const batch = batches.find(
+            (item) =>
+              item.eventId !== openEventId &&
+              !attemptedEventIds.has(item.eventId) &&
+              !dumpOutboxInFlightRef.current.has(`${userId}:${item.eventId}`),
+          );
+          if (!batch) break;
+
+          const runtimeKey = `${userId}:${batch.eventId}`;
+          dumpOutboxInFlightRef.current.add(runtimeKey);
+          try {
+            const res = await fetch("/api/rewards/yanmar-dump", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chunkCount: batch.chunkCount,
+                eventId: batch.eventId,
+              }),
+              keepalive: true,
+            });
+            if (!res.ok) {
+              attemptedEventIds.add(batch.eventId);
+              if (
+                res.status === 401 ||
+                res.status === 408 ||
+                res.status === 429 ||
+                res.status >= 500
+              ) {
+                break;
+              }
+              continue;
+            }
+
+            const data = (await res.json()) as {
+              events?: DumpRewardApiEvent[];
+              currency?: number;
+              totalXp?: number;
+              xpGained?: number;
+              gearDrops?: {
+                nameSnapshot: string;
+                grade: string;
+                slot?: string;
+                mailed?: boolean;
+              }[];
+              coresDropped?: number;
+              enhanceCores?: number;
+            };
+            if (data.gearDrops && data.gearDrops.length > 0) {
+              data.gearDrops.forEach((drop, index) => {
+                notifyGearDrop(drop, { playSound: index === 0 });
+              });
+            }
+            const coresDropped = notifyCoresDrop(
+              data.coresDropped,
+              data.enhanceCores,
+            );
+            if (coresDropped > 0) {
+              appendEnhanceCoresToRewardPanel(coresDropped);
+            }
+            const remaining = removeDumpRewardOutboxBatch(
+              parseDumpRewardOutbox(window.localStorage.getItem(storageKey)),
+              batch.eventId,
+            );
+            if (remaining.length > 0) {
+              window.localStorage.setItem(
+                storageKey,
+                serializeDumpRewardOutbox(remaining),
+              );
+            } else {
+              window.localStorage.removeItem(storageKey);
+            }
+
+            const optimistic = dumpOutboxOptimisticRef.current.get(runtimeKey);
+            dumpOutboxOptimisticRef.current.delete(runtimeKey);
+            if (dumpOutboxOwnerRef.current !== userId) continue;
+
+            const pendingOptimisticStars = Array.from(
+              dumpOutboxOptimisticRef.current.entries(),
+            ).reduce(
+              (sum, [key, item]) =>
+                key.startsWith(`${userId}:`)
+                  ? sum + item.optimisticStars
+                  : sum,
+              0,
+            );
+            syncSessionBalances(data, {
+              displayCurrency:
+                typeof data.currency === "number"
+                  ? data.currency + pendingOptimisticStars
+                  : undefined,
+            });
+            if (!optimistic) continue;
+
+            const events = Array.isArray(data.events) ? data.events : [];
+            const actualScore = events.reduce(
+              (sum, event) => sum + event.score,
+              0,
+            );
+            const actualStars = events.reduce(
+              (sum, event) =>
+                sum + (event.kind === "stars" ? event.stars : 0),
+              0,
+            );
+            const actualXp =
+              typeof data.xpGained === "number"
+                ? data.xpGained
+                : optimistic.optimisticXp;
+            const starDelta = actualStars - optimistic.optimisticStars;
+            const xpDelta = actualXp - optimistic.optimisticXp;
+            rewardStarsRef.current = Math.max(
+              0,
+              rewardStarsRef.current + starDelta,
+            );
+            for (const event of events) {
+              if (event.kind === "coupon") {
+                showCouponDiscovery(event.couponType, event.discountPct);
+              }
+            }
+            adjustDumpScorePanel(
+              actualScore - optimistic.optimisticScore,
+              {
+                critical:
+                  events.some((event) => event.critical) ||
+                  dumpScorePanelRef.current?.critical,
+                earnedStars: Math.max(
+                  0,
+                  (dumpScorePanelRef.current?.earnedStars ?? 0) + starDelta,
+                ),
+                earnedXp: Math.max(
+                  0,
+                  (dumpScorePanelRef.current?.earnedXp ?? 0) + xpDelta,
+                ),
+              },
+              optimistic.chunkCount,
+            );
+          } finally {
+            dumpOutboxInFlightRef.current.delete(runtimeKey);
+          }
+        }
+      } catch {
+        // Durable outbox remains in localStorage and retries on the next trigger.
+      } finally {
+        dumpOutboxFlushOwnersRef.current.delete(userId);
+      }
+    };
+
+    // Chain callers (debounce + exit seal) so exit can await a full drain.
+    const next = dumpOutboxFlushChainRef.current.then(runFlush, runFlush);
+    dumpOutboxFlushChainRef.current = next.then(
+      () => undefined,
+      () => undefined,
+    );
+    await next;
   }, [
     adjustDumpScorePanel,
     appendEnhanceCoresToRewardPanel,
@@ -5779,14 +5817,15 @@ export function ExcavatorGameWrapper({
     syncSessionBalances,
   ]);
 
-  const sealAndFlushDumpRewardOutbox = useCallback(() => {
+  const sealAndFlushDumpRewardOutbox = useCallback(async () => {
     dumpOutboxOpenBatchRef.current = null;
     if (dumpOutboxDebounceTimerRef.current != null) {
       window.clearTimeout(dumpOutboxDebounceTimerRef.current);
       dumpOutboxDebounceTimerRef.current = null;
     }
-    void flushDumpRewardOutbox();
+    await flushDumpRewardOutbox();
   }, [flushDumpRewardOutbox]);
+  sealAndFlushDumpRewardOutboxRef.current = sealAndFlushDumpRewardOutbox;
 
   useEffect(() => {
     if (sessionStatus === "loading") return;

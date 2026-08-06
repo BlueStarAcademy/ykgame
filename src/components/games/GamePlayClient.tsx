@@ -348,6 +348,7 @@ export function GamePlayClient({
           onStay={handleStay}
           onExit={handleExitHome}
           onScoreSaved={handleYanmarScoreSaved}
+          seasonScoreBase={yanmarSeasonBaseScore}
         />
       ) : null}
 
