@@ -212,6 +212,66 @@ export async function POST(req: Request) {
         };
       }
 
+      // Batch dismantle — one transaction for many unequipped items.
+      if (
+        action === "dismantle" &&
+        Array.isArray(body.itemIds) &&
+        body.itemIds.length > 0
+      ) {
+        const itemIds = [
+          ...new Set(
+            body.itemIds.filter((id): id is string => typeof id === "string" && !!id),
+          ),
+        ];
+        if (itemIds.length === 0) throw new Error("MISSING_ITEM");
+        if (itemIds.length > 200) throw new Error("TOO_MANY");
+
+        const items = await tx.gearItem.findMany({
+          where: {
+            id: { in: itemIds },
+            userId: session.user.id,
+            gameId: "yanmar",
+          },
+        });
+        if (items.length !== itemIds.length) throw new Error("NOT_FOUND");
+        if (items.some((item) => item.equippedSlot)) throw new Error("EQUIPPED");
+
+        let cores = 0;
+        for (const item of items) {
+          cores += getDismantleEnhanceCores(
+            item.grade as ItemGrade,
+            item.enhanceLevel,
+          );
+        }
+
+        await tx.gearItem.deleteMany({
+          where: {
+            id: { in: itemIds },
+            userId: session.user.id,
+            gameId: "yanmar",
+          },
+        });
+
+        const updatedUser = await tx.user.update({
+          where: { id: session.user.id },
+          data: {
+            enhanceCores: { increment: cores },
+          },
+          select: { currency: true, enhanceCores: true },
+        });
+        const loaded = await loadUserFinalStats(tx, session.user.id);
+        return {
+          ok: true,
+          refund: 0,
+          cores,
+          count: items.length,
+          dismantledIds: itemIds,
+          currency: updatedUser.currency,
+          enhanceCores: updatedUser.enhanceCores,
+          stats: loaded.stats,
+        };
+      }
+
       const itemId = body.itemId;
       if (!itemId) throw new Error("MISSING_ITEM");
 
@@ -413,7 +473,8 @@ export async function POST(req: Request) {
             msg === "MAX_LEVEL" ||
             msg === "MAX_SLOTS" ||
             msg === "NEED_THREE" ||
-            msg === "GRADE_MISMATCH"
+            msg === "GRADE_MISMATCH" ||
+            msg === "TOO_MANY"
           ? 400
           : 400;
     return NextResponse.json({ error: msg }, { status });

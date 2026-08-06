@@ -4,14 +4,12 @@ import { cappedCurrencyIncrement } from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
 import {
   parseRewardEventId,
-  randomInt,
   runReplayableRewardEvent,
 } from "@/lib/yanmar-rewards";
 import {
   SPORTS_MEET_MISSION_DEFAULTS,
-  SPORTS_MEET_STAR_REWARD_MAX,
-  SPORTS_MEET_STAR_REWARD_MIN,
   sportsMeetStarEventId,
+  sportsMeetStarRewardFromEventId,
 } from "@/games/yanmar/sportsMeet/missionBalance";
 import { getSportsMeetDayKey } from "@/games/yanmar/sportsMeet/weekKey";
 
@@ -90,10 +88,7 @@ export async function POST(request: Request) {
             throw new Error("RUN_STAR_CAP");
           }
 
-          const rolled = randomInt(
-            SPORTS_MEET_STAR_REWARD_MIN,
-            SPORTS_MEET_STAR_REWARD_MAX,
-          );
+          const rolled = sportsMeetStarRewardFromEventId(eventId);
           const { next, granted } = cappedCurrencyIncrement(
             user.currency,
             rolled,

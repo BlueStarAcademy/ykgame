@@ -1,10 +1,12 @@
+import { deterministicRewardInRange } from "../worldPickups";
+
 /** Tunable sports-meet mission quotas — edit here to rebalance. */
 
 export const SPORTS_MEET_MISSION_DEFAULTS = {
   drive: {
     /** Stars required per drive leg (course has multiple drive stages). */
-    starCount: 8,
-    speedBuffCount: 2,
+    starCount: 12,
+    speedBuffCount: 3,
   },
   dig: {
     digPileCapacity: 10_000,
@@ -70,6 +72,21 @@ export function formatSportsMeetMissionSummaryKo(
   return `별${mission.drive.starCount}×3 · 덤프${mission.dig.dumpTruckCapacity} · 파쇄${mission.crash.asphaltTileCount} · 돌${mission.hill.successfulDumpsRequired}`;
 }
 
+/** Idempotent reward event id for a ranked course-star pickup. */
+export function sportsMeetStarEventId(runId: string, starId: string) {
+  return `sm-star:${runId}:${starId}`;
+}
+
+/** Ranked course-star amount from eventId — must match server grant. */
+export function sportsMeetStarRewardFromEventId(eventId: string) {
+  return deterministicRewardInRange(
+    eventId,
+    SPORTS_MEET_STAR_REWARD_MIN,
+    SPORTS_MEET_STAR_REWARD_MAX,
+  );
+}
+
+/** @deprecated Prefer sportsMeetStarRewardFromEventId so toast matches server. */
 export function rollSportsMeetStarReward() {
   return (
     SPORTS_MEET_STAR_REWARD_MIN +
@@ -78,9 +95,4 @@ export function rollSportsMeetStarReward() {
         (SPORTS_MEET_STAR_REWARD_MAX - SPORTS_MEET_STAR_REWARD_MIN + 1),
     )
   );
-}
-
-/** Idempotent reward event id for a ranked course-star pickup. */
-export function sportsMeetStarEventId(runId: string, starId: string) {
-  return `sm-star:${runId}:${starId}`;
 }

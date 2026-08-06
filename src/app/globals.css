@@ -11105,13 +11105,13 @@ html.pwa-mode [contenteditable="true"] {
   position: relative;
 }
 
-.yanmar-maintenance-icon-btn {
+.yanmar-maintenance-service-btn {
   display: grid;
   place-items: center;
-  width: 2.35rem;
-  height: 2.35rem;
-  padding: 0.2rem;
-  border-radius: 0.65rem;
+  width: 2.55rem;
+  height: 2.55rem;
+  padding: 0.28rem;
+  border-radius: 0.7rem;
   border: 1px solid rgba(248, 113, 113, 0.7);
   background:
     radial-gradient(circle at 50% 30%, rgba(248, 113, 113, 0.35), transparent 65%),
@@ -11121,22 +11121,153 @@ html.pwa-mode [contenteditable="true"] {
   animation: yanmar-maintenance-warn-pulse 1.6s ease-in-out infinite;
 }
 
-.yanmar-maintenance-icon-btn.is-warn {
+.yanmar-maintenance-service-btn.is-warn {
   border-color: rgba(251, 146, 60, 0.75);
   background:
     radial-gradient(circle at 50% 30%, rgba(251, 146, 60, 0.32), transparent 65%),
     rgba(90, 40, 10, 0.92);
 }
 
-.yanmar-maintenance-icon-btn img {
-  width: 100%;
-  height: 100%;
+.yanmar-maintenance-service-btn img {
+  width: 1.7rem;
+  height: 1.7rem;
   object-fit: contain;
-  filter: sepia(0.35) saturate(1.4) hue-rotate(-20deg) brightness(0.95);
+  display: block;
 }
 
-.yanmar-maintenance-icon-btn.is-ready img {
-  filter: sepia(0.2) saturate(1.6) hue-rotate(-35deg) brightness(1.05);
+.yanmar-maintenance-status-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.yanmar-maintenance-status-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, 0.62);
+  cursor: pointer;
+}
+
+.yanmar-maintenance-status-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 22rem);
+  max-height: min(78vh, 34rem);
+  overflow: auto;
+  padding: 1rem 1rem 0.9rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.08), transparent 42%),
+    rgba(15, 23, 42, 0.96);
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.45);
+  color: #e2e8f0;
+}
+
+.yanmar-maintenance-status-eyebrow {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fbbf24;
+}
+
+.yanmar-maintenance-status-card h3 {
+  margin: 0.2rem 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.yanmar-maintenance-status-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.yanmar-maintenance-status-row {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.yanmar-maintenance-status-row.is-warn {
+  border-color: rgba(251, 146, 60, 0.45);
+  background: rgba(154, 52, 18, 0.18);
+}
+
+.yanmar-maintenance-status-row.is-ready {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(127, 29, 29, 0.28);
+}
+
+.yanmar-maintenance-status-art {
+  width: 2.4rem;
+  height: 2.4rem;
+  object-fit: contain;
+}
+
+.yanmar-maintenance-status-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.yanmar-maintenance-status-meta strong {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.yanmar-maintenance-status-meta span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.yanmar-maintenance-status-pill {
+  font-size: 0.62rem;
+  font-weight: 900;
+  padding: 0.2rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+}
+
+.yanmar-maintenance-status-row.is-warn .yanmar-maintenance-status-pill {
+  background: rgba(251, 146, 60, 0.25);
+  color: #fdba74;
+}
+
+.yanmar-maintenance-status-row.is-ready .yanmar-maintenance-status-pill {
+  background: rgba(248, 113, 113, 0.3);
+  color: #fecaca;
+}
+
+.yanmar-maintenance-status-hint {
+  margin: 0.7rem 0 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: rgba(226, 232, 240, 0.65);
+}
+
+.yanmar-maintenance-status-actions {
+  display: flex;
+  justify-content: center;
 }
 
 .yanmar-maintenance-bubble {
@@ -13299,6 +13430,44 @@ button.yanmar-gear-icon-cell {
     linear-gradient(180deg, rgba(167, 139, 250, 0.18), transparent 55%),
     rgba(76, 29, 149, 0.38);
   color: #ddd6fe;
+}
+
+.yanmar-gear-bulk-grade-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0.75rem 0 0.35rem;
+}
+
+.yanmar-gear-bulk-grade-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.yanmar-gear-bulk-grade-item input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #f87171;
+}
+
+.yanmar-gear-bulk-grade-count {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.65);
+}
+
+.yanmar-gear-mgr-inv-scroll--busy {
+  pointer-events: none;
+  opacity: 0.55;
 }
 
 .yanmar-gear-mgr-inv-cell--bulk-locked {

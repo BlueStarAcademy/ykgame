@@ -4,14 +4,12 @@ import { cappedCurrencyIncrement } from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
 import {
   parseRewardEventId,
-  randomInt,
   runReplayableRewardEvent,
 } from "@/lib/yanmar-rewards";
 import {
   getWorldPickupHourBucket,
   getWorldPickupHourStartMs,
-  STAR_REWARD_MAX,
-  STAR_REWARD_MIN,
+  starRewardFromEventId,
   STARS_PER_HOUR,
 } from "@/games/yanmar/worldPickups";
 
@@ -91,7 +89,7 @@ export async function POST(request: Request) {
             throw new Error("WORLD_STAR_HOURLY_LIMIT");
           }
 
-          const rolled = randomInt(STAR_REWARD_MIN, STAR_REWARD_MAX);
+          const rolled = starRewardFromEventId(eventId);
           const current = await tx.user.findUnique({
             where: { id: session.user.id },
             select: { currency: true },

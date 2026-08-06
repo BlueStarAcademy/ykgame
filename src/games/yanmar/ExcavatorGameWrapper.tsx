@@ -48,7 +48,7 @@ import {
   createWorldPickupsStateFromHydrate,
   getWorldPickupHourBucket,
   markWorldStarHourlyLimitReached,
-  rollClientStarReward,
+  starRewardFromEventId,
   starRewardToastFontRem,
   starRewardToastIconPx,
 } from "./worldPickups";
@@ -329,7 +329,8 @@ import {
   tryCollectNearbySportsPickups,
   getSportsMeetAllowedAttachment,
   sportsMeetStageLockMessage,
-  rollSportsMeetStarReward,
+  sportsMeetStarEventId,
+  sportsMeetStarRewardFromEventId,
   type SportsMeetMissionBalance,
   type SportsMeetPlayMode,
   type SportsMeetRunState,
@@ -1229,8 +1230,7 @@ export function ExcavatorGameWrapper({
     null,
   );
   const maintenanceEligibleRef = useRef<Set<MaintenanceFluidId>>(new Set());
-  const [maintenanceBubbleId, setMaintenanceBubbleId] =
-    useState<MaintenanceFluidId | null>(null);
+  const [maintenanceStatusOpen, setMaintenanceStatusOpen] = useState(false);
   /** serverNow - Date.now() when last synced (fixes countdown / claim skew). */
   const serverNowOffsetRef = useRef(0);
   const [serverNowOffsetMs, setServerNowOffsetMs] = useState(0);
@@ -2594,7 +2594,8 @@ export function ExcavatorGameWrapper({
         // Practice: SFX only — currency does not increase.
         return;
       }
-      const optimistic = rollSportsMeetStarReward();
+      const eventId = sportsMeetStarEventId(run.runId, starId);
+      const optimistic = sportsMeetStarRewardFromEventId(eventId);
       const before = currencyRef.current;
       currencyRef.current = clampUserCurrency(before + optimistic);
       setCurrency(currencyRef.current);
@@ -2618,6 +2619,7 @@ export function ExcavatorGameWrapper({
             stars?: number;
             currency?: number;
           };
+          // Cap-only reconcile — rolled amount already matches server (same eventId).
           if (typeof data.currency === "number") {
             syncSessionBalances(data, { syncPreviewCurrency: true });
           } else if (typeof data.stars === "number") {
@@ -3396,6 +3398,43 @@ export function ExcavatorGameWrapper({
         setEnhanceCores(data.enhanceCores);
       }
       await loadEquipment();
+    },
+    [loadEquipment, publishEquipmentStats],
+  );
+
+  const runGearDismantleMany = useCallback(
+    async (itemIds: string[]) => {
+      if (itemIds.length === 0) return null;
+      setGearBusy(true);
+      try {
+        const res = await fetch("/api/gear/yanmar/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "dismantle", itemIds }),
+        });
+        const data = await res.json();
+        if (!res.ok) return null;
+        if (data.stats) {
+          publishEquipmentStats(data.stats);
+        }
+        if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
+          setCurrency(data.currency);
+          setPreviewStars(data.currency);
+        }
+        if (typeof data.enhanceCores === "number") {
+          setEnhanceCores(data.enhanceCores);
+        }
+        await loadEquipment();
+        if (typeof data.cores !== "number") return null;
+        return {
+          cores: data.cores as number,
+          count:
+            typeof data.count === "number" ? (data.count as number) : itemIds.length,
+        };
+      } finally {
+        setGearBusy(false);
+      }
     },
     [loadEquipment, publishEquipmentStats],
   );
@@ -4274,20 +4313,13 @@ export function ExcavatorGameWrapper({
   }, [showAttachmentWarning]);
 
   useEffect(() => {
-    if (!maintenanceBubbleId) return;
-    const onPointer = (event: PointerEvent) => {
-      const target = event.target;
-      if (
-        target instanceof Element &&
-        target.closest(".yanmar-maintenance-warn-stack")
-      ) {
-        return;
-      }
-      setMaintenanceBubbleId(null);
-    };
-    window.addEventListener("pointerdown", onPointer);
-    return () => window.removeEventListener("pointerdown", onPointer);
-  }, [maintenanceBubbleId]);
+    if (
+      maintenanceStatusOpen &&
+      (!maintenance || maintenance.warnings.length === 0)
+    ) {
+      setMaintenanceStatusOpen(false);
+    }
+  }, [maintenance, maintenanceStatusOpen]);
 
   useEffect(() => {
     const sessionXp = session?.user?.totalXp;
@@ -5925,7 +5957,9 @@ export function ExcavatorGameWrapper({
       if (worldStarClaimInFlightRef.current) return;
       worldStarClaimInFlightRef.current = true;
 
-      const optimistic = rollClientStarReward();
+      // Hour-scoped id so a respawn / double-collect cannot grant twice.
+      const eventId = `world-star:${getWorldPickupHourBucket()}`;
+      const optimistic = starRewardFromEventId(eventId);
       const before = currencyRef.current;
       currencyRef.current = clampUserCurrency(
         currencyRef.current + optimistic,
@@ -5935,8 +5969,6 @@ export function ExcavatorGameWrapper({
       showAttachmentWarning(`스타 +${optimistic}`, { stars: optimistic });
       yanmarAudio.playStarAcquire();
 
-      // Hour-scoped id so a respawn / double-collect cannot grant twice.
-      const eventId = `world-star:${getWorldPickupHourBucket()}`;
       void (async () => {
         try {
           const res = await fetch("/api/rewards/yanmar-world-pickup", {
@@ -5969,7 +6001,7 @@ export function ExcavatorGameWrapper({
             stars?: number;
             currency?: number;
           };
-          // Silently reconcile to server balance — do not show a second +스타 toast.
+          // Cap-only reconcile — rolled amount already matches server (same eventId).
           if (typeof data.currency === "number") {
             syncSessionBalances(data, { syncPreviewCurrency: true });
           } else if (typeof data.stars === "number") {
@@ -6550,6 +6582,7 @@ export function ExcavatorGameWrapper({
             if (!data || typeof data.cores !== "number") return null;
             return { cores: data.cores as number };
           }}
+          onDismantleMany={async (ids) => runGearDismantleMany(ids)}
           onSell={async (id) => {
             const data = await runGearAction("sell", id);
             if (!data || typeof data.stars !== "number") return null;
@@ -6602,6 +6635,71 @@ export function ExcavatorGameWrapper({
           clockOffsetMs={serverNowOffsetMs}
           onRepair={(fluid) => handleRepair(fluid)}
         />
+        {maintenanceStatusOpen && maintenance ? (
+          <div
+            className="yanmar-maintenance-status-layer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="yanmar-maintenance-status-title"
+          >
+            <button
+              type="button"
+              className="yanmar-maintenance-status-backdrop"
+              aria-label="소모품 안내 닫기"
+              onClick={() => setMaintenanceStatusOpen(false)}
+            />
+            <div className="yanmar-maintenance-status-card">
+              <p className="yanmar-maintenance-status-eyebrow">YK건기 정비소</p>
+              <h3 id="yanmar-maintenance-status-title">소모품 교환 안내</h3>
+              <ul className="yanmar-maintenance-status-list">
+                {MAINTENANCE_FLUID_IDS.map((id) => {
+                  const fluid = maintenance.fluids[id];
+                  const ready = fluid.exchangeEligible || fluid.depleted;
+                  const warn = fluid.warning && !ready;
+                  return (
+                    <li
+                      key={id}
+                      className={`yanmar-maintenance-status-row${
+                        ready ? " is-ready" : warn ? " is-warn" : ""
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        className="yanmar-maintenance-status-art"
+                        src={MAINTENANCE_FLUID_ART[id]}
+                        alt=""
+                        draggable={false}
+                      />
+                      <div className="yanmar-maintenance-status-meta">
+                        <strong>{fluid.label}</strong>
+                        <span>
+                          {ready
+                            ? "교환 가능"
+                            : `남은 ${formatRemainingDuration(fluid.remainingMs)}`}
+                        </span>
+                      </div>
+                      <span className="yanmar-maintenance-status-pill">
+                        {ready ? "교환" : warn ? "임박" : "정상"}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="yanmar-maintenance-status-hint">
+                교환은 현장 정비소(서비스지점)에서 진행할 수 있습니다.
+              </p>
+              <div className="yanmar-maintenance-status-actions">
+                <button
+                  type="button"
+                  className="yanmar-gear-btn yanmar-gear-btn--enhance"
+                  onClick={() => setMaintenanceStatusOpen(false)}
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <WorkshopPanel
           open={showWorkshopPanel}
           workshopId={activeWorkshopId}
@@ -7748,54 +7846,37 @@ export function ExcavatorGameWrapper({
             maintenance &&
             maintenance.warnings.length > 0 ? (
               <div className="yanmar-maintenance-warn-stack" aria-live="polite">
-                {maintenance.warnings.map((fluid) => {
-                  const ready = fluid.exchangeEligible || fluid.depleted;
-                  const open = maintenanceBubbleId === fluid.id;
-                  return (
-                    <div
-                      key={fluid.id}
-                      className="yanmar-maintenance-icon-wrap"
-                    >
-                      <button
-                        type="button"
-                        className={`yanmar-maintenance-icon-btn${
-                          ready ? " is-ready" : " is-warn"
-                        }`}
-                        aria-label={
-                          ready
-                            ? `${fluid.label} 교환 가능`
-                            : `${fluid.label} 곧 만료`
-                        }
-                        aria-expanded={open}
-                        onClick={() => {
-                          setMaintenanceBubbleId((cur) =>
-                            cur === fluid.id ? null : fluid.id,
-                          );
-                        }}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={MAINTENANCE_FLUID_ART[fluid.id]}
-                          alt=""
-                          draggable={false}
-                        />
-                      </button>
-                      {open ? (
-                        <div
-                          className="yanmar-maintenance-bubble"
-                          role="dialog"
-                        >
-                          <strong>{fluid.label}</strong>
-                          <span>
-                            {ready
-                              ? "교환 가능"
-                              : `곧 만료 · 남은 ${formatRemainingDuration(fluid.remainingMs)}`}
-                          </span>
-                        </div>
+                <div className="yanmar-maintenance-icon-wrap">
+                  <button
+                    type="button"
+                    className={`yanmar-maintenance-service-btn${
+                      repairClaimableCount > 0 ? " is-ready" : " is-warn"
+                    }`}
+                    aria-label={
+                      repairClaimableCount > 0
+                        ? `소모품 교환 안내, 교환 가능 ${repairClaimableCount}개`
+                        : "소모품 교환 안내"
+                    }
+                    aria-expanded={maintenanceStatusOpen}
+                    onClick={() => setMaintenanceStatusOpen((open) => !open)}
+                  >
+                    <span className="yanmar-site-prompt-hud-icon-wrap">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src="/images/yanmar/2d/repair/service-station.svg"
+                        alt=""
+                        draggable={false}
+                      />
+                      {repairClaimableCount > 0 ? (
+                        <span className="yanmar-repair-claim-badge" aria-hidden>
+                          {repairClaimableCount > 9
+                            ? "9+"
+                            : repairClaimableCount}
+                        </span>
                       ) : null}
-                    </div>
-                  );
-                })}
+                    </span>
+                  </button>
+                </div>
               </div>
             ) : null}
             </div>

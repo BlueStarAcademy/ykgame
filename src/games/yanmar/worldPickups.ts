@@ -490,6 +490,27 @@ export function isWorldSpeedBuffActive(
   return state.speedBuffUntilMs > now;
 }
 
+/** FNV-1a style hash → inclusive [min, max]. Shared by client toast + server grant. */
+export function deterministicRewardInRange(
+  seed: string,
+  min: number,
+  max: number,
+): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const span = Math.max(1, max - min + 1);
+  return min + ((h >>> 0) % span);
+}
+
+/** Street-star amount from eventId — must match server grant. */
+export function starRewardFromEventId(eventId: string) {
+  return deterministicRewardInRange(eventId, STAR_REWARD_MIN, STAR_REWARD_MAX);
+}
+
+/** @deprecated Prefer starRewardFromEventId so toast matches server. */
 export function rollClientStarReward() {
   return (
     STAR_REWARD_MIN +

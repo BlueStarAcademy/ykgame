@@ -6,6 +6,7 @@ export {
   formatSportsMeetMissionSummaryKo,
   rollSportsMeetStarReward,
   sportsMeetStarEventId,
+  sportsMeetStarRewardFromEventId,
 } from "./missionBalance";
 export type {
   SportsMeetMissionBalance,

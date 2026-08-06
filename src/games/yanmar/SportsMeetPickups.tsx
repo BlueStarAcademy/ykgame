@@ -3,6 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
+import { StarMesh } from "./StarMesh";
 import type { SportsMeetRunState } from "./sportsMeet/types";
 
 export function SportsMeetPickups({
@@ -34,20 +35,13 @@ export function SportsMeetPickups({
       {run.courseStars
         .filter((s) => !s.collected)
         .map((s) => (
-          <mesh
+          <group
             key={s.id}
             position={[s.x, s.y, s.z]}
             userData={{ baseY: s.y }}
           >
-            <octahedronGeometry args={[0.55, 0]} />
-            <meshStandardMaterial
-              color="#fbbf24"
-              emissive="#f59e0b"
-              emissiveIntensity={0.55}
-              metalness={0.35}
-              roughness={0.25}
-            />
-          </mesh>
+            <StarMesh />
+          </group>
         ))}
       {run.speedBuffs
         .filter((b) => !b.collected)

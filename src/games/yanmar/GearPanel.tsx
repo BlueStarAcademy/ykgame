@@ -112,7 +112,15 @@ export type EnhanceActionResult = {
 
 export type DismantleActionResult = {
   cores: number;
+  count?: number;
 };
+
+const BULK_GRADE_OPTIONS: readonly ItemGrade[] = [
+  "NORMAL",
+  "ENHANCED",
+  "PRECISION",
+  "MASTER",
+];
 
 export type SellActionResult = {
   stars: number;
@@ -149,6 +157,14 @@ interface GearPanelProps {
   ) => void | Promise<void>;
   onDismantle: (
     itemId: string,
+  ) =>
+    | Promise<DismantleActionResult | null | void>
+    | DismantleActionResult
+    | null
+    | void;
+  /** Batch dismantle in one request. Prefer this in bulk dismantle mode. */
+  onDismantleMany?: (
+    itemIds: string[],
   ) =>
     | Promise<DismantleActionResult | null | void>
     | DismantleActionResult
@@ -388,6 +404,7 @@ export function GearPanel({
   onEnhance,
   onApplyEnhanceResult,
   onDismantle,
+  onDismantleMany,
   onSell,
   onSynthesize,
   onExpandInventory,
@@ -435,6 +452,15 @@ export function GearPanel({
     () => new Set(),
   );
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkGradeSelectOpen, setBulkGradeSelectOpen] = useState(false);
+  const [bulkGradeChecks, setBulkGradeChecks] = useState<
+    Record<ItemGrade, boolean>
+  >({
+    NORMAL: true,
+    ENHANCED: true,
+    PRECISION: false,
+    MASTER: false,
+  });
   const [bulkDone, setBulkDone] = useState<
     | { kind: "dismantle"; count: number; cores: number }
     | { kind: "sell"; count: number; stars: number }
@@ -796,6 +822,7 @@ export function GearPanel({
     setSynthFuseReveal(false);
     setSynthFocusId(null);
     setBulkConfirmOpen(false);
+    setBulkGradeSelectOpen(false);
     setBulkDone(null);
     setBulkSynthRun(null);
     setSynthPullOpen(false);
@@ -808,10 +835,30 @@ export function GearPanel({
     setBulkMode(null);
     setBulkSelected(new Set());
     setBulkConfirmOpen(false);
+    setBulkGradeSelectOpen(false);
+  }
+
+  function applyBulkGradeSelection() {
+    const grades = new Set(
+      BULK_GRADE_OPTIONS.filter((g) => bulkGradeChecks[g]),
+    );
+    if (grades.size === 0) {
+      setBulkSelected(new Set());
+      setBulkGradeSelectOpen(false);
+      return;
+    }
+    setBulkSelected(
+      new Set(
+        filtered
+          .filter((item) => !item.equippedSlot && grades.has(item.grade))
+          .map((item) => item.id),
+      ),
+    );
+    setBulkGradeSelectOpen(false);
   }
 
   function toggleBulkSelect(item: GearPanelItem) {
-    if (item.equippedSlot) return;
+    if (busy || item.equippedSlot) return;
     setBulkSelected((prev) => {
       const next = new Set(prev);
       if (next.has(item.id)) {
@@ -864,6 +911,20 @@ export function GearPanel({
     }));
     setBulkConfirmOpen(false);
     if (bulkMode === "dismantle") {
+      const ids = targets.map((t) => t.id);
+      if (onDismantleMany) {
+        const result = await onDismantleMany(ids);
+        exitBulkMode();
+        if (result && typeof result.cores === "number") {
+          setBulkDone({
+            kind: "dismantle",
+            count:
+              typeof result.count === "number" ? result.count : ids.length,
+            cores: result.cores,
+          });
+        }
+        return;
+      }
       let cores = 0;
       let count = 0;
       for (const target of targets) {
@@ -1376,6 +1437,16 @@ export function GearPanel({
                 </>
               ) : (
                 <>
+                  {bulkMode === "dismantle" ? (
+                    <button
+                      type="button"
+                      className="yanmar-gear-bulk-btn"
+                      disabled={busy}
+                      onClick={() => setBulkGradeSelectOpen(true)}
+                    >
+                      일괄 선택
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="yanmar-gear-bulk-btn"
@@ -1422,7 +1493,11 @@ export function GearPanel({
               {items.length} / {inventorySlots}
             </span>
           </div>
-          <div className="yanmar-gear-mgr-inv-scroll">
+          <div
+            className={`yanmar-gear-mgr-inv-scroll${
+              busy ? " yanmar-gear-mgr-inv-scroll--busy" : ""
+            }`}
+          >
             <div className="yanmar-gear-mgr-inv-grid yanmar-gear-mgr-inv-grid--5">
               {filtered.map((item) => (
                 <GearIconCell
@@ -1456,6 +1531,7 @@ export function GearPanel({
                       : ""
                   }`}
                   onClick={() => {
+                    if (busy) return;
                     if (bulkMode) {
                       toggleBulkSelect(item);
                       return;
@@ -2291,6 +2367,77 @@ export function GearPanel({
                 onClick={closeSellResult}
               >
                 확인
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {bulkGradeSelectOpen && bulkMode === "dismantle" ? (
+        <div
+          className="yanmar-gear-confirm-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="yanmar-gear-bulk-grade-title"
+        >
+          <button
+            type="button"
+            className="yanmar-gear-confirm-backdrop"
+            aria-label="일괄 선택 닫기"
+            disabled={busy}
+            onClick={() => setBulkGradeSelectOpen(false)}
+          />
+          <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--dismantle">
+            <p className="yanmar-gear-confirm-eyebrow">선택 분해</p>
+            <h3 id="yanmar-gear-bulk-grade-title">등급으로 일괄 선택</h3>
+            <div className="yanmar-gear-bulk-grade-list" role="group">
+              {BULK_GRADE_OPTIONS.map((grade) => (
+                <label key={grade} className="yanmar-gear-bulk-grade-item">
+                  <input
+                    type="checkbox"
+                    checked={bulkGradeChecks[grade]}
+                    disabled={busy}
+                    onChange={(e) =>
+                      setBulkGradeChecks((prev) => ({
+                        ...prev,
+                        [grade]: e.target.checked,
+                      }))
+                    }
+                  />
+                  <span className={gradeTextClass(grade)}>
+                    {ITEM_GRADE_LABEL[grade]}
+                  </span>
+                  <span className="yanmar-gear-bulk-grade-count tabular-nums">
+                    {
+                      filtered.filter(
+                        (item) => !item.equippedSlot && item.grade === grade,
+                      ).length
+                    }
+                    개
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="yanmar-gear-confirm-warn">
+              장착 중인 장비는 선택되지 않습니다. 현재 필터에 보이는 장비만
+              대상입니다.
+            </p>
+            <div className="yanmar-gear-confirm-actions">
+              <button
+                type="button"
+                className="yanmar-gear-btn"
+                disabled={busy}
+                onClick={() => setBulkGradeSelectOpen(false)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="yanmar-gear-btn yanmar-gear-btn--sell"
+                disabled={busy}
+                onClick={applyBulkGradeSelection}
+              >
+                선택 적용
               </button>
             </div>
           </div>
