@@ -3759,7 +3759,7 @@ function SportsMeetBackdrop() {
         rotation={[0, Math.PI * 0.18, 0]}
         renderOrder={-10}
       >
-        <cylinderGeometry args={[170, 170, 130, 128, 1, true]} />
+        <cylinderGeometry args={[170, 170, 130, 48, 1, true]} />
         <meshBasicMaterial
           map={texture}
           color="#ffffff"
@@ -3770,7 +3770,7 @@ function SportsMeetBackdrop() {
         />
       </mesh>
       <mesh position={[48, 127, 48]} scale={[1, 0.55, 1]} renderOrder={-11}>
-        <sphereGeometry args={[170, 64, 28, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
+        <sphereGeometry args={[170, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
         <meshBasicMaterial
           map={skyVaultTexture}
           fog={false}

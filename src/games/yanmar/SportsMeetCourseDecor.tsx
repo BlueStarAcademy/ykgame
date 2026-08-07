@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import type { SportsMeetPattern } from "./sportsMeet/patterns";
@@ -26,6 +26,9 @@ const TRACK_WIDTH = {
   kerb: 0.38,
 } as const;
 
+const DASH_PERIOD = 2.6;
+const DASH_LEN = 1.15;
+
 function segmentFrame(from: SitePoint, to: SitePoint) {
   const dx = to[0] - from[0];
   const dz = to[1] - from[1];
@@ -35,7 +38,6 @@ function segmentFrame(from: SitePoint, to: SitePoint) {
   const cz = (from[1] + to[1]) / 2;
   const ux = length > 1e-6 ? dx / length : 0;
   const uz = length > 1e-6 ? dz / length : 1;
-  // Perpendicular "right" in XZ.
   const rx = uz;
   const rz = -ux;
   return { length, angle, cx, cz, ux, uz, rx, rz };
@@ -91,89 +93,44 @@ function EdgeLine({
       rotation={[0, angle, 0]}
       material={material}
       receiveShadow
+      castShadow={false}
     >
       <boxGeometry args={[TRACK_WIDTH.edgeLine, 0.02, length * 0.98]} />
     </mesh>
   );
 }
 
-function CenterDashes({
-  from,
-  to,
-  material,
-}: {
-  from: SitePoint;
-  to: SitePoint;
-  material: THREE.Material;
-}) {
-  const { length, angle, cx, cz, ux, uz } = segmentFrame(from, to);
-  if (length < 1.2) return null;
-  const period = 2.35;
-  const dashLen = 1.15;
-  const count = Math.max(1, Math.floor(length / period));
-  return (
-    <group>
-      {Array.from({ length: count }, (_, i) => {
-        const along = -length * 0.5 + (i + 0.5) * (length / count);
-        return (
-          <mesh
-            key={i}
-            position={[cx + ux * along, TRACK_Y.paint + 0.002, cz + uz * along]}
-            rotation={[0, angle, 0]}
-            material={material}
-            receiveShadow
-          >
-            <boxGeometry args={[TRACK_WIDTH.centerDash, 0.018, dashLen]} />
-          </mesh>
-        );
-      })}
-    </group>
-  );
-}
-
+/** Single solid kerb — striped look via texture, not hundreds of meshes. */
 function RacingKerb({
   from,
   to,
   side,
+  material,
 }: {
   from: SitePoint;
   to: SitePoint;
   side: -1 | 1;
+  material: THREE.Material;
 }) {
   const { length, angle, cx, cz, rx, rz } = segmentFrame(from, to);
   if (length < 0.25) return null;
   const offset = TRACK_WIDTH.asphalt * 0.5 + TRACK_WIDTH.kerb * 0.35;
-  const stripeCount = Math.max(3, Math.floor(length / 0.95));
   return (
-    <group
+    <mesh
       position={[cx + rx * offset * side, TRACK_Y.kerb, cz + rz * offset * side]}
       rotation={[0, angle, 0]}
+      material={material}
+      castShadow={false}
+      receiveShadow
     >
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[TRACK_WIDTH.kerb, 0.16, length]} />
-        <meshStandardMaterial color="#0f172a" roughness={0.7} metalness={0.08} />
-      </mesh>
-      {Array.from({ length: stripeCount }, (_, i) => {
-        const t = (i + 0.5) / stripeCount - 0.5;
-        return (
-          <mesh key={i} position={[0, 0.02, t * length]} castShadow>
-            <boxGeometry
-              args={[TRACK_WIDTH.kerb * 0.92, 0.14, length / stripeCount]}
-            />
-            <meshStandardMaterial
-              color={i % 2 === 0 ? "#f8fafc" : "#dc2626"}
-              roughness={0.62}
-            />
-          </mesh>
-        );
-      })}
-    </group>
+      <boxGeometry args={[TRACK_WIDTH.kerb, 0.16, length]} />
+    </mesh>
   );
 }
 
 function CornerBarrier({ x, z }: { x: number; z: number }) {
   return (
-    <mesh position={[x, 1.05, z]} castShadow>
+    <mesh position={[x, 1.05, z]} castShadow={false}>
       <boxGeometry args={[0.2, 1.9, 0.2]} />
       <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.45} />
     </mesh>
@@ -194,6 +151,97 @@ function turnAngle(
   if (la < 1e-4 || lb < 1e-4) return 0;
   const dot = Math.max(-1, Math.min(1, (ax * bx + az * bz) / (la * lb)));
   return Math.acos(dot);
+}
+
+function makeKerbStripeTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 4;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    for (let i = 0; i < 16; i++) {
+      ctx.fillStyle = i % 2 === 0 ? "#f8fafc" : "#dc2626";
+      ctx.fillRect(0, i * 4, 4, 4);
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function CenterDashInstances({
+  segments,
+  material,
+}: {
+  segments: Array<{ from: SitePoint; to: SitePoint }>;
+  material: THREE.Material;
+}) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const dashGeo = useMemo(
+    () => new THREE.BoxGeometry(TRACK_WIDTH.centerDash, 0.018, DASH_LEN),
+    [],
+  );
+
+  const transforms = useMemo(() => {
+    const out: Array<{
+      x: number;
+      y: number;
+      z: number;
+      angle: number;
+    }> = [];
+    for (const seg of segments) {
+      const { length, angle, cx, cz, ux, uz } = segmentFrame(seg.from, seg.to);
+      if (length < 1.2) continue;
+      const count = Math.max(1, Math.floor(length / DASH_PERIOD));
+      for (let i = 0; i < count; i++) {
+        const along = -length * 0.5 + (i + 0.5) * (length / count);
+        out.push({
+          x: cx + ux * along,
+          y: TRACK_Y.paint + 0.002,
+          z: cz + uz * along,
+          angle,
+        });
+      }
+    }
+    return out;
+  }, [segments]);
+
+  useLayoutEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    for (let i = 0; i < transforms.length; i++) {
+      const t = transforms[i]!;
+      dummy.position.set(t.x, t.y, t.z);
+      dummy.rotation.set(0, t.angle, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.count = transforms.length;
+  }, [dummy, transforms]);
+
+  useLayoutEffect(() => {
+    return () => {
+      dashGeo.dispose();
+    };
+  }, [dashGeo]);
+
+  if (transforms.length === 0) return null;
+
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[dashGeo, material, transforms.length]}
+      castShadow={false}
+      receiveShadow
+      frustumCulled={false}
+    />
+  );
 }
 
 /** Painted premium racing corridor for the sports-meet arena. */
@@ -217,6 +265,7 @@ export function SportsMeetCourseDecor({
     [loaded],
   );
   const normalScale = useMemo(() => new THREE.Vector2(0.55, 0.55), []);
+  const kerbMap = useMemo(() => makeKerbStripeTexture(), []);
 
   useLayoutEffect(() => {
     configureSiteTexture(albedo, 3.2, 3.2, true);
@@ -226,8 +275,9 @@ export function SportsMeetCourseDecor({
       albedo.dispose();
       normal.dispose();
       roughness.dispose();
+      kerbMap.dispose();
     };
-  }, [albedo, normal, roughness]);
+  }, [albedo, normal, roughness, kerbMap]);
 
   const materials = useMemo(() => {
     const shoulder = new THREE.MeshStandardMaterial({
@@ -256,8 +306,14 @@ export function SportsMeetCourseDecor({
       emissive: "#78350f",
       emissiveIntensity: 0.12,
     });
-    return { shoulder, asphalt, whitePaint, yellowPaint };
-  }, [albedo, normal, roughness, normalScale]);
+    const kerb = new THREE.MeshStandardMaterial({
+      map: kerbMap,
+      roughness: 0.65,
+      metalness: 0.05,
+    });
+    kerbMap.repeat.set(1, Math.max(4, Math.round(segments.length * 0.7)));
+    return { shoulder, asphalt, whitePaint, yellowPaint, kerb };
+  }, [albedo, normal, roughness, normalScale, kerbMap, segments.length]);
 
   useLayoutEffect(() => {
     return () => {
@@ -265,6 +321,7 @@ export function SportsMeetCourseDecor({
       materials.asphalt.dispose();
       materials.whitePaint.dispose();
       materials.yellowPaint.dispose();
+      materials.kerb.dispose();
     };
   }, [materials]);
 
@@ -273,13 +330,11 @@ export function SportsMeetCourseDecor({
     for (let i = 1; i < segments.length; i++) {
       const prev = segments[i - 1]!;
       const curr = segments[i]!;
-      // Shared joint ≈ curr.from / prev.to
       const joint: SitePoint = curr.from;
       const angle = turnAngle(prev.from, joint, curr.to);
-      if (angle < 0.28) continue;
+      if (angle < 0.35) continue;
       const { rx, rz } = segmentFrame(curr.from, curr.to);
       const outer = TRACK_WIDTH.asphalt * 0.5 + 0.85;
-      // Post on the outside of the bend.
       const ax = joint[0] - prev.from[0];
       const az = joint[1] - prev.from[1];
       const bx = curr.to[0] - joint[0];
@@ -327,27 +382,36 @@ export function SportsMeetCourseDecor({
             side={1}
             material={materials.whitePaint}
           />
-          <CenterDashes
+          <RacingKerb
             from={seg.from}
             to={seg.to}
-            material={materials.yellowPaint}
+            side={-1}
+            material={materials.kerb}
           />
-          <RacingKerb from={seg.from} to={seg.to} side={-1} />
-          <RacingKerb from={seg.from} to={seg.to} side={1} />
+          <RacingKerb
+            from={seg.from}
+            to={seg.to}
+            side={1}
+            material={materials.kerb}
+          />
         </group>
       ))}
+
+      <CenterDashInstances
+        segments={segments}
+        material={materials.yellowPaint}
+      />
 
       {cornerPosts.map((p) => (
         <CornerBarrier key={p.key} x={p.x} z={p.z} />
       ))}
 
-      {/* Zone pads */}
       <mesh
         position={[pattern.zones.dig[0], 0.705, pattern.zones.dig[1]]}
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
       >
-        <circleGeometry args={[11, 40]} />
+        <circleGeometry args={[11, 24]} />
         <meshStandardMaterial color="#6b5340" roughness={0.95} />
       </mesh>
       <mesh
@@ -355,7 +419,7 @@ export function SportsMeetCourseDecor({
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
       >
-        <circleGeometry args={[14, 40]} />
+        <circleGeometry args={[14, 24]} />
         <meshStandardMaterial color="#3f4650" roughness={0.9} />
       </mesh>
       <mesh
@@ -363,7 +427,7 @@ export function SportsMeetCourseDecor({
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
       >
-        <circleGeometry args={[16, 40]} />
+        <circleGeometry args={[16, 24]} />
         <meshStandardMaterial color="#5c4a3a" roughness={0.94} />
       </mesh>
     </group>

@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import * as THREE from "three";
 
 function createStarShape() {
@@ -18,43 +17,52 @@ function createStarShape() {
     else shape.lineTo(x, y);
   }
   shape.closePath();
+  // Light bevel — shared across all stars (do not dispose per instance).
   const geo = new THREE.ExtrudeGeometry(shape, {
     depth: 0.16,
     bevelEnabled: true,
-    bevelThickness: 0.04,
-    bevelSize: 0.03,
-    bevelSegments: 2,
+    bevelThickness: 0.03,
+    bevelSize: 0.02,
+    bevelSegments: 1,
   });
   geo.center();
-  // Keep in XY (vertical). Do not rotate onto the ground plane.
   return geo;
 }
 
+const SHARED_STAR_GEO = createStarShape();
+const SHARED_CORE_GEO = new THREE.OctahedronGeometry(0.35, 0);
+
+const SHARED_STAR_MAT = new THREE.MeshStandardMaterial({
+  color: "#ffd24a",
+  emissive: "#c99612",
+  emissiveIntensity: 0.55,
+  metalness: 0.35,
+  roughness: 0.35,
+  side: THREE.DoubleSide,
+});
+
+const SHARED_CORE_MAT = new THREE.MeshStandardMaterial({
+  color: "#fff6c8",
+  emissive: "#ffcc44",
+  emissiveIntensity: 0.35,
+  metalness: 0.2,
+  roughness: 0.4,
+});
+
 /** Shared 5-point extruded star used by world pickups and sports-meet courses. */
-export function StarMesh() {
-  const geo = useMemo(() => createStarShape(), []);
+export function StarMesh({ castShadow = false }: { castShadow?: boolean }) {
   return (
     <group>
-      <mesh geometry={geo} castShadow>
-        <meshStandardMaterial
-          color="#ffd24a"
-          emissive="#c99612"
-          emissiveIntensity={0.55}
-          metalness={0.35}
-          roughness={0.35}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      <mesh position={[0, 0, 0]} scale={0.38}>
-        <octahedronGeometry args={[0.35, 0]} />
-        <meshStandardMaterial
-          color="#fff6c8"
-          emissive="#ffcc44"
-          emissiveIntensity={0.35}
-          metalness={0.2}
-          roughness={0.4}
-        />
-      </mesh>
+      <mesh
+        geometry={SHARED_STAR_GEO}
+        material={SHARED_STAR_MAT}
+        castShadow={castShadow}
+      />
+      <mesh
+        geometry={SHARED_CORE_GEO}
+        material={SHARED_CORE_MAT}
+        scale={0.38}
+      />
     </group>
   );
 }
