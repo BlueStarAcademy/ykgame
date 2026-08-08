@@ -8263,13 +8263,7 @@ export function ExcavatorGameWrapper({
             setShowSportsMeetRankings(true);
           }}
         />
-        <SportsMeetRankingsPanel
-          open={showSportsMeetRankings}
-          week={sportsMeetRankingsWeek}
-          onClose={() => setShowSportsMeetRankings(false)}
-          onSwitchWeek={setSportsMeetRankingsWeek}
-        />
-        {sportsMeetRun?.phase === "finished" ? (
+        {sportsMeetRun?.phase === "finished" && !showSportsMeetRankings ? (
           <SportsMeetResultPanel
             open
             playMode={sportsMeetRun.playMode}
@@ -8301,6 +8295,12 @@ export function ExcavatorGameWrapper({
             }}
           />
         ) : null}
+        <SportsMeetRankingsPanel
+          open={showSportsMeetRankings}
+          week={sportsMeetRankingsWeek}
+          onClose={() => setShowSportsMeetRankings(false)}
+          onSwitchWeek={setSportsMeetRankingsWeek}
+        />
 
         <YanmarGameSettingsMenu
           immersive={immersive}

@@ -126,16 +126,21 @@ const LINEAR_DRIVE_3: SitePoint[] = [
   [-10, 116],
 ];
 
-/** hill → longer NW finish sprint (no stars). */
+/**
+ * hill → midfield loop → NE FINISH gate (no stars).
+ * Keep clear of walls (~8u) and avoid scribbling on the north rim.
+ */
 const LINEAR_DRIVE_4: SitePoint[] = [
-  [-16, 122],
-  [-28, 128],
-  [-36, 118],
-  [-28, 132],
-  [-12, 136],
-  [8, 132],
-  [-4, 140],
-  [-20, 138],
+  [-12, 116],
+  [-28, 92],
+  [-18, 66],
+  [10, 50],
+  [42, 58],
+  [74, 48],
+  [102, 62],
+  [118, 86],
+  [108, 112],
+  [84, 124],
 ];
 
 const LINEAR_PATHS = [
@@ -193,14 +198,16 @@ const WIDE_DRIVE_3: SitePoint[] = [
   [-10, 118],
 ];
 const WIDE_DRIVE_4: SitePoint[] = [
-  [-18, 124],
-  [-32, 130],
-  [-38, 120],
-  [-30, 134],
-  [-10, 138],
-  [12, 134],
-  [0, 140],
-  [-18, 138],
+  [-14, 118],
+  [-34, 94],
+  [-26, 66],
+  [4, 46],
+  [40, 54],
+  [78, 44],
+  [108, 58],
+  [122, 84],
+  [110, 112],
+  [86, 126],
 ];
 
 /** Tighter wiggles — denser switchbacks on a slightly inward corridor. */
@@ -251,14 +258,16 @@ const TIGHT_DRIVE_3: SitePoint[] = [
   [-8, 114],
 ];
 const TIGHT_DRIVE_4: SitePoint[] = [
-  [-14, 120],
-  [-26, 126],
-  [-34, 116],
-  [-26, 130],
-  [-8, 134],
-  [6, 130],
-  [-6, 138],
-  [-16, 136],
+  [-10, 114],
+  [-24, 90],
+  [-14, 66],
+  [12, 52],
+  [40, 60],
+  [68, 50],
+  [94, 64],
+  [110, 86],
+  [98, 108],
+  [74, 118],
 ];
 
 const MIRROR_ZONES: SportsMeetZoneLayout = {
@@ -313,14 +322,15 @@ const MIRROR_DRIVE_3: SitePoint[] = [
   [18, 122],
 ];
 const MIRROR_DRIVE_4: SitePoint[] = [
-  [28, 128],
-  [12, 134],
-  [-8, 128],
-  [-22, 136],
-  [-6, 140],
-  [14, 136],
-  [4, 142],
-  [-10, 140],
+  [24, 120],
+  [48, 98],
+  [40, 70],
+  [12, 52],
+  [-18, 58],
+  [-34, 78],
+  [-32, 104],
+  [-20, 122],
+  [-4, 128],
 ];
 
 function makePattern(
@@ -412,7 +422,7 @@ export function driveLegIndexAtStage(
   return Math.max(0, driveIdx);
 }
 
-/** Final short drive to the FINISH gate (no course stars). */
+/** Final drive to the FINISH gate (no course stars). */
 export function isSportsMeetFinishDriveStage(
   stageOrder: readonly SportsMeetStageKind[],
   stageIndex: number,
