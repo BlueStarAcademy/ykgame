@@ -207,7 +207,6 @@ function TerrainMesh({
   const meshRef = useRef<THREE.Mesh>(null);
   const geomRef = useRef<THREE.PlaneGeometry | null>(null);
   const colorsRef = useRef<Float32Array | null>(null);
-  const normalFrameRef = useRef(0);
   const colorScratchRef = useRef({
     ground: new THREE.Color("#d4b07a"),
     dug: new THREE.Color("#7a5230"),
@@ -259,6 +258,9 @@ function TerrainMesh({
     colorsRef.current = new Float32Array(count * 3);
     geo.setAttribute("color", new THREE.BufferAttribute(colorsRef.current, 3));
     geomRef.current = geo;
+    // Fresh PlaneGeometry is flat (y=0) with black vertexColors — must resync
+    // even if this terrain object was already painted before a remount/swap.
+    t.meshDirty = true;
     return geo;
     // terrainRevision rebuilds the plane when map tier / grid size changes.
   }, [terrainRef, terrainRevision]);
@@ -274,9 +276,14 @@ function TerrainMesh({
     const t = terrainRef.current;
     const colors = colorsRef.current;
     if (!geo || !colors) return;
-    if (!t.meshDirty) return;
+    // Only skip when explicitly clean. Missing/undefined must still sync.
+    if (t.meshDirty === false) return;
     const expectedCount = t.gridSizeX * t.gridSizeZ;
-    if (geo.attributes.position.count !== expectedCount) return;
+    if (geo.attributes.position.count !== expectedCount) {
+      // Grid size changed under us — wait for geometry remount; stay dirty.
+      t.meshDirty = true;
+      return;
+    }
     const pos = geo.attributes.position as THREE.BufferAttribute;
     const palette = colorScratchRef.current;
     const {
@@ -344,10 +351,9 @@ function TerrainMesh({
     }
     pos.needsUpdate = true;
     (geo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
+    // Normals every dirty sync so remounts never leave a flat/black plane.
+    geo.computeVertexNormals();
     t.meshDirty = false;
-    // Only when heights changed — idle frames skip this entirely.
-    normalFrameRef.current = (normalFrameRef.current + 1) % 2;
-    if (normalFrameRef.current === 0) geo.computeVertexNormals();
   });
 
   return (

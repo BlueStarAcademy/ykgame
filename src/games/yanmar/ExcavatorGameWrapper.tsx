@@ -2531,6 +2531,8 @@ export function ExcavatorGameWrapper({
           equipmentStatsRef.current.haulTruckCooldownSec,
         );
       }
+      // Held terrain was already painted before sports — remount needs a resync.
+      main.meshDirty = true;
       terrainRef.current = main;
       sportsMainTerrainRef.current = null;
       setTerrainRevision((k) => k + 1);
