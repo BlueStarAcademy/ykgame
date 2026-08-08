@@ -762,11 +762,25 @@ export function tickExcavatorSim(params: SimTickParams) {
     sim.attachmentType === "grapple" &&
     !!sim.carriedBoulderId &&
     !runtime.grappleGrip.liftChecked;
-  const toolBlocksTravel = clearanceBlocksTravel || grappleCarryBlocksTravel;
-  runtime.travelToolLocked = toolBlocksTravel;
   const wantsTravel =
     allowed.travel &&
     (Math.abs(rawInput.travel.left) > 0.08 || Math.abs(rawInput.travel.right) > 0.08);
+  // Not commanding travel and tip already above the lock line → drop the latch
+  // so the next drive attempt starts from the lock threshold, not unlock.
+  if (
+    !wantsTravel &&
+    !grappleCarryBlocksTravel &&
+    ((sim.attachmentType === "bucket" &&
+      tipClearance >= BUCKET_TRAVEL_LOCK_CLEARANCE) ||
+      (sim.attachmentType === "breaker" &&
+        tipClearance >= BREAKER_TRAVEL_LOCK_CLEARANCE) ||
+      (sim.attachmentType === "grapple" &&
+        tipClearance >= GRAPPLE_TRAVEL_LOCK_CLEARANCE))
+  ) {
+    clearanceBlocksTravel = false;
+  }
+  const toolBlocksTravel = clearanceBlocksTravel || grappleCarryBlocksTravel;
+  runtime.travelToolLocked = toolBlocksTravel;
   if (toolBlocksTravel) {
     filtered = {
       ...filtered,

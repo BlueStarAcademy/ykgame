@@ -2,8 +2,11 @@ export const MIN_BUCKET_GROUND_CLEARANCE = 0.05;
 export const MIN_BUCKET_DIG_ZONE_CLEARANCE = -2.15;
 /** 버켓이 이 높이보다 낮으면(지면 침투) 주행 잠금. 굴착지 여부와 무관. */
 export const BUCKET_TRAVEL_LOCK_CLEARANCE = -0.05;
-/** 주행 잠금 해제에 필요한 여유(히스테리시스 — 요철에서 경고/잠금 깜빡임 방지). */
-export const BUCKET_TRAVEL_UNLOCK_CLEARANCE = 0.1;
+/**
+ * 주행 잠금 해제 여유(히스테리시스).
+ * Lock(-0.05)보다 조금만 높게 — 너무 크면 들어올린 뒤에도 잠금/경고가 안 풀림.
+ */
+export const BUCKET_TRAVEL_UNLOCK_CLEARANCE = 0.02;
 /** 브레이커 주행 잠금 해제 여유. */
 export const BREAKER_TRAVEL_UNLOCK_CLEARANCE = 0.4;
 /** 집게는 지면 아래로 파고들지 않는다. */

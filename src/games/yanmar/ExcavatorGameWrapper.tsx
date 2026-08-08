@@ -1193,6 +1193,8 @@ export function ExcavatorGameWrapper({
     key: number;
     phase: "hold" | "fade";
   } | null>(null);
+  const travelBlockedRaiseArmRef = useRef(false);
+  const travelRaiseWarnClearTimerRef = useRef<number | null>(null);
   const [previewStars, setPreviewStars] = useState(() => session?.user?.currency ?? 0);
   const [tutorialFlash, setTutorialFlash] = useState<{
     kind: "phase" | "complete";
@@ -2099,32 +2101,60 @@ export function ExcavatorGameWrapper({
   );
 
   useEffect(() => {
+    travelBlockedRaiseArmRef.current = digFeedback.travelBlockedRaiseArm;
+  }, [digFeedback.travelBlockedRaiseArm]);
+
+  useEffect(() => {
+    const clearClearTimer = () => {
+      if (travelRaiseWarnClearTimerRef.current != null) {
+        window.clearTimeout(travelRaiseWarnClearTimerRef.current);
+        travelRaiseWarnClearTimerRef.current = null;
+      }
+    };
+
     if (mode === "intro" || mode === "gameReady") {
+      clearClearTimer();
       setTravelRaiseWarn(null);
       return;
     }
 
     if (digFeedback.travelBlockedRaiseArm) {
-      setTravelRaiseWarn((prev) =>
-        prev?.phase === "hold"
-          ? prev
-          : { key: (prev?.key ?? 0) + 1, phase: "hold" },
-      );
+      clearClearTimer();
+      // Do not snap back to hold while fading — clearance flicker was
+      // restarting the banner forever. Re-show after fade if still blocked.
+      setTravelRaiseWarn((prev) => {
+        if (prev?.phase === "fade") return prev;
+        if (prev?.phase === "hold") return prev;
+        return { key: (prev?.key ?? 0) + 1, phase: "hold" };
+      });
       return;
     }
 
-    // Cleared — fade out briefly then remove (do not keep a 3s sticky banner).
-    setTravelRaiseWarn((prev) => {
-      if (!prev) return null;
-      if (prev.phase === "fade") return prev;
-      return { key: prev.key, phase: "fade" };
-    });
+    // Debounce clear so a single unlocked frame does not start fade while
+    // the next frame re-locks on uneven ground.
+    if (travelRaiseWarnClearTimerRef.current != null) return;
+    travelRaiseWarnClearTimerRef.current = window.setTimeout(() => {
+      travelRaiseWarnClearTimerRef.current = null;
+      if (travelBlockedRaiseArmRef.current) return;
+      setTravelRaiseWarn((prev) => {
+        if (!prev || prev.phase === "fade") return prev;
+        return { key: prev.key, phase: "fade" };
+      });
+    }, 280);
+
+    return () => {
+      clearClearTimer();
+    };
   }, [digFeedback.travelBlockedRaiseArm, mode]);
 
   useEffect(() => {
     if (travelRaiseWarn?.phase !== "fade") return;
     const timer = window.setTimeout(() => {
       setTravelRaiseWarn(null);
+      // Fade finished while still blocked → show again once, without flicker loop.
+      if (travelBlockedRaiseArmRef.current) {
+        setTravelRaiseWarn({ key: Date.now(), phase: "hold" });
+      }
     }, 420);
     return () => window.clearTimeout(timer);
   }, [travelRaiseWarn?.key, travelRaiseWarn?.phase]);
