@@ -6614,6 +6614,13 @@ export function ExcavatorGameWrapper({
   const questClaimableCount = questsDisabled
     ? 0
     : countClaimableQuestRewards(questState).total;
+  const liveFreeGacha = freeGacha
+    ? withGachaFreeDayRollover(freeGacha)
+    : null;
+  const shopHasFreeGacha =
+    !!liveFreeGacha &&
+    (liveFreeGacha.standard.remaining > 0 ||
+      liveFreeGacha.premium.remaining > 0);
   const workshopClaimableCount =
     nearWorkshopId && workshopQuestState
       ? countClaimableWorkshopQuests(workshopQuestState, nearWorkshopId)
@@ -6996,7 +7003,13 @@ export function ExcavatorGameWrapper({
                         setShowShopPanel((open) => !open);
                       })}
                       aria-expanded={showShopPanel}
-                      aria-label={showShopPanel ? "상점 닫기" : "상점 열기"}
+                      aria-label={
+                        showShopPanel
+                          ? "상점 닫기"
+                          : shopHasFreeGacha
+                            ? "상점 열기, 무료 뽑기 남음"
+                            : "상점 열기"
+                      }
                     >
                       <img
                         className="yanmar-shop-button-icon"
@@ -7005,6 +7018,12 @@ export function ExcavatorGameWrapper({
                         draggable={false}
                       />
                       <span className="yanmar-shop-button-label">상점</span>
+                      {shopHasFreeGacha ? (
+                        <span
+                          className="yanmar-quest-notify-badge is-dot"
+                          aria-hidden
+                        />
+                      ) : null}
                     </button>
                     {nearMonument &&
                     !showMonumentPanel &&
