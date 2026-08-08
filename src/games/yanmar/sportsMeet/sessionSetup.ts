@@ -50,6 +50,8 @@ function setPadHeight(
   const next = h + (height - h) * blend;
   terrain.heights[idx] = next;
   terrain.baseHeights[idx] = next;
+  terrain.meshDirty = true;
+  terrain.heightsPersistDirty = true;
 }
 
 /** Stamp a soft circle pad — O(radius²) instead of full-grid scans. */
@@ -173,6 +175,8 @@ function sculptSportsMeetArena(
       terrain.baseHeights[idx] = h;
     }
   }
+  terrain.meshDirty = true;
+  terrain.heightsPersistDirty = true;
 
   stampTrackCorridor(terrain, segments, 5.2, 0.715);
   stampCirclePad(

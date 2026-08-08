@@ -208,6 +208,16 @@ function TerrainMesh({
   const geomRef = useRef<THREE.PlaneGeometry | null>(null);
   const colorsRef = useRef<Float32Array | null>(null);
   const normalFrameRef = useRef(0);
+  const colorScratchRef = useRef({
+    ground: new THREE.Color("#d4b07a"),
+    dug: new THREE.Color("#7a5230"),
+    deepDug: new THREE.Color("#5c3d22"),
+    mound: new THREE.Color("#e8c88a"),
+    moundPeak: new THREE.Color("#f2d9a6"),
+    packed: new THREE.Color("#b89262"),
+    gravel: new THREE.Color("#c4b29a"),
+    work: new THREE.Color(),
+  });
   const groundNormalScale = useMemo(
     () => new THREE.Vector2(0.42, 0.42),
     [],
@@ -264,16 +274,21 @@ function TerrainMesh({
     const t = terrainRef.current;
     const colors = colorsRef.current;
     if (!geo || !colors) return;
+    if (!t.meshDirty) return;
     const expectedCount = t.gridSizeX * t.gridSizeZ;
     if (geo.attributes.position.count !== expectedCount) return;
     const pos = geo.attributes.position as THREE.BufferAttribute;
-    const cGround = new THREE.Color("#d4b07a");
-    const cDug = new THREE.Color("#7a5230");
-    const cDeepDug = new THREE.Color("#5c3d22");
-    const cMound = new THREE.Color("#e8c88a");
-    const cMoundPeak = new THREE.Color("#f2d9a6");
-    const cPacked = new THREE.Color("#b89262");
-    const cGravel = new THREE.Color("#c4b29a");
+    const palette = colorScratchRef.current;
+    const {
+      ground: cGround,
+      dug: cDug,
+      deepDug: cDeepDug,
+      mound: cMound,
+      moundPeak: cMoundPeak,
+      packed: cPacked,
+      gravel: cGravel,
+      work: col,
+    } = palette;
 
     const heightAt = (gx: number, gz: number) => {
       const cx = Math.max(0, Math.min(t.gridSizeX - 1, gx));
@@ -302,7 +317,7 @@ function TerrainMesh({
         const truckLaneBlend =
           h >= 0.685 && h <= 0.735 && wx > 24 && wx < 76 && wz > -18 && wz < 8 ? 0.42 : 0;
 
-        const col = cGround.clone();
+        col.copy(cGround);
         if (dug > 0.04) {
           const digBlend = Math.min(1, dug / 0.32);
           col.lerp(dug > 0.22 ? cDeepDug : cDug, digBlend);
@@ -329,7 +344,9 @@ function TerrainMesh({
     }
     pos.needsUpdate = true;
     (geo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
-    normalFrameRef.current = (normalFrameRef.current + 1) % 4;
+    t.meshDirty = false;
+    // Only when heights changed — idle frames skip this entirely.
+    normalFrameRef.current = (normalFrameRef.current + 1) % 2;
     if (normalFrameRef.current === 0) geo.computeVertexNormals();
   });
 
@@ -3461,13 +3478,7 @@ function DumpTruck({
   );
 }
 
-function WorksiteSetDressing({
-  dumpTruckStateRef,
-  equipmentStatsRef,
-}: {
-  dumpTruckStateRef: React.MutableRefObject<DumpTruckRuntimeState>;
-  equipmentStatsRef: React.RefObject<YanmarEquipmentStats>;
-}) {
+function WorksitePerimeterDressing() {
   const cones = [
     [-35, -35],
     [-15, -35],
@@ -3495,6 +3506,22 @@ function WorksiteSetDressing({
       {cones.map(([x, z]) => (
         <SafetyCone key={`${x}:${z}`} x={x} z={z} />
       ))}
+    </>
+  );
+}
+
+function WorksiteSetDressing({
+  dumpTruckStateRef,
+  equipmentStatsRef,
+  showPerimeter = true,
+}: {
+  dumpTruckStateRef: React.MutableRefObject<DumpTruckRuntimeState>;
+  equipmentStatsRef: React.RefObject<YanmarEquipmentStats>;
+  showPerimeter?: boolean;
+}) {
+  return (
+    <>
+      {showPerimeter ? <WorksitePerimeterDressing /> : null}
       <DumpTruck stateRef={dumpTruckStateRef} statsRef={equipmentStatsRef} />
       <DumpTruckWorldHud stateRef={dumpTruckStateRef} statsRef={equipmentStatsRef} />
     </>
@@ -3914,7 +3941,12 @@ function SceneContent(props: ExcavatorSceneProps) {
           storageCap={props.monumentStorageCap}
         />
       ) : null}
-      <TerrainRockScatter key={`rocks-${terrainRevision}`} terrainRef={props.terrainRef} />
+      {!sportsArena ? (
+        <TerrainRockScatter
+          key={`rocks-${terrainRevision}`}
+          terrainRef={props.terrainRef}
+        />
+      ) : null}
       <ContactShadows
         position={[48, 0.12, 48]}
         scale={205}
@@ -3927,6 +3959,7 @@ function SceneContent(props: ExcavatorSceneProps) {
       <WorksiteSetDressing
         dumpTruckStateRef={props.dumpTruckStateRef}
         equipmentStatsRef={props.equipmentStatsRef}
+        showPerimeter={!sportsArena}
       />
       <ZoneMarkers
         terrainRef={props.terrainRef}

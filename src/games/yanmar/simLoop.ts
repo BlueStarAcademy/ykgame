@@ -113,7 +113,9 @@ import {
   BREAKER_TIP_PROBE_RADIUS,
   BREAKER_TOUCH_BAND,
   BREAKER_TRAVEL_LOCK_CLEARANCE,
+  BREAKER_TRAVEL_UNLOCK_CLEARANCE,
   BUCKET_TRAVEL_LOCK_CLEARANCE,
+  BUCKET_TRAVEL_UNLOCK_CLEARANCE,
   MIN_BREAKER_SURFACE_CLEARANCE,
   MIN_BUCKET_DIG_ZONE_CLEARANCE,
   MIN_BUCKET_GROUND_CLEARANCE,
@@ -147,6 +149,7 @@ import {
   resetGrappleGrip,
   GRAPPLE_LIFT_JUDGE_CLEARANCE_DELTA,
   GRAPPLE_TRAVEL_LOCK_CLEARANCE,
+  GRAPPLE_TRAVEL_UNLOCK_CLEARANCE,
   type GrappleGripRuntime,
 } from "./grappleGrip";
 import {
@@ -189,6 +192,11 @@ export interface SimLoopRuntime {
   warningCooldown: number;
   /** Latches zone/use warnings until the triggering condition clears. */
   warningLatchKey: string | null;
+  /**
+   * Travel lock latch for attachment ground clearance.
+   * Unlocks only after clearance rises past a higher threshold (hysteresis).
+   */
+  travelToolLocked: boolean;
   grappleGrip: GrappleGripRuntime;
   /**
    * 집게가 70% 이상 열린 채 닫기를 시작하면 true.
@@ -223,6 +231,7 @@ export function createSimLoopRuntime(): SimLoopRuntime {
     breakerHitCount: 0,
     warningCooldown: 0,
     warningLatchKey: null,
+    travelToolLocked: false,
     grappleGrip: createGrappleGripRuntime(),
     grappleGrabArmed: false,
     lastSystemsWallMs: 0,
@@ -731,20 +740,30 @@ export function tickExcavatorSim(params: SimTickParams) {
   const beforeControlBucket = measureAttachmentClearance(sim, terrain, boomSwing, grappleOpen);
   // Dig-zone gate removed: after a mound depletes the zone is inactive but the
   // bucket can still be underground — travel must stay locked until clear.
-  const bucketAnchoredToGround =
-    sim.attachmentType === "bucket" &&
-    beforeControlBucket.clearance < BUCKET_TRAVEL_LOCK_CLEARANCE;
-  const breakerNearGround =
-    sim.attachmentType === "breaker" &&
-    beforeControlBucket.clearance < BREAKER_TRAVEL_LOCK_CLEARANCE;
-  // Grapple matches breaker: travel is locked while the jaws sit too low,
-  // and also while a carried rock has not finished the lift check.
-  const grappleNearGround =
+  // Hysteresis: once locked, require a higher clearance before unlocking so
+  // uneven ground does not flicker the travel lock / warning banner.
+  const tipClearance = beforeControlBucket.clearance;
+  let clearanceBlocksTravel = false;
+  if (sim.attachmentType === "bucket") {
+    clearanceBlocksTravel = runtime.travelToolLocked
+      ? tipClearance < BUCKET_TRAVEL_UNLOCK_CLEARANCE
+      : tipClearance < BUCKET_TRAVEL_LOCK_CLEARANCE;
+  } else if (sim.attachmentType === "breaker") {
+    clearanceBlocksTravel = runtime.travelToolLocked
+      ? tipClearance < BREAKER_TRAVEL_UNLOCK_CLEARANCE
+      : tipClearance < BREAKER_TRAVEL_LOCK_CLEARANCE;
+  } else if (sim.attachmentType === "grapple") {
+    clearanceBlocksTravel = runtime.travelToolLocked
+      ? tipClearance < GRAPPLE_TRAVEL_UNLOCK_CLEARANCE
+      : tipClearance < GRAPPLE_TRAVEL_LOCK_CLEARANCE;
+  }
+  // Grapple also locks travel while a carried rock has not finished the lift check.
+  const grappleCarryBlocksTravel =
     sim.attachmentType === "grapple" &&
-    (beforeControlBucket.clearance < GRAPPLE_TRAVEL_LOCK_CLEARANCE ||
-      (!!sim.carriedBoulderId && !runtime.grappleGrip.liftChecked));
-  const toolBlocksTravel =
-    bucketAnchoredToGround || breakerNearGround || grappleNearGround;
+    !!sim.carriedBoulderId &&
+    !runtime.grappleGrip.liftChecked;
+  const toolBlocksTravel = clearanceBlocksTravel || grappleCarryBlocksTravel;
+  runtime.travelToolLocked = toolBlocksTravel;
   const wantsTravel =
     allowed.travel &&
     (Math.abs(rawInput.travel.left) > 0.08 || Math.abs(rawInput.travel.right) > 0.08);

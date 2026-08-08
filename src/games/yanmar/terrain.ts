@@ -148,6 +148,15 @@ export interface TerrainData {
   cellSize: number;
   originX: number;
   originZ: number;
+  /** When true, TerrainMesh should rewrite vertex buffers. Cleared after sync. */
+  meshDirty: boolean;
+  /** When true, session persist should re-serialize height maps. */
+  heightsPersistDirty: boolean;
+}
+
+export function markTerrainMeshDirty(terrain: TerrainData) {
+  terrain.meshDirty = true;
+  terrain.heightsPersistDirty = true;
 }
 
 export function getMapWorldBounds(terrain: TerrainData) {
@@ -215,6 +224,8 @@ export function createTerrain(
     cellSize: CELL_SIZE,
     originX,
     originZ,
+    meshDirty: true,
+    heightsPersistDirty: true,
   };
 }
 
@@ -242,6 +253,7 @@ export function expandTerrainForLevel(
     }
   }
   rebakeSpecialSiteSurfaces(expanded);
+  markTerrainMeshDirty(expanded);
   return expanded;
 }
 
@@ -266,6 +278,7 @@ export function rebakeSpecialSiteSurfaces(terrain: TerrainData) {
     }
   }
   flattenStoneZoneHeights(terrain);
+  markTerrainMeshDirty(terrain);
 }
 
 /** Strip legacy hill elevation so the stone zone sits on flat ground. */
@@ -310,6 +323,7 @@ export function flattenStoneZoneHeights(terrain: TerrainData) {
       terrain.heights[index] = Math.max(0, next - dug);
     }
   }
+  markTerrainMeshDirty(terrain);
 }
 
 export function worldToCell(
@@ -364,6 +378,7 @@ export function digAt(
       dug += take;
     }
   }
+  if (dug > 0) markTerrainMeshDirty(terrain);
   return dug;
 }
 
@@ -763,6 +778,7 @@ function addMoundAtZone(terrain: TerrainData, zone: DigZone) {
       terrain.baseHeights[idx] = next;
     }
   }
+  markTerrainMeshDirty(terrain);
 }
 
 /** Snap dig zones to the fixed site mound; preserves fill ratio when capacity changes. */
@@ -834,6 +850,7 @@ function nudgeDigZoneMoundTowardFill(terrain: TerrainData, zone: DigZone) {
       );
       terrain.heights[idx] = next;
       terrain.baseHeights[idx] = Math.max(terrain.baseHeights[idx], next);
+      markTerrainMeshDirty(terrain);
     }
   }
 }

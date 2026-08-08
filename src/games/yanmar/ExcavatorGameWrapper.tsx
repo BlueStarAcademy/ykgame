@@ -502,6 +502,23 @@ const FREE_LOOK_DISTANCE_MAX = 2.5;
 const FREE_LOOK_VEL_MAX = 5.5;
 const FREE_LOOK_VEL_SMOOTH = 0.35;
 
+/** 주행 드래그(다른 손가락) 중에도 HUD 버튼이 동작하도록 pointerdown으로 처리 */
+function activateOnPointerDown(handler: () => void) {
+  return (e: ReactPointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handler();
+  };
+}
+
+function isTravelBlockingFreeLook(travel: { left: number; right: number }) {
+  return (
+    Math.abs(travel.left) > FREE_LOOK_TRAVEL_THRESHOLD ||
+    Math.abs(travel.right) > FREE_LOOK_TRAVEL_THRESHOLD
+  );
+}
+
 function appendRewardText(previous: string, next: string) {
   if (!next) return previous;
   if (!previous) return next;
@@ -1142,8 +1159,6 @@ export function ExcavatorGameWrapper({
   );
   /** Wall-clock when main-map trucks were frozen for sports (offline-style resume). */
   const sportsWorldAwayAtMsRef = useRef<number | null>(null);
-  const sportsHudTickRef = useRef(0);
-  const [sportsHudTick, setSportsHudTick] = useState(0);
   const [sportsResultSubmitted, setSportsResultSubmitted] = useState(false);
   const [terrainRevision, setTerrainRevision] = useState(0);
   const [savePoseCooldownUntil, setSavePoseCooldownUntil] = useState(0);
@@ -1433,8 +1448,14 @@ export function ExcavatorGameWrapper({
     );
   }, []);
 
+  const persistedHeightsRef = useRef<{
+    heights: number[];
+    baseHeights: number[];
+  } | null>(null);
+
   const persistGameSession = useCallback((force = false) => {
     const userId = gameSessionUserIdRef.current;
+    // Ranked game only — sports/practice skip heavy height serialization.
     if (!userId || modeRef.current !== "game") return;
     if (!force && endedRef.current) return;
 
@@ -1444,6 +1465,23 @@ export function ExcavatorGameWrapper({
     const terrain = terrainRef.current;
     const truckState = dumpTruckStateRef.current;
     const cooldownSec = equipmentStatsRef.current.truckCooldownSec;
+    let heightsSnap = persistedHeightsRef.current?.heights;
+    let baseHeightsSnap = persistedHeightsRef.current?.baseHeights;
+    if (
+      force ||
+      terrain.heightsPersistDirty ||
+      !heightsSnap ||
+      !baseHeightsSnap ||
+      heightsSnap.length !== terrain.heights.length
+    ) {
+      heightsSnap = Array.from(terrain.heights);
+      baseHeightsSnap = Array.from(terrain.baseHeights);
+      persistedHeightsRef.current = {
+        heights: heightsSnap,
+        baseHeights: baseHeightsSnap,
+      };
+      terrain.heightsPersistDirty = false;
+    }
     saveYanmarGameSession(
       userId,
       {
@@ -1457,8 +1495,8 @@ export function ExcavatorGameWrapper({
         mapTier: terrain.mapTier,
         gridSizeX: terrain.gridSizeX,
         gridSizeZ: terrain.gridSizeZ,
-        heights: Array.from(terrain.heights),
-        baseHeights: Array.from(terrain.baseHeights),
+        heights: heightsSnap,
+        baseHeights: baseHeightsSnap,
         arcadeScore: arcadeScoreRef.current,
         dumped: scoreRef.current.dumped,
         rewardStars: rewardStarsRef.current,
@@ -1718,14 +1756,31 @@ export function ExcavatorGameWrapper({
     };
   }, [persistDumpTruckCooldown, persistGameSession, session?.user?.id]);
 
+  const inputRef = useRef(input);
+  const freeLookSurfaceRef = useRef<HTMLDivElement | null>(null);
+
+  const applyFreeLookSurfacePointerEvents = useCallback(
+    (travel: { left: number; right: number }) => {
+      const surface = freeLookSurfaceRef.current;
+      if (!surface) return;
+      surface.style.pointerEvents = isTravelBlockingFreeLook(travel)
+        ? "none"
+        : "auto";
+    },
+    [],
+  );
+
   const syncMergedInput = useCallback(() => {
-    setInput(
-      filterInput(
-        mergeControlInputs(touchInputRef.current, keyboardInputRef.current),
-        allowedRef.current,
-      ),
+    const merged = filterInput(
+      mergeControlInputs(touchInputRef.current, keyboardInputRef.current),
+      allowedRef.current,
     );
-  }, []);
+    // Keep refs/surface in sync before paint so free-look cannot steal HUD taps
+    // while travel input is already active.
+    inputRef.current = merged;
+    applyFreeLookSurfacePointerEvents(merged.travel);
+    setInput(merged);
+  }, [applyFreeLookSurfacePointerEvents]);
 
   const clearAllInput = useCallback(() => {
     const zero = {
@@ -1735,10 +1790,10 @@ export function ExcavatorGameWrapper({
     };
     touchInputRef.current = zero;
     keyboardInputRef.current = zero;
+    inputRef.current = zero;
+    applyFreeLookSurfacePointerEvents(zero.travel);
     setInput(zero);
-  }, []);
-
-  const inputRef = useRef(input);
+  }, [applyFreeLookSurfacePointerEvents]);
 
   const clearFreeLook = useCallback(() => {
     resetCameraLookOffset(lookOffsetRef.current);
@@ -1749,11 +1804,7 @@ export function ExcavatorGameWrapper({
   }, []);
 
   const isFreeLookTraveling = useCallback(() => {
-    const travel = inputRef.current.travel;
-    return (
-      Math.abs(travel.left) > FREE_LOOK_TRAVEL_THRESHOLD ||
-      Math.abs(travel.right) > FREE_LOOK_TRAVEL_THRESHOLD
-    );
+    return isTravelBlockingFreeLook(inputRef.current.travel);
   }, []);
 
   const clampFreeLookPitch = useCallback((pitch: number) => {
@@ -2062,8 +2113,10 @@ export function ExcavatorGameWrapper({
       return;
     }
 
+    // Cleared — fade out briefly then remove (do not keep a 3s sticky banner).
     setTravelRaiseWarn((prev) => {
-      if (!prev || prev.phase === "fade") return prev;
+      if (!prev) return null;
+      if (prev.phase === "fade") return prev;
       return { key: prev.key, phase: "fade" };
     });
   }, [digFeedback.travelBlockedRaiseArm, mode]);
@@ -2072,9 +2125,9 @@ export function ExcavatorGameWrapper({
     if (travelRaiseWarn?.phase !== "fade") return;
     const timer = window.setTimeout(() => {
       setTravelRaiseWarn(null);
-    }, 3000);
+    }, 420);
     return () => window.clearTimeout(timer);
-  }, [travelRaiseWarn]);
+  }, [travelRaiseWarn?.key, travelRaiseWarn?.phase]);
 
   const isAdmin = session?.user?.role === "ADMIN";
   const practiceUnlocksAll =
@@ -2588,6 +2641,7 @@ export function ExcavatorGameWrapper({
   const startSportsCountdown = useCallback(() => {
     const run = sportsMeetRunRef.current;
     if (!run || run.phase !== "ready") return;
+    yanmarAudio.unlock();
     syncSportsMeetRun(startSportsMeetCountdown(run));
   }, [syncSportsMeetRun]);
 
@@ -5057,9 +5111,6 @@ export function ExcavatorGameWrapper({
         ) {
           const stageChanged = run.stageIndex !== beforeStage;
           const prevCourseStars = sportsMeetRunRef.current?.courseStars;
-          const prevBuffCollected = sportsMeetRunRef.current?.speedBuffs.map(
-            (b) => b.collected,
-          );
           if (run.starsCollected !== beforeStars) {
             const newlyCollected = run.courseStars.filter(
               (star) =>
@@ -5078,14 +5129,9 @@ export function ExcavatorGameWrapper({
           }
           sportsMeetRunRef.current = run;
           setSportsMeetRun(run);
-          const buffChanged = run.speedBuffs.some(
-            (b, i) => b.collected !== prevBuffCollected?.[i],
-          );
-          if (
-            stageChanged ||
-            run.starsCollected !== beforeStars ||
-            buffChanged
-          ) {
+          // Collect visibility is handled in SportsMeetPickups useFrame;
+          // only remount pickup tree on stage change (new star/buff layout).
+          if (stageChanged) {
             setSportsMeetPickupRevision((n) => n + 1);
           }
           if (run.phase === "finished" && beforePhase !== "finished") {
@@ -5111,10 +5157,6 @@ export function ExcavatorGameWrapper({
               }
             })();
           }
-        }
-        sportsHudTickRef.current += 1;
-        if (sportsHudTickRef.current % 6 === 0) {
-          setSportsHudTick((n) => n + 1);
         }
       }
     }
@@ -6391,12 +6433,15 @@ export function ExcavatorGameWrapper({
       last = now;
       elapsedRef.current += dt;
       tickTimer(scoreRef.current, dt);
-      setHud((h) => ({
-        ...h,
-        timeLeft: config.duration > 0 ? scoreRef.current.timeLeft : elapsedRef.current,
-        progress: getProgress(scoreRef.current),
-      }));
-      syncDigHud();
+      const timeLeft =
+        config.duration > 0 ? scoreRef.current.timeLeft : elapsedRef.current;
+      const progress = getProgress(scoreRef.current);
+      setHud((h) =>
+        h.timeLeft === timeLeft && h.progress === progress
+          ? h
+          : { ...h, timeLeft, progress },
+      );
+      // Dig HUD syncs from handleSimTick — avoid a second pass each RAF.
 
       if (config.duration > 0 && isTimeUp(scoreRef.current) && !isComplete(scoreRef.current)) {
         endedRef.current = true;
@@ -6419,7 +6464,7 @@ export function ExcavatorGameWrapper({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [config.duration, equipmentStats.maxLoadUnits, mode, onEnd, syncDigHud]);
+  }, [config.duration, equipmentStats.maxLoadUnits, mode, onEnd]);
 
   useEffect(() => {
     if (tutorialStep?.id !== "dig") return;
@@ -6830,7 +6875,7 @@ export function ExcavatorGameWrapper({
         ) : null}
 
         {mode !== "intro" && mode !== "gameReady" && mode !== "ride" ? (
-          <div className="absolute left-1 top-2 z-50 flex max-w-[calc(100%-7rem)] flex-col items-start gap-1.5">
+          <div className="absolute left-1 top-2 z-[90] flex max-w-[calc(100%-7rem)] flex-col items-start gap-1.5">
             {!questsDisabled ? (
               <>
                 <div className="pointer-events-auto flex max-w-full flex-col items-start gap-1.5">
@@ -6840,11 +6885,11 @@ export function ExcavatorGameWrapper({
                       className={`yanmar-quest-button yanmar-aux-button touch-none active:scale-95${
                         showQuestPanel ? " is-open" : ""
                       }`}
-                      onClick={() => {
+                      onPointerDown={activateOnPointerDown(() => {
                         setShowShopPanel(false);
                         setShowEquipmentUpgrade(false);
                         setShowQuestPanel((open) => !open);
-                      }}
+                      })}
                       aria-expanded={showQuestPanel}
                       aria-label={
                         showQuestPanel
@@ -6875,12 +6920,12 @@ export function ExcavatorGameWrapper({
                       className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
                         showEquipmentUpgrade ? " is-open" : ""
                       }`}
-                      onClick={() => {
+                      onPointerDown={activateOnPointerDown(() => {
                         setShowQuestPanel(false);
                         setShowShopPanel(false);
                         setShowProfileModal(false);
                         setShowEquipmentUpgrade((open) => !open);
-                      }}
+                      })}
                       aria-expanded={showEquipmentUpgrade}
                       aria-label={
                         showEquipmentUpgrade ? "장비강화 닫기" : "장비강화 열기"
@@ -6899,12 +6944,12 @@ export function ExcavatorGameWrapper({
                       className={`yanmar-shop-button yanmar-aux-button touch-none active:scale-95${
                         showShopPanel ? " is-open" : ""
                       }`}
-                      onClick={() => {
+                      onPointerDown={activateOnPointerDown(() => {
                         setShowQuestPanel(false);
                         setShowEquipmentUpgrade(false);
                         setShowProfileModal(false);
                         setShowShopPanel((open) => !open);
-                      }}
+                      })}
                       aria-expanded={showShopPanel}
                       aria-label={showShopPanel ? "상점 닫기" : "상점 열기"}
                     >
@@ -6924,7 +6969,7 @@ export function ExcavatorGameWrapper({
                         <button
                           type="button"
                           className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
-                          onClick={() => {
+                          onPointerDown={activateOnPointerDown(() => {
                             setShowQuestPanel(false);
                             setShowShopPanel(false);
                             setShowEquipmentUpgrade(false);
@@ -6933,7 +6978,7 @@ export function ExcavatorGameWrapper({
                             setShowWorkshopPanel(false);
                             setShowMonumentPanel(true);
                             void loadMonumentState();
-                          }}
+                          })}
                           aria-label={
                             monumentStarsClaimable
                               ? `조형물 입장, 수령 가능 스타 ${monumentPanelState?.starsStored?.toLocaleString() ?? 0}`
@@ -6967,8 +7012,12 @@ export function ExcavatorGameWrapper({
                             type="button"
                             className="yanmar-site-prompt-hud-btn touch-none active:scale-95 disabled:opacity-50"
                             disabled={monumentBusy}
-                            onClick={() =>
-                              void handleMonumentClaimConstruction()
+                            onPointerDown={
+                              monumentBusy
+                                ? undefined
+                                : activateOnPointerDown(() => {
+                                    void handleMonumentClaimConstruction();
+                                  })
                             }
                             aria-label="건설완료"
                           >
@@ -6991,7 +7040,7 @@ export function ExcavatorGameWrapper({
                       <button
                         type="button"
                         className="yanmar-site-prompt-hud-btn yanmar-site-prompt-hud-btn--sports touch-none active:scale-95"
-                        onClick={() => {
+                        onPointerDown={activateOnPointerDown(() => {
                           setShowQuestPanel(false);
                           setShowShopPanel(false);
                           setShowEquipmentUpgrade(false);
@@ -7001,7 +7050,7 @@ export function ExcavatorGameWrapper({
                           setShowMonumentPanel(false);
                           void refreshSportsMeetTicket();
                           setShowSportsMeetPanel(true);
-                        }}
+                        })}
                         aria-label={`운동회 입장, 입장권 ${sportsMeetTicket.remaining}/${sportsMeetTicket.limit}`}
                       >
                         <span className="yanmar-site-prompt-hud-copy">
@@ -7032,7 +7081,7 @@ export function ExcavatorGameWrapper({
                         className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
                           repairClaimableCount > 0 ? " is-claimable" : ""
                         }`}
-                        onClick={() => {
+                        onPointerDown={activateOnPointerDown(() => {
                           setShowQuestPanel(false);
                           setShowShopPanel(false);
                           setShowEquipmentUpgrade(false);
@@ -7040,7 +7089,7 @@ export function ExcavatorGameWrapper({
                           setShowWorkshopPanel(false);
                           setShowMonumentPanel(false);
                           setShowRepairPanel(true);
-                        }}
+                        })}
                         aria-label={
                           repairClaimableCount > 0
                             ? `YK건기 서비스지점 열기, 교환 가능 ${repairClaimableCount}개`
@@ -7081,7 +7130,7 @@ export function ExcavatorGameWrapper({
                         className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
                           workshopClaimableCount > 0 ? " is-claimable" : ""
                         }`}
-                        onClick={() => {
+                        onPointerDown={activateOnPointerDown(() => {
                           setShowQuestPanel(false);
                           setShowShopPanel(false);
                           setShowEquipmentUpgrade(false);
@@ -7090,7 +7139,7 @@ export function ExcavatorGameWrapper({
                           setActiveWorkshopId(nearWorkshopId);
                           setShowWorkshopPanel(true);
                           void loadWorkshopState();
-                        }}
+                        })}
                         aria-label={
                           workshopClaimableCount > 0
                             ? `${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기, 완료 퀘스트 ${workshopClaimableCount}개`
@@ -7182,9 +7231,9 @@ export function ExcavatorGameWrapper({
                     className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
                       showEquipmentUpgrade ? " is-open" : ""
                     }`}
-                    onClick={() => {
+                    onPointerDown={activateOnPointerDown(() => {
                       setShowEquipmentUpgrade((open) => !open);
-                    }}
+                    })}
                     aria-expanded={showEquipmentUpgrade}
                     aria-label={
                       showEquipmentUpgrade ? "장비강화 닫기" : "장비강화 열기"
@@ -7201,7 +7250,9 @@ export function ExcavatorGameWrapper({
                   {mode !== "sportsRanked" && mode !== "sportsPractice" ? (
                     <button
                       type="button"
-                      onClick={() => setShowTutorialMenu(true)}
+                      onPointerDown={activateOnPointerDown(() =>
+                        setShowTutorialMenu(true),
+                      )}
                       className="h-[2.75rem] rounded-lg border border-white/20 bg-black/70 px-2.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
                     >
                       튜토리얼
@@ -7215,13 +7266,13 @@ export function ExcavatorGameWrapper({
                     <button
                       type="button"
                       className="yanmar-site-prompt-hud-btn touch-none active:scale-95"
-                      onClick={() => {
+                      onPointerDown={activateOnPointerDown(() => {
                         setShowEquipmentUpgrade(false);
                         setShowRepairPanel(false);
                         setShowWorkshopPanel(false);
                         setShowMonumentPanel(true);
                         void loadMonumentState();
-                      }}
+                      })}
                       aria-label={
                         monumentStarsClaimable
                           ? `조형물 입장, 수령 가능 스타 ${monumentPanelState?.starsStored?.toLocaleString() ?? 0}`
@@ -7255,7 +7306,13 @@ export function ExcavatorGameWrapper({
                         type="button"
                         className="yanmar-site-prompt-hud-btn touch-none active:scale-95 disabled:opacity-50"
                         disabled={monumentBusy}
-                        onClick={() => void handleMonumentClaimConstruction()}
+                        onPointerDown={
+                          monumentBusy
+                            ? undefined
+                            : activateOnPointerDown(() => {
+                                void handleMonumentClaimConstruction();
+                              })
+                        }
                         aria-label="건설완료"
                       >
                         <span className="yanmar-site-prompt-hud-copy">
@@ -7276,12 +7333,12 @@ export function ExcavatorGameWrapper({
                     className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
                       repairClaimableCount > 0 ? " is-claimable" : ""
                     }`}
-                    onClick={() => {
+                    onPointerDown={activateOnPointerDown(() => {
                       setShowEquipmentUpgrade(false);
                       setShowWorkshopPanel(false);
                       setShowMonumentPanel(false);
                       setShowRepairPanel(true);
-                    }}
+                    })}
                     aria-label={
                       repairClaimableCount > 0
                         ? `YK건기 서비스지점 열기, 교환 가능 ${repairClaimableCount}개`
@@ -7322,13 +7379,13 @@ export function ExcavatorGameWrapper({
                     className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
                       workshopClaimableCount > 0 ? " is-claimable" : ""
                     }`}
-                    onClick={() => {
+                    onPointerDown={activateOnPointerDown(() => {
                       setShowEquipmentUpgrade(false);
                       setShowRepairPanel(false);
                       setActiveWorkshopId(nearWorkshopId);
                       setShowWorkshopPanel(true);
                       void loadWorkshopState();
-                    }}
+                    })}
                     aria-label={
                       workshopClaimableCount > 0
                         ? `${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기, 완료 퀘스트 ${workshopClaimableCount}개`
@@ -7360,7 +7417,6 @@ export function ExcavatorGameWrapper({
                 sportsMeetRun ? (
                   <div className="w-[9rem]">
                     <SportsMeetHud
-                      key={`sports-hud-${sportsHudTick}`}
                       stageLabel={
                         sportsMeetRun.phase === "finished"
                           ? "완주!"
@@ -7399,16 +7455,11 @@ export function ExcavatorGameWrapper({
                         return `돌 ${sportsMeetRun.rocksDumped}/${sportsMeetRun.mission.hill.successfulDumpsRequired}`;
                       })()}
                       elapsedMs={sportsMeetElapsedMs(sportsMeetRun)}
-                      countdownSec={
+                      raceStartedAtMs={sportsMeetRun.raceStartedAtMs}
+                      countdownEndsAtMs={
                         sportsMeetRun.phase === "countdown"
-                          ? Math.max(
-                              0,
-                              Math.ceil(
-                                (sportsMeetRun.countdownEndsAtMs - Date.now()) /
-                                  1000,
-                              ),
-                            )
-                          : null
+                          ? sportsMeetRun.countdownEndsAtMs
+                          : 0
                       }
                       phase={sportsMeetRun.phase}
                       patternName={sportsMeetRun.patternNameKo}
@@ -7743,7 +7794,7 @@ export function ExcavatorGameWrapper({
         )}
 
         {mode !== "intro" && (mode !== "gameReady" || showMinimap) && (
-          <div className="absolute right-1.5 top-1.5 z-30 flex items-start gap-1 pointer-events-auto">
+          <div className="absolute right-1.5 top-1.5 z-[90] flex items-start gap-1 pointer-events-auto">
             <ActiveShopBuffIcons
               buffs={activeShopBuffs}
               onChange={persistActiveShopBuffs}
@@ -7760,10 +7811,10 @@ export function ExcavatorGameWrapper({
               {mode !== "gameReady" ? (
                 <button
                   type="button"
-                  onClick={() => {
+                  onPointerDown={activateOnPointerDown(() => {
                     clearFreeLook();
                     setCameraMode((current) => ((current % 3) + 1) as CameraMode);
-                  }}
+                  })}
                   className="flex h-6 w-full items-center justify-center gap-0.5 border-b border-white/10 px-1 text-[9px] font-black whitespace-nowrap text-white hover:bg-white/10"
                   aria-label={`카메라 ${cameraMode}번 시점`}
                 >
@@ -7897,7 +7948,9 @@ export function ExcavatorGameWrapper({
                         : "소모품 교환 안내"
                     }
                     aria-expanded={maintenanceStatusOpen}
-                    onClick={() => setMaintenanceStatusOpen((open) => !open)}
+                    onPointerDown={activateOnPointerDown(() =>
+                      setMaintenanceStatusOpen((open) => !open),
+                    )}
                   >
                     <span className="yanmar-site-prompt-hud-icon-wrap">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -8248,13 +8301,12 @@ export function ExcavatorGameWrapper({
 
         {mode !== "intro" && mode !== "gameReady" && (
           <div
+            ref={freeLookSurfaceRef}
             className="absolute inset-0 z-[5] touch-none"
             style={{
-              pointerEvents:
-                Math.abs(input.travel.left) > FREE_LOOK_TRAVEL_THRESHOLD ||
-                Math.abs(input.travel.right) > FREE_LOOK_TRAVEL_THRESHOLD
-                  ? "none"
-                  : "auto",
+              pointerEvents: isTravelBlockingFreeLook(input.travel)
+                ? "none"
+                : "auto",
             }}
             onPointerDown={onFreeLookPointerDown}
             onPointerMove={onFreeLookPointerMove}

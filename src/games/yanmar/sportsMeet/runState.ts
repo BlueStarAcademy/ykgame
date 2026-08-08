@@ -278,7 +278,10 @@ export function noteSportsDumpFill(
 ): SportsMeetRunState {
   if (state.phase !== "racing") return state;
   if (state.stageOrder[state.stageIndex] !== "dig") return state;
-  return { ...state, dumpFillUnits: fillUnits };
+  // Quantize for HUD; skip clone when unchanged to avoid per-frame React updates.
+  const quantized = Math.round(fillUnits * 10) / 10;
+  if (Math.abs(state.dumpFillUnits - quantized) < 0.05) return state;
+  return { ...state, dumpFillUnits: quantized };
 }
 
 export function noteSportsDumpDepart(

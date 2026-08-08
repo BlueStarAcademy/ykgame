@@ -346,6 +346,8 @@ export function applyGameSessionTerrain(
   ) {
     terrain.heights.set(snapshot.heights);
     terrain.baseHeights.set(snapshot.baseHeights);
+    terrain.meshDirty = true;
+    terrain.heightsPersistDirty = true;
   }
   flattenStoneZoneHeights(terrain);
   updateDigZoneRespawns(terrain, nowMs);

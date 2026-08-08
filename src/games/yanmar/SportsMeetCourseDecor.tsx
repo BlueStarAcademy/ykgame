@@ -29,6 +29,14 @@ const TRACK_WIDTH = {
 const DASH_PERIOD = 2.6;
 const DASH_LEN = 1.15;
 
+type SegTransform = {
+  x: number;
+  y: number;
+  z: number;
+  angle: number;
+  scaleZ: number;
+};
+
 function segmentFrame(from: SitePoint, to: SitePoint) {
   const dx = to[0] - from[0];
   const dz = to[1] - from[1];
@@ -41,100 +49,6 @@ function segmentFrame(from: SitePoint, to: SitePoint) {
   const rx = uz;
   const rz = -ux;
   return { length, angle, cx, cz, ux, uz, rx, rz };
-}
-
-function TrackLane({
-  from,
-  to,
-  width,
-  y,
-  material,
-  height = 0.045,
-}: {
-  from: SitePoint;
-  to: SitePoint;
-  width: number;
-  y: number;
-  material: THREE.Material;
-  height?: number;
-}) {
-  const { length, angle, cx, cz } = segmentFrame(from, to);
-  if (length < 0.2) return null;
-  return (
-    <mesh
-      position={[cx, y, cz]}
-      rotation={[0, angle, 0]}
-      material={material}
-      receiveShadow
-      castShadow={false}
-    >
-      <boxGeometry args={[width, height, length]} />
-    </mesh>
-  );
-}
-
-function EdgeLine({
-  from,
-  to,
-  side,
-  material,
-}: {
-  from: SitePoint;
-  to: SitePoint;
-  side: -1 | 1;
-  material: THREE.Material;
-}) {
-  const { length, angle, cx, cz, rx, rz } = segmentFrame(from, to);
-  if (length < 0.2) return null;
-  const inset = TRACK_WIDTH.asphalt * 0.5 - TRACK_WIDTH.edgeLine * 0.65;
-  return (
-    <mesh
-      position={[cx + rx * inset * side, TRACK_Y.paint, cz + rz * inset * side]}
-      rotation={[0, angle, 0]}
-      material={material}
-      receiveShadow
-      castShadow={false}
-    >
-      <boxGeometry args={[TRACK_WIDTH.edgeLine, 0.02, length * 0.98]} />
-    </mesh>
-  );
-}
-
-/** Single solid kerb — striped look via texture, not hundreds of meshes. */
-function RacingKerb({
-  from,
-  to,
-  side,
-  material,
-}: {
-  from: SitePoint;
-  to: SitePoint;
-  side: -1 | 1;
-  material: THREE.Material;
-}) {
-  const { length, angle, cx, cz, rx, rz } = segmentFrame(from, to);
-  if (length < 0.25) return null;
-  const offset = TRACK_WIDTH.asphalt * 0.5 + TRACK_WIDTH.kerb * 0.35;
-  return (
-    <mesh
-      position={[cx + rx * offset * side, TRACK_Y.kerb, cz + rz * offset * side]}
-      rotation={[0, angle, 0]}
-      material={material}
-      castShadow={false}
-      receiveShadow
-    >
-      <boxGeometry args={[TRACK_WIDTH.kerb, 0.16, length]} />
-    </mesh>
-  );
-}
-
-function CornerBarrier({ x, z }: { x: number; z: number }) {
-  return (
-    <mesh position={[x, 1.05, z]} castShadow={false}>
-      <boxGeometry args={[0.2, 1.9, 0.2]} />
-      <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.45} />
-    </mesh>
-  );
 }
 
 function turnAngle(
@@ -171,6 +85,58 @@ function makeKerbStripeTexture() {
   tex.minFilter = THREE.NearestFilter;
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+function SegmentBoxInstances({
+  transforms,
+  width,
+  height,
+  material,
+}: {
+  transforms: SegTransform[];
+  width: number;
+  height: number;
+  material: THREE.Material;
+}) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const geo = useMemo(
+    () => new THREE.BoxGeometry(width, height, 1),
+    [width, height],
+  );
+
+  useLayoutEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    for (let i = 0; i < transforms.length; i++) {
+      const t = transforms[i]!;
+      dummy.position.set(t.x, t.y, t.z);
+      dummy.rotation.set(0, t.angle, 0);
+      dummy.scale.set(1, 1, t.scaleZ);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.count = transforms.length;
+  }, [dummy, transforms]);
+
+  useLayoutEffect(() => {
+    return () => {
+      geo.dispose();
+    };
+  }, [geo]);
+
+  if (transforms.length === 0) return null;
+
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[geo, material, transforms.length]}
+      castShadow={false}
+      receiveShadow
+      frustumCulled={false}
+    />
+  );
 }
 
 function CenterDashInstances({
@@ -241,6 +207,15 @@ function CenterDashInstances({
       receiveShadow
       frustumCulled={false}
     />
+  );
+}
+
+function CornerBarrier({ x, z }: { x: number; z: number }) {
+  return (
+    <mesh position={[x, 1.05, z]} castShadow={false}>
+      <boxGeometry args={[0.2, 1.9, 0.2]} />
+      <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.45} />
+    </mesh>
   );
 }
 
@@ -325,6 +300,69 @@ export function SportsMeetCourseDecor({
     };
   }, [materials]);
 
+  const laneLayers = useMemo(() => {
+    const shoulder: SegTransform[] = [];
+    const asphalt: SegTransform[] = [];
+    const edgeL: SegTransform[] = [];
+    const edgeR: SegTransform[] = [];
+    const kerbL: SegTransform[] = [];
+    const kerbR: SegTransform[] = [];
+    const edgeInset =
+      TRACK_WIDTH.asphalt * 0.5 - TRACK_WIDTH.edgeLine * 0.65;
+    const kerbOffset =
+      TRACK_WIDTH.asphalt * 0.5 + TRACK_WIDTH.kerb * 0.35;
+
+    for (const seg of segments) {
+      const { length, angle, cx, cz, rx, rz } = segmentFrame(seg.from, seg.to);
+      if (length < 0.2) continue;
+      shoulder.push({
+        x: cx,
+        y: TRACK_Y.shoulder,
+        z: cz,
+        angle,
+        scaleZ: length,
+      });
+      asphalt.push({
+        x: cx,
+        y: TRACK_Y.asphalt,
+        z: cz,
+        angle,
+        scaleZ: length,
+      });
+      edgeL.push({
+        x: cx - rx * edgeInset,
+        y: TRACK_Y.paint,
+        z: cz - rz * edgeInset,
+        angle,
+        scaleZ: length * 0.98,
+      });
+      edgeR.push({
+        x: cx + rx * edgeInset,
+        y: TRACK_Y.paint,
+        z: cz + rz * edgeInset,
+        angle,
+        scaleZ: length * 0.98,
+      });
+      if (length >= 0.25) {
+        kerbL.push({
+          x: cx - rx * kerbOffset,
+          y: TRACK_Y.kerb,
+          z: cz - rz * kerbOffset,
+          angle,
+          scaleZ: length,
+        });
+        kerbR.push({
+          x: cx + rx * kerbOffset,
+          y: TRACK_Y.kerb,
+          z: cz + rz * kerbOffset,
+          angle,
+          scaleZ: length,
+        });
+      }
+    }
+    return { shoulder, asphalt, edgeL, edgeR, kerbL, kerbR };
+  }, [segments]);
+
   const cornerPosts = useMemo(() => {
     const posts: Array<{ x: number; z: number; key: string }> = [];
     for (let i = 1; i < segments.length; i++) {
@@ -352,50 +390,42 @@ export function SportsMeetCourseDecor({
 
   return (
     <group>
-      {segments.map((seg, i) => (
-        <group key={`sports-track-${i}`}>
-          <TrackLane
-            from={seg.from}
-            to={seg.to}
-            width={TRACK_WIDTH.shoulder}
-            y={TRACK_Y.shoulder}
-            material={materials.shoulder}
-            height={0.04}
-          />
-          <TrackLane
-            from={seg.from}
-            to={seg.to}
-            width={TRACK_WIDTH.asphalt}
-            y={TRACK_Y.asphalt}
-            material={materials.asphalt}
-            height={0.055}
-          />
-          <EdgeLine
-            from={seg.from}
-            to={seg.to}
-            side={-1}
-            material={materials.whitePaint}
-          />
-          <EdgeLine
-            from={seg.from}
-            to={seg.to}
-            side={1}
-            material={materials.whitePaint}
-          />
-          <RacingKerb
-            from={seg.from}
-            to={seg.to}
-            side={-1}
-            material={materials.kerb}
-          />
-          <RacingKerb
-            from={seg.from}
-            to={seg.to}
-            side={1}
-            material={materials.kerb}
-          />
-        </group>
-      ))}
+      <SegmentBoxInstances
+        transforms={laneLayers.shoulder}
+        width={TRACK_WIDTH.shoulder}
+        height={0.04}
+        material={materials.shoulder}
+      />
+      <SegmentBoxInstances
+        transforms={laneLayers.asphalt}
+        width={TRACK_WIDTH.asphalt}
+        height={0.055}
+        material={materials.asphalt}
+      />
+      <SegmentBoxInstances
+        transforms={laneLayers.edgeL}
+        width={TRACK_WIDTH.edgeLine}
+        height={0.02}
+        material={materials.whitePaint}
+      />
+      <SegmentBoxInstances
+        transforms={laneLayers.edgeR}
+        width={TRACK_WIDTH.edgeLine}
+        height={0.02}
+        material={materials.whitePaint}
+      />
+      <SegmentBoxInstances
+        transforms={laneLayers.kerbL}
+        width={TRACK_WIDTH.kerb}
+        height={0.16}
+        material={materials.kerb}
+      />
+      <SegmentBoxInstances
+        transforms={laneLayers.kerbR}
+        width={TRACK_WIDTH.kerb}
+        height={0.16}
+        material={materials.kerb}
+      />
 
       <CenterDashInstances
         segments={segments}

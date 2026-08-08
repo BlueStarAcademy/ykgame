@@ -430,7 +430,7 @@ body {
 }
 
 .yanmar-travel-raise-warn.is-fading {
-  animation: yanmar-travel-raise-warn-fade 3s ease-out forwards;
+  animation: yanmar-travel-raise-warn-fade 0.42s ease-out forwards;
 }
 
 @keyframes yanmar-repair-prompt-in {

@@ -38,20 +38,28 @@ export function SportsMeetPickups({
     const run = runRef.current;
     if (!g || !run) return;
     const t = clock.elapsedTime;
-    const starCollected = new Map(
-      run.courseStars.map((s) => [s.id, s.collected] as const),
-    );
-    const buffCollected = new Map(
-      run.speedBuffs.map((b) => [b.id, b.collected] as const),
-    );
+    const stars = run.courseStars;
+    const buffsLive = run.speedBuffs;
     for (const child of g.children) {
       const id = child.userData.pickupId as string | undefined;
       const kind = child.userData.kind as "star" | "buff" | undefined;
       if (!id || !kind) continue;
-      const collected =
-        kind === "star"
-          ? (starCollected.get(id) ?? true)
-          : (buffCollected.get(id) ?? true);
+      let collected = true;
+      if (kind === "star") {
+        for (let i = 0; i < stars.length; i++) {
+          if (stars[i]!.id === id) {
+            collected = stars[i]!.collected;
+            break;
+          }
+        }
+      } else {
+        for (let i = 0; i < buffsLive.length; i++) {
+          if (buffsLive[i]!.id === id) {
+            collected = buffsLive[i]!.collected;
+            break;
+          }
+        }
+      }
       child.visible = !collected;
       if (collected) continue;
       child.position.y =

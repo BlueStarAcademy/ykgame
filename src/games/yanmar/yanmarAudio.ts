@@ -583,6 +583,52 @@ class YanmarAudioController {
   }
 
   /**
+   * Racing-style countdown beeps for sports-meet start (5…1 tick, then GO).
+   * Synthesized so no extra asset is required.
+   */
+  playSportsCountdownBeep(kind: "tick" | "go") {
+    if (typeof window === "undefined") return;
+    if (!this.sfxEnabled) return;
+    this.ensureStoreSubscription();
+    void this.ensureAudioContext().then((ctx) => {
+      if (!ctx || !this.sfxEnabled) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "square";
+      const peak = Math.max(
+        0.0001,
+        (kind === "go" ? 0.28 : 0.2) * volumeToGain(this.sfxVolume),
+      );
+      gain.gain.setValueAtTime(0.0001, now);
+      if (kind === "tick") {
+        osc.frequency.setValueAtTime(880, now);
+        gain.gain.exponentialRampToValueAtTime(peak, now + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      } else {
+        osc.frequency.setValueAtTime(988, now);
+        osc.frequency.setValueAtTime(1319, now + 0.09);
+        gain.gain.exponentialRampToValueAtTime(peak, now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+        osc.start(now);
+        osc.stop(now + 0.45);
+      }
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.onended = () => {
+        try {
+          osc.disconnect();
+          gain.disconnect();
+        } catch {
+          // ignore
+        }
+      };
+    });
+  }
+
+  /**
    * Loop breaker SFX while the tip is striking active asphalt with the pedal held.
    * Pass false when the strike stops (pedal up, tip leaves asphalt, etc.).
    */

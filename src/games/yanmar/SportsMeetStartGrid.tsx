@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
 import * as THREE from "three";
@@ -9,6 +9,32 @@ import {
   getSportsMeetStartPaddock,
   type SportsMeetStartPaddock,
 } from "./sportsMeet/startPaddock";
+
+let sharedRailStripeTex: THREE.CanvasTexture | null = null;
+
+function getRailStripeTexture() {
+  if (sharedRailStripeTex) return sharedRailStripeTex;
+  const canvas = document.createElement("canvas");
+  canvas.width = 8;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, 5, 64);
+    for (let i = 0; i < 16; i++) {
+      ctx.fillStyle = i % 2 === 0 ? "#f8fafc" : "#dc2626";
+      ctx.fillRect(5, i * 4, 3, 4);
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  sharedRailStripeTex = tex;
+  return tex;
+}
 
 function BarrierPost({
   x,
@@ -20,7 +46,7 @@ function BarrierPost({
   y?: number;
 }) {
   return (
-    <mesh position={[x, y, z]} castShadow>
+    <mesh position={[x, y, z]} castShadow={false}>
       <boxGeometry args={[0.22, 2.3, 0.22]} />
       <meshStandardMaterial color="#1e293b" metalness={0.55} roughness={0.42} />
     </mesh>
@@ -41,32 +67,40 @@ function StripedRail({
   thickness?: number;
 }) {
   const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  const stripeMap = useMemo(() => getRailStripeTexture(), []);
+  const material = useMemo(() => {
+    const map = stripeMap.clone();
+    map.needsUpdate = true;
+    map.repeat.set(1, Math.max(4, Math.round(length / 0.85)));
+    return new THREE.MeshStandardMaterial({
+      map,
+      roughness: 0.62,
+      metalness: 0.2,
+    });
+  }, [length, stripeMap]);
+
+  useLayoutEffect(() => {
+    return () => {
+      material.map?.dispose();
+      material.dispose();
+    };
+  }, [material]);
+
   if (length < 0.15) return null;
   const angle = Math.atan2(to[0] - from[0], to[1] - from[1]);
   const cx = (from[0] + to[0]) / 2;
   const cz = (from[1] + to[1]) / 2;
-  const stripeCount = Math.max(4, Math.floor(length / 0.85));
 
   return (
-    <group position={[cx, y, cz]} rotation={[0, angle, 0]}>
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[thickness, height, length]} />
-        <meshStandardMaterial color="#0f172a" metalness={0.35} roughness={0.55} />
-      </mesh>
-      {Array.from({ length: stripeCount }, (_, i) => {
-        const t = (i + 0.5) / stripeCount - 0.5;
-        const localZ = t * length;
-        return (
-          <mesh key={i} position={[thickness * 0.55, 0, localZ]} castShadow>
-            <boxGeometry args={[0.06, height * 0.92, length / stripeCount]} />
-            <meshStandardMaterial
-              color={i % 2 === 0 ? "#f8fafc" : "#dc2626"}
-              roughness={0.7}
-            />
-          </mesh>
-        );
-      })}
-    </group>
+    <mesh
+      position={[cx, y, cz]}
+      rotation={[0, angle, 0]}
+      material={material}
+      castShadow={false}
+      receiveShadow
+    >
+      <boxGeometry args={[thickness, height, length]} />
+    </mesh>
   );
 }
 
@@ -106,7 +140,7 @@ function StartGate({
           (fl.z + fr.z) / 2 + paddock.forwardZ * 0.15,
         ]}
         rotation={[0, paddock.heading, 0]}
-        castShadow
+        castShadow={false}
       >
         <boxGeometry args={[half * 2 + 0.8, 0.22, 0.28]} />
         <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.4} />

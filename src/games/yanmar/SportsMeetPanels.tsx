@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   SPORTS_MEET_WEEKLY_REWARD_TIERS,
   type SportsMeetPlayMode,
 } from "./sportsMeet";
+import { yanmarAudio } from "./yanmarAudio";
 
 const STAR_CURRENCY_ICON = "/images/star-currency.svg";
 
@@ -411,7 +412,8 @@ export function SportsMeetHud({
   stageLabel,
   progressLabel,
   elapsedMs,
-  countdownSec,
+  raceStartedAtMs = 0,
+  countdownEndsAtMs = 0,
   phase,
   patternName,
   stageIndex,
@@ -421,8 +423,10 @@ export function SportsMeetHud({
 }: {
   stageLabel: string;
   progressLabel: string;
+  /** Finished time, or initial elapsed; live racing time ticks inside this HUD. */
   elapsedMs: number;
-  countdownSec: number | null;
+  raceStartedAtMs?: number;
+  countdownEndsAtMs?: number;
   phase: string;
   patternName: string;
   stageIndex: number;
@@ -430,6 +434,54 @@ export function SportsMeetHud({
   onStart: () => void;
   onExit: () => void;
 }) {
+  const [liveElapsedMs, setLiveElapsedMs] = useState(elapsedMs);
+  const [countdownSec, setCountdownSec] = useState<number | null>(null);
+  const lastCountdownBeepSecRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (phase === "finished") {
+      setLiveElapsedMs(elapsedMs);
+      return;
+    }
+    if (phase !== "racing" || raceStartedAtMs <= 0) {
+      setLiveElapsedMs(0);
+      return;
+    }
+    const tick = () => {
+      setLiveElapsedMs(Math.max(0, Date.now() - raceStartedAtMs));
+    };
+    tick();
+    const id = window.setInterval(tick, 100);
+    return () => window.clearInterval(id);
+  }, [phase, raceStartedAtMs, elapsedMs]);
+
+  useEffect(() => {
+    if (phase !== "countdown" || countdownEndsAtMs <= 0) {
+      setCountdownSec(null);
+      lastCountdownBeepSecRef.current = null;
+      return;
+    }
+    const tick = () => {
+      setCountdownSec(
+        Math.max(0, Math.ceil((countdownEndsAtMs - Date.now()) / 1000)),
+      );
+    };
+    tick();
+    const id = window.setInterval(tick, 100);
+    return () => window.clearInterval(id);
+  }, [phase, countdownEndsAtMs]);
+
+  useEffect(() => {
+    if (countdownSec == null) return;
+    if (lastCountdownBeepSecRef.current === countdownSec) return;
+    lastCountdownBeepSecRef.current = countdownSec;
+    if (countdownSec > 0) {
+      yanmarAudio.playSportsCountdownBeep("tick");
+      return;
+    }
+    yanmarAudio.playSportsCountdownBeep("go");
+  }, [countdownSec]);
+
   const courseLabel =
     stageTotal > 0
       ? `코스 ${Math.min(stageIndex + 1, stageTotal)}/${stageTotal}`
@@ -461,7 +513,7 @@ export function SportsMeetHud({
 
         {phase === "racing" || phase === "finished" ? (
           <p className="mt-1 font-mono text-[15px] font-black tabular-nums leading-none text-amber-100">
-            {formatTimeMs(elapsedMs)}
+            {formatTimeMs(liveElapsedMs)}
           </p>
         ) : null}
 

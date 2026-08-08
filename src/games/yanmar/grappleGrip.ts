@@ -7,6 +7,8 @@ import {
 export const GRAPPLE_PRESSURE_MAX_SEC = 3;
 /** 운반 중 팁이 이보다 낮으면 주행 잠금. */
 export const GRAPPLE_TRAVEL_LOCK_CLEARANCE = 0.32;
+/** 집게 주행 잠금 해제 여유(히스테리시스). */
+export const GRAPPLE_TRAVEL_UNLOCK_CLEARANCE = 0.44;
 /** 밀착 확정 시점 대비 이만큼 더 들어야 적재 성공/실패 판정. */
 export const GRAPPLE_LIFT_JUDGE_CLEARANCE_DELTA = 0.45;
 /** The visible jaws can enclose a rock throughout this practical curl range. */

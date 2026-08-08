@@ -590,8 +590,13 @@ export function ExcavatorMinimap({
       {onExpand ? (
         <button
           type="button"
-          className="yanmar-minimap-expand-hit relative block w-full touch-manipulation pointer-events-auto active:brightness-110"
-          onClick={onExpand}
+          className="yanmar-minimap-expand-hit relative block w-full touch-none pointer-events-auto active:brightness-110"
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            onExpand();
+          }}
           aria-label="맵 크게 보기"
         >
           <canvas ref={canvasRef} className="block w-full" aria-hidden />
