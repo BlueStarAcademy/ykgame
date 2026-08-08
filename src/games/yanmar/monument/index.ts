@@ -40,6 +40,7 @@ export {
   activateMonumentQuests,
   ensureMonumentQuestsForPhase,
   areBuildQuestsComplete,
+  countClaimableMonumentQuests,
   isInMonumentRange,
   createMonumentQuestState,
   type MonumentQuestState,

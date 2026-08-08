@@ -9,6 +9,7 @@ import {
   MONUMENT_SHOP_ITEMS,
   MONUMENT_STARS_PER_TICK,
   MONUMENT_UPGRADES,
+  countClaimableMonumentQuests,
   getMonumentUpgradeCost,
   getMonumentUpgradeMaxLevel,
   monumentIntervalMs,
@@ -192,19 +193,10 @@ export function MonumentPanel({
     return MONUMENT_BUILD_QUESTS.every((q) => questState.build[q.id]?.completed);
   }, [questState]);
 
-  const claimableQuestCount = useMemo(() => {
-    if (!questState) return 0;
-    let count = 0;
-    for (const q of questState.daily) {
-      const item = questState.dailyProgress[q.id];
-      if (item?.completed && !item.claimed) count += 1;
-    }
-    for (const q of questState.repeat) {
-      const item = questState.repeatProgress[q.id];
-      if (item?.completed) count += 1;
-    }
-    return count;
-  }, [questState]);
+  const claimableQuestCount = useMemo(
+    () => countClaimableMonumentQuests(questState),
+    [questState],
+  );
 
   if (!open || !panelState) return null;
 

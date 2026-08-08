@@ -100,6 +100,7 @@ import {
 import type { GachaFreeStatus } from "./gachaFree";
 import {
   getMsUntilNextGachaFreeReset,
+  hasReadyGachaFreePull,
   withGachaFreeDayRollover,
 } from "./gachaFree";
 import { ActiveShopBuffIcons } from "./ActiveShopBuffIcons";
@@ -230,6 +231,7 @@ import type { WorkshopQuestMetric } from "./workshop/types";
 import {
   activateMonumentQuests,
   claimMonumentRepeatQuest,
+  countClaimableMonumentQuests,
   ensureMonumentQuestsForPhase,
   isInMonumentRange,
   loadMonumentQuestState,
@@ -1286,6 +1288,8 @@ export function ExcavatorGameWrapper({
   const [gachaTicketsStandard, setGachaTicketsStandard] = useState(0);
   const [gachaTicketsPremium, setGachaTicketsPremium] = useState(0);
   const [freeGacha, setFreeGacha] = useState<GachaFreeStatus | null>(null);
+  /** HUD 붉은점: 쿨타임 중에는 false, 종료 시 true로 전환 */
+  const [shopFreeGachaReady, setShopFreeGachaReady] = useState(false);
   const travelMetersAccumRef = useRef(0);
   const travelFlushBusyRef = useRef(false);
   const [activeShopBuffs, setActiveShopBuffs] = useState<ActiveShopBuff[]>([]);
@@ -4378,6 +4382,42 @@ export function ExcavatorGameWrapper({
     refreshFreeGacha,
   ]);
 
+  // 무료 뽑기 HUD 붉은점: 잔여가 있어도 쿨타임 중에는 숨기고, 쿨이 끝나면 표시
+  useEffect(() => {
+    if (!freeGacha) {
+      setShopFreeGachaReady(false);
+      return;
+    }
+    if (hasReadyGachaFreePull(freeGacha)) {
+      setShopFreeGachaReady(true);
+      return;
+    }
+    const live = withGachaFreeDayRollover(freeGacha);
+    const cooldownMs =
+      live.standard.remaining > 0 ? live.standard.cooldownRemainingMs : 0;
+    if (cooldownMs <= 0) {
+      setShopFreeGachaReady(false);
+      return;
+    }
+    setShopFreeGachaReady(false);
+    const timer = window.setTimeout(() => {
+      setFreeGacha((prev) => {
+        if (!prev) return prev;
+        const rolled = withGachaFreeDayRollover(prev);
+        if (rolled.standard.remaining <= 0) return rolled;
+        return {
+          ...rolled,
+          standard: {
+            ...rolled.standard,
+            cooldownRemainingMs: 0,
+            available: true,
+          },
+        };
+      });
+    }, cooldownMs + 50);
+    return () => window.clearTimeout(timer);
+  }, [freeGacha]);
+
   useEffect(() => {
     const id = window.setInterval(() => {
       const row = repairStateRef.current;
@@ -6614,13 +6654,7 @@ export function ExcavatorGameWrapper({
   const questClaimableCount = questsDisabled
     ? 0
     : countClaimableQuestRewards(questState).total;
-  const liveFreeGacha = freeGacha
-    ? withGachaFreeDayRollover(freeGacha)
-    : null;
-  const shopHasFreeGacha =
-    !!liveFreeGacha &&
-    (liveFreeGacha.standard.remaining > 0 ||
-      liveFreeGacha.premium.remaining > 0);
+  const shopHasFreeGacha = shopFreeGachaReady;
   const workshopClaimableCount =
     nearWorkshopId && workshopQuestState
       ? countClaimableWorkshopQuests(workshopQuestState, nearWorkshopId)
@@ -6648,6 +6682,13 @@ export function ExcavatorGameWrapper({
   );
   const monumentMinimapStorageFull =
     (monumentPanelState?.starsStored ?? 0) >= monumentMinimapStorageCap;
+  const monumentClaimableQuestCount =
+    countClaimableMonumentQuests(monumentQuestState);
+  const showMonumentHudNotify =
+    !showMonumentPanel &&
+    mode !== "gameReady" &&
+    (monumentClaimableQuestCount > 0 ||
+      (monumentHudPhase === "active" && monumentMinimapStorageFull));
 
   return (
     <div
@@ -7007,7 +7048,7 @@ export function ExcavatorGameWrapper({
                         showShopPanel
                           ? "상점 닫기"
                           : shopHasFreeGacha
-                            ? "상점 열기, 무료 뽑기 남음"
+                            ? "상점 열기, 무료 뽑기 가능"
                             : "상점 열기"
                       }
                     >
@@ -7997,42 +8038,88 @@ export function ExcavatorGameWrapper({
               ) : null}
             </div>
             {mode !== "gameReady" &&
-            maintenance &&
-            maintenance.warnings.length > 0 ? (
+            (showMonumentHudNotify ||
+              (maintenance && maintenance.warnings.length > 0)) ? (
               <div className="yanmar-maintenance-warn-stack" aria-live="polite">
-                <div className="yanmar-maintenance-icon-wrap">
-                  <button
-                    type="button"
-                    className={`yanmar-maintenance-service-btn${
-                      repairClaimableCount > 0 ? " is-ready" : " is-warn"
-                    }`}
-                    aria-label={
-                      repairClaimableCount > 0
-                        ? `소모품 교환 안내, 교환 가능 ${repairClaimableCount}개`
-                        : "소모품 교환 안내"
-                    }
-                    aria-expanded={maintenanceStatusOpen}
-                    onPointerDown={activateOnPointerDown(() =>
-                      setMaintenanceStatusOpen((open) => !open),
-                    )}
-                  >
-                    <span className="yanmar-site-prompt-hud-icon-wrap">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src="/images/yanmar/2d/repair/service-station.svg"
-                        alt=""
-                        draggable={false}
-                      />
-                      {repairClaimableCount > 0 ? (
-                        <span className="yanmar-repair-claim-badge" aria-hidden>
-                          {repairClaimableCount > 9
-                            ? "9+"
-                            : repairClaimableCount}
-                        </span>
-                      ) : null}
-                    </span>
-                  </button>
-                </div>
+                {showMonumentHudNotify ? (
+                  <div className="yanmar-maintenance-icon-wrap">
+                    <button
+                      type="button"
+                      className="yanmar-maintenance-service-btn"
+                      aria-label={
+                        monumentClaimableQuestCount > 0 &&
+                        monumentHudPhase === "active" &&
+                        monumentMinimapStorageFull
+                          ? `조형물 안내, 퀘스트 보상 ${monumentClaimableQuestCount}개 · 스타 저장 한도 가득`
+                          : monumentClaimableQuestCount > 0
+                            ? `조형물 안내, 퀘스트 보상 ${monumentClaimableQuestCount}개`
+                            : "조형물 안내, 스타 저장 한도 가득"
+                      }
+                      onPointerDown={activateOnPointerDown(() => {
+                        setShowQuestPanel(false);
+                        setShowShopPanel(false);
+                        setShowEquipmentUpgrade(false);
+                        setShowProfileModal(false);
+                        setShowRepairPanel(false);
+                        setShowWorkshopPanel(false);
+                        setMaintenanceStatusOpen(false);
+                        setShowMonumentPanel(true);
+                        void loadMonumentState();
+                      })}
+                    >
+                      <span className="yanmar-site-prompt-hud-icon-wrap">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/images/yanmar/2d/monument/yanmar-mark.png"
+                          alt=""
+                          draggable={false}
+                        />
+                        <span
+                          className="yanmar-quest-notify-badge is-dot"
+                          aria-hidden
+                        />
+                      </span>
+                    </button>
+                  </div>
+                ) : null}
+                {maintenance && maintenance.warnings.length > 0 ? (
+                  <div className="yanmar-maintenance-icon-wrap">
+                    <button
+                      type="button"
+                      className={`yanmar-maintenance-service-btn${
+                        repairClaimableCount > 0 ? " is-ready" : " is-warn"
+                      }`}
+                      aria-label={
+                        repairClaimableCount > 0
+                          ? `소모품 교환 안내, 교환 가능 ${repairClaimableCount}개`
+                          : "소모품 교환 안내"
+                      }
+                      aria-expanded={maintenanceStatusOpen}
+                      onPointerDown={activateOnPointerDown(() =>
+                        setMaintenanceStatusOpen((open) => !open),
+                      )}
+                    >
+                      <span className="yanmar-site-prompt-hud-icon-wrap">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/images/yanmar/2d/repair/service-station.svg"
+                          alt=""
+                          draggable={false}
+                        />
+                        {repairClaimableCount > 0 ? (
+                          <span
+                            className="yanmar-repair-claim-badge"
+                            aria-hidden
+                          >
+                            {repairClaimableCount > 9
+                              ? "9+"
+                              : repairClaimableCount}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             </div>

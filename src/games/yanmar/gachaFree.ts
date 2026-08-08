@@ -149,6 +149,15 @@ export function withGachaFreeDayRollover(
   );
 }
 
+/** 지금 바로 시작할 수 있는 무료 뽑기가 있는지 (잔여 + 쿨타임 완료) */
+export function hasReadyGachaFreePull(
+  status: GachaFreeStatus,
+  now = new Date(),
+): boolean {
+  const live = withGachaFreeDayRollover(status, now);
+  return live.standard.available || live.premium.available;
+}
+
 export const GACHA_FREE_USER_SELECT = {
   gachaFreeDayKey: true,
   gachaFreeStandardUsed: true,

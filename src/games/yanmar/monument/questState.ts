@@ -359,6 +359,23 @@ export function areBuildQuestsComplete(state: MonumentQuestState): boolean {
   return MONUMENT_BUILD_QUESTS.every((q) => state.build[q.id]?.completed);
 }
 
+/** Daily unclaimed + repeat completed (claimable rewards). */
+export function countClaimableMonumentQuests(
+  state: MonumentQuestState | null | undefined,
+): number {
+  if (!state) return 0;
+  let count = 0;
+  for (const q of state.daily) {
+    const item = state.dailyProgress[q.id];
+    if (item?.completed && !item.claimed) count += 1;
+  }
+  for (const q of state.repeat) {
+    const item = state.repeatProgress[q.id];
+    if (item?.completed) count += 1;
+  }
+  return count;
+}
+
 export function isInMonumentRange(posX: number, posZ: number): boolean {
   const dx = posX - MONUMENT_SIGN.x;
   const dz = posZ - MONUMENT_SIGN.z;
