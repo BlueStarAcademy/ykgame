@@ -1193,8 +1193,7 @@ export function ExcavatorGameWrapper({
     key: number;
     phase: "hold" | "fade";
   } | null>(null);
-  /** Prevent the same travel-blocked banner from re-spawning (was stacking forever). */
-  const travelRaiseWarnCooldownUntilRef = useRef(0);
+  const travelRaiseWarnVisibleRef = useRef(false);
   const [previewStars, setPreviewStars] = useState(() => session?.user?.currency ?? 0);
   const [tutorialFlash, setTutorialFlash] = useState<{
     kind: "phase" | "complete";
@@ -2101,6 +2100,10 @@ export function ExcavatorGameWrapper({
   );
 
   useEffect(() => {
+    travelRaiseWarnVisibleRef.current = travelRaiseWarn != null;
+  }, [travelRaiseWarn]);
+
+  useEffect(() => {
     if (mode !== "intro" && mode !== "gameReady") return;
     setTravelRaiseWarn(null);
   }, [mode]);
@@ -2108,12 +2111,9 @@ export function ExcavatorGameWrapper({
   useEffect(() => {
     if (mode === "intro" || mode === "gameReady") return;
     if (!digFeedback.travelBlockedRaiseArm) return;
-    const now = Date.now();
-    if (now < travelRaiseWarnCooldownUntilRef.current) return;
-
-    // One show per 10s — do not re-spawn while still blocked / flickering.
-    travelRaiseWarnCooldownUntilRef.current = now + 10_000;
-    setTravelRaiseWarn({ key: now, phase: "hold" });
+    // Already on screen — never stack another copy.
+    if (travelRaiseWarnVisibleRef.current) return;
+    setTravelRaiseWarn({ key: Date.now(), phase: "hold" });
   }, [digFeedback.travelBlockedRaiseArm, mode]);
 
   useEffect(() => {
