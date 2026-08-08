@@ -124,6 +124,7 @@ const BULK_GRADE_OPTIONS: readonly ItemGrade[] = [
 
 export type SellActionResult = {
   stars: number;
+  count?: number;
 };
 
 export type SynthesizeActionResult = {
@@ -172,6 +173,10 @@ interface GearPanelProps {
     | void;
   onSell: (
     itemId: string,
+  ) => Promise<SellActionResult | null | void> | SellActionResult | null | void;
+  /** Batch sell in one request. Prefer this in bulk sell mode. */
+  onSellMany?: (
+    itemIds: string[],
   ) => Promise<SellActionResult | null | void> | SellActionResult | null | void;
   onSynthesize: (
     itemIds: [string, string, string],
@@ -406,6 +411,7 @@ export function GearPanel({
   onDismantle,
   onDismantleMany,
   onSell,
+  onSellMany,
   onSynthesize,
   onExpandInventory,
 }: GearPanelProps) {
@@ -939,6 +945,20 @@ export function GearPanel({
       return;
     }
     if (bulkMode === "sell") {
+      const ids = targets.map((t) => t.id);
+      if (onSellMany) {
+        const result = await onSellMany(ids);
+        exitBulkMode();
+        if (result && typeof result.stars === "number") {
+          setBulkDone({
+            kind: "sell",
+            count:
+              typeof result.count === "number" ? result.count : ids.length,
+            stars: result.stars,
+          });
+        }
+        return;
+      }
       let stars = 0;
       let count = 0;
       for (const target of targets) {
@@ -1437,7 +1457,7 @@ export function GearPanel({
                 </>
               ) : (
                 <>
-                  {bulkMode === "dismantle" ? (
+                  {bulkMode === "dismantle" || bulkMode === "sell" ? (
                     <button
                       type="button"
                       className="yanmar-gear-bulk-btn"
@@ -2373,7 +2393,8 @@ export function GearPanel({
         </div>
       ) : null}
 
-      {bulkGradeSelectOpen && bulkMode === "dismantle" ? (
+      {bulkGradeSelectOpen &&
+      (bulkMode === "dismantle" || bulkMode === "sell") ? (
         <div
           className="yanmar-gear-confirm-layer"
           role="dialog"
@@ -2387,8 +2408,16 @@ export function GearPanel({
             disabled={busy}
             onClick={() => setBulkGradeSelectOpen(false)}
           />
-          <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--dismantle">
-            <p className="yanmar-gear-confirm-eyebrow">선택 분해</p>
+          <div
+            className={`yanmar-gear-confirm-card ${
+              bulkMode === "sell"
+                ? "yanmar-gear-confirm-card--sell"
+                : "yanmar-gear-confirm-card--dismantle"
+            }`}
+          >
+            <p className="yanmar-gear-confirm-eyebrow">
+              {bulkMode === "sell" ? "선택 판매" : "선택 분해"}
+            </p>
             <h3 id="yanmar-gear-bulk-grade-title">등급으로 일괄 선택</h3>
             <div className="yanmar-gear-bulk-grade-list" role="group">
               {BULK_GRADE_OPTIONS.map((grade) => (

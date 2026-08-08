@@ -272,6 +272,68 @@ export async function POST(req: Request) {
         };
       }
 
+      // Batch sell — one transaction for many unequipped items.
+      if (
+        action === "sell" &&
+        Array.isArray(body.itemIds) &&
+        body.itemIds.length > 0
+      ) {
+        const itemIds = [
+          ...new Set(
+            body.itemIds.filter((id): id is string => typeof id === "string" && !!id),
+          ),
+        ];
+        if (itemIds.length === 0) throw new Error("MISSING_ITEM");
+        if (itemIds.length > 200) throw new Error("TOO_MANY");
+
+        const items = await tx.gearItem.findMany({
+          where: {
+            id: { in: itemIds },
+            userId: session.user.id,
+            gameId: "yanmar",
+          },
+        });
+        if (items.length !== itemIds.length) throw new Error("NOT_FOUND");
+        if (items.some((item) => item.equippedSlot)) throw new Error("EQUIPPED");
+
+        let starsRaw = 0;
+        for (const item of items) {
+          starsRaw += SELL_STARS_BY_GRADE[item.grade as ItemGrade];
+        }
+
+        await tx.gearItem.deleteMany({
+          where: {
+            id: { in: itemIds },
+            userId: session.user.id,
+            gameId: "yanmar",
+          },
+        });
+
+        const current = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { currency: true },
+        });
+        const { next, granted } = cappedCurrencyIncrement(
+          current?.currency ?? 0,
+          starsRaw,
+        );
+        const updatedUser = await tx.user.update({
+          where: { id: session.user.id },
+          data: { currency: next },
+          select: { currency: true, enhanceCores: true },
+        });
+        const loaded = await loadUserFinalStats(tx, session.user.id);
+        return {
+          ok: true,
+          stars: granted,
+          count: items.length,
+          soldIds: itemIds,
+          currency: updatedUser.currency,
+          enhanceCores: updatedUser.enhanceCores,
+          stats: loaded.stats,
+        };
+      }
+
       const itemId = body.itemId;
       if (!itemId) throw new Error("MISSING_ITEM");
 

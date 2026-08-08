@@ -3504,6 +3504,43 @@ export function ExcavatorGameWrapper({
     [loadEquipment, publishEquipmentStats],
   );
 
+  const runGearSellMany = useCallback(
+    async (itemIds: string[]) => {
+      if (itemIds.length === 0) return null;
+      setGearBusy(true);
+      try {
+        const res = await fetch("/api/gear/yanmar/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "sell", itemIds }),
+        });
+        const data = await res.json();
+        if (!res.ok) return null;
+        if (data.stats) {
+          publishEquipmentStats(data.stats);
+        }
+        if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
+          setCurrency(data.currency);
+          setPreviewStars(data.currency);
+        }
+        if (typeof data.enhanceCores === "number") {
+          setEnhanceCores(data.enhanceCores);
+        }
+        await loadEquipment();
+        if (typeof data.stars !== "number") return null;
+        return {
+          stars: data.stars as number,
+          count:
+            typeof data.count === "number" ? (data.count as number) : itemIds.length,
+        };
+      } finally {
+        setGearBusy(false);
+      }
+    },
+    [loadEquipment, publishEquipmentStats],
+  );
+
   const runGearSynthesize = useCallback(
     async (itemIds: [string, string, string]) => {
       setGearBusy(true);
@@ -6679,6 +6716,7 @@ export function ExcavatorGameWrapper({
             if (!data || typeof data.stars !== "number") return null;
             return { stars: data.stars as number };
           }}
+          onSellMany={async (ids) => runGearSellMany(ids)}
           onSynthesize={(itemIds) => runGearSynthesize(itemIds)}
           onExpandInventory={() => void handleExpandInventory()}
         />
