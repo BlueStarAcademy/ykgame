@@ -64,21 +64,35 @@
   object-position: center;
 }
 
-.teaserBadge {
+.adMarker {
   position: absolute;
-  top: 0.3rem;
-  left: 0.3rem;
-  z-index: 1;
-  border-radius: 999px;
-  border: 1px solid rgba(253, 230, 138, 0.55);
-  background: rgba(0, 0, 0, 0.55);
-  padding: 0.12rem 0.35rem;
+  top: 0.28rem;
+  left: 0.28rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 0.85rem;
+  padding: 0 0.28rem;
+  border-radius: 0.2rem;
+  background: rgba(15, 23, 42, 0.82);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
   font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
-  font-size: 0.55rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: #fde68a;
-  backdrop-blur: 4px;
+  font-size: 0.52rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  color: #f8fafc;
+  pointer-events: none;
+}
+
+.adFrame .adMarker {
+  top: 0.4rem;
+  left: 0.4rem;
+  min-width: 1.55rem;
+  height: 1rem;
+  font-size: 0.58rem;
 }
 
 .teaserBody {

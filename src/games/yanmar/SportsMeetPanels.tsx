@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   SPORTS_MEET_WEEKLY_REWARD_TIERS,
   type SportsMeetPlayMode,
 } from "./sportsMeet";
-import { yanmarAudio } from "./yanmarAudio";
 
 const STAR_CURRENCY_ICON = "/images/star-currency.svg";
 
@@ -436,7 +435,6 @@ export function SportsMeetHud({
 }) {
   const [liveElapsedMs, setLiveElapsedMs] = useState(elapsedMs);
   const [countdownSec, setCountdownSec] = useState<number | null>(null);
-  const lastCountdownBeepSecRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (phase === "finished") {
@@ -458,7 +456,6 @@ export function SportsMeetHud({
   useEffect(() => {
     if (phase !== "countdown" || countdownEndsAtMs <= 0) {
       setCountdownSec(null);
-      lastCountdownBeepSecRef.current = null;
       return;
     }
     const tick = () => {
@@ -470,17 +467,6 @@ export function SportsMeetHud({
     const id = window.setInterval(tick, 100);
     return () => window.clearInterval(id);
   }, [phase, countdownEndsAtMs]);
-
-  useEffect(() => {
-    if (countdownSec == null) return;
-    if (lastCountdownBeepSecRef.current === countdownSec) return;
-    lastCountdownBeepSecRef.current = countdownSec;
-    if (countdownSec > 0) {
-      yanmarAudio.playSportsCountdownBeep("tick");
-      return;
-    }
-    yanmarAudio.playSportsCountdownBeep("go");
-  }, [countdownSec]);
 
   const courseLabel =
     stageTotal > 0

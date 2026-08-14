@@ -37,6 +37,7 @@ import {
   damageCrashTile,
   getCrashTileAt,
   isInsideHillZoneCore,
+  isInsideHillZoneOuter,
   isInDumpTruckBed,
   markHillRockExtracted,
   tryClearHillZone,
@@ -719,7 +720,9 @@ export function tickExcavatorSim(params: SimTickParams) {
   const isAutoArm = autoPose.executing && autoPose.saved != null;
 
   const isRide = mode === "ride";
-  // RPM(고속)연동: 전진·붐·암이 동일 배율. 버켓/선회는 고정.
+  // RPM(고속)연동: 전진·붐·암은 절대 배율, 선회는 RPM1 체감 유지 후 상대×민첩.
+  // 버켓 컬은 고정.
+  const rpmLow = isRide ? 1 : 0.25;
   const rpmScale = isRide
     ? auxiliary?.highSpeed
       ? 1.15
@@ -736,6 +739,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     rpmScale *
     (worldBuffActive ? SPEED_BUFF_MULT : 1);
   const workSpeedScale = (stats.workSpeedMultiplier ?? 1) * rpmScale;
+  /** 상부 선회: RPM 상대 배율 × 민첩. RPM1=현재×민첩, RPM2=2×(게임) / 1.15×(탑승). */
+  const swingSpeedScale =
+    (stats.workSpeedMultiplier ?? 1) * (rpmScale / rpmLow);
   const boomSwing = auxiliary?.boomSwing ?? DEFAULT_BOOM_SWING;
   const grappleOpen = auxiliary?.grappleOpen ?? 1;
   const beforeControlBucket = measureAttachmentClearance(sim, terrain, boomSwing, grappleOpen);
@@ -882,6 +888,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       workSpeedScale,
       travelSpeedScale,
       speedProfile,
+      swingSpeedScale,
     );
     if (blockBoomRaiseWhileGripping && sim.boom < subBefore.boom) {
       sim.boom = subBefore.boom;
@@ -1601,9 +1608,10 @@ export function tickExcavatorSim(params: SimTickParams) {
     }
   }
 
-  // 집어서 돌 구역 밖으로 나가면 반출 처리. 전부 반출되면 구역이 사라진다.
+  // 집어서 돌 작업 반경(트럭 포함 outer) 밖으로 나가면 반출 처리.
+  // 원(core) 밖 하역 파괴와 달리, 돌트럭까지는 운반할 수 있어야 한다.
   if (terrain.hillZone?.active && sim.carriedBoulderId) {
-    if (!isInsideHillZoneCore(terrain.hillZone, sim.posX, sim.posZ)) {
+    if (!isInsideHillZoneOuter(terrain.hillZone, sim.posX, sim.posZ)) {
       markHillRockExtracted(terrain, sim.carriedBoulderId);
       sim.carriedBoulderId = null;
       resetGrappleGrip(runtime.grappleGrip);

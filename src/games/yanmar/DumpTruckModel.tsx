@@ -15,6 +15,11 @@ import {
   DUMP_TRUCK_WHEEL_CENTER_LOCAL_Y,
   DUMP_TRUCK_WHEEL_RADIUS,
 } from "./terrain";
+import {
+  ribSegmentOffset,
+  ribSegmentsAroundMark,
+  type SideMarkBand,
+} from "./truckSideMark";
 
 const WHEEL_POSITIONS = [
   { x: -2.7, z: -1.46 },
@@ -86,6 +91,31 @@ function TruckWheel({
   );
 }
 
+/**
+ * Side-panel wordmark band (bed local).
+ * Placed between the mudguard bars so tyres never cut into it, and the ribs
+ * break into stubs above/below the band instead of crossing the mark.
+ */
+const BED_MARK = {
+  width: 1.6,
+  x: 0.4,
+  y: 0,
+  /** Just proud of the panel face (panel half-depth 0.08). */
+  z: 0.115,
+} as const;
+const BED_MARK_HEIGHT = BED_MARK.width / YK_GEONGI_LOGO.aspect;
+/** Ribs stand 0.06 further out than the mark, so keep them out of this box. */
+const BED_MARK_BAND: SideMarkBand = {
+  x: BED_MARK.x,
+  y: BED_MARK.y,
+  clearX: BED_MARK.width / 2 + 0.16,
+  clearY: BED_MARK_HEIGHT / 2 + 0.1,
+};
+
+const BED_RIB_XS = [-2.25, -1.35, -0.45, 0.45, 1.35, 2.25] as const;
+const BED_RIB_TILT = -0.08;
+const BED_RIB_HALF_LENGTH = 0.64;
+
 function DumpBed({ sideMark }: { sideMark: THREE.Texture | null }) {
   return (
     <group position={[-0.68, 1.05, 0]}>
@@ -107,25 +137,47 @@ function DumpBed({ sideMark }: { sideMark: THREE.Texture | null }) {
             <boxGeometry args={[5.4, 0.17, 0.23]} />
             <meshStandardMaterial color={COLOR.truckBedDark} {...MATERIAL.paintedDark} />
           </mesh>
-          {[-2.25, -1.35, -0.45, 0.45, 1.35, 2.25].map((x) => (
-            <group key={`rib-${x}`} position={[x, 0, side * 0.1]}>
-              <mesh rotation={[0, 0, -0.08]}>
-                <boxGeometry args={[0.14, 1.28, 0.15]} />
-                <meshStandardMaterial color={COLOR.truckBedDark} {...MATERIAL.paintedDark} />
-              </mesh>
-              <mesh position={[0, 0.18, side * 0.085]}>
-                <boxGeometry args={[0.055, 0.78, 0.06]} />
-                <meshStandardMaterial color={COLOR.truckBedBright} {...MATERIAL.painted} />
-              </mesh>
-            </group>
-          ))}
+          {BED_RIB_XS.flatMap((x) =>
+            ribSegmentsAroundMark(x, BED_MARK_BAND, BED_RIB_HALF_LENGTH).map(
+              (segment, index) => {
+                const [ribX, ribY] = ribSegmentOffset(
+                  x,
+                  segment.along,
+                  BED_RIB_TILT,
+                );
+                return (
+                  <group
+                    key={`rib-${x}-${index}`}
+                    position={[ribX, ribY, side * 0.1]}
+                  >
+                    <mesh rotation={[0, 0, BED_RIB_TILT]}>
+                      <boxGeometry args={[0.14, segment.length, 0.15]} />
+                      <meshStandardMaterial
+                        color={COLOR.truckBedDark}
+                        {...MATERIAL.paintedDark}
+                      />
+                    </mesh>
+                    {segment.full ? (
+                      <mesh position={[0, 0.18, side * 0.085]}>
+                        <boxGeometry args={[0.055, 0.78, 0.06]} />
+                        <meshStandardMaterial
+                          color={COLOR.truckBedBright}
+                          {...MATERIAL.painted}
+                        />
+                      </mesh>
+                    ) : null}
+                  </group>
+                );
+              },
+            ),
+          )}
           {sideMark ? (
             <mesh
-              position={[0.15, -0.26, side * 0.115]}
+              position={[BED_MARK.x, BED_MARK.y, side * BED_MARK.z]}
               rotation={[0, side < 0 ? Math.PI : 0, 0]}
               renderOrder={18}
             >
-              <planeGeometry args={[1.48, 1.48 / YK_GEONGI_LOGO.aspect]} />
+              <planeGeometry args={[BED_MARK.width, BED_MARK_HEIGHT]} />
               <meshBasicMaterial
                 map={sideMark}
                 transparent

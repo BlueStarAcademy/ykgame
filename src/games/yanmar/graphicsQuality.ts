@@ -28,6 +28,30 @@ function preferPerformanceByDefault(): boolean {
   return cores <= 4 || dpr >= 2;
 }
 
+/**
+ * Backbuffer pixel budget for the performance tier.
+ * Rendering at dpr 1 on a 3x phone screen is cheap but visibly upscaled, so
+ * spend the same pixel budget everywhere instead of pinning to CSS pixels:
+ * small viewports (phones) get supersampled back toward native, while large
+ * retina desktops stay at dpr 1 as before.
+ */
+const PERFORMANCE_PIXEL_BUDGET = 1_150_000;
+const PERFORMANCE_DPR_CAP = 1.75;
+
+function performanceDprCap(): number {
+  if (typeof window === "undefined") return 1;
+  const deviceDpr = window.devicePixelRatio || 1;
+  if (deviceDpr <= 1.05) return 1;
+  const cssPixels = Math.max(
+    1,
+    (window.innerWidth || 1280) * (window.innerHeight || 720),
+  );
+  const budgetCap = Math.sqrt(PERFORMANCE_PIXEL_BUDGET / cssPixels);
+  const cap = Math.min(deviceDpr, PERFORMANCE_DPR_CAP, budgetCap);
+  // Round to 0.05 so resizes don't churn the backbuffer.
+  return Math.max(1, Math.round(cap * 20) / 20);
+}
+
 export function getGraphicsQuality(): GraphicsQuality {
   return readStored() ?? (preferPerformanceByDefault() ? "performance" : "high");
 }
@@ -70,7 +94,7 @@ export function getGraphicsProfile(
   if (quality === "performance") {
     return {
       quality,
-      dpr: [1, 1],
+      dpr: [1, performanceDprCap()],
       shadows: "percentage",
       shadowMapSize: 1024,
       shadowCameraExtent: 90,
@@ -79,7 +103,7 @@ export function getGraphicsProfile(
       contactShadowResolution: 256,
       paintClearcoat: 0,
       paintEnvMapIntensity: 0.35,
-      minimapMaxDpr: 1.25,
+      minimapMaxDpr: 1.5,
       minimapFps: 12,
     };
   }

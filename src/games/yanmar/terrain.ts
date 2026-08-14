@@ -41,7 +41,7 @@ export const HAUL_TRUCK_ENGINE_START_SEC = 2.2;
 export const HAUL_TRUCK_DEPART_SEC = 5.8;
 export const HAUL_TRUCK_ARRIVE_SEC = 10;
 export const HILL_BOULDER_COUNT = 5;
-/** 돌 구역: 이탈 후(또는 전량 반출 후) 풀 리젠까지 대기. */
+/** 돌 구역: 전량 반출 후 풀 리젠까지 대기 (재진입으로 타이머 초기화하지 않음). */
 export const HILL_ZONE_RESPAWN_MS = 300 * 1000;
 /** 채취량은 유지하되 화면에 보이는 지형 침하는 완만하게 제한한다. */
 const DIG_TERRAIN_DEFORMATION_SCALE = 0.16;
@@ -1013,7 +1013,8 @@ function createHillBoulders(
   const boulderCount = Math.max(1, Math.floor(count));
   return Array.from({ length: boulderCount }, (_, index) => {
     const angle = (index / boulderCount) * Math.PI * 2 + 0.35;
-    // Keep harvestable rocks inside the painted stone ring (radius * 0.55 ≈ 13.75).
+    // Keep harvestable rocks inside the painted stone ring
+    // (radius * HILL_ZONE_CORE_RADIUS_SCALE ≈ 13.75).
     const ring = 5.2 + (index % 3) * 1.8;
     return {
       id: `${cycleId}-rock-${index + 1}`,
@@ -1188,7 +1189,32 @@ export function isInHillZone(
   return Math.hypot(wx - zone.centerX, wz - zone.centerZ) <= zone.radius + 8;
 }
 
+/**
+ * Painted stone ring as a fraction of {@link HillZone.radius}.
+ * Rocks spawn inside this ring; drops outside it are destroyed.
+ */
+export const HILL_ZONE_CORE_RADIUS_SCALE = 0.55;
+
+export function getHillZoneCoreRadius(zone: Pick<HillZone, "radius">): number {
+  return zone.radius * HILL_ZONE_CORE_RADIUS_SCALE;
+}
+
+/** Inside the painted stone circle (drop-valid / harvest core). */
 export function isInsideHillZoneCore(
+  zone: HillZone,
+  wx: number,
+  wz: number,
+): boolean {
+  return (
+    Math.hypot(wx - zone.centerX, wz - zone.centerZ) <= getHillZoneCoreRadius(zone)
+  );
+}
+
+/**
+ * Wider hill working envelope (includes the haul-truck pad).
+ * Used when carrying a rock out of the area entirely — not for ground drops.
+ */
+export function isInsideHillZoneOuter(
   zone: HillZone,
   wx: number,
   wz: number,
@@ -1225,8 +1251,9 @@ export function tryClearHillZone(
 }
 
 /**
- * 돌·아스팔트: 구역에 남아 있어도 플레이어가 나가 있으면 리젠 타이머를 돌리고,
+ * 아스팔트: 구역에 남아 있어도 플레이어가 나가 있으면 리젠 타이머를 돌리고,
  * 시간이 지나면 100%로 채운다. 구역 안에 있으면(아직 활성일 때) 타이머를 취소한다.
+ * 돌 구역: 전량 반출(`!active`) 후에만 리젠 타이머를 돌리며, 재진입해도 초기화하지 않는다.
  */
 export function updateSpecialZones(
   terrain: TerrainData,
@@ -1263,18 +1290,16 @@ export function updateSpecialZones(
 
   const hill = terrain.hillZone;
   if (hill) {
-    const playerInHill =
-      playerX != null &&
-      playerZ != null &&
-      hill.active &&
-      isInHillZone(terrain, playerX, playerZ);
     if (isHillZoneFull(hill)) {
       hill.clearedAt = null;
       hill.respawnAt = null;
-    } else if (playerInHill) {
+    } else if (hill.active) {
+      // Still has rocks to harvest — no leave-based regen (avoids timer
+      // cancel/restart when re-entering mid-cycle).
       hill.clearedAt = null;
       hill.respawnAt = null;
     } else {
+      // Fully cleared: keep counting down even if the player drives back in.
       if (hill.clearedAt == null) hill.clearedAt = now;
       hill.respawnAt = hill.clearedAt + HILL_ZONE_RESPAWN_MS;
       if (now >= hill.respawnAt) {

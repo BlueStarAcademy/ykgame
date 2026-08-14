@@ -171,7 +171,7 @@ export interface YanmarEquipmentStats {
   /** Maintenance / other global score penalty (default 1). */
   scoreMult?: number;
   travelSpeedMultiplier: number;
-  /** 붐/암 속도 배율 (선회·버켓·블레이드·집게 제외) */
+  /** 붐/암/상부선회 속도 배율 (버켓·블레이드·집게 제외) */
   workSpeedMultiplier: number;
   /** Upgrade bonus added to each 6~10 base hit roll. */
   breakerDamage: number;

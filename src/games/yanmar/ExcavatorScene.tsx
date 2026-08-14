@@ -54,6 +54,7 @@ import {
   isInCrashZone,
   isInDumpZone,
   isInHillZone,
+  isInsideHillZoneCore,
   dumpTruckBedDeckWorldY,
   sampleHeight,
   sampleCrashContactHeight,
@@ -1794,6 +1795,18 @@ function ExcavatorArm({
         }
       }
     }
+
+    // Travel loop — RPM(x1)=travel-1, RPM(x2)=travel-2 while tracks move.
+    {
+      const vel = velRef.current;
+      const rpm: 1 | 2 = aux?.highSpeed ? 2 : 1;
+      const moving =
+        Math.abs(vel.travel) > 0.08 ||
+        Math.abs(vel.trackLeft) > 0.08 ||
+        Math.abs(vel.trackRight) > 0.08;
+      yanmarAudio.setTravelDriving(moving, rpm);
+    }
+
     if (grappleVisualRef.current) {
       grappleVisualRef.current.visible = s.attachmentType === "grapple";
       grappleVisualRef.current.userData.openAmount = aux?.grappleOpen ?? 1;
@@ -1937,8 +1950,8 @@ function ExcavatorArm({
                 width={0.18}
               />
               <HydraulicCylinder
-                barrelLength={1.4}
-                initialDistance={2.2}
+                barrelLength={1.2}
+                initialDistance={2}
                 detail="full"
                 radius={0.056}
                 controlRef={bucketCylinderRef}
@@ -2552,8 +2565,7 @@ function ZoneMarkers({
       .sort();
     const nextInCrash = isInCrashZone(terrain, sim.posX, sim.posZ);
     const nextInHill =
-      !!hill?.active &&
-      Math.hypot(sim.posX - hill.centerX, sim.posZ - hill.centerZ) <= hill.radius * 0.55;
+      !!hill?.active && isInsideHillZoneCore(hill, sim.posX, sim.posZ);
     const signature = nextZones
       .map(
         (zone) =>

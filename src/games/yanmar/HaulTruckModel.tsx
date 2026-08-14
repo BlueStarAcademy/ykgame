@@ -20,8 +20,38 @@ import {
   YANMAR_MACHINE_COLORS as COLORS,
   YANMAR_MACHINE_MATERIALS as MATERIALS,
 } from "./machineVisualTheme";
+import {
+  ribSegmentOffset,
+  ribSegmentsAroundMark,
+  type SideMarkBand,
+} from "./truckSideMark";
+import { HAUL_TRUCK_BODY_DROP } from "./truckDumpAlign";
 
 const MAX_VISIBLE_BED_ROCKS = 5;
+
+/**
+ * Quarry bed side wordmark (panel local).
+ * The bright stiffener ribs stand further out than the mark, so they step
+ * aside inside this band — otherwise the middle rib runs straight through it.
+ */
+const BED_MARK = {
+  width: 2.05,
+  x: 0,
+  y: 0.02,
+  /** Just proud of the rounded panel face (panel half-depth 0.09). */
+  z: 0.12,
+} as const;
+const BED_MARK_HEIGHT = BED_MARK.width / YK_GEONGI_LOGO.aspect;
+const BED_MARK_BAND: SideMarkBand = {
+  x: BED_MARK.x,
+  y: BED_MARK.y,
+  clearX: BED_MARK.width / 2 + 0.14,
+  clearY: BED_MARK_HEIGHT / 2 + 0.1,
+};
+
+const BED_RIB_XS = [-1.55, -0.78, 0, 0.78, 1.55] as const;
+const BED_RIB_TILT = -0.12;
+const BED_RIB_HALF_LENGTH = 0.64;
 
 /** 짐칸 바닥에 안정적으로 앉는 위치 (bed group local). */
 const BED_ROCK_SLOTS: ReadonlyArray<{
@@ -228,6 +258,9 @@ export function HaulTruckModel({
 
   return (
     <group ref={groupRef} rotation={[0, HAUL_TRUCK.rotation, 0]}>
+      {/* Body sits lower than the wheels so the bed is reachable with the
+          shortened arm without piercing the high quarry hull. */}
+      <group position={[0, -HAUL_TRUCK_BODY_DROP, 0]}>
       {/* High-clearance black chassis under the painted body. */}
       <RoundedBox args={[6.9, 0.42, 2.55]} radius={0.12} position={[-0.05, 1.1, 0]} castShadow>
         <meshStandardMaterial color={COLORS.frame} {...MATERIALS.frame} />
@@ -246,19 +279,37 @@ export function HaulTruckModel({
             <RoundedBox args={[4.4, 1.45, 0.18]} radius={0.06} castShadow>
               <meshStandardMaterial color={COLORS.truckBed} {...MATERIALS.painted} />
             </RoundedBox>
-            {[-1.55, -0.78, 0, 0.78, 1.55].map((x) => (
-              <mesh key={x} position={[x, 0, side * 0.11]} rotation={[0, 0, -0.12]}>
-                <boxGeometry args={[0.11, 1.28, 0.12]} />
-                <meshStandardMaterial color={COLORS.truckBedBright} {...MATERIALS.painted} />
-              </mesh>
-            ))}
+            {BED_RIB_XS.flatMap((x) =>
+              ribSegmentsAroundMark(x, BED_MARK_BAND, BED_RIB_HALF_LENGTH).map(
+                (segment, index) => {
+                  const [ribX, ribY] = ribSegmentOffset(
+                    x,
+                    segment.along,
+                    BED_RIB_TILT,
+                  );
+                  return (
+                    <mesh
+                      key={`rib-${x}-${index}`}
+                      position={[ribX, ribY, side * 0.11]}
+                      rotation={[0, 0, BED_RIB_TILT]}
+                    >
+                      <boxGeometry args={[0.11, segment.length, 0.12]} />
+                      <meshStandardMaterial
+                        color={COLORS.truckBedBright}
+                        {...MATERIALS.painted}
+                      />
+                    </mesh>
+                  );
+                },
+              ),
+            )}
             {ykMark ? (
               <mesh
-                position={[0, 0.02, side * 0.12]}
+                position={[BED_MARK.x, BED_MARK.y, side * BED_MARK.z]}
                 rotation={[0, side > 0 ? 0 : Math.PI, 0]}
                 renderOrder={18}
               >
-                <planeGeometry args={[2.05, 2.05 / YK_GEONGI_LOGO.aspect]} />
+                <planeGeometry args={[BED_MARK.width, BED_MARK_HEIGHT]} />
                 <meshBasicMaterial
                   map={ykMark}
                   transparent
@@ -339,13 +390,14 @@ export function HaulTruckModel({
           <meshStandardMaterial color={COLORS.steel} {...MATERIALS.steel} />
         </mesh>
       ))}
-      {[-2.3, -0.85, 1.85].flatMap((x) =>
-        [-1.58, 1.58].map((z) => <PremiumWheel key={`${x}-${z}`} x={x} z={z} />),
-      )}
       <mesh position={[3.34, 1.72, 0]}>
         <boxGeometry args={[0.15, 0.62, 2.9]} />
         <meshStandardMaterial color={COLORS.warning} emissive="#b45309" emissiveIntensity={0.16} {...MATERIALS.painted} />
       </mesh>
+      </group>
+      {[-2.3, -0.85, 1.85].flatMap((x) =>
+        [-1.58, 1.58].map((z) => <PremiumWheel key={`${x}-${z}`} x={x} z={z} />),
+      )}
     </group>
   );
 }

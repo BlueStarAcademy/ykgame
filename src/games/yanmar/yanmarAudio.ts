@@ -47,6 +47,14 @@ const STAR_ACQUIRE_SRC = `${SOUND_BASE}/star-acquire.ogg`;
 const BUFF_ACQUIRE_SRC = `${SOUND_BASE}/buff-acquire.ogg`;
 const ITEM_ACQUIRE_SRC = `${SOUND_BASE}/item-acquire.ogg`;
 const MASTER_ITEM_ACQUIRE_SRC = `${SOUND_BASE}/master-item-acquire.ogg`;
+const SPORTS_COUNTDOWN_SRC = `${SOUND_BASE}/countdown.ogg`;
+const ATTACHMENT_UNLOCK_SRC = `${SOUND_BASE}/attachment-unlock.ogg`;
+const TRAVEL_1_SRC = `${SOUND_BASE}/travel-1.ogg`;
+const TRAVEL_2_SRC = `${SOUND_BASE}/travel-2.ogg`;
+const TRAVEL_SRC: Record<TravelRpm, string> = {
+  1: TRAVEL_1_SRC,
+  2: TRAVEL_2_SRC,
+};
 const INGAME_BGM_SRC = "/sounds/site-legend/ingame-bgm.ogg";
 const SPORTS_MEET_BGM_SRC = "/sounds/yanmar/sports-meet-bgm.ogg";
 const HORN_BASE_VOLUME = 0.88;
@@ -59,12 +67,24 @@ const STAR_ACQUIRE_BASE_VOLUME = 0.88;
 const BUFF_ACQUIRE_BASE_VOLUME = 0.88;
 const ITEM_ACQUIRE_BASE_VOLUME = 0.88;
 const MASTER_ITEM_ACQUIRE_BASE_VOLUME = 0.92;
+const SPORTS_COUNTDOWN_BASE_VOLUME = 0.9;
+const ATTACHMENT_UNLOCK_BASE_VOLUME = 0.9;
+/** Keep under horns / breaker so travel drone does not dominate. */
+const TRAVEL_BASE_GAIN = 0.48;
 const UI_CLICK_POOL_SIZE = 4;
 const ITEM_ACQUIRE_POOL_SIZE = 4;
 /** Ignore brief contact flicker so the loop does not restart mid-strike. */
 const BREAKER_STOP_GRACE_MS = 120;
+/** Ignore brief travel-input flicker at lever zero crossings. */
+const TRAVEL_STOP_GRACE_MS = 90;
+/** Crossfade length when building a seamless loop buffer from travel clips. */
+const TRAVEL_LOOP_CROSSFADE_SEC = 0.14;
+const TRAVEL_FADE_IN_SEC = 0.09;
+const TRAVEL_FADE_OUT_SEC = 0.14;
 
 const GLOBAL_CTRL = "__ykYanmarAudioCtrl";
+
+type TravelRpm = 1 | 2;
 
 type GlobalBag = typeof globalThis & {
   [GLOBAL_CTRL]?: YanmarAudioController;
@@ -72,6 +92,45 @@ type GlobalBag = typeof globalThis & {
 
 function bag(): GlobalBag {
   return globalThis as GlobalBag;
+}
+
+/**
+ * Build a shorter buffer whose start/end crossfade so WebAudio `loop=true`
+ * does not click at the seam when the source clip is not authored as seamless.
+ */
+function makeSeamlessLoopBuffer(
+  ctx: AudioContext,
+  source: AudioBuffer,
+  crossfadeSec: number,
+): AudioBuffer {
+  const channels = source.numberOfChannels;
+  const sampleRate = source.sampleRate;
+  const fadeSamples = Math.min(
+    Math.max(1, Math.floor(crossfadeSec * sampleRate)),
+    Math.floor(source.length / 4),
+  );
+  if (fadeSamples < 64 || source.length <= fadeSamples * 2) {
+    return source;
+  }
+
+  const outLen = source.length - fadeSamples;
+  const out = ctx.createBuffer(channels, outLen, sampleRate);
+  for (let ch = 0; ch < channels; ch++) {
+    const src = source.getChannelData(ch);
+    const dst = out.getChannelData(ch);
+    for (let i = 0; i < outLen; i++) {
+      if (i < fadeSamples) {
+        const t = i / fadeSamples;
+        // Equal-power-ish blend: end of clip into start so the loop seam matches.
+        const a = Math.cos(t * 0.5 * Math.PI);
+        const b = Math.sin(t * 0.5 * Math.PI);
+        dst[i] = src[source.length - fadeSamples + i] * a + src[i] * b;
+      } else {
+        dst[i] = src[i];
+      }
+    }
+  }
+  return out;
 }
 
 class YanmarAudioController {
@@ -83,6 +142,8 @@ class YanmarAudioController {
   private monumentEnterAudio: HTMLAudioElement | null = null;
   private starAcquireAudio: HTMLAudioElement | null = null;
   private buffAcquireAudio: HTMLAudioElement | null = null;
+  private sportsCountdownAudio: HTMLAudioElement | null = null;
+  private attachmentUnlockAudio: HTMLAudioElement | null = null;
   private itemAcquirePool: HTMLAudioElement[] = [];
   private itemAcquirePoolIndex = 0;
   private masterItemAcquirePool: HTMLAudioElement[] = [];
@@ -116,6 +177,17 @@ class YanmarAudioController {
   private breakerSource: AudioBufferSourceNode | null = null;
   private breakerGain: GainNode | null = null;
   private breakerStopTimer: ReturnType<typeof setTimeout> | null = null;
+  private travelWanted = false;
+  private travelRpm: TravelRpm = 1;
+  private travelBuffers = new Map<TravelRpm, AudioBuffer>();
+  private travelBufferLoadings = new Map<
+    TravelRpm,
+    Promise<AudioBuffer | null>
+  >();
+  private travelSource: AudioBufferSourceNode | null = null;
+  private travelGain: GainNode | null = null;
+  private travelStopTimer: ReturnType<typeof setTimeout> | null = null;
+  private travelFadeToken = 0;
   private lifecycleBound = false;
 
   private ensureStoreSubscription() {
@@ -134,7 +206,9 @@ class YanmarAudioController {
     registerPageAudioHooks("yanmar-audio", {
       pause: () => {
         this.breakerWanted = false;
+        this.travelWanted = false;
         this.stopBreakerImmediate();
+        this.stopTravelImmediate();
         this.stopBgm(false);
         this.unbindBgmGesture();
         void suspendWebAudioBgmContext("ingame");
@@ -152,7 +226,9 @@ class YanmarAudioController {
       },
       exit: () => {
         this.breakerWanted = false;
+        this.travelWanted = false;
         this.stopBreakerImmediate();
+        this.stopTravelImmediate();
         this.unbindBgmGesture();
         this.stopBgm(true);
         if (this.audioCtx) {
@@ -161,6 +237,9 @@ class YanmarAudioController {
           this.breakerBuffer = null;
           this.breakerBufferLoading = null;
           this.breakerGain = null;
+          this.travelBuffers.clear();
+          this.travelBufferLoadings.clear();
+          this.travelGain = null;
         }
         for (const audio of this.hornCache.values()) {
           try {
@@ -184,8 +263,10 @@ class YanmarAudioController {
     this.breakerSfxEnabled = settings.breakerSfxEnabled;
     this.hornId = settings.hornId;
     this.applyBreakerGain();
+    this.applyTravelGain();
     this.applyHornVolumes();
     this.syncBreakerPlayback();
+    this.syncTravelPlayback();
     if (!settings.bgmEnabled || !isSiteLegendBgmMasterEnabled()) {
       this.bgmEnabled = false;
       this.unbindBgmGesture();
@@ -205,7 +286,9 @@ class YanmarAudioController {
     this.active = active;
     if (!active) {
       this.breakerWanted = false;
+      this.travelWanted = false;
       this.stopBreakerImmediate();
+      this.stopTravelImmediate();
       this.stopBgm(false);
       this.unbindBgmGesture();
       return;
@@ -254,11 +337,13 @@ class YanmarAudioController {
   setSfxEnabled(enabled: boolean) {
     this.sfxEnabled = enabled;
     this.syncBreakerPlayback();
+    this.syncTravelPlayback();
   }
 
   setSfxVolume(volume0to100: number) {
     this.sfxVolume = Math.max(0, Math.min(100, Math.round(volume0to100)));
     this.applyBreakerGain();
+    this.applyTravelGain();
     this.applyHornVolumes();
   }
 
@@ -285,6 +370,20 @@ class YanmarAudioController {
     }
   }
 
+  private canPlayTravel() {
+    return this.sfxEnabled && this.active;
+  }
+
+  private syncTravelPlayback() {
+    if (!this.canPlayTravel()) {
+      this.stopTravelImmediate();
+      return;
+    }
+    if (this.travelWanted) {
+      void this.startTravel();
+    }
+  }
+
   private applyBgmVolume() {
     setWebAudioBgmGain("ingame", bgmVolumeToGain(this.bgmVolume));
   }
@@ -294,6 +393,13 @@ class YanmarAudioController {
       this.breakerGain.gain.value =
         BREAKER_BASE_GAIN * volumeToGain(this.sfxVolume);
     }
+  }
+
+  private applyTravelGain() {
+    if (!this.travelGain || !this.audioCtx || !this.travelWanted) return;
+    const peak = TRAVEL_BASE_GAIN * volumeToGain(this.sfxVolume);
+    this.travelGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
+    this.travelGain.gain.setValueAtTime(peak, this.audioCtx.currentTime);
   }
 
   private applyHornVolumes() {
@@ -313,6 +419,8 @@ class YanmarAudioController {
     void this.ensureAudioContext();
     void preloadWebAudioBgm("ingame", INGAME_BGM_SRC);
     void preloadWebAudioBgm("ingame", SPORTS_MEET_BGM_SRC);
+    void this.ensureTravelBuffer(1);
+    void this.ensureTravelBuffer(2);
     this.syncBgm();
     if (this.unlocked) return;
     const probe = new Audio(HORN_SRC[this.hornId]);
@@ -582,50 +690,46 @@ class YanmarAudioController {
     );
   }
 
-  /**
-   * Racing-style countdown beeps for sports-meet start (5…1 tick, then GO).
-   * Synthesized so no extra asset is required.
-   */
-  playSportsCountdownBeep(kind: "tick" | "go") {
+  /** Full 5s sports-meet start countdown (played once when Start is pressed). */
+  playSportsCountdown() {
     if (typeof window === "undefined") return;
     if (!this.sfxEnabled) return;
     this.ensureStoreSubscription();
-    void this.ensureAudioContext().then((ctx) => {
-      if (!ctx || !this.sfxEnabled) return;
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "square";
-      const peak = Math.max(
-        0.0001,
-        (kind === "go" ? 0.28 : 0.2) * volumeToGain(this.sfxVolume),
-      );
-      gain.gain.setValueAtTime(0.0001, now);
-      if (kind === "tick") {
-        osc.frequency.setValueAtTime(880, now);
-        gain.gain.exponentialRampToValueAtTime(peak, now + 0.012);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
-        osc.start(now);
-        osc.stop(now + 0.15);
-      } else {
-        osc.frequency.setValueAtTime(988, now);
-        osc.frequency.setValueAtTime(1319, now + 0.09);
-        gain.gain.exponentialRampToValueAtTime(peak, now + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
-        osc.start(now);
-        osc.stop(now + 0.45);
-      }
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.onended = () => {
-        try {
-          osc.disconnect();
-          gain.disconnect();
-        } catch {
-          // ignore
-        }
-      };
-    });
+    if (!this.sportsCountdownAudio) {
+      this.sportsCountdownAudio = new Audio(SPORTS_COUNTDOWN_SRC);
+      this.sportsCountdownAudio.preload = "auto";
+    }
+    this.playHtmlAudio(
+      this.sportsCountdownAudio,
+      SPORTS_COUNTDOWN_BASE_VOLUME * volumeToGain(this.sfxVolume),
+    );
+  }
+
+  /** Stop mid-countdown if the sports-meet run is aborted. */
+  stopSportsCountdown() {
+    const audio = this.sportsCountdownAudio;
+    if (!audio) return;
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+    } catch {
+      // ignore
+    }
+  }
+
+  /** One-shot when breaker/grapple unlock popup appears (Lv.10 / Lv.15). */
+  playAttachmentUnlock() {
+    if (typeof window === "undefined") return;
+    if (!this.sfxEnabled) return;
+    this.ensureStoreSubscription();
+    if (!this.attachmentUnlockAudio) {
+      this.attachmentUnlockAudio = new Audio(ATTACHMENT_UNLOCK_SRC);
+      this.attachmentUnlockAudio.preload = "auto";
+    }
+    this.playHtmlAudio(
+      this.attachmentUnlockAudio,
+      ATTACHMENT_UNLOCK_BASE_VOLUME * volumeToGain(this.sfxVolume),
+    );
   }
 
   /**
@@ -645,6 +749,47 @@ class YanmarAudioController {
     if (!this.breakerWanted) return;
     this.breakerWanted = false;
     this.scheduleBreakerStop();
+  }
+
+  /**
+   * Loop travel SFX while tracks are moving.
+   * `rpm` 1 → travel-1.ogg, 2 → travel-2.ogg (seamless crossfaded buffers).
+   */
+  setTravelDriving(driving: boolean, rpm: TravelRpm = 1) {
+    if (driving) {
+      this.clearTravelStopTimer();
+      const rpmChanged = this.travelRpm !== rpm;
+      this.travelWanted = true;
+      this.travelRpm = rpm;
+      if (!this.canPlayTravel()) return;
+      if (this.travelSource && this.travelGain && this.audioCtx && !rpmChanged) {
+        // Resume during fade-out without restarting the buffer (avoids a seam click).
+        this.travelFadeToken += 1;
+        const peak = Math.max(
+          0.0001,
+          TRAVEL_BASE_GAIN * volumeToGain(this.sfxVolume),
+        );
+        const now = this.audioCtx.currentTime;
+        const current = Math.max(0.0001, this.travelGain.gain.value);
+        this.travelGain.gain.cancelScheduledValues(now);
+        this.travelGain.gain.setValueAtTime(current, now);
+        this.travelGain.gain.exponentialRampToValueAtTime(
+          peak,
+          now + TRAVEL_FADE_IN_SEC,
+        );
+        return;
+      }
+      if (rpmChanged && this.travelSource) {
+        // Swap clip on RPM toggle while still moving — quick restart with fade-in.
+        this.stopTravelImmediate();
+      }
+      void this.startTravel();
+      return;
+    }
+
+    if (!this.travelWanted) return;
+    this.travelWanted = false;
+    this.scheduleTravelStop();
   }
 
   private async ensureAudioContext() {
@@ -768,12 +913,170 @@ class YanmarAudioController {
     }
   }
 
+  private async ensureTravelBuffer(rpm: TravelRpm) {
+    const cached = this.travelBuffers.get(rpm);
+    if (cached) return cached;
+    const inflight = this.travelBufferLoadings.get(rpm);
+    if (inflight) return inflight;
+
+    const loading = (async () => {
+      const ctx = await this.ensureAudioContext();
+      if (!ctx) return null;
+      try {
+        const res = await fetch(TRAVEL_SRC[rpm]);
+        const data = await res.arrayBuffer();
+        const decoded = await ctx.decodeAudioData(data.slice(0));
+        const seamless = makeSeamlessLoopBuffer(
+          ctx,
+          decoded,
+          TRAVEL_LOOP_CROSSFADE_SEC,
+        );
+        this.travelBuffers.set(rpm, seamless);
+        return seamless;
+      } catch {
+        return null;
+      } finally {
+        this.travelBufferLoadings.delete(rpm);
+      }
+    })();
+
+    this.travelBufferLoadings.set(rpm, loading);
+    return loading;
+  }
+
+  private async startTravel() {
+    const rpm = this.travelRpm;
+    const ctx = await this.ensureAudioContext();
+    const buffer = await this.ensureTravelBuffer(rpm);
+    if (
+      !ctx ||
+      !buffer ||
+      !this.travelWanted ||
+      this.travelRpm !== rpm ||
+      !this.canPlayTravel()
+    ) {
+      return;
+    }
+    if (this.travelSource) return;
+
+    const gain = ctx.createGain();
+    const peak = Math.max(
+      0.0001,
+      TRAVEL_BASE_GAIN * volumeToGain(this.sfxVolume),
+    );
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(peak, now + TRAVEL_FADE_IN_SEC);
+    gain.connect(ctx.destination);
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(gain);
+    try {
+      source.start(0);
+    } catch {
+      gain.disconnect();
+      return;
+    }
+
+    this.travelGain = gain;
+    this.travelSource = source;
+    this.unlocked = true;
+
+    source.onended = () => {
+      if (this.travelSource === source) {
+        this.travelSource = null;
+        this.travelGain?.disconnect();
+        this.travelGain = null;
+      }
+    };
+  }
+
+  private scheduleTravelStop() {
+    this.clearTravelStopTimer();
+    this.travelStopTimer = setTimeout(() => {
+      this.travelStopTimer = null;
+      if (!this.travelWanted) {
+        this.fadeOutTravel();
+      }
+    }, TRAVEL_STOP_GRACE_MS);
+  }
+
+  private clearTravelStopTimer() {
+    if (this.travelStopTimer == null) return;
+    clearTimeout(this.travelStopTimer);
+    this.travelStopTimer = null;
+  }
+
+  private fadeOutTravel() {
+    const ctx = this.audioCtx;
+    const source = this.travelSource;
+    const gain = this.travelGain;
+    if (!source || !gain) {
+      this.stopTravelImmediate();
+      return;
+    }
+    if (!ctx) {
+      this.stopTravelImmediate();
+      return;
+    }
+
+    const token = ++this.travelFadeToken;
+    const now = ctx.currentTime;
+    const current = Math.max(0.0001, gain.gain.value);
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(current, now);
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      now + TRAVEL_FADE_OUT_SEC,
+    );
+
+    window.setTimeout(() => {
+      if (token !== this.travelFadeToken) return;
+      if (this.travelWanted) return;
+      this.stopTravelImmediate();
+    }, Math.ceil(TRAVEL_FADE_OUT_SEC * 1000) + 20);
+  }
+
+  private stopTravelImmediate() {
+    this.clearTravelStopTimer();
+    this.travelFadeToken += 1;
+    const source = this.travelSource;
+    const gain = this.travelGain;
+    this.travelSource = null;
+    this.travelGain = null;
+    if (source) {
+      try {
+        source.onended = null;
+        source.stop();
+      } catch {
+        // already stopped
+      }
+      try {
+        source.disconnect();
+      } catch {
+        // ignore
+      }
+    }
+    if (gain) {
+      try {
+        gain.disconnect();
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   /** Soft teardown when leaving a play session — keeps decoded buffers for next run. */
   deactivate() {
     this.sportsMeetBgm = false;
     this.active = false;
     this.breakerWanted = false;
+    this.travelWanted = false;
+    this.stopSportsCountdown();
     this.stopBreakerImmediate();
+    this.stopTravelImmediate();
     this.stopBgm(true);
     this.unbindBgmGesture();
   }
@@ -783,6 +1086,8 @@ class YanmarAudioController {
     stopWebAudioBgm("ingame", true);
     this.breakerBuffer = null;
     this.breakerBufferLoading = null;
+    this.travelBuffers.clear();
+    this.travelBufferLoadings.clear();
     if (this.audioCtx) {
       void this.audioCtx.close().catch(() => undefined);
       this.audioCtx = null;
@@ -822,6 +1127,16 @@ class YanmarAudioController {
       this.buffAcquireAudio.pause();
       this.buffAcquireAudio.src = "";
       this.buffAcquireAudio = null;
+    }
+    if (this.sportsCountdownAudio) {
+      this.sportsCountdownAudio.pause();
+      this.sportsCountdownAudio.src = "";
+      this.sportsCountdownAudio = null;
+    }
+    if (this.attachmentUnlockAudio) {
+      this.attachmentUnlockAudio.pause();
+      this.attachmentUnlockAudio.src = "";
+      this.attachmentUnlockAudio = null;
     }
     if (this.itemAcquirePool.length) {
       for (const audio of this.itemAcquirePool) {

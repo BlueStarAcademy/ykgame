@@ -863,6 +863,11 @@ function AttachmentUnlockOverlay({
   unlock: PlayerUnlockKind | undefined;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    if (unlock !== "BREAKER" && unlock !== "GRAPPLE") return;
+    yanmarAudio.playAttachmentUnlock();
+  }, [unlock]);
+
   if (!unlock) return null;
 
   if (unlock === "MONUMENT") {
@@ -2542,6 +2547,7 @@ export function ExcavatorGameWrapper({
   );
 
   const exitSportsMeet = useCallback(() => {
+    yanmarAudio.stopSportsCountdown();
     const awayAtMs = sportsWorldAwayAtMsRef.current;
     sportsWorldAwayAtMsRef.current = null;
     const elapsedSec =
@@ -2683,6 +2689,7 @@ export function ExcavatorGameWrapper({
     const run = sportsMeetRunRef.current;
     if (!run || run.phase !== "ready") return;
     yanmarAudio.unlock();
+    yanmarAudio.playSportsCountdown();
     syncSportsMeetRun(startSportsMeetCountdown(run));
   }, [syncSportsMeetRun]);
 

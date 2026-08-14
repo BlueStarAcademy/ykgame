@@ -4,8 +4,12 @@ import * as THREE from "three";
 import { Outlines, Text } from "@react-three/drei";
 import { HaulTruckModel } from "./HaulTruckModel";
 import type { HillBoulder, HillZone, TerrainData } from "./terrain";
-import { getHillZoneRespawnEtaSec, sampleHeight } from "./terrain";
-import { hillBoulderVisualScale } from "./terrain";
+import {
+  getHillZoneCoreRadius,
+  getHillZoneRespawnEtaSec,
+  hillBoulderVisualScale,
+  sampleHeight,
+} from "./terrain";
 import { formatDumpTruckReturnTime } from "./dumpTruckState";
 
 const GROUND_PAINT_MATERIAL = {
@@ -139,7 +143,7 @@ function PremiumBoulder({
 }
 
 function StoneZonePaint({ zone, terrain }: { zone: HillZone; terrain: TerrainData }) {
-  const radius = zone.radius * 0.55;
+  const radius = getHillZoneCoreRadius(zone);
   const paintY = zoneRingPaintY(terrain, zone.centerX, zone.centerZ, radius);
   const remaining = zone.boulders.filter(
     (rock) => rock.active && !rock.delivered && !rock.extracted,

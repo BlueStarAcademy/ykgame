@@ -24,9 +24,18 @@ export type TruckAlignTarget = {
 };
 
 /**
+ * Lower the painted body / bed / cab relative to the wheels.
+ * Shorter excavator arm reach made high-bed loading pierce the hull awkwardly;
+ * keep wheels planted and drop the body so the cavity is reachable with a
+ * natural arm fold.
+ */
+export const HAUL_TRUCK_BODY_DROP = 0.35;
+
+/**
  * HaulTruckModel: group at drop, rotation Y = HAUL_TRUCK.rotation (+π/2).
  * Bed group local (-1.05, 0) → world offset (0, +1.05).
  * Chassis ~6.9 × 2.55 after rotation → halfZ≈3.45, halfX≈1.56.
+ * Vertical extents include {@link HAUL_TRUCK_BODY_DROP}.
  */
 export const HAUL_TRUCK_ALIGN = {
   rotation: HAUL_TRUCK.rotation,
@@ -40,11 +49,11 @@ export const HAUL_TRUCK_ALIGN = {
     halfZ: 3.55,
   },
   /** 붐·암 충돌용 높이·짐칸 공동 (휠 바닥=그룹 원점 기준) */
-  solidMinY: 0.5,
-  solidMaxY: 3.1,
+  solidMinY: 0.4,
+  solidMaxY: 3.1 - HAUL_TRUCK_BODY_DROP,
   /** 측판 위쪽만 공동 — 옆에서 뚫지 못하고 위에서 내려놓게 */
-  cavityMinY: 2.05,
-  cavityMaxY: 3.25,
+  cavityMinY: 2.05 - HAUL_TRUCK_BODY_DROP,
+  cavityMaxY: 3.25 - HAUL_TRUCK_BODY_DROP,
   /** 반드시 collider half보다 작아야 측판이 고체로 남음 */
   cavityHalfX: 1.35,
   cavityHalfZ: 1.15,

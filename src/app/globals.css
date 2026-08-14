@@ -2689,52 +2689,917 @@ body {
   box-shadow: 0 0 0.35rem rgba(251, 191, 36, 0.35);
 }
 
-.yanmar-quest-reward-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.35rem 0.4rem;
-  width: 100%;
-}
-
-.yanmar-quest-reward-inline {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  column-gap: 0.35rem;
-  row-gap: 0.2rem;
-}
-
-.yanmar-quest-reward-inline-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28rem;
-}
-
-.yanmar-quest-reward-sep {
-  color: rgba(253, 230, 138, 0.35);
-  font-weight: 800;
-  line-height: 1;
-}
-
-.yanmar-quest-reward-cell {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.28rem;
-  color: rgba(253, 230, 138, 0.88);
-  font-size: 0.625rem;
-  font-weight: 800;
-  line-height: 1.15;
-  white-space: nowrap;
-}
-
 .yanmar-quest-reward-icon {
   display: block;
   width: 0.75rem;
   height: 0.75rem;
   flex-shrink: 0;
   object-fit: contain;
+}
+
+.yanmar-quest-reward-icon.is-lg {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+/* ── 퀘스트 모달 ─────────────────────────────────────── */
+
+.yanmar-quest-modal-shell {
+  box-sizing: border-box;
+  min-width: 0 !important;
+  width: min(34rem, 100%) !important;
+  max-width: min(34rem, 100%) !important;
+  height: min(40rem, 90dvh) !important;
+  max-height: min(40rem, 90dvh) !important;
+  overflow: hidden !important;
+  border-radius: 1.25rem !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .yanmar-quest-modal-shell {
+    width: min(46rem, 100%) !important;
+    max-width: min(46rem, 100%) !important;
+    height: min(27rem, 94dvh) !important;
+    max-height: min(27rem, 94dvh) !important;
+  }
+}
+
+.yanmar-quest-modal {
+  --qm-gold: #f7d894;
+  --qm-gold-hot: #fbbf24;
+  /* 카드 내부 배치는 화면 폭이 아니라 패널 폭에 맞춰 바뀐다. */
+  container: yanmar-quest / inline-size;
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(247, 216, 148, 0.26);
+  color: #f8fafc;
+  background:
+    radial-gradient(ellipse at 10% -10%, rgba(251, 191, 36, 0.16), transparent 46%),
+    radial-gradient(ellipse at 94% 2%, rgba(56, 130, 246, 0.1), transparent 42%),
+    linear-gradient(180deg, #16202e 0%, #0d1420 46%, #070a10 100%);
+  box-shadow:
+    0 1.5rem 3rem -0.75rem rgba(0, 0, 0, 0.72),
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: yanmar-quest-modal-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.yanmar-quest-modal::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(253, 230, 138, 0.75) 22%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(253, 230, 138, 0.75) 78%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+@keyframes yanmar-quest-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.55rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.yanmar-quest-modal-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.8rem 0.65rem;
+  border-bottom: 1px solid rgba(247, 216, 148, 0.14);
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.28), transparent);
+}
+
+.yanmar-quest-modal-emblem {
+  position: relative;
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(247, 216, 148, 0.4);
+  background:
+    radial-gradient(circle at 50% 26%, rgba(251, 191, 36, 0.32), transparent 62%),
+    linear-gradient(180deg, rgba(120, 53, 15, 0.6), rgba(2, 6, 23, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.yanmar-quest-modal-emblem img {
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
+  filter: drop-shadow(0 0.12rem 0.2rem rgba(0, 0, 0, 0.7));
+}
+
+.yanmar-quest-modal-titles {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.yanmar-quest-modal-eyebrow {
+  margin: 0;
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  color: rgba(253, 230, 138, 0.6);
+}
+
+.yanmar-quest-modal-titles h2 {
+  margin: 0.05rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  background: linear-gradient(180deg, #fff8e6, #f3c76b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.yanmar-quest-modal-head-meta {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.yanmar-quest-modal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.42);
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.62);
+  white-space: nowrap;
+}
+
+.yanmar-quest-modal-chip b {
+  font-weight: 900;
+  color: #fde68a;
+}
+
+.yanmar-quest-modal-chip.is-alert {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(127, 29, 29, 0.42);
+  color: #fecaca;
+}
+
+.yanmar-quest-modal-chip.is-alert b {
+  color: #fff;
+}
+
+.yanmar-quest-modal-chip svg {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.yanmar-quest-modal-close {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.38);
+  color: rgba(255, 255, 255, 0.7);
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.yanmar-quest-modal-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.yanmar-quest-modal-close svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.yanmar-quest-modal-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.25rem;
+  margin: 0.55rem 0.8rem 0;
+  padding: 0.22rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.yanmar-quest-tab {
+  position: relative;
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.42rem 0.3rem;
+  border-radius: 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.5);
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.yanmar-quest-tab:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.yanmar-quest-tab.is-active {
+  color: #2b1a05;
+  background: linear-gradient(180deg, #fde9b0, #f0b23c 62%, #c9832a);
+  box-shadow:
+    0 0.3rem 0.7rem -0.3rem rgba(240, 178, 60, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.yanmar-quest-modal-rail {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.5rem 0.8rem 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(247, 216, 148, 0.16);
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.09), rgba(0, 0, 0, 0.32));
+}
+
+.yanmar-quest-modal-rail-label {
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  color: rgba(253, 230, 138, 0.82);
+}
+
+.yanmar-quest-modal-rail-value {
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.yanmar-quest-modal-rail-value b {
+  color: #fff;
+}
+
+.yanmar-quest-modal-rail-note {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.yanmar-quest-pips {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 0.22rem;
+}
+
+.yanmar-quest-pip {
+  height: 0.3rem;
+  min-width: 0;
+  flex: 1 1 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.4);
+}
+
+.yanmar-quest-pip.is-on {
+  background: linear-gradient(90deg, #f59e0b, #fde68a);
+  box-shadow: 0 0 0.4rem rgba(251, 191, 36, 0.5);
+}
+
+.yanmar-quest-modal-body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.6rem 0.8rem 0.85rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.yanmar-quest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.yanmar-quest-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.6rem;
+  overflow: hidden;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 46%),
+    rgba(6, 10, 18, 0.66);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.yanmar-quest-card.has-action {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.yanmar-quest-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: transparent;
+}
+
+.yanmar-quest-card.is-claimable {
+  border-color: rgba(251, 191, 36, 0.5);
+  background:
+    linear-gradient(180deg, rgba(251, 191, 36, 0.12), transparent 52%),
+    rgba(20, 14, 4, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.12),
+    0 0.5rem 1.2rem -0.6rem rgba(251, 191, 36, 0.4);
+}
+
+.yanmar-quest-card.is-claimable::before {
+  background: linear-gradient(180deg, #fde68a, #f59e0b);
+}
+
+.yanmar-quest-card.is-done {
+  border-color: rgba(52, 211, 153, 0.22);
+  background: rgba(6, 12, 14, 0.6);
+}
+
+.yanmar-quest-card.is-done::before {
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.7), rgba(16, 185, 129, 0.3));
+}
+
+.yanmar-quest-card.is-done .yanmar-quest-card-title {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.yanmar-quest-medal {
+  position: relative;
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 999px;
+  background: conic-gradient(
+    from -90deg,
+    var(--qm-ring, #fbbf24) calc(var(--qm-pct, 0) * 1%),
+    rgba(255, 255, 255, 0.09) 0
+  );
+}
+
+.yanmar-quest-medal::before {
+  content: "";
+  position: absolute;
+  inset: 0.2rem;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 26%, rgba(255, 255, 255, 0.1), transparent 60%),
+    rgba(4, 8, 14, 0.94);
+  box-shadow: inset 0 0 0.35rem rgba(0, 0, 0, 0.7);
+}
+
+.yanmar-quest-medal.is-done {
+  --qm-ring: #34d399;
+}
+
+.yanmar-quest-medal.is-claimable {
+  box-shadow: 0 0 0.7rem rgba(251, 191, 36, 0.45);
+}
+
+.yanmar-quest-medal-value {
+  position: relative;
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.yanmar-quest-medal-value.is-done {
+  color: #6ee7b7;
+}
+
+.yanmar-quest-medal-check {
+  position: relative;
+  width: 1rem;
+  height: 1rem;
+  color: #34d399;
+}
+
+.yanmar-quest-card-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.yanmar-quest-card-topline {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.yanmar-quest-card-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: #f1f5f9;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yanmar-quest-card-tag {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 0.12rem 0.3rem;
+  margin-right: 0.28rem;
+  border-radius: 0.3rem;
+  border: 1px solid rgba(251, 146, 60, 0.45);
+  background: rgba(154, 52, 18, 0.45);
+  font-size: 0.5rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #fed7aa;
+  vertical-align: 0.08em;
+}
+
+.yanmar-quest-card-tag.is-bonus {
+  border-color: rgba(129, 140, 248, 0.45);
+  background: rgba(49, 46, 129, 0.45);
+  color: #c7d2fe;
+}
+
+.yanmar-quest-chips {
+  display: inline-flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.yanmar-quest-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.16rem 0.36rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(253, 230, 138, 0.22);
+  background: rgba(120, 53, 15, 0.28);
+  font-size: 0.6rem;
+  font-weight: 900;
+  line-height: 1;
+  color: rgba(253, 230, 138, 0.92);
+  white-space: nowrap;
+}
+
+.yanmar-quest-chip.is-xp {
+  border-color: rgba(147, 197, 253, 0.24);
+  background: rgba(30, 58, 138, 0.32);
+  color: #bfdbfe;
+}
+
+.yanmar-quest-chip.is-score {
+  border-color: rgba(134, 239, 172, 0.24);
+  background: rgba(6, 78, 59, 0.32);
+  color: #bbf7d0;
+}
+
+.yanmar-quest-chip.is-empty {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.yanmar-quest-chip-glyph {
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.yanmar-quest-card-meta {
+  font-size: 0.56rem;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.yanmar-quest-track {
+  position: relative;
+  height: 1.05rem;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.6), rgba(255, 255, 255, 0.05));
+}
+
+.yanmar-quest-track-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #b45309, #f59e0b 58%, #fde68a);
+  box-shadow: 0 0 0.5rem rgba(251, 191, 36, 0.35);
+  transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.yanmar-quest-track-fill.is-done {
+  background: linear-gradient(90deg, #047857, #34d399 62%, #a7f3d0);
+  box-shadow: 0 0 0.5rem rgba(52, 211, 153, 0.3);
+}
+
+.yanmar-quest-track-labels {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.yanmar-quest-track-note {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.yanmar-quest-track-count {
+  flex-shrink: 0;
+  padding-left: 0.4rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* 게이지가 채워진 구간의 글자는 어둡게 두어 대비를 유지한다. */
+.yanmar-quest-track-note.is-on-fill,
+.yanmar-quest-track-count.is-on-fill {
+  color: rgba(35, 22, 4, 0.9);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+/* 행마다 게이지 오른쪽 끝이 어긋나지 않도록 액션 폭을 고정한다. */
+.yanmar-quest-card-action {
+  display: flex;
+  width: 5.1rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.yanmar-quest-claim {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.5rem 0.4rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 236, 180, 0.6);
+  background: linear-gradient(180deg, #fde68a, #f59e0b 58%, #b45309);
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #3b2208;
+  box-shadow:
+    0 0.35rem 0.75rem -0.3rem rgba(251, 191, 36, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition:
+    filter 140ms ease,
+    transform 140ms ease;
+}
+
+.yanmar-quest-claim:enabled:hover {
+  filter: brightness(1.06);
+}
+
+.yanmar-quest-claim:enabled:active {
+  transform: scale(0.97);
+}
+
+.yanmar-quest-claim:disabled {
+  opacity: 0.6;
+}
+
+.yanmar-quest-stamp {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22rem;
+  padding: 0.42rem 0.4rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(6, 78, 59, 0.32);
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #6ee7b7;
+  white-space: nowrap;
+}
+
+.yanmar-quest-stamp svg {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+
+.yanmar-quest-stamp.is-pending {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.yanmar-quest-mission {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.7rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(247, 216, 148, 0.22);
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(251, 191, 36, 0.14), transparent 52%),
+    rgba(6, 10, 18, 0.68);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.yanmar-quest-mission-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.yanmar-quest-mission-difficulty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.yanmar-quest-mission-label {
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: rgba(253, 230, 138, 0.6);
+}
+
+.yanmar-quest-mission-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.yanmar-quest-mission-star {
+  color: rgba(255, 255, 255, 0.16);
+}
+
+.yanmar-quest-mission-star.is-on {
+  color: #fbbf24;
+  text-shadow: 0 0 0.35rem rgba(251, 191, 36, 0.6);
+}
+
+.yanmar-quest-reward-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(3.5rem, 1fr));
+  gap: 0.4rem;
+}
+
+.yanmar-quest-reward-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.45rem 0.3rem 0.4rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(247, 216, 148, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.35));
+}
+
+.yanmar-quest-reward-tile-amount {
+  font-size: 0.74rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #fde68a;
+}
+
+.yanmar-quest-reward-tile-label {
+  font-size: 0.52rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.yanmar-quest-reward-tile-glyph {
+  display: grid;
+  width: 1.45rem;
+  height: 1.45rem;
+  place-items: center;
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.yanmar-quest-section-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.1rem 0 0;
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.36);
+}
+
+.yanmar-quest-section-label::after {
+  content: "";
+  height: 1px;
+  flex: 1 1 auto;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.14), transparent);
+}
+
+.yanmar-quest-mission-footer {
+  margin: 0;
+  text-align: center;
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.yanmar-quest-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 2.25rem 1rem;
+  border-radius: 1rem;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.28);
+  text-align: center;
+}
+
+.yanmar-quest-empty-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.yanmar-quest-empty-sub {
+  margin: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.yanmar-quest-empty.is-clear {
+  border-style: solid;
+  border-color: rgba(52, 211, 153, 0.28);
+  background: rgba(6, 78, 59, 0.22);
+}
+
+.yanmar-quest-empty.is-clear .yanmar-quest-empty-title {
+  color: #a7f3d0;
+}
+
+/* 패널이 좁을 때는 제목이 잘리지 않도록 보상 칩을 아래 줄로 내린다. */
+@container yanmar-quest (max-width: 27rem) {
+  .yanmar-quest-card-topline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+
+  .yanmar-quest-chips {
+    justify-content: flex-start;
+  }
+
+  .yanmar-quest-card-title {
+    max-width: 100%;
+  }
+
+  .yanmar-quest-card-action {
+    width: 4.2rem;
+  }
+
+  .yanmar-quest-claim {
+    padding: 0.5rem 0.3rem;
+    font-size: 0.64rem;
+  }
+
+  .yanmar-quest-stamp {
+    padding: 0.42rem 0.3rem;
+    font-size: 0.58rem;
+  }
+
+  .yanmar-quest-modal-eyebrow {
+    display: none;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .yanmar-quest-modal-head {
+    padding: 0.5rem 0.7rem 0.45rem;
+  }
+
+  .yanmar-quest-modal-emblem {
+    width: 2.15rem;
+    height: 2.15rem;
+  }
+
+  .yanmar-quest-modal-emblem img {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .yanmar-quest-modal-titles h2 {
+    font-size: 0.92rem;
+  }
+
+  .yanmar-quest-modal-tabs,
+  .yanmar-quest-modal-rail {
+    margin-top: 0.4rem;
+  }
+
+  .yanmar-quest-modal-rail {
+    padding: 0.35rem 0.55rem;
+  }
+
+  .yanmar-quest-modal-body {
+    padding: 0.5rem 0.7rem 0.65rem;
+  }
+
+  .yanmar-quest-card {
+    padding: 0.45rem 0.6rem;
+  }
+
+  .yanmar-quest-medal {
+    width: 2.3rem;
+    height: 2.3rem;
+  }
 }
 
 .yanmar-shop-button {

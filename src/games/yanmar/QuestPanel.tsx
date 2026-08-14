@@ -1,8 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import {
+  isMetaDailyQuest,
   MISSION_DIFFICULTY_REWARDS,
   QUEST_MISSIONS_PER_DAY,
 } from "./quests/config";
@@ -15,7 +22,7 @@ import {
   getVisibleRepeatQuests,
   type YanmarQuestState,
 } from "./quests/questState";
-import type { QuestReward, QuestTab } from "./quests/types";
+import type { QuestMetric, QuestReward, QuestTab } from "./quests/types";
 import { formatQuestProgressCurrent } from "./quests/formatProgress";
 
 function QuestNotifyBadge({
@@ -35,142 +42,320 @@ function QuestNotifyBadge({
     </span>
   );
 }
-function QuestRewardDisplay({
-  reward,
-  layout = "inline",
-}: {
-  reward: QuestReward;
-  layout?: "inline" | "grid";
-}) {
-  const parts: { key: string; node: ReactNode }[] = [];
+
+function ClockGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M12 7.5V12l3 2"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function CloseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M6 6l12 12M18 6L6 18"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function CheckGlyph({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M5 12.5l4.5 4.5L19 7.5"
+        stroke="currentColor"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+type RewardEntry = {
+  key: string;
+  tone: string;
+  label: string;
+  amount: string;
+  icon: ReactNode;
+  tile: ReactNode;
+};
+
+function rewardImage(src: string, alt: string, extraClass = "") {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`yanmar-quest-reward-icon ${extraClass}`.trim()}
+      draggable={false}
+    />
+  );
+}
+
+function buildRewardEntries(reward: QuestReward): RewardEntry[] {
+  const entries: RewardEntry[] = [];
   if (reward.xp > 0) {
-    parts.push({
+    entries.push({
       key: "xp",
-      node: (
-        <span className="tabular-nums">{reward.xp.toLocaleString()} EXP</span>
-      ),
+      tone: "is-xp",
+      label: "경험치",
+      amount: reward.xp.toLocaleString(),
+      icon: <span className="yanmar-quest-chip-glyph">XP</span>,
+      tile: <span className="yanmar-quest-reward-tile-glyph">XP</span>,
     });
   }
   if (reward.stars > 0) {
-    parts.push({
+    entries.push({
       key: "stars",
-      node: (
-        <>
-          <img
-            src="/images/star-currency.svg"
-            alt=""
-            width={12}
-            height={12}
-            className="yanmar-quest-reward-icon yanmar-score-panel-star"
-            draggable={false}
-          />
-          <span className="tabular-nums">{reward.stars.toLocaleString()}</span>
-        </>
+      tone: "is-star",
+      label: "스타",
+      amount: reward.stars.toLocaleString(),
+      icon: rewardImage("/images/star-currency.svg", "", "yanmar-score-panel-star"),
+      tile: rewardImage(
+        "/images/star-currency.svg",
+        "",
+        "is-lg yanmar-score-panel-star",
       ),
     });
   }
   if ((reward.score ?? 0) > 0) {
-    parts.push({
+    entries.push({
       key: "score",
-      node: (
-        <span className="tabular-nums">
-          {reward.score!.toLocaleString()}점
-        </span>
-      ),
+      tone: "is-score",
+      label: "점수",
+      amount: reward.score!.toLocaleString(),
+      icon: <span className="yanmar-quest-chip-glyph">PT</span>,
+      tile: <span className="yanmar-quest-reward-tile-glyph">PT</span>,
     });
   }
   if ((reward.enhanceCores ?? 0) > 0) {
-    parts.push({
+    entries.push({
       key: "cores",
-      node: (
-        <>
-          <img
-            src="/images/yanmar/2d/enhance-core.png?v=3"
-            alt=""
-            width={12}
-            height={12}
-            className="yanmar-quest-reward-icon"
-            draggable={false}
-          />
-          <span className="tabular-nums">
-            {reward.enhanceCores!.toLocaleString()}
-          </span>
-        </>
-      ),
+      tone: "is-core",
+      label: "강화코어",
+      amount: reward.enhanceCores!.toLocaleString(),
+      icon: rewardImage("/images/yanmar/2d/enhance-core.png?v=3", ""),
+      tile: rewardImage("/images/yanmar/2d/enhance-core.png?v=3", "", "is-lg"),
     });
   }
   if ((reward.gachaTicketsStandard ?? 0) > 0) {
-    parts.push({
+    entries.push({
       key: "ticket-std",
-      node: (
-        <>
-          <img
-            src="/images/yanmar/2d/gacha-ticket-standard.svg"
-            alt=""
-            width={12}
-            height={12}
-            className="yanmar-quest-reward-icon"
-            draggable={false}
-          />
-          <span className="tabular-nums">
-            {reward.gachaTicketsStandard!.toLocaleString()}
-          </span>
-        </>
-      ),
+      tone: "is-ticket",
+      label: "일반 뽑기권",
+      amount: reward.gachaTicketsStandard!.toLocaleString(),
+      icon: rewardImage("/images/yanmar/2d/gacha-ticket-standard.svg", ""),
+      tile: rewardImage("/images/yanmar/2d/gacha-ticket-standard.svg", "", "is-lg"),
     });
   }
   if ((reward.gachaTicketsPremium ?? 0) > 0) {
-    parts.push({
+    entries.push({
       key: "ticket-prem",
-      node: (
-        <>
-          <img
-            src="/images/yanmar/2d/gacha-ticket-premium.svg"
-            alt=""
-            width={12}
-            height={12}
-            className="yanmar-quest-reward-icon"
-            draggable={false}
-          />
-          <span className="tabular-nums">
-            {reward.gachaTicketsPremium!.toLocaleString()}
-          </span>
-        </>
-      ),
+      tone: "is-ticket",
+      label: "고급 뽑기권",
+      amount: reward.gachaTicketsPremium!.toLocaleString(),
+      icon: rewardImage("/images/yanmar/2d/gacha-ticket-premium.svg", ""),
+      tile: rewardImage("/images/yanmar/2d/gacha-ticket-premium.svg", "", "is-lg"),
     });
   }
-  if (parts.length === 0) {
-    return <span>보상 없음</span>;
-  }
-  if (layout === "grid") {
-    return (
-      <div className="flex w-full flex-wrap items-center justify-center gap-x-1 gap-y-1.5">
-        {parts.map((part) => (
-          <div
-            key={part.key}
-            className="flex w-[32%] min-w-0 items-center justify-center gap-1 text-[10px] font-extrabold leading-none text-amber-200/90"
-          >
-            {part.node}
-          </div>
-        ))}
-      </div>
-    );
+  return entries;
+}
+
+function QuestRewardChips({ reward }: { reward: QuestReward }) {
+  const entries = buildRewardEntries(reward);
+  if (entries.length === 0) {
+    return <span className="yanmar-quest-chip is-empty">보상 없음</span>;
   }
   return (
-    <span className="yanmar-quest-reward-inline">
-      {parts.map((part, index) => (
-        <span key={part.key} className="yanmar-quest-reward-inline-item">
-          {index > 0 ? (
-            <span className="yanmar-quest-reward-sep" aria-hidden>
-              +
-            </span>
-          ) : null}
-          <span className="yanmar-quest-reward-cell">{part.node}</span>
+    <span className="yanmar-quest-chips">
+      {entries.map((entry) => (
+        <span
+          key={entry.key}
+          className={`yanmar-quest-chip ${entry.tone}`}
+          title={`${entry.label} ${entry.amount}`}
+        >
+          {entry.icon}
+          <span className="tabular-nums">{entry.amount}</span>
         </span>
       ))}
     </span>
   );
 }
+
+function QuestRewardTiles({ reward }: { reward: QuestReward }) {
+  const entries = buildRewardEntries(reward);
+  if (entries.length === 0) return null;
+  return (
+    <div className="yanmar-quest-reward-tiles">
+      {entries.map((entry) => (
+        <div key={entry.key} className="yanmar-quest-reward-tile">
+          {entry.tile}
+          <span className="yanmar-quest-reward-tile-amount tabular-nums">
+            {entry.amount}
+          </span>
+          <span className="yanmar-quest-reward-tile-label">{entry.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+type QuestCardState = "active" | "claimable" | "done";
+
+function QuestCard({
+  title,
+  tag,
+  reward,
+  meta,
+  value,
+  target,
+  metric,
+  state,
+  action,
+}: {
+  title: string;
+  tag?: { label: string; tone?: "required" | "bonus" };
+  reward?: QuestReward;
+  meta?: ReactNode;
+  value: number;
+  target: number;
+  metric?: QuestMetric;
+  state: QuestCardState;
+  action?: ReactNode;
+}) {
+  const reached = state === "done" || state === "claimable";
+  const shown = reached ? Math.max(value, target) : value;
+  const pct =
+    target <= 0 ? 0 : Math.min(100, Math.round((shown / target) * 100));
+  const current = formatQuestProgressCurrent(shown, target, metric);
+
+  return (
+    <li
+      className={`yanmar-quest-card${action ? " has-action" : ""} ${
+        state === "claimable"
+          ? "is-claimable"
+          : state === "done"
+            ? "is-done"
+            : ""
+      }`.trim()}
+    >
+      <span
+        className={`yanmar-quest-medal${
+          state === "done" ? " is-done" : state === "claimable" ? " is-claimable" : ""
+        }`}
+        style={{ "--qm-pct": pct } as CSSProperties}
+        aria-hidden
+      >
+        {state === "done" ? (
+          <CheckGlyph className="yanmar-quest-medal-check" />
+        ) : (
+          <span className="yanmar-quest-medal-value tabular-nums">{pct}%</span>
+        )}
+      </span>
+
+      <div className="yanmar-quest-card-main">
+        <div className="yanmar-quest-card-topline">
+          <p className="yanmar-quest-card-title">
+            {tag ? (
+              <span
+                className={`yanmar-quest-card-tag${
+                  tag.tone === "bonus" ? " is-bonus" : ""
+                }`}
+              >
+                {tag.label}
+              </span>
+            ) : null}
+            {title}
+          </p>
+          {reward ? <QuestRewardChips reward={reward} /> : null}
+        </div>
+        {meta ? <div className="yanmar-quest-card-meta">{meta}</div> : null}
+        <div
+          className="yanmar-quest-track"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={target}
+          aria-valuenow={current}
+          aria-label={`${title} 진행도`}
+        >
+          <span
+            className={`yanmar-quest-track-fill${state === "done" ? " is-done" : ""}`}
+            style={{ width: `${pct}%` }}
+          />
+          <span className="yanmar-quest-track-labels">
+            <span
+              className={`yanmar-quest-track-note${pct >= 26 ? " is-on-fill" : ""}`}
+            >
+              {reached
+                ? "목표 달성"
+                : `남은 ${Math.max(0, target - current).toLocaleString()}`}
+            </span>
+            <span
+              className={`yanmar-quest-track-count tabular-nums${
+                pct >= 76 ? " is-on-fill" : ""
+              }`}
+            >
+              {current.toLocaleString()} / {target.toLocaleString()}
+            </span>
+          </span>
+        </div>
+      </div>
+
+      {action ? <div className="yanmar-quest-card-action">{action}</div> : null}
+    </li>
+  );
+}
+
+function ClaimButton({
+  claiming,
+  onClaim,
+}: {
+  claiming: boolean;
+  onClaim: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="yanmar-quest-claim"
+      disabled={claiming}
+      onClick={onClaim}
+    >
+      {claiming ? "수령 중" : "보상 받기"}
+    </button>
+  );
+}
+
+function DoneStamp() {
+  return (
+    <span className="yanmar-quest-stamp">
+      <CheckGlyph />
+      완료
+    </span>
+  );
+}
+
+function PendingStamp() {
+  return <span className="yanmar-quest-stamp is-pending">진행 중</span>;
+}
+
+const TABS: { id: QuestTab; label: string }[] = [
+  { id: "daily", label: "일일" },
+  { id: "mission", label: "미션" },
+  { id: "repeat", label: "반복" },
+];
+
 interface QuestPanelProps {
   open: boolean;
   onClose: () => void;
@@ -181,51 +366,6 @@ interface QuestPanelProps {
   onClaimMission: () => void;
   onClaimRepeat: (questId: string) => void;
 }
-
-function DifficultyStars({ count }: { count: number }) {
-  return (
-    <span className="inline-flex items-center gap-0.5" aria-label={`난이도 ${count}`}>
-      {Array.from({ length: 5 }, (_, i) => (
-        <span
-          key={i}
-          className={`text-[11px] leading-none ${
-            i < count ? "text-amber-300" : "text-white/20"
-          }`}
-        >
-          ★
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function ProgressBar({
-  value,
-  max,
-  className = "",
-}: {
-  value: number;
-  max: number;
-  className?: string;
-}) {
-  const pct = max <= 0 ? 0 : Math.min(100, Math.round((value / max) * 100));
-  return (
-    <div
-      className={`h-1.5 overflow-hidden rounded-full bg-white/12 ${className}`.trim()}
-    >
-      <div
-        className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-300 transition-[width] duration-200"
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  );
-}
-
-const TABS: { id: QuestTab; label: string }[] = [
-  { id: "daily", label: "일일" },
-  { id: "mission", label: "미션" },
-  { id: "repeat", label: "반복" },
-];
 
 export function QuestPanel({
   open,
@@ -294,268 +434,292 @@ export function QuestPanel({
     () => countClaimableQuestRewards(questState),
     [questState],
   );
+  const totalClaimable =
+    claimable.daily + claimable.mission + claimable.repeat;
+  const dailyClaimed = dailyRows.filter((row) => row.claimed).length;
+  const repeatClaimedToday = repeatRows.reduce(
+    (sum, row) => sum + row.claimCount,
+    0,
+  );
 
   return (
-    <AppModalOverlay open={open} onClose={onClose}>
-      <div className="flex h-[min(82dvh,36rem)] w-full flex-col overflow-hidden rounded-2xl border border-amber-200/20 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl landscape:h-[min(90dvh,22rem)]">
-        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="yanmar-quest-panel-badge" aria-hidden />
-            <h2 className="text-sm font-black text-amber-100">퀘스트</h2>
+    <AppModalOverlay
+      open={open}
+      onClose={onClose}
+      panelClassName="yanmar-quest-modal-shell"
+    >
+      <div className="yanmar-quest-modal">
+        <header className="yanmar-quest-modal-head">
+          <span className="yanmar-quest-modal-emblem" aria-hidden>
+            <img
+              src="/images/yanmar/2d/cockpit/quest-premium.png?v=3"
+              alt=""
+              draggable={false}
+            />
+          </span>
+          <div className="yanmar-quest-modal-titles">
+            <p className="yanmar-quest-modal-eyebrow">YANMAR FIELD LOG</p>
+            <h2>퀘스트</h2>
+          </div>
+          <div className="yanmar-quest-modal-head-meta">
+            {totalClaimable > 0 ? (
+              <span
+                className="yanmar-quest-modal-chip is-alert"
+                title="수령 대기 중인 보상"
+              >
+                보상 <b className="tabular-nums">{totalClaimable}</b>
+              </span>
+            ) : null}
             <span
-              className="text-[10px] font-bold tabular-nums text-white/55"
+              className="yanmar-quest-modal-chip"
               title="일일 퀘스트 초기화까지 남은 시간"
             >
-              초기화 {resetCountdown}
+              <ClockGlyph />
+              초기화 <b className="tabular-nums">{resetCountdown}</b>
             </span>
+            <button
+              type="button"
+              className="yanmar-quest-modal-close"
+              onClick={onClose}
+              aria-label="퀘스트 닫기"
+            >
+              <CloseGlyph />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-[11px] font-bold text-white/70 hover:bg-white/10 hover:text-white"
-          >
-            닫기
-          </button>
-        </div>
+        </header>
 
-        <div className="flex shrink-0 gap-1 border-b border-white/10 px-3 pt-2">
+        <div className="yanmar-quest-modal-tabs" role="tablist">
           {TABS.map((item) => {
             const active = tab === item.id;
-            const badgeCount = claimable[item.id];
             return (
               <button
                 key={item.id}
                 type="button"
+                role="tab"
+                aria-selected={active}
                 onClick={() => setTab(item.id)}
-                className={`relative flex flex-1 items-center justify-center gap-1 rounded-t-lg px-2 py-2 text-[11px] font-black transition ${
-                  active
-                    ? "bg-white/10 text-amber-100"
-                    : "text-white/45 hover:bg-white/5 hover:text-white/75"
-                }`}
+                className={`yanmar-quest-tab${active ? " is-active" : ""}`}
               >
                 <span>{item.label}</span>
-                <QuestNotifyBadge count={badgeCount} className="is-tab" />
-                {active ? (
-                  <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-amber-300" />
-                ) : null}
+                <QuestNotifyBadge count={claimable[item.id]} className="is-tab" />
               </button>
             );
           })}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 [-webkit-overflow-scrolling:touch]">
-          {tab === "daily" ? (
-            <ul className="space-y-2">
-              {dailyRows.map(({ def, title, target, progress, completed, claimed }) => {
-                const claiming = claimingId === `daily:${def.id}`;
-                return (
-                  <li
-                    key={def.id}
-                    className="rounded-xl border border-white/10 bg-black/35 px-3 py-2.5"
-                  >
-                    <div className="flex min-w-0 items-center justify-between gap-2">
-                      <p className="min-w-0 truncate text-[12px] font-bold text-white">
-                        {title}
-                      </p>
-                      <p className="shrink-0 text-[10px] font-semibold text-amber-200/80">
-                        <QuestRewardDisplay reward={def.reward} />
-                      </p>
-                    </div>
-                    <div className="mt-1.5 flex min-w-0 items-center gap-2">
-                      <ProgressBar
-                        value={
-                          claimed || completed
-                            ? Math.max(progress, target)
-                            : progress
-                        }
-                        max={target}
-                        className="min-w-0 flex-1"
-                      />
-                      {claimed ? (
-                        <span className="shrink-0 text-[10px] font-bold tabular-nums text-emerald-300">
-                          {target.toLocaleString()}/{target.toLocaleString()}
-                        </span>
-                      ) : completed ? (
-                        <button
-                          type="button"
-                          disabled={claiming}
-                          onClick={() => onClaimDaily(def.id)}
-                          className="shrink-0 rounded-md border border-amber-300/40 bg-amber-500/90 px-2.5 py-1 text-[10px] font-black text-white disabled:opacity-60"
-                        >
-                          {claiming ? "받는 중" : "보상"}
-                        </button>
-                      ) : (
-                        <span className="shrink-0 text-[10px] font-bold tabular-nums text-white/55">
-                          {formatQuestProgressCurrent(
-                            progress,
-                            target,
-                            def.metric,
-                          ).toLocaleString()}
-                          /{target.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
-
-          {tab === "mission" ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 px-3 py-2">
-                <span className="text-[11px] font-bold text-white/70">
-                  오늘 미션 진행
-                </span>
-                <span className="text-[11px] font-black tabular-nums text-amber-100">
-                  {missionsDone}/{QUEST_MISSIONS_PER_DAY}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 px-0.5">
-                <ProgressBar
-                  value={missionsDone}
-                  max={QUEST_MISSIONS_PER_DAY}
-                  className="min-w-0 flex-1"
+        {tab === "daily" ? (
+          <div className="yanmar-quest-modal-rail">
+            <span className="yanmar-quest-modal-rail-label">오늘 달성</span>
+            <span className="yanmar-quest-pips" aria-hidden>
+              {dailyRows.map((row) => (
+                <span
+                  key={row.def.id}
+                  className={`yanmar-quest-pip${row.claimed ? " is-on" : ""}`}
                 />
-              </div>
+              ))}
+            </span>
+            <span className="yanmar-quest-modal-rail-value tabular-nums">
+              <b>{dailyClaimed}</b> / {dailyRows.length}
+            </span>
+          </div>
+        ) : null}
 
-              {!currentMission ? (
-                <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-6 text-center">
-                  <p className="text-[12px] font-black text-emerald-100">
-                    미션 퀘스트 완료
-                  </p>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-amber-200/20 bg-black/40 px-3 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <DifficultyStars count={currentMission.difficulty} />
-                    <span className="text-[10px] font-bold text-amber-200/55">
-                      보상
-                    </span>
-                  </div>
-                  <div className="mt-2 rounded-lg border border-amber-200/10 bg-black/25 px-2.5 py-2">
-                    <QuestRewardDisplay
-                      layout="grid"
-                      reward={
-                        MISSION_DIFFICULTY_REWARDS[currentMission.difficulty]
-                      }
-                    />
-                  </div>
+        {tab === "mission" ? (
+          <div className="yanmar-quest-modal-rail">
+            <span className="yanmar-quest-modal-rail-label">미션 진행</span>
+            <span className="yanmar-quest-pips" aria-hidden>
+              {Array.from({ length: QUEST_MISSIONS_PER_DAY }, (_, i) => (
+                <span
+                  key={i}
+                  className={`yanmar-quest-pip${i < missionsDone ? " is-on" : ""}`}
+                />
+              ))}
+            </span>
+            <span className="yanmar-quest-modal-rail-value tabular-nums">
+              <b>{missionsDone}</b> / {QUEST_MISSIONS_PER_DAY}
+            </span>
+          </div>
+        ) : null}
 
-                  <ul className="mt-3 space-y-2">
-                    {currentMission.tasks.map((task) => {
-                      const value = currentMission.progress[task.id] ?? 0;
-                      const done = value >= task.target;
-                      return (
-                        <li
-                          key={task.id}
-                          className="rounded-lg border border-white/8 bg-white/5 px-2.5 py-2"
-                        >
-                          <div className="flex min-w-0 items-center justify-between gap-2">
-                            <p className="min-w-0 truncate text-[11px] font-bold text-white/90">
-                              {task.required ? (
-                                <span className="mr-1 text-[9px] font-black text-orange-300">
-                                  필수
-                                </span>
-                              ) : null}
-                              {task.label}
-                            </p>
-                          </div>
-                          <div className="mt-1.5 flex min-w-0 items-center gap-2">
-                            <ProgressBar
-                              value={done ? Math.max(value, task.target) : value}
-                              max={task.target}
-                              className="min-w-0 flex-1"
-                            />
-                            <span
-                              className={`shrink-0 text-[10px] font-bold tabular-nums ${
-                                done ? "text-emerald-300" : "text-white/50"
-                              }`}
-                            >
-                              {done
-                                ? `${task.target.toLocaleString()}/${task.target.toLocaleString()}`
-                                : `${formatQuestProgressCurrent(
-                                    value,
-                                    task.target,
-                                    task.metric,
-                                  ).toLocaleString()}/${task.target.toLocaleString()}`}
-                            </span>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
+        {tab === "repeat" ? (
+          <div className="yanmar-quest-modal-rail">
+            <span className="yanmar-quest-modal-rail-label">반복 퀘스트</span>
+            <span className="yanmar-quest-modal-rail-note">
+              완료할 때마다 다시 도전할 수 있습니다
+            </span>
+            <span className="yanmar-quest-modal-rail-value tabular-nums">
+              오늘 <b>{repeatClaimedToday}</b>회 수령
+            </span>
+          </div>
+        ) : null}
 
-                  {currentMission.completed && !currentMission.claimed ? (
-                    <button
-                      type="button"
-                      disabled={claimingId === "mission"}
-                      onClick={onClaimMission}
-                      className="mt-3 w-full rounded-xl border border-amber-300/40 bg-amber-500/90 px-3 py-2.5 text-[12px] font-black text-white disabled:opacity-60"
-                    >
-                      {claimingId === "mission"
-                        ? "보상 수령 중..."
-                        : "미션 보상 받기"}
-                    </button>
-                  ) : (
-                    <p className="mt-3 text-center text-[10px] font-semibold text-white/40">
-                      모든 목표를 달성하면 다음 미션이 열립니다.
-                    </p>
-                  )}
-                </div>
-              )}
+        <div className="yanmar-quest-modal-body">
+          {!questState ? (
+            <div className="yanmar-quest-empty">
+              <p className="yanmar-quest-empty-title">
+                퀘스트 정보를 불러오는 중입니다
+              </p>
+              <p className="yanmar-quest-empty-sub">
+                잠시 후 다시 확인해 주세요.
+              </p>
             </div>
           ) : null}
 
-          {tab === "repeat" ? (
-            <ul className="space-y-2">
+          {questState && tab === "daily" ? (
+            <ul className="yanmar-quest-list">
+              {dailyRows.map(
+                ({ def, title, target, progress, completed, claimed }) => {
+                  const claiming = claimingId === `daily:${def.id}`;
+                  const state: QuestCardState = claimed
+                    ? "done"
+                    : completed
+                      ? "claimable"
+                      : "active";
+                  return (
+                    <QuestCard
+                      key={def.id}
+                      title={title}
+                      tag={
+                        isMetaDailyQuest(def)
+                          ? { label: "보너스", tone: "bonus" }
+                          : undefined
+                      }
+                      reward={def.reward}
+                      value={progress}
+                      target={target}
+                      metric={def.metric}
+                      state={state}
+                      action={
+                        claimed ? (
+                          <DoneStamp />
+                        ) : completed ? (
+                          <ClaimButton
+                            claiming={claiming}
+                            onClaim={() => onClaimDaily(def.id)}
+                          />
+                        ) : (
+                          <PendingStamp />
+                        )
+                      }
+                    />
+                  );
+                },
+              )}
+            </ul>
+          ) : null}
+
+          {questState && tab === "mission" ? (
+            !currentMission ? (
+              <div className="yanmar-quest-empty is-clear">
+                <p className="yanmar-quest-empty-title">
+                  오늘의 미션 퀘스트를 모두 완료했습니다
+                </p>
+                <p className="yanmar-quest-empty-sub">
+                  초기화 후 새로운 미션이 배정됩니다.
+                </p>
+              </div>
+            ) : (
+              <div className="yanmar-quest-mission">
+                <div className="yanmar-quest-mission-head">
+                  <span className="yanmar-quest-mission-difficulty">
+                    <span className="yanmar-quest-mission-label">난이도</span>
+                    <span
+                      className="yanmar-quest-mission-stars"
+                      aria-label={`난이도 ${currentMission.difficulty}`}
+                    >
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <span
+                          key={i}
+                          className={`yanmar-quest-mission-star${
+                            i < currentMission.difficulty ? " is-on" : ""
+                          }`}
+                          aria-hidden
+                        >
+                          ★
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                  <span className="yanmar-quest-modal-rail-value tabular-nums">
+                    ROUND <b>{Math.min(missionsDone + 1, QUEST_MISSIONS_PER_DAY)}</b>
+                  </span>
+                </div>
+
+                <p className="yanmar-quest-section-label">클리어 보상</p>
+                <QuestRewardTiles
+                  reward={MISSION_DIFFICULTY_REWARDS[currentMission.difficulty]}
+                />
+
+                <p className="yanmar-quest-section-label">목표</p>
+                <ul className="yanmar-quest-list">
+                  {currentMission.tasks.map((task) => {
+                    const value = currentMission.progress[task.id] ?? 0;
+                    const done = value >= task.target;
+                    return (
+                      <QuestCard
+                        key={task.id}
+                        title={task.label}
+                        tag={
+                          task.required
+                            ? { label: "필수", tone: "required" }
+                            : { label: "선택", tone: "bonus" }
+                        }
+                        value={value}
+                        target={task.target}
+                        metric={task.metric}
+                        state={done ? "done" : "active"}
+                      />
+                    );
+                  })}
+                </ul>
+
+                {currentMission.completed && !currentMission.claimed ? (
+                  <button
+                    type="button"
+                    className="yanmar-quest-claim"
+                    disabled={claimingId === "mission"}
+                    onClick={onClaimMission}
+                  >
+                    {claimingId === "mission"
+                      ? "보상 수령 중..."
+                      : "미션 보상 받기"}
+                  </button>
+                ) : (
+                  <p className="yanmar-quest-mission-footer">
+                    모든 목표를 달성하면 다음 미션이 열립니다.
+                  </p>
+                )}
+              </div>
+            )
+          ) : null}
+
+          {questState && tab === "repeat" ? (
+            <ul className="yanmar-quest-list">
               {repeatRows.map(({ def, progress, completed, claimCount }) => {
                 const claiming = claimingId === `repeat:${def.id}`;
                 return (
-                  <li
+                  <QuestCard
                     key={def.id}
-                    className="rounded-xl border border-white/10 bg-black/35 px-3 py-2.5"
-                  >
-                    <div className="flex min-w-0 items-center justify-between gap-2">
-                      <p className="min-w-0 truncate text-[12px] font-bold text-white">
-                        {def.title}
-                      </p>
-                      <p className="shrink-0 text-[10px] font-semibold text-amber-200/80">
-                        <QuestRewardDisplay reward={def.reward} />
-                        {claimCount > 0 ? (
-                          <span className="ml-1.5 text-white/35">
-                            · {claimCount}회 수령
-                          </span>
-                        ) : null}
-                      </p>
-                    </div>
-                    <div className="mt-1.5 flex min-w-0 items-center gap-2">
-                      <ProgressBar
-                        value={progress}
-                        max={def.target}
-                        className="min-w-0 flex-1"
-                      />
-                      {completed ? (
-                        <button
-                          type="button"
-                          disabled={claiming}
-                          onClick={() => onClaimRepeat(def.id)}
-                          className="shrink-0 rounded-md border border-amber-300/40 bg-amber-500/90 px-2.5 py-1 text-[10px] font-black text-white disabled:opacity-60"
-                        >
-                          {claiming ? "받는 중" : "보상"}
-                        </button>
+                    title={def.title}
+                    reward={def.reward}
+                    meta={
+                      claimCount > 0 ? `오늘 ${claimCount}회 수령` : undefined
+                    }
+                    value={progress}
+                    target={def.target}
+                    metric={def.metric}
+                    state={completed ? "claimable" : "active"}
+                    action={
+                      completed ? (
+                        <ClaimButton
+                          claiming={claiming}
+                          onClaim={() => onClaimRepeat(def.id)}
+                        />
                       ) : (
-                        <span className="shrink-0 text-[10px] font-bold tabular-nums text-white/55">
-                          {formatQuestProgressCurrent(
-                            progress,
-                            def.target,
-                            def.metric,
-                          ).toLocaleString()}
-                          /{def.target.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                  </li>
+                        <PendingStamp />
+                      )
+                    }
+                  />
                 );
               })}
             </ul>

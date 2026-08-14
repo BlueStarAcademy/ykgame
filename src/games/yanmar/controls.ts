@@ -251,9 +251,10 @@ export function mergeControlInputs(
 }
 
 /**
- * @param workSpeedScale RPM×민첩 — 붐/암에만 적용
+ * @param workSpeedScale RPM×민첩 — 붐/암에 적용
  * @param travelSpeedScale RPM×민첩 — 전진 주행에만 적용
- * 선회·버켓 컬은 차체/RPM 배율 없이 고정
+ * @param swingSpeedScale RPM 상대×민첩 — 상부 선회(좌 조이 X). RPM1=1×민첩, RPM2=2×(게임)
+ * 버켓 컬은 차체/RPM 배율 없이 고정
  */
 export function applyControls(
   state: {
@@ -271,12 +272,13 @@ export function applyControls(
   workSpeedScale = 1,
   travelSpeedScale = 1,
   speedProfile: ControlSpeedProfile = CONTROL_SPEED,
+  swingSpeedScale = 1,
 ) {
   const { left, right, travel } = input;
 
   vel.swing = approach(
     vel.swing,
-    -left.x * speedProfile.swing,
+    -left.x * speedProfile.swing * swingSpeedScale,
     ACCEL.swing,
     DAMPING.swing,
     dt,

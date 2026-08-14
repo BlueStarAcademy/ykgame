@@ -115,8 +115,8 @@ export const WE = {
   boomLiftStroke: { min: 1.12, max: 1.55 },
   /** Boom-등 cylinder kink → boom tip only (length ~constant; not an arm joint). */
   armCylStroke: { min: 1.5, max: 2.0 },
-  /** Arm cylinder along arm 등 (ΔX only). */
-  bucketCylStroke: { min: 1.85, max: 2.45 },
+  /** Arm cylinder along arm 등 (ΔX only) — tracks armLength. */
+  bucketCylStroke: { min: 1.65, max: 2.25 },
   /** Mechanical hard stops (rad, sim joint space) before stroke tightening. */
   mechStops: {
     boomMin: getBoomRaiseMinJoint(),
@@ -124,15 +124,15 @@ export const WE = {
     /** Inward fold — keep deep; do not let boom-cyl stroke edits shrink this. */
     armMin: -2.55,
     /**
-     * Outward / up toward boom — stop ~80° short of colinear (0)
-     * so boom–arm interior angle tops out near 100°, not 180°.
+     * Outward / up toward boom — stop ~60° short of colinear (0)
+     * so boom–arm interior angle tops out near 120°, not 180°.
      */
-    armMax: -((80 * Math.PI) / 180),
+    armMax: -((60 * Math.PI) / 180),
     bucketMin: 0.75,
     bucketMax: 3.45,
   },
-  /** Soft fold clearance — matches armMax (~100° boom–arm). */
-  armFoldSoftMax: -((80 * Math.PI) / 180),
+  /** Soft fold clearance — matches armMax (~120° boom–arm). */
+  armFoldSoftMax: -((60 * Math.PI) / 180),
   /** Collision sample fractions along boom/arm kinematic axis. */
   boomCollisionT: [0.12, 0.28, 0.42, 0.55, 0.7, 0.85, 0.96] as const,
   armCollisionT: [0.12, 0.28, 0.45, 0.62, 0.78, 0.92] as const,

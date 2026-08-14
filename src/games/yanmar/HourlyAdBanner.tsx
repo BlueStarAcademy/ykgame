@@ -382,7 +382,9 @@ export function HourlyAdBanner({
         >
           <span className={styles.teaserShine} aria-hidden />
           <div className={styles.teaserMedia}>
-            <span className={styles.teaserBadge}>NEW</span>
+            <span className={styles.adMarker} aria-hidden>
+              AD
+            </span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={creative.image} alt="" draggable={false} />
           </div>
@@ -426,6 +428,9 @@ export function HourlyAdBanner({
                 </div>
                 <div className={styles.panelBody}>
                   <div className={styles.adFrame}>
+                    <span className={styles.adMarker} aria-hidden>
+                      AD
+                    </span>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={creative.image} alt={creative.imageAlt} />
                   </div>

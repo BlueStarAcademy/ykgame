@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 export const YANMAR_MACHINE_RIG = {
   boomLength: 3,
-  armLength: 2.35,
+  armLength: 2.15,
   bucketLength: 1.2,
   boomPivotY: 1.68,
   /**
