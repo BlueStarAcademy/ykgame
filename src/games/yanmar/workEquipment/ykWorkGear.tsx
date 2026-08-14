@@ -16,11 +16,14 @@ import {
   getGooseneckGeometry,
   WE,
 } from "./workEquipmentStructure";
-import { YANMAR_MACHINE_COLORS } from "../machineVisualTheme";
+import {
+  YANMAR_MACHINE_COLORS,
+  YANMAR_PAINT_MATERIAL,
+  YANMAR_PAINT_RED,
+} from "../machineVisualTheme";
 
-/** Match chassis + mark backdrop (YK / YANMAR sit on this paint). */
-const RED = YANMAR_MACHINE_COLORS.paintRed;
-const RED_DARK = YANMAR_MACHINE_COLORS.paintRedDark;
+/** Match house paint exactly (same hex + physical material). */
+const RED = YANMAR_PAINT_RED;
 const CHROME = YANMAR_MACHINE_COLORS.chrome;
 const BARREL = YANMAR_MACHINE_COLORS.frame;
 
@@ -32,13 +35,9 @@ const ARM_D = 0.26;
 /** Outline lip (reference-style edge reinforcement). */
 const RIM = 0.02;
 
-function Paint({ dark = false }: { dark?: boolean }) {
+function Paint(_props?: { dark?: boolean }) {
   return (
-    <meshStandardMaterial
-      color={dark ? RED_DARK : RED}
-      roughness={dark ? 0.38 : 0.24}
-      metalness={dark ? 0.2 : 0.24}
-    />
+    <meshPhysicalMaterial color={RED} {...YANMAR_PAINT_MATERIAL} />
   );
 }
 

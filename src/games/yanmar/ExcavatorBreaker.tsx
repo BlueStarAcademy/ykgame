@@ -7,6 +7,8 @@ import {
   YANMAR_MACHINE_COLORS as COLOR,
   YANMAR_MACHINE_MATERIALS as MATERIAL,
   YANMAR_MACHINE_RIG,
+  YANMAR_PAINT_MATERIAL,
+  YANMAR_PAINT_RED,
 } from "./machineVisualTheme";
 
 const FRAME = {
@@ -24,6 +26,10 @@ const STEEL = {
 const BRIGHT_STEEL = {
   color: COLOR.steelBright,
   ...MATERIAL.steel,
+} as const;
+const PAINT = {
+  color: YANMAR_PAINT_RED,
+  ...YANMAR_PAINT_MATERIAL,
 } as const;
 
 const BREAKER_TOOL_PROFILE = [
@@ -82,12 +88,12 @@ export function ExcavatorBreaker({
       <PivotPin x={0} y={0} radius={0.14} width={0.48} />
       <group position={[-0.14, -0.06, 0]}>
         <RoundedBox args={[0.36, 0.28, 0.48]} radius={0.06} smoothness={5} castShadow>
-          <meshStandardMaterial color={COLOR.paintRedDark} {...MATERIAL.paintedDark} />
+          <meshPhysicalMaterial {...PAINT} />
         </RoundedBox>
         {([-1, 1] as const).map((side) => (
           <mesh key={side} position={[0.02, 0.05, side * 0.26]} castShadow>
             <boxGeometry args={[0.28, 0.14, 0.04]} />
-            <meshStandardMaterial color={COLOR.paintRed} {...MATERIAL.painted} />
+            <meshPhysicalMaterial {...PAINT} />
           </mesh>
         ))}
       </group>
@@ -109,13 +115,13 @@ export function ExcavatorBreaker({
           position={[-0.62, -0.13, 0]}
           castShadow
         >
-          <meshStandardMaterial color={COLOR.paintRed} {...MATERIAL.painted} />
+          <meshPhysicalMaterial {...PAINT} />
         </RoundedBox>
 
         {([-1, 1] as const).map((side) => (
           <mesh key={side} position={[-0.69, -0.13, side * 0.285]}>
             <boxGeometry args={[0.5, 0.055, 0.025]} />
-            <meshStandardMaterial color={COLOR.paintHighlight} {...MATERIAL.painted} />
+            <meshPhysicalMaterial {...PAINT} />
           </mesh>
         ))}
 

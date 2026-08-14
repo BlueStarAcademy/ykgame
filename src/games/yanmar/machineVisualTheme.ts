@@ -103,12 +103,16 @@ export function getDozerArmHalfWidth(trackWidth = 1): number {
   return getCarbodyWidth(trackWidth) * 0.28;
 }
 
+/** Exact paint for boom / arm / house — no bright/dark hue drift. */
+export const YANMAR_PAINT_RED = "#DC1E37";
+
 export const YANMAR_MACHINE_COLORS = {
-  /** Primary Yanmar body / boom / arm paint — keep all red parts on this hue. */
-  paintRed: "#DC1E37",
-  paintRedBright: "#E83A52",
-  paintRedDark: "#9A1528",
-  paintHighlight: "#F05A6E",
+  /** Primary Yanmar body / boom / arm paint. */
+  paintRed: YANMAR_PAINT_RED,
+  /** Aliases kept for call sites — same hex so parts never mismatch. */
+  paintRedBright: YANMAR_PAINT_RED,
+  paintRedDark: YANMAR_PAINT_RED,
+  paintHighlight: YANMAR_PAINT_RED,
   frame: "#141a20",
   frameLight: "#2b353e",
   rubber: "#090d10",
@@ -124,18 +128,27 @@ export const YANMAR_MACHINE_COLORS = {
   interior: "#242b32",
   warning: "#ffb629",
   lamp: "#fff6da",
-  truckBed: "#DC1E37",
-  truckBedDark: "#9A1528",
+  truckBed: YANMAR_PAINT_RED,
+  truckBedDark: YANMAR_PAINT_RED,
+} as const;
+
+/** Shared painted-metal look for house + work equipment. */
+export const YANMAR_PAINT_MATERIAL = {
+  roughness: 0.22,
+  metalness: 0.18,
+  clearcoat: 0.55,
+  clearcoatRoughness: 0.28,
+  envMapIntensity: 0.85,
 } as const;
 
 export const YANMAR_MACHINE_MATERIALS = {
   painted: {
-    roughness: 0.24,
-    metalness: 0.24,
+    roughness: YANMAR_PAINT_MATERIAL.roughness,
+    metalness: YANMAR_PAINT_MATERIAL.metalness,
   },
   paintedDark: {
-    roughness: 0.38,
-    metalness: 0.2,
+    roughness: YANMAR_PAINT_MATERIAL.roughness,
+    metalness: YANMAR_PAINT_MATERIAL.metalness,
   },
   frame: {
     roughness: 0.42,

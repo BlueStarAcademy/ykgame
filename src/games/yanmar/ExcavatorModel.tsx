@@ -15,6 +15,8 @@ import {
   YANMAR_MACHINE_COLORS as COLOR,
   YANMAR_MACHINE_MATERIALS as MATERIAL,
   YANMAR_MACHINE_RIG,
+  YANMAR_PAINT_MATERIAL,
+  YANMAR_PAINT_RED,
 } from "./machineVisualTheme";
 import {
   getChassisVisualProfile,
@@ -780,21 +782,13 @@ function UndercarriageAssembly({
 }
 
 function PaintMaterial({
-  color,
-  dark = false,
+  color = YANMAR_PAINT_RED,
 }: {
-  color: string;
+  color?: string;
   dark?: boolean;
 }) {
   return (
-    <meshPhysicalMaterial
-      color={color}
-      roughness={dark ? 0.32 : 0.22}
-      metalness={0.18}
-      clearcoat={0.55}
-      clearcoatRoughness={0.28}
-      envMapIntensity={0.85}
-    />
+    <meshPhysicalMaterial color={color} {...YANMAR_PAINT_MATERIAL} />
   );
 }
 
@@ -1430,7 +1424,7 @@ function UpperHood({
           <boxGeometry
             args={[hoodLen * (isEnclosed ? 0.42 : 0.55), 0.038, 0.035]}
           />
-          <meshStandardMaterial color={COLOR.paintHighlight} {...MATERIAL.painted} />
+          <PaintMaterial />
         </mesh>
       ))}
       {([-1, 1] as const).map((side) => (
@@ -1627,18 +1621,12 @@ export function PremiumExcavatorLink({
             position={[length * 0.52, -height * 0.22, 0]}
             castShadow
           >
-            <meshStandardMaterial
-              color={COLOR.paintRedDark}
-              {...MATERIAL.paintedDark}
-            />
+            <PaintMaterial />
           </RoundedBox>
           {/* Thin inner floor so the channel reads as a box section */}
           <mesh position={[length * 0.55, -height * 0.02, 0]} castShadow>
             <boxGeometry args={[length * 0.78, height * 0.06, sideDepth * 1.15]} />
-            <meshStandardMaterial
-              color={COLOR.paintRedDark}
-              {...MATERIAL.paintedDark}
-            />
+            <PaintMaterial />
           </mesh>
         </>
       ) : (
@@ -1649,10 +1637,7 @@ export function PremiumExcavatorLink({
           position={[length * 0.52, 0, 0]}
           castShadow
         >
-          <meshStandardMaterial
-            color={COLOR.paintRedDark}
-            {...MATERIAL.paintedDark}
-          />
+          <PaintMaterial />
         </RoundedBox>
       )}
       {[-1, 1].map((side) => (
@@ -1664,32 +1649,23 @@ export function PremiumExcavatorLink({
             position={[length / 2, 0, 0]}
             castShadow
           >
-            <meshStandardMaterial color={COLOR.paintRed} {...MATERIAL.painted} />
+            <PaintMaterial />
           </RoundedBox>
           {openTop ? (
             // Top flange of the open channel (does not close the sky face)
             <mesh position={[length * 0.52, height * 0.42, side * 0.02]}>
               <boxGeometry args={[length * 0.78, height * 0.06, 0.055]} />
-              <meshStandardMaterial
-                color={COLOR.paintHighlight}
-                {...MATERIAL.painted}
-              />
+              <PaintMaterial />
             </mesh>
           ) : (
             <mesh position={[length * 0.52, height * 0.39, side * 0.052]}>
               <boxGeometry args={[length * 0.72, height * 0.075, 0.022]} />
-              <meshStandardMaterial
-                color={COLOR.paintHighlight}
-                {...MATERIAL.painted}
-              />
+              <PaintMaterial />
             </mesh>
           )}
           <mesh position={[length * 0.56, -height * 0.4, side * 0.052]}>
             <boxGeometry args={[length * 0.68, height * 0.09, 0.024]} />
-            <meshStandardMaterial
-              color={COLOR.paintRedDark}
-              {...MATERIAL.paintedDark}
-            />
+            <PaintMaterial />
           </mesh>
           {logo && logoX != null ? (
             <mesh
@@ -1769,7 +1745,7 @@ export function PremiumExcavatorBoom({
             position={[0, 0, side * sideDepth]}
             castShadow
           >
-            <meshStandardMaterial color={COLOR.paintRed} {...MATERIAL.painted} />
+            <PaintMaterial />
           </RoundedBox>
         ))}
         <RoundedBox
@@ -1778,10 +1754,7 @@ export function PremiumExcavatorBoom({
           smoothness={5}
           castShadow
         >
-          <meshStandardMaterial
-            color={COLOR.paintRedDark}
-            {...MATERIAL.paintedDark}
-          />
+          <PaintMaterial />
         </RoundedBox>
       </group>
 
