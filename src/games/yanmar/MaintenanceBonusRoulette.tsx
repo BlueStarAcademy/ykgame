@@ -3,13 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MAINTENANCE_FLUIDS,
-  bonusOutcomeAmount,
-  bonusOutcomeKey,
   bonusTableForFluid,
+  maintenancePackageHighlight,
   pointKindLabel,
   type MaintenanceBonusOutcome,
-  type MaintenanceBonusSpec,
   type MaintenanceFluidId,
+  type MaintenanceGrantedPayout,
   type MaintenancePointKind,
 } from "./maintenance";
 import { yanmarAudio } from "./yanmarAudio";
@@ -34,53 +33,55 @@ type ReelItem = {
   key: string;
   label: string;
   icon: string;
-  amount: number;
 };
 
 type Phase = "spinning" | "reveal";
 
-function outcomeToReelItem(
+type GrantChip = {
+  key: string;
+  src: string;
+  label: string;
+  amountLabel: string;
+};
+
+function iconForKind(
+  kind: ReturnType<typeof maintenancePackageHighlight>["iconKind"],
+  pointKind: MaintenancePointKind,
+): string {
+  switch (kind) {
+    case "stars":
+      return STAR_ICON;
+    case "points":
+      return POINT_ICONS[pointKind];
+    case "cores":
+      return CORE_ICON;
+    case "ticket-std":
+      return TICKET_STANDARD_ICON;
+    case "ticket-prem":
+      return TICKET_PREMIUM_ICON;
+  }
+}
+
+function highlightToReelItem(
   fluidId: MaintenanceFluidId,
-  outcome: MaintenanceBonusOutcome | MaintenanceBonusSpec,
+  bonus: MaintenanceBonusOutcome | Parameters<
+    typeof maintenancePackageHighlight
+  >[1],
 ): ReelItem {
   const pointKind = MAINTENANCE_FLUIDS[fluidId].pointKind;
-  const key = bonusOutcomeKey(outcome);
-  const amount = bonusOutcomeAmount(outcome);
-  if (outcome.stars) {
-    return { key, label: outcome.label, icon: STAR_ICON, amount };
-  }
-  if (outcome.workshopPoints) {
-    return {
-      key,
-      label: outcome.label || `${pointKindLabel(pointKind)} +${amount}`,
-      icon: POINT_ICONS[pointKind],
-      amount,
-    };
-  }
-  if (outcome.enhanceCores) {
-    return { key, label: outcome.label, icon: CORE_ICON, amount };
-  }
-  if (
-    outcome.gachaTicketsStandard ||
-    ("gachaTicketsStandardRange" in outcome &&
-      outcome.gachaTicketsStandardRange)
-  ) {
-    return { key, label: outcome.label, icon: TICKET_STANDARD_ICON, amount };
-  }
-  if (
-    outcome.gachaTicketsPremium ||
-    ("gachaTicketsPremiumRange" in outcome && outcome.gachaTicketsPremiumRange)
-  ) {
-    return { key, label: outcome.label, icon: TICKET_PREMIUM_ICON, amount };
-  }
-  return { key, label: outcome.label, icon: STAR_ICON, amount };
+  const highlight = maintenancePackageHighlight(fluidId, bonus);
+  return {
+    key: highlight.key,
+    label: highlight.label,
+    icon: iconForKind(highlight.iconKind, pointKind),
+  };
 }
 
 function buildReel(fluidId: MaintenanceFluidId, winner: MaintenanceBonusOutcome) {
   const base = bonusTableForFluid(fluidId).map((entry) =>
-    outcomeToReelItem(fluidId, entry.outcome),
+    highlightToReelItem(fluidId, entry.outcome),
   );
-  const winnerItem = outcomeToReelItem(fluidId, winner);
+  const winnerItem = highlightToReelItem(fluidId, winner);
   const winnerIndexInPool = Math.max(
     0,
     base.findIndex((item) => item.key === winnerItem.key),
@@ -96,19 +97,75 @@ function buildReel(fluidId: MaintenanceFluidId, winner: MaintenanceBonusOutcome)
   return { items, stopIndex, winnerItem };
 }
 
+function grantChips(granted: MaintenanceGrantedPayout): GrantChip[] {
+  const chips: GrantChip[] = [];
+  if (granted.stars > 0) {
+    chips.push({
+      key: "stars",
+      src: STAR_ICON,
+      label: "스타",
+      amountLabel: `+${granted.stars.toLocaleString()}`,
+    });
+  }
+  if (granted.workshopPoints > 0) {
+    chips.push({
+      key: "points",
+      src: POINT_ICONS[granted.pointKind],
+      label: pointKindLabel(granted.pointKind),
+      amountLabel: `+${granted.workshopPoints.toLocaleString()}`,
+    });
+  }
+  if (granted.enhanceCores > 0) {
+    chips.push({
+      key: "cores",
+      src: CORE_ICON,
+      label: "강화코어",
+      amountLabel: `+${granted.enhanceCores.toLocaleString()}`,
+    });
+  }
+  if (granted.gachaTicketsStandard > 0) {
+    chips.push({
+      key: "ticket-std",
+      src: TICKET_STANDARD_ICON,
+      label: "일반 뽑기권",
+      amountLabel: `${granted.gachaTicketsStandard}개`,
+    });
+  }
+  if (granted.gachaTicketsPremium > 0) {
+    chips.push({
+      key: "ticket-prem",
+      src: TICKET_PREMIUM_ICON,
+      label: "고급 뽑기권",
+      amountLabel: `${granted.gachaTicketsPremium}개`,
+    });
+  }
+  if (granted.xpGarnish > 0) {
+    chips.push({
+      key: "xp",
+      src: STAR_ICON,
+      label: "EXP",
+      amountLabel: `+${granted.xpGarnish.toLocaleString()}`,
+    });
+  }
+  return chips;
+}
+
 export function MaintenanceBonusRoulette({
   fluidId,
   bonus,
+  granted,
+  buffLabel,
   onDone,
 }: {
   fluidId: MaintenanceFluidId;
   bonus: MaintenanceBonusOutcome;
+  granted: MaintenanceGrantedPayout;
+  buffLabel: string;
   onDone: () => void;
 }) {
   const [phase, setPhase] = useState<Phase>("spinning");
   const [reelItems, setReelItems] = useState<ReelItem[]>([]);
   const [reelOffsetRem, setReelOffsetRem] = useState(0);
-  const [wonItem, setWonItem] = useState<ReelItem | null>(null);
   const spinRafRef = useRef(0);
   const spinningRef = useRef(false);
   const stopRequestedRef = useRef(false);
@@ -125,9 +182,8 @@ export function MaintenanceBonusRoulette({
     if (startedRef.current) return;
     startedRef.current = true;
 
-    const { items, stopIndex, winnerItem } = buildReel(fluidId, bonus);
+    const { items, stopIndex } = buildReel(fluidId, bonus);
     setReelItems(items);
-    setWonItem(winnerItem);
     setReelOffsetRem(0);
     spinningRef.current = true;
     stopRequestedRef.current = false;
@@ -167,7 +223,7 @@ export function MaintenanceBonusRoulette({
         spinningRef.current = false;
         setReelOffsetRem(endOffset);
         setPhase("reveal");
-        if (bonus.stars) {
+        if (granted.stars > 0) {
           yanmarAudio.playStarAcquire();
         }
         return;
@@ -177,29 +233,27 @@ export function MaintenanceBonusRoulette({
     };
 
     spinRafRef.current = requestAnimationFrame(frame);
-  }, [fluidId, bonus]);
+  }, [fluidId, bonus, granted.stars]);
 
   function requestStopSpin() {
     if (phase !== "spinning") return;
     stopRequestedRef.current = true;
   }
 
-  const display = wonItem ?? outcomeToReelItem(fluidId, bonus);
-  const isTicket = Boolean(
-    bonus.gachaTicketsStandard || bonus.gachaTicketsPremium,
-  );
+  const chips = grantChips(granted);
 
   return (
     <div className={styles.backdrop} role="dialog" aria-modal="true">
       <div className={styles.panel} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <h3 className={styles.title}>
-            {phase === "reveal" ? "보너스 획득!" : "보너스 뽑기"}
+            {phase === "reveal" ? "교환 보상 획득!" : "보상 뽑기"}
           </h3>
         </div>
         <div className={styles.body}>
           {phase === "spinning" ? (
             <div className={styles.slotStage}>
+              <p className={styles.slotHint}>범위 보상 · 한 번에 전체 지급</p>
               <div className={styles.slotPointer} aria-hidden />
               <div className={styles.slotWindow}>
                 <div
@@ -214,7 +268,10 @@ export function MaintenanceBonusRoulette({
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={item.icon} alt="" draggable={false} />
                       </div>
-                      <div className={styles.slotLabel}>{item.label}</div>
+                      <div className={styles.slotLabelCol}>
+                        <div className={styles.slotLabel}>{item.label}</div>
+                        <div className={styles.slotSub}>전체 지급분</div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -222,17 +279,32 @@ export function MaintenanceBonusRoulette({
             </div>
           ) : (
             <div className={styles.slotResult}>
-              <div className={styles.slotResultEyebrow}>BONUS</div>
-              <div className={styles.slotResultIcon}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={display.icon} alt="" draggable={false} />
+              <div className={styles.slotResultEyebrow}>TOTAL REWARD</div>
+              <div className={styles.grantGrid} aria-label="획득한 전체 보상">
+                {chips.map((chip) => (
+                  <span
+                    key={chip.key}
+                    className={styles.grantChip}
+                    title={`${chip.label} ${chip.amountLabel}`}
+                  >
+                    {chip.key === "xp" ? (
+                      <strong className={styles.grantXp}>EXP</strong>
+                    ) : (
+                      <span className={styles.grantIcon}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={chip.src} alt="" draggable={false} />
+                      </span>
+                    )}
+                    <span className={styles.grantMeta}>
+                      <em>{chip.label}</em>
+                      <strong>{chip.amountLabel}</strong>
+                    </span>
+                  </span>
+                ))}
               </div>
-              <div className={styles.slotResultTitle}>{display.label}</div>
-              <div className={styles.slotResultAmount}>
-                {isTicket
-                  ? `${display.amount}개`
-                  : `+${display.amount.toLocaleString("ko-KR")}`}
-              </div>
+              {buffLabel ? (
+                <p className={styles.buffLine}>{buffLabel}</p>
+              ) : null}
             </div>
           )}
         </div>

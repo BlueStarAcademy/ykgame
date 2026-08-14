@@ -10144,6 +10144,15 @@ html.pwa-mode [contenteditable="true"] {
   line-height: 1;
 }
 
+.yanmar-repair-reward-range-note {
+  margin: 0.15rem 0 0;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: rgba(254, 243, 199, 0.78);
+}
+
 .yanmar-repair-reward-bonus {
   display: flex;
   flex-direction: column;
@@ -10216,6 +10225,11 @@ html.pwa-mode [contenteditable="true"] {
 
 .yanmar-repair-reward-preview-body.is-compact .yanmar-repair-reward-amt {
   font-size: 0.72rem;
+}
+
+.yanmar-repair-reward-preview-body.is-compact .yanmar-repair-reward-range-note {
+  font-size: 0.66rem;
+  margin-top: 0.2rem;
 }
 
 .yanmar-repair-reward-preview-body.is-compact .yanmar-repair-reward-bonus {

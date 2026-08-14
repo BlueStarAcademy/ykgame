@@ -127,7 +127,7 @@ const LINEAR_DRIVE_3: SitePoint[] = [
 ];
 
 /**
- * hill → midfield loop → NE FINISH gate (no stars).
+ * hill → midfield loop → NE FINISH gate (stars guide the line like other legs).
  * Keep clear of walls (~8u) and avoid scribbling on the north rim.
  */
 const LINEAR_DRIVE_4: SitePoint[] = [
@@ -422,7 +422,7 @@ export function driveLegIndexAtStage(
   return Math.max(0, driveIdx);
 }
 
-/** Final drive to the FINISH gate (no course stars). */
+/** Final drive to the FINISH gate (stars required, then gate). */
 export function isSportsMeetFinishDriveStage(
   stageOrder: readonly SportsMeetStageKind[],
   stageIndex: number,
@@ -439,7 +439,6 @@ export function sportsMeetDriveStarQuota(
   stageIndex: number,
 ) {
   if (stageOrder[stageIndex] !== "drive") return 0;
-  if (isSportsMeetFinishDriveStage(stageOrder, stageIndex)) return 0;
   return mission.drive.starCount;
 }
 

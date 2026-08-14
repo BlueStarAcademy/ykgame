@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 
       const targetLevel = currentLevel + 1;
       const requiredPlayerLevel =
-        getWorkshopUpgradeRequiredPlayerLevel(targetLevel);
+        getWorkshopUpgradeRequiredPlayerLevel(targetLevel, upgradeKey);
       if (requiredPlayerLevel == null) throw new Error("INVALID_LEVEL");
 
       const user = await tx.user.findUnique({

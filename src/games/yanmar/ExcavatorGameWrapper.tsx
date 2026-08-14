@@ -2507,7 +2507,7 @@ export function ExcavatorGameWrapper({
             prepared.stageOrder,
             prepared.stageIndex,
           )
-            ? "골인 주행 시작! FINISH로 달리세요"
+            ? "골인 주행 시작! 별을 따라 FINISH로!"
             : `${STAGE_LABEL_KO[stage]} 코스 시작!`,
         );
       }
@@ -3767,11 +3767,28 @@ export function ExcavatorGameWrapper({
           setPreviewStars(data.currency);
         }
         await loadEquipment();
-        if (data.reward?.guaranteed && data.reward?.bonus && data.reward?.buff) {
+        if (
+          data.reward?.bonus &&
+          data.reward?.buff &&
+          data.reward?.granted &&
+          typeof data.reward.granted.stars === "number"
+        ) {
           return {
-            guaranteed: data.reward.guaranteed,
             bonus: data.reward.bonus,
             buff: data.reward.buff,
+            granted: {
+              stars: data.reward.granted.stars,
+              enhanceCores: data.reward.granted.enhanceCores ?? 0,
+              gachaTicketsStandard:
+                data.reward.granted.gachaTicketsStandard ?? 0,
+              gachaTicketsPremium:
+                data.reward.granted.gachaTicketsPremium ?? 0,
+              workshopPoints: data.reward.granted.workshopPoints ?? 0,
+              xpGarnish: data.reward.granted.xpGarnish ?? 0,
+              pointKind:
+                data.reward.granted.pointKind ??
+                MAINTENANCE_FLUIDS[fluid].pointKind,
+            },
           };
         }
         return null;
@@ -7536,19 +7553,20 @@ export function ExcavatorGameWrapper({
                         const stage = currentSportsStage(sportsMeetRun);
                         if (!stage) return "";
                         if (stage === "drive") {
-                          if (
-                            isSportsMeetFinishDriveStage(
-                              sportsMeetRun.stageOrder,
-                              sportsMeetRun.stageIndex,
-                            )
-                          ) {
-                            return "FINISH 골인";
-                          }
                           const quota = sportsMeetDriveStarQuota(
                             sportsMeetRun.mission,
                             sportsMeetRun.stageOrder,
                             sportsMeetRun.stageIndex,
                           );
+                          if (
+                            isSportsMeetFinishDriveStage(
+                              sportsMeetRun.stageOrder,
+                              sportsMeetRun.stageIndex,
+                            ) &&
+                            sportsMeetRun.starsCollected >= quota
+                          ) {
+                            return "FINISH 골인";
+                          }
                           return `별 ${sportsMeetRun.starsCollected}/${quota}`;
                         }
                         if (stage === "dig") {

@@ -7,19 +7,17 @@ import {
   MAINTENANCE_FLUID_ART,
   MAINTENANCE_FLUID_IDS,
   MAINTENANCE_FLUIDS,
-  MAINTENANCE_REWARDS,
-  bonusTableForFluid,
+  MAINTENANCE_CLAIM_SKEW_MS,
   formatCycleHours,
   formatRemainingHhMm,
-  MAINTENANCE_CLAIM_SKEW_MS,
+  maintenancePayoutRanges,
   pointKindLabel,
   type FluidSnapshot,
   type MaintenanceBonusOutcome,
-  type MaintenanceBonusSpec,
   type MaintenanceClaimBuff,
   type MaintenanceFluidId,
+  type MaintenanceGrantedPayout,
   type MaintenancePointKind,
-  type MaintenanceReward,
   type MaintenanceSnapshot,
 } from "./maintenance";
 import { MaintenanceBonusRoulette } from "./MaintenanceBonusRoulette";
@@ -37,44 +35,7 @@ const POINT_ICONS: Record<MaintenancePointKind, string> = {
   monument: "/images/yanmar/2d/workshop-coin-monument.svg",
 };
 
-function bonusOutcomeBounds(
-  outcome: MaintenanceBonusSpec,
-): { min: number; max: number } | null {
-  if (outcome.gachaTicketsStandardRange) {
-    return {
-      min: outcome.gachaTicketsStandardRange[0],
-      max: outcome.gachaTicketsStandardRange[1],
-    };
-  }
-  if (outcome.gachaTicketsPremiumRange) {
-    return {
-      min: outcome.gachaTicketsPremiumRange[0],
-      max: outcome.gachaTicketsPremiumRange[1],
-    };
-  }
-  if (outcome.stars) return { min: outcome.stars, max: outcome.stars };
-  if (outcome.workshopPoints) {
-    return { min: outcome.workshopPoints, max: outcome.workshopPoints };
-  }
-  if (outcome.enhanceCores) {
-    return { min: outcome.enhanceCores, max: outcome.enhanceCores };
-  }
-  if (outcome.gachaTicketsStandard) {
-    return {
-      min: outcome.gachaTicketsStandard,
-      max: outcome.gachaTicketsStandard,
-    };
-  }
-  if (outcome.gachaTicketsPremium) {
-    return {
-      min: outcome.gachaTicketsPremium,
-      max: outcome.gachaTicketsPremium,
-    };
-  }
-  return null;
-}
-
-function formatBonusAmountLabel(
+function formatRangeAmount(
   min: number,
   max: number,
   asCount: boolean,
@@ -89,108 +50,38 @@ function formatBonusAmountLabel(
     : `+${min.toLocaleString()}~${max.toLocaleString()}`;
 }
 
-function bonusPoolPreview(
-  fluidId: MaintenanceFluidId,
-): { key: string; src: string; label: string; amountLabel: string }[] {
-  const pointKind = MAINTENANCE_FLUIDS[fluidId].pointKind;
-  type Acc = {
-    key: string;
-    src: string;
-    label: string;
-    asCount: boolean;
-    min: number;
-    max: number;
-  };
-  const byKey = new Map<string, Acc>();
-
-  for (const entry of bonusTableForFluid(fluidId)) {
-    const o = entry.outcome;
-    const bounds = bonusOutcomeBounds(o);
-    if (!bounds) continue;
-
-    let key: string;
-    let src: string;
-    let label: string;
-    let asCount = false;
-    if (o.stars) {
-      key = "stars";
-      src = STAR_ICON;
-      label = "스타";
-    } else if (o.workshopPoints) {
-      key = "points";
-      src = POINT_ICONS[pointKind];
-      label = pointKindLabel(pointKind);
-    } else if (o.enhanceCores) {
-      key = "cores";
-      src = CORE_ICON;
-      label = "강화코어";
-    } else if (o.gachaTicketsStandard || o.gachaTicketsStandardRange) {
-      key = "ticket-std";
-      src = TICKET_STANDARD_ICON;
-      label = "일반 뽑기권";
-      asCount = true;
-    } else if (o.gachaTicketsPremium || o.gachaTicketsPremiumRange) {
-      key = "ticket-prem";
-      src = TICKET_PREMIUM_ICON;
-      label = "고급 뽑기권";
-      asCount = true;
-    } else {
-      continue;
-    }
-
-    const prev = byKey.get(key);
-    if (!prev) {
-      byKey.set(key, {
-        key,
-        src,
-        label,
-        asCount,
-        min: bounds.min,
-        max: bounds.max,
-      });
-    } else {
-      prev.min = Math.min(prev.min, bounds.min);
-      prev.max = Math.max(prev.max, bounds.max);
-    }
-  }
-
-  return [...byKey.values()].map((item) => ({
-    key: item.key,
-    src: item.src,
-    label: item.label,
-    amountLabel: formatBonusAmountLabel(item.min, item.max, item.asCount),
-  }));
-}
-
-function RewardIconChip({
+function RewardRangeChip({
   src,
-  amount,
   label,
+  amountLabel,
 }: {
-  src: string;
-  amount: number;
+  src?: string;
   label: string;
+  amountLabel: string;
 }) {
-  const caption = `${label} +${amount.toLocaleString()}`;
+  const caption = `${label} ${amountLabel}`;
   return (
     <span
       className="yanmar-repair-reward-chip is-icon"
       title={caption}
       aria-label={caption}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" draggable={false} />
-      <strong className="yanmar-repair-reward-amt">
-        +{amount.toLocaleString()}
-      </strong>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" draggable={false} />
+      ) : null}
+      <strong className="yanmar-repair-reward-amt">{amountLabel}</strong>
+      {!src ? (
+        <em className="yanmar-repair-reward-exp-label">{label}</em>
+      ) : null}
     </span>
   );
 }
 
 export type MaintenanceClaimResult = {
-  guaranteed: MaintenanceReward;
   bonus: MaintenanceBonusOutcome;
   buff: MaintenanceClaimBuff;
+  granted: MaintenanceGrantedPayout;
 };
 
 interface RepairPanelProps {
@@ -226,60 +117,77 @@ function statusLabel(
 function RewardPreview({
   fluidId,
   compact,
-  hideBonusBanner,
 }: {
   fluidId: MaintenanceFluidId;
   compact?: boolean;
-  hideBonusBanner?: boolean;
 }) {
-  const reward = MAINTENANCE_REWARDS[fluidId];
   const def = MAINTENANCE_FLUIDS[fluidId];
   const buff = MAINTENANCE_CLAIM_BUFF[fluidId];
-  const bonusItems = bonusPoolPreview(fluidId);
+  const ranges = maintenancePayoutRanges(fluidId);
   return (
     <div
       className={`yanmar-repair-reward-preview-body${compact ? " is-compact" : ""}`}
     >
-      <div className="yanmar-repair-reward-grid" aria-label="확정 보상">
-        <RewardIconChip
+      <div className="yanmar-repair-reward-grid" aria-label="교환 보상 범위">
+        <RewardRangeChip
           src={STAR_ICON}
-          amount={reward.stars}
           label="스타"
+          amountLabel={formatRangeAmount(
+            ranges.stars.min,
+            ranges.stars.max,
+            false,
+          )}
         />
-        <RewardIconChip
+        <RewardRangeChip
           src={POINT_ICONS[def.pointKind]}
-          amount={reward.workshopPoints}
           label={pointKindLabel(def.pointKind)}
+          amountLabel={formatRangeAmount(
+            ranges.workshopPoints.min,
+            ranges.workshopPoints.max,
+            false,
+          )}
         />
-        {reward.enhanceCores ? (
-          <RewardIconChip
+        {ranges.enhanceCores ? (
+          <RewardRangeChip
             src={CORE_ICON}
-            amount={reward.enhanceCores}
             label="강화코어"
+            amountLabel={formatRangeAmount(
+              ranges.enhanceCores.min,
+              ranges.enhanceCores.max,
+              false,
+            )}
           />
         ) : null}
-        {reward.gachaTicketsStandard ? (
-          <RewardIconChip
+        {ranges.gachaTicketsStandard ? (
+          <RewardRangeChip
             src={TICKET_STANDARD_ICON}
-            amount={reward.gachaTicketsStandard}
             label="일반 뽑기권"
+            amountLabel={formatRangeAmount(
+              ranges.gachaTicketsStandard.min,
+              ranges.gachaTicketsStandard.max,
+              true,
+            )}
           />
         ) : null}
-        {reward.gachaTicketsPremium ? (
-          <RewardIconChip
+        {ranges.gachaTicketsPremium ? (
+          <RewardRangeChip
             src={TICKET_PREMIUM_ICON}
-            amount={reward.gachaTicketsPremium}
             label="고급 뽑기권"
+            amountLabel={formatRangeAmount(
+              ranges.gachaTicketsPremium.min,
+              ranges.gachaTicketsPremium.max,
+              true,
+            )}
           />
         ) : null}
-        {reward.xpGarnish ? (
+        {ranges.xpGarnish ? (
           <span
             className="yanmar-repair-reward-chip is-icon is-xp"
-            title={`EXP +${reward.xpGarnish.toLocaleString()}`}
-            aria-label={`EXP +${reward.xpGarnish.toLocaleString()}`}
+            title={`EXP +${ranges.xpGarnish.toLocaleString()}`}
+            aria-label={`EXP +${ranges.xpGarnish.toLocaleString()}`}
           >
             <strong className="yanmar-repair-reward-amt">
-              +{reward.xpGarnish.toLocaleString()}
+              +{ranges.xpGarnish.toLocaleString()}
             </strong>
             <em className="yanmar-repair-reward-exp-label">EXP</em>
           </span>
@@ -288,34 +196,9 @@ function RewardPreview({
           <em>{buff.label}</em>
         </span>
       </div>
-      {!hideBonusBanner ? (
-        <div
-          className="yanmar-repair-reward-bonus"
-          aria-label="보너스 뽑기 보상"
-        >
-          <strong className="yanmar-repair-reward-bonus-title">
-            보너스 뽑기(1개 획득)
-          </strong>
-          <div className="yanmar-repair-reward-bonus-pool">
-            {bonusItems.map((item) => (
-              <span
-                key={item.key}
-                className="yanmar-repair-reward-bonus-item"
-                title={`${item.label} ${item.amountLabel}`}
-                aria-label={`${item.label} ${item.amountLabel}`}
-              >
-                <span className="yanmar-repair-reward-bonus-icon">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={item.src} alt="" draggable={false} />
-                </span>
-                <strong className="yanmar-repair-reward-bonus-amt">
-                  {item.amountLabel}
-                </strong>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      <p className="yanmar-repair-reward-range-note">
+        위 범위의 보상이 한 번의 뽑기로 한꺼번에 결정됩니다.
+      </p>
     </div>
   );
 }
@@ -332,9 +215,6 @@ export function RepairPanel({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [claimResult, setClaimResult] =
     useState<MaintenanceClaimResult | null>(null);
-  const [claimPhase, setClaimPhase] = useState<"idle" | "bonus" | "summary">(
-    "idle",
-  );
   const [nowMs, setNowMs] = useState(() => Date.now() + clockOffsetMs);
 
   useEffect(() => {
@@ -349,7 +229,6 @@ export function RepairPanel({
     if (open) return;
     setConfirmOpen(false);
     setClaimResult(null);
-    setClaimPhase("idle");
   }, [open]);
 
   const activeFluid = useMemo(() => {
@@ -409,20 +288,17 @@ export function RepairPanel({
     const result = await onRepair(activeId);
     if (result) {
       setClaimResult(result);
-      setClaimPhase("bonus");
     }
   }
 
   function closeAll() {
     setConfirmOpen(false);
     setClaimResult(null);
-    setClaimPhase("idle");
     onClose();
   }
 
   function dismissClaimResult() {
     setClaimResult(null);
-    setClaimPhase("idle");
   }
 
   return (
@@ -554,7 +430,7 @@ export function RepairPanel({
             disabled={busy || !canExchange}
             onClick={() => setConfirmOpen(true)}
           >
-            {canExchange ? "교환하기 + 보너스뽑기" : "대기 중"}
+            {canExchange ? "교환하기" : "대기 중"}
           </button>
         </footer>
 
@@ -598,38 +474,14 @@ export function RepairPanel({
           </div>
         ) : null}
 
-        {claimResult && claimPhase === "bonus" ? (
+        {claimResult ? (
           <MaintenanceBonusRoulette
             fluidId={activeId}
             bonus={claimResult.bonus}
-            onDone={() => setClaimPhase("summary")}
+            granted={claimResult.granted}
+            buffLabel={claimResult.buff.label}
+            onDone={dismissClaimResult}
           />
-        ) : null}
-
-        {claimResult && claimPhase === "summary" ? (
-          <div
-            className="yanmar-repair-confirm"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="yanmar-repair-result-title"
-          >
-            <div className="yanmar-repair-confirm-card is-result">
-              <h3 id="yanmar-repair-result-title">교환 완료</h3>
-              <RewardPreview fluidId={activeId} compact hideBonusBanner />
-              <p className="yanmar-repair-confirm-item is-buff">
-                {claimResult.buff.label}
-              </p>
-              <div className="yanmar-repair-confirm-actions">
-                <button
-                  type="button"
-                  className="yanmar-repair-confirm-ok"
-                  onClick={dismissClaimResult}
-                >
-                  확인
-                </button>
-              </div>
-            </div>
-          </div>
         ) : null}
       </div>
     </AppModalOverlay>

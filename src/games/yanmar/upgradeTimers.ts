@@ -7,9 +7,14 @@ export const UPGRADE_DURATION_MS = UPGRADE_DURATION_MINUTES.map(
   (m) => m * 60_000,
 ) as readonly number[];
 
-/** Player level required to start workshop upgrade to +N (index 0 = +1). */
+/** Player level required to start max-10 workshop upgrade to +N (index 0 = +1). */
 export const WORKSHOP_UPGRADE_MIN_LEVEL = [
-  1, 4, 7, 10, 13, 16, 19, 22, 25, 30,
+  5, 7, 9, 12, 15, 18, 21, 24, 28, 32,
+] as const;
+
+/** Player level required to start max-5 workshop upgrade (rock_appraiser) to +N. */
+export const WORKSHOP_UPGRADE_MIN_LEVEL_MAX5 = [
+  5, 13, 19, 26, 33,
 ] as const;
 
 /** Player level required to start monument upgrade to +N (index 0 = +1). */
@@ -29,11 +34,16 @@ export function getUpgradeDurationMs(targetLevel: number): number | null {
 
 export function getWorkshopUpgradeRequiredPlayerLevel(
   targetLevel: number,
+  upgradeKey?: string,
 ): number | null {
-  if (targetLevel < 1 || targetLevel > WORKSHOP_UPGRADE_MIN_LEVEL.length) {
+  const table =
+    upgradeKey === "rock_appraiser"
+      ? WORKSHOP_UPGRADE_MIN_LEVEL_MAX5
+      : WORKSHOP_UPGRADE_MIN_LEVEL;
+  if (targetLevel < 1 || targetLevel > table.length) {
     return null;
   }
-  return WORKSHOP_UPGRADE_MIN_LEVEL[targetLevel - 1]!;
+  return table[targetLevel - 1]!;
 }
 
 export function getMonumentUpgradeRequiredPlayerLevel(

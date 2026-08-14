@@ -155,12 +155,34 @@
   object-fit: contain;
 }
 
+.slotHint {
+  margin: 0 0 0.55rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: rgba(253, 230, 138, 0.85);
+}
+
+.slotLabelCol {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
 .slotLabel {
   min-width: 0;
   font-size: 0.95rem;
   font-weight: 900;
   color: #fffbeb;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}
+
+.slotSub {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(253, 230, 138, 0.72);
 }
 
 .slotPointer {
@@ -230,6 +252,87 @@
   font-variant-numeric: tabular-nums;
   color: #fde68a;
   text-shadow: 0 0 1.2rem rgba(252, 211, 77, 0.35);
+}
+
+.grantGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.grantChip {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(252, 211, 77, 0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(68, 64, 60, 0.55),
+    rgba(28, 25, 23, 0.9)
+  );
+  text-align: left;
+}
+
+.grantIcon {
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(160deg, #57534e, #1c1917);
+  flex-shrink: 0;
+}
+
+.grantIcon img {
+  width: 1.45rem;
+  height: 1.45rem;
+  object-fit: contain;
+}
+
+.grantXp {
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  background: linear-gradient(160deg, #1e3a8a, #0f172a);
+  color: #dbeafe;
+  font-size: 0.72rem;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.grantMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.grantMeta em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(254, 243, 199, 0.78);
+}
+
+.grantMeta strong {
+  font-size: 1.05rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fde68a;
+}
+
+.buffLine {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #bbf7d0;
 }
 
 @keyframes resultPop {

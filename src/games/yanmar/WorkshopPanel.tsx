@@ -157,6 +157,11 @@ export function WorkshopPanel({
     cost: number;
     durationMs: number;
   } | null>(null);
+  const [confirmInstant, setConfirmInstant] = useState<{
+    label: string;
+    toLevel: number;
+    stars: number;
+  } | null>(null);
   const autoSettleKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -166,8 +171,15 @@ export function WorkshopPanel({
   }, [open]);
 
   useEffect(() => {
-    if (!open) setConfirmUpgrade(null);
+    if (!open) {
+      setConfirmUpgrade(null);
+      setConfirmInstant(null);
+    }
   }, [open, workshopId]);
+
+  useEffect(() => {
+    if (!pending) setConfirmInstant(null);
+  }, [pending]);
 
   const def = workshopId ? WORKSHOP_DEFS[workshopId] : null;
   const points = workshopId && panelState ? panelState.points[workshopId] : 0;
@@ -352,7 +364,8 @@ export function WorkshopPanel({
                 const maxed = level >= max;
                 const targetLevel = level + 1;
                 const reqLevel =
-                  getWorkshopUpgradeRequiredPlayerLevel(targetLevel) ?? 999;
+                  getWorkshopUpgradeRequiredPlayerLevel(targetLevel, u.key) ??
+                  999;
                 const levelLocked = !maxed && playerLevel < reqLevel;
                 const durationMs = getUpgradeDurationMs(targetLevel);
                 const isThisPending =
@@ -415,7 +428,18 @@ export function WorkshopPanel({
                               busy || (!timerReady && currency < instantCost)
                             }
                             className="inline-flex items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
-                            onClick={() => void onInstantUpgrade()}
+                            onClick={() => {
+                              if (timerReady) {
+                                void onInstantUpgrade();
+                                return;
+                              }
+                              if (currency < instantCost) return;
+                              setConfirmInstant({
+                                label: u.label,
+                                toLevel: targetLevel,
+                                stars: instantCost,
+                              });
+                            }}
                           >
                             {timerReady
                               ? "완료"
@@ -589,6 +613,48 @@ export function WorkshopPanel({
                   }}
                 >
                   업그레이드
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {confirmInstant ? (
+          <div
+            className="yanmar-repair-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="yanmar-workshop-instant-confirm-title"
+          >
+            <div className="yanmar-repair-confirm-card">
+              <h3 id="yanmar-workshop-instant-confirm-title">즉시완료 확인</h3>
+              <p className="yanmar-repair-confirm-item">
+                {confirmInstant.label} +{confirmInstant.toLevel}
+              </p>
+              <ul className="yanmar-repair-confirm-facts">
+                <li className="yanmar-repair-confirm-cost">
+                  소모 ★{confirmInstant.stars.toLocaleString()}
+                </li>
+              </ul>
+              <div className="yanmar-repair-confirm-actions">
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-cancel"
+                  disabled={busy}
+                  onClick={() => setConfirmInstant(null)}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-ok"
+                  disabled={busy}
+                  onClick={() => {
+                    setConfirmInstant(null);
+                    void onInstantUpgrade?.();
+                  }}
+                >
+                  즉시완료
                 </button>
               </div>
             </div>

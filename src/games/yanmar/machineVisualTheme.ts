@@ -104,10 +104,11 @@ export function getDozerArmHalfWidth(trackWidth = 1): number {
 }
 
 export const YANMAR_MACHINE_COLORS = {
-  paintRed: "#e2231a",
-  paintRedBright: "#ff3b2f",
-  paintRedDark: "#8f1111",
-  paintHighlight: "#ff7567",
+  /** Primary Yanmar body / boom / arm paint — keep all red parts on this hue. */
+  paintRed: "#DC1E37",
+  paintRedBright: "#E83A52",
+  paintRedDark: "#9A1528",
+  paintHighlight: "#F05A6E",
   frame: "#141a20",
   frameLight: "#2b353e",
   rubber: "#090d10",
@@ -123,8 +124,8 @@ export const YANMAR_MACHINE_COLORS = {
   interior: "#242b32",
   warning: "#ffb629",
   lamp: "#fff6da",
-  truckBed: "#d8242a",
-  truckBedDark: "#771216",
+  truckBed: "#DC1E37",
+  truckBedDark: "#9A1528",
 } as const;
 
 export const YANMAR_MACHINE_MATERIALS = {

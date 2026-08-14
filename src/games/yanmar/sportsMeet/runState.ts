@@ -204,7 +204,11 @@ export function collectSportsMeetStar(
   );
   const starsCollected = stars.filter((s) => s.collected).length;
   let next: SportsMeetRunState = { ...state, courseStars: stars, starsCollected };
-  if (starsCollected >= quota) {
+  // Finish leg: stars guide the route; clock stops only at the FINISH gate.
+  if (
+    starsCollected >= quota &&
+    !isSportsMeetFinishDriveStage(state.stageOrder, state.stageIndex)
+  ) {
     next = advanceStage(next, "drive", now);
   }
   return next;
@@ -255,7 +259,7 @@ export function tryCollectNearbySportsPickups(
   return next;
 }
 
-/** Finish sprint: crossing the FINISH gate stops the clock. */
+/** Finish sprint: all course stars, then crossing the FINISH gate stops the clock. */
 export function tryCrossSportsFinishGate(
   state: SportsMeetRunState,
   pattern: SportsMeetPattern,
@@ -267,6 +271,12 @@ export function tryCrossSportsFinishGate(
   if (!isSportsMeetFinishDriveStage(state.stageOrder, state.stageIndex)) {
     return state;
   }
+  const quota = sportsMeetDriveStarQuota(
+    state.mission,
+    state.stageOrder,
+    state.stageIndex,
+  );
+  if (quota > 0 && state.starsCollected < quota) return state;
   const gate = getSportsMeetFinishGate(pattern);
   if (distanceXZ(posX, posZ, gate.x, gate.z) > gate.radius) return state;
   return advanceStage(state, "drive", now);

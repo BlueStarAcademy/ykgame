@@ -69,7 +69,7 @@ export function resolveSportsMeetMission(
 export function formatSportsMeetMissionSummaryKo(
   mission: SportsMeetMissionBalance = SPORTS_MEET_MISSION_DEFAULTS,
 ): string {
-  return `별${mission.drive.starCount}×3 · 덤프${mission.dig.dumpTruckCapacity} · 파쇄${mission.crash.asphaltTileCount} · 돌${mission.hill.successfulDumpsRequired}`;
+  return `별${mission.drive.starCount}×4 · 덤프${mission.dig.dumpTruckCapacity} · 파쇄${mission.crash.asphaltTileCount} · 돌${mission.hill.successfulDumpsRequired}`;
 }
 
 /** Idempotent reward event id for a ranked course-star pickup. */

@@ -518,6 +518,187 @@ export function rollMaintenanceBonus(
   return resolveBonusSpec(table[table.length - 1]!.outcome, rng);
 }
 
+export type MaintenanceGrantedPayout = {
+  stars: number;
+  enhanceCores: number;
+  gachaTicketsStandard: number;
+  gachaTicketsPremium: number;
+  workshopPoints: number;
+  xpGarnish: number;
+  pointKind: MaintenancePointKind;
+};
+
+export type MaintenanceAmountRange = {
+  min: number;
+  max: number;
+};
+
+/** Total claim payout ranges (guaranteed base + possible bonus swing). */
+export type MaintenancePayoutRanges = {
+  stars: MaintenanceAmountRange;
+  workshopPoints: MaintenanceAmountRange;
+  enhanceCores: MaintenanceAmountRange | null;
+  gachaTicketsStandard: MaintenanceAmountRange | null;
+  gachaTicketsPremium: MaintenanceAmountRange | null;
+  xpGarnish: number;
+};
+
+function emptyBonusOutcome(): MaintenanceBonusOutcome {
+  return { label: "" };
+}
+
+/** Preview ranges for one fluid: always-get base ~ base+best bonus per currency. */
+export function maintenancePayoutRanges(
+  fluidId: MaintenanceFluidId,
+): MaintenancePayoutRanges {
+  const guaranteed = MAINTENANCE_REWARDS[fluidId];
+  const base = mergeRewards(guaranteed, emptyBonusOutcome());
+  let maxStars = base.stars;
+  let maxPoints = base.workshopPoints;
+  let maxCores = base.enhanceCores;
+  let maxStd = base.gachaTicketsStandard;
+  let maxPrem = base.gachaTicketsPremium;
+
+  for (const entry of bonusTableForFluid(fluidId)) {
+    const o = entry.outcome;
+    if (o.stars) {
+      maxStars = Math.max(maxStars, base.stars + o.stars);
+    }
+    if (o.workshopPoints) {
+      maxPoints = Math.max(maxPoints, base.workshopPoints + o.workshopPoints);
+    }
+    if (o.enhanceCores) {
+      maxCores = Math.max(maxCores, base.enhanceCores + o.enhanceCores);
+    }
+    if (o.gachaTicketsStandard) {
+      maxStd = Math.max(
+        maxStd,
+        base.gachaTicketsStandard + o.gachaTicketsStandard,
+      );
+    }
+    if (o.gachaTicketsStandardRange) {
+      maxStd = Math.max(
+        maxStd,
+        base.gachaTicketsStandard + o.gachaTicketsStandardRange[1],
+      );
+    }
+    if (o.gachaTicketsPremium) {
+      maxPrem = Math.max(
+        maxPrem,
+        base.gachaTicketsPremium + o.gachaTicketsPremium,
+      );
+    }
+    if (o.gachaTicketsPremiumRange) {
+      maxPrem = Math.max(
+        maxPrem,
+        base.gachaTicketsPremium + o.gachaTicketsPremiumRange[1],
+      );
+    }
+  }
+
+  return {
+    stars: { min: base.stars, max: maxStars },
+    workshopPoints: { min: base.workshopPoints, max: maxPoints },
+    enhanceCores:
+      maxCores > 0 ? { min: base.enhanceCores, max: maxCores } : null,
+    gachaTicketsStandard:
+      maxStd > 0 ? { min: base.gachaTicketsStandard, max: maxStd } : null,
+    gachaTicketsPremium:
+      maxPrem > 0 ? { min: base.gachaTicketsPremium, max: maxPrem } : null,
+    xpGarnish: base.xpGarnish,
+  };
+}
+
+/** Compact highlight for a full (guaranteed + bonus) package on the reel. */
+export function maintenancePackageHighlight(
+  fluidId: MaintenanceFluidId,
+  bonus: MaintenanceBonusOutcome | MaintenanceBonusSpec,
+): { key: string; iconKind: "stars" | "points" | "cores" | "ticket-std" | "ticket-prem"; label: string } {
+  const guaranteed = MAINTENANCE_REWARDS[fluidId];
+  const pointKind = MAINTENANCE_FLUIDS[fluidId].pointKind;
+  const key = bonusOutcomeKey(bonus);
+
+  if (bonus.stars) {
+    const total = guaranteed.stars + bonus.stars;
+    return {
+      key,
+      iconKind: "stars",
+      label: `스타 +${total.toLocaleString()}`,
+    };
+  }
+  if (bonus.workshopPoints) {
+    const total = guaranteed.workshopPoints + bonus.workshopPoints;
+    return {
+      key,
+      iconKind: "points",
+      label: `${pointKindLabel(pointKind)} +${total.toLocaleString()}`,
+    };
+  }
+  if (bonus.enhanceCores) {
+    const total = (guaranteed.enhanceCores || 0) + bonus.enhanceCores;
+    return {
+      key,
+      iconKind: "cores",
+      label: `강화코어 +${total.toLocaleString()}`,
+    };
+  }
+  if (
+    "gachaTicketsStandardRange" in bonus &&
+    bonus.gachaTicketsStandardRange
+  ) {
+    const base = guaranteed.gachaTicketsStandard || 0;
+    const lo = base + bonus.gachaTicketsStandardRange[0];
+    const hi = base + bonus.gachaTicketsStandardRange[1];
+    return {
+      key,
+      iconKind: "ticket-std",
+      label:
+        lo === hi
+          ? `일반 뽑기권 ${lo}개`
+          : `일반 뽑기권 ${lo}~${hi}개`,
+    };
+  }
+  if (bonus.gachaTicketsStandard) {
+    const total =
+      (guaranteed.gachaTicketsStandard || 0) + bonus.gachaTicketsStandard;
+    return {
+      key,
+      iconKind: "ticket-std",
+      label: `일반 뽑기권 ${total}개`,
+    };
+  }
+  if (
+    "gachaTicketsPremiumRange" in bonus &&
+    bonus.gachaTicketsPremiumRange
+  ) {
+    const base = guaranteed.gachaTicketsPremium || 0;
+    const lo = base + bonus.gachaTicketsPremiumRange[0];
+    const hi = base + bonus.gachaTicketsPremiumRange[1];
+    return {
+      key,
+      iconKind: "ticket-prem",
+      label:
+        lo === hi
+          ? `고급 뽑기권 ${lo}개`
+          : `고급 뽑기권 ${lo}~${hi}개`,
+    };
+  }
+  if (bonus.gachaTicketsPremium) {
+    const total =
+      (guaranteed.gachaTicketsPremium || 0) + bonus.gachaTicketsPremium;
+    return {
+      key,
+      iconKind: "ticket-prem",
+      label: `고급 뽑기권 ${total}개`,
+    };
+  }
+  return {
+    key,
+    iconKind: "stars",
+    label: bonus.label || "교환 보상",
+  };
+}
+
 export function pointKindLabel(kind: MaintenancePointKind): string {
   switch (kind) {
     case "dump":
