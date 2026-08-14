@@ -196,9 +196,6 @@ function RewardPreview({
           <em>{buff.label}</em>
         </span>
       </div>
-      <p className="yanmar-repair-reward-range-note">
-        위 범위의 보상이 한 번의 뽑기로 한꺼번에 결정됩니다.
-      </p>
     </div>
   );
 }

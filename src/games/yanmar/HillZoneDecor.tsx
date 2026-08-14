@@ -1,7 +1,10 @@
 "use client";
 
+import { useRef, useState } from "react";
 import * as THREE from "three";
+import { useFrame } from "@react-three/fiber";
 import { Outlines, Text } from "@react-three/drei";
+import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import { HaulTruckModel } from "./HaulTruckModel";
 import type { HillBoulder, HillZone, TerrainData } from "./terrain";
 import {
@@ -24,6 +27,33 @@ const GROUND_PAINT_MATERIAL = {
 } as const;
 
 const GROUND_PAINT_LIFT = 0.055;
+const BOULDER_VISUAL_MIN_MS = 125;
+
+type TroikaLabel = THREE.Object3D & { text?: string };
+
+function hillZoneLabelText(zone: HillZone) {
+  const remaining = zone.boulders.filter(
+    (rock) => rock.active && !rock.delivered && !rock.extracted,
+  ).length;
+  const respawnEtaSec = getHillZoneRespawnEtaSec(zone);
+  if (respawnEtaSec > 0) {
+    return `석재 · 리젠 ${formatDumpTruckReturnTime(respawnEtaSec)}`;
+  }
+  if (zone.active) return `석재 · ${remaining}`;
+  return "석재";
+}
+
+function boulderVisualSig(zone: HillZone) {
+  return (
+    `${zone.active ? 1 : 0}|${zone.haulTruck.phase}|${zone.haulTruck.loadCount}|` +
+    zone.boulders
+      .map(
+        (rock) =>
+          `${rock.id}:${rock.active ? 1 : 0}:${rock.delivered ? 1 : 0}:${rock.extracted ? 1 : 0}`,
+      )
+      .join(",")
+  );
+}
 
 function zoneRingPaintY(
   terrain: TerrainData,
@@ -142,19 +172,17 @@ function PremiumBoulder({
   );
 }
 
-function StoneZonePaint({ zone, terrain }: { zone: HillZone; terrain: TerrainData }) {
+function StoneZonePaint({
+  zone,
+  terrain,
+  labelRef,
+}: {
+  zone: HillZone;
+  terrain: TerrainData;
+  labelRef: React.RefObject<TroikaLabel | null>;
+}) {
   const radius = getHillZoneCoreRadius(zone);
   const paintY = zoneRingPaintY(terrain, zone.centerX, zone.centerZ, radius);
-  const remaining = zone.boulders.filter(
-    (rock) => rock.active && !rock.delivered && !rock.extracted,
-  ).length;
-  const respawnEtaSec = getHillZoneRespawnEtaSec(zone);
-  const label =
-    respawnEtaSec > 0
-      ? `석재 · 리젠 ${formatDumpTruckReturnTime(respawnEtaSec)}`
-      : zone.active
-        ? `석재 · ${remaining}`
-        : "석재";
   return (
     <group position={[zone.centerX, paintY, zone.centerZ]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={0}>
@@ -170,6 +198,8 @@ function StoneZonePaint({ zone, terrain }: { zone: HillZone; terrain: TerrainDat
         <meshBasicMaterial color="#bae6fd" opacity={0.5} {...GROUND_PAINT_MATERIAL} />
       </mesh>
       <Text
+        font={YANMAR_SCENE_FONT}
+        ref={labelRef}
         position={[0, 0.006, -radius - 1.15]}
         rotation={[-Math.PI / 2, 0, Math.PI]}
         fontSize={1.55}
@@ -187,23 +217,49 @@ function StoneZonePaint({ zone, terrain }: { zone: HillZone; terrain: TerrainDat
         material-polygonOffsetUnits={-2}
         material-toneMapped={false}
       >
-        {label}
+        {hillZoneLabelText(zone)}
       </Text>
     </group>
   );
 }
 
 export function HillZoneDecor({
-  zone,
-  terrain,
+  terrainRef,
   showZonePaint = true,
   highlightBoulders = false,
 }: {
-  zone: HillZone;
-  terrain: TerrainData;
+  terrainRef: React.MutableRefObject<TerrainData>;
   showZonePaint?: boolean;
   highlightBoulders?: boolean;
 }) {
+  const [, setBoulderRev] = useState(0);
+  const boulderSigRef = useRef("");
+  const lastBoulderVisualAtRef = useRef(0);
+  const labelRef = useRef<TroikaLabel>(null);
+
+  useFrame(() => {
+    const zone = terrainRef.current.hillZone;
+    if (!zone) return;
+
+    const label = labelRef.current;
+    if (label && "text" in label) {
+      const nextLabel = hillZoneLabelText(zone);
+      if (label.text !== nextLabel) label.text = nextLabel;
+    }
+
+    const nextSig = boulderVisualSig(zone);
+    if (nextSig === boulderSigRef.current) return;
+    const now = performance.now();
+    if (now - lastBoulderVisualAtRef.current < BOULDER_VISUAL_MIN_MS) return;
+    boulderSigRef.current = nextSig;
+    lastBoulderVisualAtRef.current = now;
+    setBoulderRev((value) => value + 1);
+  });
+
+  const zone = terrainRef.current.hillZone;
+  if (!zone) return null;
+
+  const terrain = terrainRef.current;
   const topY = sampleHeight(terrain, zone.centerX, zone.centerZ);
   const dropY = sampleHeight(terrain, zone.dropX, zone.dropZ);
   const showQuarry = zone.active;
@@ -211,7 +267,7 @@ export function HillZoneDecor({
   return (
     <group>
       {(showQuarry || showRespawnPaint) && showZonePaint ? (
-        <StoneZonePaint zone={zone} terrain={terrain} />
+        <StoneZonePaint zone={zone} terrain={terrain} labelRef={labelRef} />
       ) : null}
 
       {/* Distant quarry face decor — outside the harvest ring so it is not mistaken for pickups. */}
@@ -292,6 +348,7 @@ export function HillZoneDecor({
         <HaulTruckModel state={zone.haulTruck} />
         {showQuarry ? (
           <Text
+            font={YANMAR_SCENE_FONT}
             position={[0, 0.1, 7.4]}
             rotation={[-Math.PI / 2, 0, 0]}
             fontSize={1.15}

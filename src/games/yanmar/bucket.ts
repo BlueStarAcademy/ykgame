@@ -394,3 +394,68 @@ export function createDigFeedback(): DigFeedback {
     hillCooldownEtaSec: 0,
   };
 }
+
+/** True when HUD-facing dig feedback has not changed enough to re-render. */
+export function isDigFeedbackHudEqual(prev: DigFeedback, next: DigFeedback) {
+  return (
+    prev.inDigZone === next.inDigZone &&
+    prev.inDumpZone === next.inDumpZone &&
+    prev.tipOnGround === next.tipOnGround &&
+    prev.bucketCurled === next.bucketCurled &&
+    prev.canLoad === next.canLoad &&
+    Math.abs(prev.digZoneRemainingUnits - next.digZoneRemainingUnits) < 1 &&
+    prev.canStrike === next.canStrike &&
+    prev.breakerNeedsVertical === next.breakerNeedsVertical &&
+    prev.crashTileHp === next.crashTileHp &&
+    prev.crashTileMaxHp === next.crashTileMaxHp &&
+    prev.crashHitTick === next.crashHitTick &&
+    prev.crashHitDamage === next.crashHitDamage &&
+    prev.canGrab === next.canGrab &&
+    prev.grappleNeedsAlignment === next.grappleNeedsAlignment &&
+    prev.canDropRock === next.canDropRock &&
+    prev.showGripGauge === next.showGripGauge &&
+    Math.round(prev.gripAdhesion * 100) ===
+      Math.round(Math.min(1, next.gripAdhesion) * 100) &&
+    Math.round(prev.gripPressure * 100) ===
+      Math.round(Math.min(1, next.gripPressure) * 100) &&
+    prev.grappleLiftResult === next.grappleLiftResult &&
+    prev.grappleLiftResultTick === next.grappleLiftResultTick &&
+    prev.digging === next.digging &&
+    prev.bladeWorking === next.bladeWorking &&
+    Math.abs(prev.groundDepth - next.groundDepth) < 0.05 &&
+    prev.bucketOpenReady === next.bucketOpenReady &&
+    prev.insertedDeepEnough === next.insertedDeepEnough &&
+    prev.bucketCurlReady === next.bucketCurlReady &&
+    prev.armPulling === next.armPulling &&
+    prev.optimalDigPose === next.optimalDigPose &&
+    prev.canDump === next.canDump &&
+    prev.dumpBodyTouching === next.dumpBodyTouching &&
+    prev.dumpFacingBed === next.dumpFacingBed &&
+    prev.truckPresent === next.truckPresent &&
+    prev.haulTruckPresent === next.haulTruckPresent &&
+    prev.nearHaulTruck === next.nearHaulTruck &&
+    prev.carryingRock === next.carryingRock &&
+    prev.truckCanAccept === next.truckCanAccept &&
+    Math.abs(prev.truckFillRatio - next.truckFillRatio) < 0.02 &&
+    Math.abs(prev.truckCooldownRemaining - next.truckCooldownRemaining) < 0.15 &&
+    prev.haulTruckCanAccept === next.haulTruckCanAccept &&
+    Math.abs(prev.haulTruckFillRatio - next.haulTruckFillRatio) < 0.02 &&
+    Math.abs(prev.haulTruckCooldownRemaining - next.haulTruckCooldownRemaining) <
+      0.15 &&
+    prev.haulTruckLoadCount === next.haulTruckLoadCount &&
+    prev.haulTruckCapacity === next.haulTruckCapacity &&
+    prev.raiseArmForDump === next.raiseArmForDump &&
+    prev.travelBlockedRaiseArm === next.travelBlockedRaiseArm &&
+    Math.abs(prev.digPoseScore - next.digPoseScore) < 0.01 &&
+    Math.abs(prev.soilRetention - next.soilRetention) < 0.02 &&
+    prev.soilSpilling === next.soilSpilling &&
+    prev.digCooldowns.length === next.digCooldowns.length &&
+    prev.digCooldowns.every(
+      (item, i) =>
+        item.id === next.digCooldowns[i]?.id &&
+        Math.abs(item.etaSec - (next.digCooldowns[i]?.etaSec ?? 0)) < 0.15,
+    ) &&
+    Math.abs(prev.crashCooldownEtaSec - next.crashCooldownEtaSec) < 0.15 &&
+    Math.abs(prev.hillCooldownEtaSec - next.hillCooldownEtaSec) < 0.15
+  );
+}

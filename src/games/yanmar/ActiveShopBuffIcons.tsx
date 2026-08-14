@@ -8,11 +8,17 @@ import {
   pruneExpiredShopBuffs,
 } from "./shopBuffPersistence";
 import { SHOP_ITEM_BY_ID, type ShopItemId } from "./shopCatalog";
+import type { RepairBuffKind } from "./gearStats";
 import type { WorldPickupsState } from "./worldPickups";
 
 interface ActiveShopBuffIconsProps {
   buffs: ActiveShopBuff[];
   onChange: (next: ActiveShopBuff[]) => void;
+  /** Timed stat buff received when exchanging a maintenance consumable. */
+  repairBuff?: {
+    kind: Exclude<RepairBuffKind, "NONE">;
+    expiresAt: string;
+  } | null;
   /** Street speed buff lives on the world-pickup sim state. */
   worldPickupsRef?: RefObject<WorldPickupsState | null>;
   /** Bumps when world pickups change so street-speed icon updates immediately. */
@@ -23,13 +29,21 @@ interface ActiveShopBuffIconsProps {
 
 const TIP_VISIBLE_MS = 3000;
 const STREET_SPEED_ICON_SRC = "/images/yanmar/2d/street-speed-buff.svg";
+const REPAIR_BUFF_ICON_SRC = {
+  SMALL: "/images/yanmar/2d/repair-buff-small.svg",
+  LARGE: "/images/yanmar/2d/repair-buff-large.svg",
+} as const;
 const STREET_SPEED_FADE_MS = 10_000;
 const STREET_SPEED_BLINK_MS = 5_000;
 const MAX_SHOP_ICONS = 5; // +1 street speed slot = 6 max
 
 type TipTarget =
   | { kind: "shop"; id: ShopItemId; key: number }
+  | { kind: "repair"; key: number }
   | { kind: "street-speed"; key: number };
+
+const REPAIR_BUFF_FADE_MS = 10 * 60 * 1000;
+const REPAIR_BUFF_BLINK_MS = 30 * 1000;
 
 function formatRemainingMs(ms: number): string {
   const totalSec = Math.max(0, Math.ceil(ms / 1000));
@@ -45,6 +59,7 @@ function formatRemainingMs(ms: number): string {
 export function ActiveShopBuffIcons({
   buffs,
   onChange,
+  repairBuff = null,
   worldPickupsRef,
   worldPickupRevision = 0,
   alignWithMinimap = false,
@@ -57,7 +72,8 @@ export function ActiveShopBuffIcons({
     const syncStreetSpeed = () => {
       const tick = Date.now();
       const until = worldPickupsRef?.current?.speedBuffUntilMs ?? 0;
-      setSpeedBuffUntilMs(until > tick ? until : 0);
+      const next = until > tick ? until : 0;
+      setSpeedBuffUntilMs((prev) => (prev === next ? prev : next));
     };
     syncStreetSpeed();
     const id = window.setInterval(() => {
@@ -79,8 +95,16 @@ export function ActiveShopBuffIcons({
   const visible = pruneExpiredShopBuffs(buffs, now).slice(0, MAX_SHOP_ICONS);
   const streetRemaining = speedBuffUntilMs > now ? speedBuffUntilMs - now : 0;
   const showStreetSpeed = streetRemaining > 0;
+  const repairExpiresAt = repairBuff
+    ? new Date(repairBuff.expiresAt).getTime()
+    : 0;
+  const repairRemaining =
+    Number.isFinite(repairExpiresAt) && repairExpiresAt > now
+      ? repairExpiresAt - now
+      : 0;
+  const showRepairBuff = repairRemaining > 0 && repairBuff != null;
 
-  if (visible.length === 0 && !showStreetSpeed) return null;
+  if (visible.length === 0 && !showStreetSpeed && !showRepairBuff) return null;
 
   return (
     <ul
@@ -89,6 +113,45 @@ export function ActiveShopBuffIcons({
       }`}
       aria-label="적용 중인 버프"
     >
+      {showRepairBuff && repairBuff ? (
+        <li
+          className={`yanmar-active-buff-icon yanmar-active-repair-buff-icon is-${repairBuff.kind.toLowerCase()}`}
+        >
+          <button
+            type="button"
+            className={`yanmar-active-buff-hit${
+              repairRemaining <= REPAIR_BUFF_FADE_MS &&
+              repairRemaining > REPAIR_BUFF_BLINK_MS
+                ? " is-fading"
+                : ""
+            }${
+              repairRemaining <= REPAIR_BUFF_BLINK_MS ? " is-blinking" : ""
+            }`}
+            aria-label={`정비소 버프 ${
+              repairBuff.kind === "LARGE" ? "힘·인내 +8%" : "민첩 +5%"
+            }, 남은 시간 ${formatRemainingMs(repairRemaining)}`}
+            onClick={() => setTip({ kind: "repair", key: Date.now() })}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={REPAIR_BUFF_ICON_SRC[repairBuff.kind]}
+              alt=""
+              draggable={false}
+              aria-hidden
+            />
+          </button>
+          {tip?.kind === "repair" ? (
+            <span
+              key={tip.key}
+              className="yanmar-active-buff-tip"
+              role="status"
+            >
+              {repairBuff.kind === "LARGE" ? "힘·인내 +8%" : "민첩 +5%"} ·{" "}
+              {formatRemainingMs(repairRemaining)}
+            </span>
+          ) : null}
+        </li>
+      ) : null}
       {showStreetSpeed ? (
         <li className="yanmar-active-buff-icon">
           <button

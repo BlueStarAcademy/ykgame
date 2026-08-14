@@ -3,6 +3,7 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
+import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import * as THREE from "three";
 import type { SportsMeetPattern } from "./sportsMeet/patterns";
 import {
@@ -177,6 +178,7 @@ function StartGate({
       <group ref={gateRef}>
         <StripedRail from={[fl.x, fl.z]} to={[fr.x, fr.z]} y={0} height={0.7} />
         <Text
+          font={YANMAR_SCENE_FONT}
           position={[
             paddock.gateX - paddock.forwardX * 0.05,
             0.55,
@@ -295,6 +297,7 @@ export function SportsMeetStartGrid({
 
       {!gateOpen ? (
         <Text
+          font={YANMAR_SCENE_FONT}
           position={[
             paddock.centerX - paddock.forwardX * 0.2,
             2.6,

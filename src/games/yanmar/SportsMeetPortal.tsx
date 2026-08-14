@@ -3,6 +3,7 @@
 import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
+import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import * as THREE from "three";
 import { SPORTS_MEET_PORTAL } from "./sportsMeet/coursePickups";
 
@@ -152,7 +153,7 @@ function TicketCountPlaque({
         />
       </mesh>
       <Text
-        key={`${remaining}-${limit}`}
+        font={YANMAR_SCENE_FONT}
         position={[0.38, 0, 0.13]}
         fontSize={0.38}
         color="#fef3c7"
@@ -216,6 +217,7 @@ export function SportsMeetPortal({
         <meshStandardMaterial color="#1e3a5f" roughness={0.55} />
       </mesh>
       <Text
+        font={YANMAR_SCENE_FONT}
         position={[0, BEAM_Y + 1.15, 0.08]}
         fontSize={0.28}
         color="#fef3c7"

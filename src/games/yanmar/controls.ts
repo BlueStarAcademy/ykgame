@@ -56,6 +56,8 @@ export interface AuxiliaryControlState {
   throttle: number;
   highSpeed: boolean;
   safetyLocked: boolean;
+  /** 시동 On일 때만 주행·작업 조작 가능. 접속 시 기본 Off. */
+  engineOn: boolean;
   /** 좌=-1(열기), 우=1(닫기). 브레이커는 좌측만 타격. */
   attachmentPedal: -1 | 0 | 1;
   /** 0=닫힘, 1=완전히 열림. */
@@ -122,6 +124,7 @@ export function createAuxiliaryControls(): AuxiliaryControlState {
     throttle: 0,
     highSpeed: false,
     safetyLocked: false,
+    engineOn: false,
     attachmentPedal: 0,
     grappleOpen: 1,
   };

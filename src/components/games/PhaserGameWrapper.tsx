@@ -1,5 +1,8 @@
 "use client";
 
+/** Troika Text worker off before any game/drei chunk evaluates. */
+import "@/games/yanmar/troikaTextSetup";
+
 import { useEffect, useRef } from "react";
 import type { GameId } from "@/lib/games";
 import { getGameById } from "@/lib/games";

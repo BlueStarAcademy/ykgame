@@ -2,6 +2,7 @@
 
 import { useLayoutEffect } from "react";
 import { RoundedBox, Text } from "@react-three/drei";
+import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { YK_GEONGI_LOGO } from "@/lib/brand-assets";
@@ -362,6 +363,7 @@ export function PremiumDumpTruckModel({
         />
       ))}
       <Text
+        font={YANMAR_SCENE_FONT}
         position={[0.05, 2.72, -1.9]}
         fontSize={0.68}
         color="#ffffff"

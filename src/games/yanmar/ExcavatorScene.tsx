@@ -2,6 +2,9 @@
 
 /* eslint-disable react-hooks/refs */
 
+/** Must run before `@react-three/drei` Text pulls Troika fonts. */
+import "./troikaTextSetup";
+import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Billboard, ContactShadows, RoundedBox, Text } from "@react-three/drei";
@@ -47,9 +50,7 @@ import {
   createTerrain,
   digZoneLabel,
   getActiveDigZones,
-  getCrashZoneRespawnEtaSec,
   getHaulTruckReturnEtaSec,
-  getHillZoneRespawnEtaSec,
   isHaulTruckVisible,
   isInCrashZone,
   isInDumpZone,
@@ -1796,14 +1797,14 @@ function ExcavatorArm({
       }
     }
 
-    // Travel loop — RPM(x1)=travel-1, RPM(x2)=travel-2 while tracks move.
+    // Travel loop — tied to lever input so releasing cuts the SFX immediately
+    // (velocity damping would otherwise keep the drone running while coasting).
     {
-      const vel = velRef.current;
+      const travel = inputRef.current?.travel;
       const rpm: 1 | 2 = aux?.highSpeed ? 2 : 1;
       const moving =
-        Math.abs(vel.travel) > 0.08 ||
-        Math.abs(vel.trackLeft) > 0.08 ||
-        Math.abs(vel.trackRight) > 0.08;
+        Math.abs(travel?.left ?? 0) > 0.05 ||
+        Math.abs(travel?.right ?? 0) > 0.05;
       yanmarAudio.setTravelDriving(moving, rpm);
     }
 
@@ -2547,9 +2548,9 @@ function ZoneMarkers({
   const [occupiedDigIds, setOccupiedDigIds] = useState<string[]>([]);
   const [inCrashZone, setInCrashZone] = useState(false);
   const [inHillZone, setInHillZone] = useState(false);
-  const [, setSpecialVersion] = useState(0);
   const signatureRef = useRef("");
   const digGroupRefs = useRef(new Map<string, THREE.Group>());
+  const digLabelRefs = useRef(new Map<string, THREE.Object3D & { text?: string }>());
   const dumpGroupRef = useRef<THREE.Group>(null);
   const dumpBedMeshRef = useRef<THREE.Mesh>(null);
 
@@ -2566,35 +2567,42 @@ function ZoneMarkers({
     const nextInCrash = isInCrashZone(terrain, sim.posX, sim.posZ);
     const nextInHill =
       !!hill?.active && isInsideHillZoneCore(hill, sim.posX, sim.posZ);
-    const signature = nextZones
-      .map(
-        (zone) =>
-          `${zone.id}:${zone.x.toFixed(1)}:${zone.z.toFixed(1)}:${zone.active}:${
-            Math.floor(zone.remainingUnits / 25)
-          }`,
-      )
-      .join("|") +
-      `|crash:${crash?.active}:${Math.ceil(getCrashZoneRespawnEtaSec(crash))}:${crash?.tiles.map((tile) => tile.hp).join(",")}` +
-      `|hill:${hill?.active}:${Math.ceil(getHillZoneRespawnEtaSec(hill))}:${hill?.haulTruck.phase}:${hill?.haulTruck.loadCount}:${hill?.boulders
-        .map((rock) => `${rock.id}:${rock.active}:${rock.delivered}:${rock.extracted}`)
-        .join(",")}` +
+
+    // Structural / occupancy only — do NOT include tile HP, timers, or fill amounts.
+    // Those used to setState every frame and flood React 19's MessageChannel scheduler
+    // (`[Violation] 'message' handler took …ms`) plus Troika typesetting.
+    const signature =
+      nextZones
+        .map(
+          (zone) =>
+            `${zone.id}:${zone.x.toFixed(1)}:${zone.z.toFixed(1)}:${zone.active ? 1 : 0}`,
+        )
+        .join("|") +
+      `|crash:${crash ? 1 : 0}:${crash?.active ? 1 : 0}` +
+      `|hill:${hill ? 1 : 0}:${hill?.active ? 1 : 0}` +
       `|occDig:${nextOccupiedDigIds.join(",")}` +
-      `|occCrash:${nextInCrash}` +
-      `|occHill:${nextInHill}`;
+      `|occCrash:${nextInCrash ? 1 : 0}` +
+      `|occHill:${nextInHill ? 1 : 0}`;
     if (signature !== signatureRef.current) {
       signatureRef.current = signature;
       setZones(nextZones.map((zone) => ({ ...zone })));
       setOccupiedDigIds(nextOccupiedDigIds);
       setInCrashZone(nextInCrash);
       setInHillZone(nextInHill);
-      setSpecialVersion((value) => value + 1);
     }
 
-    // Keep zone paint on the driveable ring height every frame (dig mounds change).
     for (const zone of nextZones) {
       const group = digGroupRefs.current.get(zone.id);
       if (group) {
         group.position.y = zoneRingPaintY(terrain, zone.x, zone.z, zone.radius);
+      }
+      const label = digLabelRefs.current.get(zone.id);
+      if (label && "text" in label) {
+        const nextText = `${digZoneLabel(zone.id)} · 흙 ${Math.max(
+          0,
+          Math.ceil(zone.remainingUnits / 10) * 10,
+        ).toLocaleString("ko-KR")} / ${zone.capacityUnits.toLocaleString("ko-KR")}`;
+        if (label.text !== nextText) label.text = nextText;
       }
     }
     if (dumpGroupRef.current) {
@@ -2670,6 +2678,11 @@ function ZoneMarkers({
                 </mesh>
                 <GroundZoneArrows radius={zone.radius} color="#ffe082" />
                 <Text
+                  font={YANMAR_SCENE_FONT}
+                  ref={(node) => {
+                    if (node) digLabelRefs.current.set(zone.id, node);
+                    else digLabelRefs.current.delete(zone.id);
+                  }}
                   position={[0, 0.006, -zone.radius - 1.15]}
                   rotation={[-Math.PI / 2, 0, Math.PI]}
                   fontSize={1.7}
@@ -2699,16 +2712,14 @@ function ZoneMarkers({
       })}
       {crash ? (
         <CrashZoneDecor
-          zone={crash}
-          terrain={terrain}
+          terrainRef={terrainRef}
           showZoneLabel={!inCrashZone || !crash.active}
           highlightTiles={inCrashZone}
         />
       ) : null}
       {hill ? (
         <HillZoneDecor
-          zone={hill}
-          terrain={terrain}
+          terrainRef={terrainRef}
           showZonePaint={!inHillZone || !hill.active}
           highlightBoulders={inHillZone && hill.active}
         />
@@ -2733,6 +2744,7 @@ function ZoneMarkers({
         </mesh>
         <GroundZoneArrows radius={DUMP_ZONE.radius} color="#a5f3a8" />
         <Text
+          font={YANMAR_SCENE_FONT}
           position={[0, 0.006, -DUMP_ZONE.radius - 1.1]}
           rotation={[-Math.PI / 2, 0, Math.PI]}
           fontSize={1.55}
@@ -2825,6 +2837,7 @@ function TierBoundaryBarriers({
           ]}
         >
           <Text
+            font={YANMAR_SCENE_FONT}
             fontSize={0.9}
             color="#ffffff"
             outlineWidth={0.08}
@@ -3030,6 +3043,7 @@ function NavigationGuide({
         <meshBasicMaterial color={target.color} opacity={0.72} {...GROUND_PAINT_MATERIAL} />
       </mesh>
       <Text
+        font={YANMAR_SCENE_FONT}
         position={[0, 0.006, -1.45]}
         rotation={[-Math.PI / 2, 0, Math.PI]}
         fontSize={0.78}
@@ -3089,6 +3103,7 @@ function DumpTruckWorldHud({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const labelRef = useRef<THREE.Object3D & { text?: string }>(null);
+  const lastTextRef = useRef("");
 
   useFrame(() => {
     const state = stateRef.current;
@@ -3113,20 +3128,25 @@ function DumpTruckWorldHud({
 
     if (!label || !("text" in label)) return;
 
+    let nextText: string;
     if (shouldShowDumpTruckReturnTimer(state)) {
-      label.text = `복귀 ${formatDumpTruckReturnTime(
+      nextText = `복귀 ${formatDumpTruckReturnTime(
         getDumpTruckReturnEtaSec(state, cooldownSec),
       )}`;
-      return;
+    } else {
+      // Quantize fill readout so Troika does not retypeset every unit.
+      nextText = `${Math.floor(Math.round(state.fillUnits) / 10) * 10}/${capacity}`;
     }
-
-    label.text = `${Math.round(state.fillUnits)}/${capacity}`;
+    if (nextText === lastTextRef.current) return;
+    lastTextRef.current = nextText;
+    label.text = nextText;
   });
 
   return (
     <group ref={groupRef}>
       <Billboard follow>
         <Text
+          font={YANMAR_SCENE_FONT}
           ref={labelRef}
           fontSize={0.52}
           color="#f8fafc"
@@ -3151,6 +3171,7 @@ function HaulTruckWorldHud({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const labelRef = useRef<THREE.Object3D & { text?: string }>(null);
+  const lastTextRef = useRef("");
 
   useFrame(() => {
     const hill = terrainRef.current.hillZone;
@@ -3180,20 +3201,24 @@ function HaulTruckWorldHud({
 
     if (!label || !("text" in label)) return;
 
+    let nextText: string;
     if (shouldShowHaulTruckReturnTimer(truck)) {
-      label.text = `복귀 ${formatDumpTruckReturnTime(
+      nextText = `복귀 ${formatDumpTruckReturnTime(
         getHaulTruckReturnEtaSec(truck, cooldownSec),
       )}`;
-      return;
+    } else {
+      nextText = `${truck.loadCount}/${capacity}`;
     }
-
-    label.text = `${truck.loadCount}/${capacity}`;
+    if (nextText === lastTextRef.current) return;
+    lastTextRef.current = nextText;
+    label.text = nextText;
   });
 
   return (
     <group ref={groupRef}>
       <Billboard follow>
         <Text
+          font={YANMAR_SCENE_FONT}
           ref={labelRef}
           fontSize={0.52}
           color="#f8fafc"
@@ -3474,6 +3499,7 @@ function DumpTruck({
       ))}
 
       <Text
+        font={YANMAR_SCENE_FONT}
         visible={false}
         position={[0.05, 2.65, -1.88]}
         rotation={[0, 0, 0]}

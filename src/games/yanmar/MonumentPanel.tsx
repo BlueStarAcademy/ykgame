@@ -30,8 +30,15 @@ import {
   instantCompleteStars,
   isUpgradeTimerReady,
 } from "./upgradeTimers";
-import { formatQuestProgressCurrent } from "./quests/formatProgress";
 import type { WorkshopShopItemId } from "./workshop";
+import {
+  ClaimButton,
+  DoneStamp,
+  PendingStamp,
+  QuestCard,
+  QuestPointsChip,
+  type QuestCardState,
+} from "./QuestCardUI";
 
 type TabId = "quest" | "upgrade" | "shop" | "build";
 
@@ -67,6 +74,19 @@ interface MonumentPanelProps {
   onClaimConstruction?: () => void | Promise<void>;
   onClaimStars?: () => void | Promise<void>;
   onRefresh?: () => void | Promise<void>;
+}
+
+function CloseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M6 6l12 12M18 6L6 18"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }
 
 function PointsAmount({
@@ -232,54 +252,66 @@ export function MonumentPanel({
       open={open}
       onClose={onClose}
       nested
-      panelClassName="!max-w-[min(96vw,26rem)] !overflow-hidden landscape:!max-h-[min(94dvh,32rem)]"
+      panelClassName="yanmar-facility-modal-shell"
     >
-      <div className="yanmar-workshop-panel relative flex h-[min(88dvh,36rem)] w-full flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md landscape:h-[min(92dvh,26rem)]">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-          <h2 className="min-w-0 flex-1 truncate text-lg font-black tracking-tight">
-            YK 조형물
-          </h2>
-          <div className="flex shrink-0 items-center gap-2">
-            <div
-              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-sm font-black text-amber-100 shadow-inner"
+      <div className="yanmar-facility-modal is-monument">
+        <header className="yanmar-facility-modal-head">
+          <span className="yanmar-facility-modal-emblem" aria-hidden>
+            <img
+              src="/images/yanmar/2d/cockpit/quest-premium.png?v=3"
+              alt=""
+              draggable={false}
+            />
+          </span>
+          <div className="yanmar-facility-modal-titles">
+            <p className="yanmar-facility-modal-eyebrow">YK MONUMENT</p>
+            <h2>YK 조형물</h2>
+          </div>
+          <div className="yanmar-facility-modal-head-meta">
+            <span
+              className="yanmar-facility-modal-chip is-points"
               title="조형물 포인트"
             >
-              <PointsAmount value={panelState.points} size={20} />
-            </div>
+              <PointsAmount value={panelState.points} size={14} />
+            </span>
+            {claimableQuestCount > 0 ? (
+              <span className="yanmar-facility-modal-chip" title="수령 대기">
+                보상 <b className="tabular-nums">{claimableQuestCount}</b>
+              </span>
+            ) : null}
             <button
               type="button"
-              className="shrink-0 rounded-lg px-2 py-1 text-sm text-stone-300 hover:bg-white/10"
+              className="yanmar-facility-modal-close"
               onClick={onClose}
+              aria-label="조형물 닫기"
             >
-              닫기
+              <CloseGlyph />
             </button>
           </div>
         </header>
 
         {showManage ? (
-          <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-1.5">
-                <span className="inline-flex items-center gap-1 text-sm font-black tabular-nums text-amber-100">
+          <div className="yanmar-facility-storage-rail">
+            <div className="yanmar-facility-storage-main">
+              <div className="yanmar-facility-storage-row">
+                <span className="yanmar-facility-storage-value">
                   <img
                     src="/images/star-currency.svg"
                     alt=""
-                    width={16}
-                    height={16}
+                    width={14}
+                    height={14}
                     className="yanmar-score-panel-star shrink-0"
                     draggable={false}
                   />
                   {starsStored.toLocaleString()}
                 </span>
-                <span className="text-[11px] font-semibold tabular-nums text-stone-400">
+                <span className="yanmar-facility-storage-cap">
                   / {storageCap.toLocaleString()}
                 </span>
                 {!storageFull ? (
-                  <span className="truncate text-[10px] font-semibold text-stone-400">
+                  <span className="yanmar-facility-storage-note">
                     · 다음{" "}
-                    <span className="tabular-nums text-amber-100/90">
-                      {formatUpgradeRemaining(nextProdRemainingMs)}
-                    </span>
+                    <b>{formatUpgradeRemaining(nextProdRemainingMs)}</b>
                     {" · "}
                     {MONUMENT_STARS_PER_TICK}/
                     {intervalMs >= 60_000
@@ -287,23 +319,20 @@ export function MonumentPanel({
                       : `${Math.round(intervalMs / 1000)}초`}
                   </span>
                 ) : (
-                  <span className="truncate text-[10px] font-semibold text-amber-200/90">
+                  <span className="yanmar-facility-storage-note is-full">
                     · 저장 가득 참
                   </span>
                 )}
               </div>
-              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-black/40">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-500 via-amber-300 to-yellow-200 transition-[width] duration-500"
-                  style={{ width: `${storagePct}%` }}
-                />
+              <div className="yanmar-facility-track" style={{ marginTop: "0.4rem" }}>
+                <span style={{ width: `${storagePct}%` }} />
               </div>
             </div>
             <button
               type="button"
               disabled={busy || !canClaimStars || !onClaimStars}
               onClick={() => void onClaimStars?.()}
-              className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-amber-200/45 bg-gradient-to-b from-amber-200 to-amber-500 px-2.5 py-1.5 text-xs font-black text-[#3b2208] transition enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-none disabled:bg-white/10 disabled:text-stone-500"
+              className="yanmar-facility-btn is-instant"
             >
               {canClaimStars ? (
                 <>
@@ -326,7 +355,7 @@ export function MonumentPanel({
         ) : null}
 
         {showManage ? (
-          <div className="flex shrink-0 gap-1 border-b border-white/10 px-2 pt-2">
+          <div className="yanmar-facility-modal-tabs" role="tablist">
             {(
               [
                 ["quest", "퀘스트"],
@@ -337,32 +366,50 @@ export function MonumentPanel({
               <button
                 key={id}
                 type="button"
-                className={`relative flex-1 rounded-t-lg px-2 py-2 text-sm font-bold ${
-                  tab === id
-                    ? "bg-white/15 text-white"
-                    : "text-stone-400 hover:bg-white/5"
-                }`}
+                role="tab"
+                aria-selected={tab === id}
+                className={`yanmar-facility-tab${tab === id ? " is-active" : ""}`}
                 onClick={() => setTab(id)}
               >
-                {label}
+                <span>{label}</span>
                 {id === "quest" && claimableQuestCount > 0 ? (
                   <span
-                    className="yanmar-quest-notify-badge is-dot"
+                    className="yanmar-quest-notify-badge is-tab"
                     aria-label={`미수령 보상 ${claimableQuestCount}개`}
-                  />
+                  >
+                    {claimableQuestCount > 9 ? "9+" : claimableQuestCount}
+                  </span>
                 ) : null}
               </button>
             ))}
           </div>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3">
+        {phase === "quest" ? (
+          <div className="yanmar-quest-modal-rail">
+            <span className="yanmar-quest-modal-rail-label">건설 미션</span>
+            <span className="yanmar-quest-modal-rail-note">
+              기본 미션을 완료하면 건설을 시작할 수 있습니다
+            </span>
+          </div>
+        ) : null}
+
+        {showManage && tab === "quest" ? (
+          <div className="yanmar-quest-modal-rail">
+            <span className="yanmar-quest-modal-rail-label">조형물 퀘스트</span>
+            <span className="yanmar-quest-modal-rail-note">
+              완료 보상은 조형물 포인트로 지급됩니다
+            </span>
+            <span className="yanmar-quest-modal-rail-value tabular-nums">
+              수령대기 <b>{claimableQuestCount}</b>
+            </span>
+          </div>
+        ) : null}
+
+        <div className="yanmar-facility-modal-body">
           {phase === "quest" ? (
             <div className="flex flex-col gap-3">
-              <p className="text-sm text-stone-300">
-                기본 미션 3개를 완료하면 건설을 시작할 수 있습니다.
-              </p>
-              <ul className="flex flex-col gap-2">
+              <ul className="yanmar-quest-list">
                 {MONUMENT_BUILD_QUESTS.map((q) => {
                   const item: MonumentQuestProgressItem = questState?.build[
                     q.id
@@ -372,29 +419,26 @@ export function MonumentPanel({
                     completed: false,
                     claimed: false,
                   };
-                  const pct = Math.min(100, (item.progress / q.target) * 100);
+                  const state: QuestCardState = item.completed
+                    ? "done"
+                    : "active";
                   return (
-                    <li
+                    <QuestCard
                       key={q.id}
-                      className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
-                    >
-                      <p className="text-sm font-bold">{q.title}</p>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                        <div
-                          className="h-full rounded-full bg-amber-400/80"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <p className="mt-1 text-right text-[11px] tabular-nums text-stone-400">
-                        {formatQuestProgressCurrent(
-                          item.progress,
-                          q.target,
-                          q.metric,
-                        ).toLocaleString()}{" "}
-                        / {q.target.toLocaleString()}
-                        {item.completed ? " ✓" : ""}
-                      </p>
-                    </li>
+                      title={q.title}
+                      tag={{ label: "건설", tone: "required" }}
+                      value={item.progress}
+                      target={q.target}
+                      metric={q.metric}
+                      state={state}
+                      action={
+                        item.completed ? (
+                          <DoneStamp label="완료" />
+                        ) : (
+                          <PendingStamp />
+                        )
+                      }
+                    />
                   );
                 })}
               </ul>
@@ -402,7 +446,7 @@ export function MonumentPanel({
                 <button
                   type="button"
                   disabled={busy || !buildComplete}
-                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40"
+                  className="yanmar-facility-btn is-primary"
                   onClick={() => void onStartConstruction()}
                 >
                   건설 시작 (60분)
@@ -412,31 +456,31 @@ export function MonumentPanel({
           ) : null}
 
           {phase === "building" ? (
-            <div className="flex flex-col items-center gap-3 py-6 text-center">
-              <p className="text-base font-bold">건설 진행 중</p>
-              <p className="text-2xl font-black tabular-nums text-amber-200">
+            <div className="yanmar-facility-hero">
+              <p className="yanmar-facility-hero-title">건설 진행 중</p>
+              <p className="yanmar-facility-hero-value">
                 {panelState.constructionEndsAt
                   ? formatUpgradeRemaining(
                       new Date(panelState.constructionEndsAt).getTime() - nowMs,
                     )
                   : "—"}
               </p>
-              <p className="text-xs text-stone-400">
+              <p className="yanmar-facility-hero-note">
                 시간이 끝나면 가까이에서 건설완료를 눌러 주세요.
               </p>
             </div>
           ) : null}
 
           {phase === "claimable" ? (
-            <div className="flex flex-col items-center gap-3 py-6">
-              <p className="text-base font-bold text-emerald-300">
+            <div className="yanmar-facility-hero">
+              <p className="yanmar-facility-hero-title is-success">
                 건설이 완료되었습니다!
               </p>
               {onClaimConstruction ? (
                 <button
                   type="button"
                   disabled={busy}
-                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40"
+                  className="yanmar-facility-btn is-primary"
                   onClick={() => void onClaimConstruction()}
                 >
                   건설완료
@@ -446,7 +490,7 @@ export function MonumentPanel({
           ) : null}
 
           {showManage && tab === "quest" ? (
-            <ul className="flex flex-col gap-2">
+            <ul className="yanmar-quest-list">
               {(questState?.daily ?? []).map((q) => {
                 const item = questState?.dailyProgress[q.id] ?? {
                   id: q.id,
@@ -455,58 +499,42 @@ export function MonumentPanel({
                   claimed: false,
                 };
                 const canClaim = item.completed && !item.claimed;
-                const pct = Math.min(100, (item.progress / q.target) * 100);
+                const state: QuestCardState = item.claimed
+                  ? "done"
+                  : canClaim
+                    ? "claimable"
+                    : "active";
                 return (
-                  <li
+                  <QuestCard
                     key={q.id}
-                    className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold">{q.title}</p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-stone-400">일일</span>
-                          <PointsAmount value={q.rewardPoints} size={16} />
-                        </div>
-                        {canClaim ? (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            className="relative rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
-                            onClick={() =>
-                              void onClaimQuest(q.id, q.rewardPoints)
-                            }
-                          >
-                            완료
-                            <span
-                              className="yanmar-quest-notify-badge is-dot"
-                              aria-hidden
-                            />
-                          </button>
-                        ) : item.claimed ? (
-                          <span className="text-xs font-semibold text-stone-500">
-                            수령됨
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-amber-400/80"
-                        style={{ width: `${pct}%` }}
+                    title={q.title}
+                    tag={{ label: "일일", tone: "required" }}
+                    rewardSlot={
+                      <QuestPointsChip
+                        iconSrc={MONUMENT_POINTS_ICON}
+                        amount={q.rewardPoints}
+                        label="조형물 포인트"
                       />
-                    </div>
-                    <p className="mt-1 text-right text-[11px] tabular-nums text-stone-400">
-                      {formatQuestProgressCurrent(
-                        item.progress,
-                        q.target,
-                        q.metric,
-                      ).toLocaleString()}{" "}
-                      / {q.target.toLocaleString()}
-                    </p>
-                  </li>
+                    }
+                    value={item.progress}
+                    target={q.target}
+                    metric={q.metric}
+                    state={state}
+                    action={
+                      canClaim ? (
+                        <ClaimButton
+                          claiming={Boolean(busy)}
+                          onClaim={() =>
+                            void onClaimQuest(q.id, q.rewardPoints)
+                          }
+                        />
+                      ) : item.claimed ? (
+                        <DoneStamp label="수령됨" />
+                      ) : (
+                        <PendingStamp />
+                      )
+                    }
+                  />
                 );
               })}
               {(questState?.repeat ?? []).map((q) => {
@@ -517,61 +545,45 @@ export function MonumentPanel({
                   claimed: false,
                 };
                 const canClaim = item.completed;
-                const pct = Math.min(100, (item.progress / q.target) * 100);
+                const state: QuestCardState = canClaim
+                  ? "claimable"
+                  : "active";
                 return (
-                  <li
+                  <QuestCard
                     key={q.id}
-                    className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold">{q.title}</p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-stone-400">반복</span>
-                          <PointsAmount value={q.rewardPoints} size={16} />
-                        </div>
-                        {canClaim ? (
-                          <button
-                            type="button"
-                            disabled={busy || !onClaimRepeatQuest}
-                            className="relative rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
-                            onClick={() =>
-                              void onClaimRepeatQuest?.(q.id, q.rewardPoints)
-                            }
-                          >
-                            완료
-                            <span
-                              className="yanmar-quest-notify-badge is-dot"
-                              aria-hidden
-                            />
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-amber-400/80"
-                        style={{ width: `${pct}%` }}
+                    title={q.title}
+                    tag={{ label: "반복", tone: "bonus" }}
+                    rewardSlot={
+                      <QuestPointsChip
+                        iconSrc={MONUMENT_POINTS_ICON}
+                        amount={q.rewardPoints}
+                        label="조형물 포인트"
                       />
-                    </div>
-                    <p className="mt-1 text-right text-[11px] tabular-nums text-stone-400">
-                      {formatQuestProgressCurrent(
-                        item.progress,
-                        q.target,
-                        q.metric,
-                      ).toLocaleString()}{" "}
-                      / {q.target.toLocaleString()}
-                    </p>
-                  </li>
+                    }
+                    value={item.progress}
+                    target={q.target}
+                    metric={q.metric}
+                    state={state}
+                    action={
+                      canClaim ? (
+                        <ClaimButton
+                          claiming={Boolean(busy) || !onClaimRepeatQuest}
+                          onClaim={() =>
+                            void onClaimRepeatQuest?.(q.id, q.rewardPoints)
+                          }
+                        />
+                      ) : (
+                        <PendingStamp />
+                      )
+                    }
+                  />
                 );
               })}
             </ul>
           ) : null}
 
           {showManage && tab === "upgrade" ? (
-            <ul className="flex flex-col gap-2">
+            <ul className="yanmar-facility-list">
               {MONUMENT_UPGRADES.map((u) => {
                 const level = levels[u.key] ?? 0;
                 const max = getMonumentUpgradeMaxLevel(u.key);
@@ -608,21 +620,21 @@ export function MonumentPanel({
                 return (
                   <li
                     key={u.key}
-                    className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
+                    className={`yanmar-facility-card${
+                      isThisPending ? " is-claimable" : ""
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold">
-                          {u.label}{" "}
-                          <span className="text-amber-200">
+                    <div className="yanmar-facility-card-top">
+                      <div className="yanmar-facility-card-main">
+                        <p className="yanmar-facility-card-title">
+                          {u.label}
+                          <em>
                             +{level}/{max}
-                          </span>
+                          </em>
                           {!maxed ? (
                             <span
-                              className={`ml-1.5 text-[11px] font-extrabold ${
-                                levelLocked
-                                  ? "text-red-400"
-                                  : "text-stone-400"
+                              className={`yanmar-facility-level-lock${
+                                levelLocked ? " is-locked" : ""
                               }`}
                             >
                               레벨제한{reqLevel}
@@ -630,19 +642,19 @@ export function MonumentPanel({
                           ) : null}
                         </p>
                         {!maxed ? (
-                          <p className="mt-1 text-[11px] text-sky-200/90">
+                          <p className="yanmar-facility-card-preview">
                             {nextPreview}
                           </p>
                         ) : null}
                       </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
+                      <div className="yanmar-facility-card-side">
                         {isThisPending && onInstantUpgrade ? (
                           <button
                             type="button"
                             disabled={
                               busy || (!timerReady && currency < instantCost)
                             }
-                            className="inline-flex items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                            className="yanmar-facility-btn is-instant"
                             onClick={() => void onInstantUpgrade()}
                           >
                             {timerReady ? (
@@ -665,7 +677,7 @@ export function MonumentPanel({
                               !canBuy ||
                               otherPending
                             }
-                            className="inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                            className="yanmar-facility-btn is-upgrade"
                             onClick={() => {
                               if (
                                 cost == null ||
@@ -695,10 +707,8 @@ export function MonumentPanel({
                           ? remainingMs != null
                           : durationMs != null) ? (
                           <p
-                            className={`text-[11px] tabular-nums ${
-                              isThisPending
-                                ? "font-semibold text-amber-200"
-                                : "text-stone-500"
+                            className={`yanmar-facility-timer${
+                              isThisPending ? " is-live" : ""
                             }`}
                           >
                             {formatUpgradeRemaining(
@@ -715,57 +725,55 @@ export function MonumentPanel({
           ) : null}
 
           {showManage && tab === "shop" ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-[11px] text-stone-400">
-                상품당 주간 {MONUMENT_SHOP_ITEMS[0]?.weeklyLimit ?? 3}회 ·
-                월요일 0시(KST) 리셋
-              </p>
-              <ul className="flex flex-col gap-2">
-                {MONUMENT_SHOP_ITEMS.map((item) => {
-                  const purchase = panelState.shopPurchases[item.id] ?? {
-                    count: 0,
-                    remaining: item.weeklyLimit,
-                  };
-                  const canBuy =
-                    panelState.points >= item.cost && purchase.remaining > 0;
-                  return (
-                    <li
-                      key={item.id}
-                      className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
+            <ul className="yanmar-facility-list">
+              <li className="yanmar-facility-card-desc" style={{ listStyle: "none", margin: 0 }}>
+                상품당 주간 {MONUMENT_SHOP_ITEMS[0]?.weeklyLimit ?? 3}회 · 월요일
+                0시(KST) 리셋
+              </li>
+              {MONUMENT_SHOP_ITEMS.map((item) => {
+                const purchase = panelState.shopPurchases[item.id] ?? {
+                  count: 0,
+                  remaining: item.weeklyLimit,
+                };
+                const canBuy =
+                  panelState.points >= item.cost && purchase.remaining > 0;
+                return (
+                  <li key={item.id} className="yanmar-facility-card is-row">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.icon}
+                      alt=""
+                      className="yanmar-facility-shop-art"
+                      draggable={false}
+                    />
+                    <div className="yanmar-facility-card-main">
+                      <p className="yanmar-facility-card-title">{item.label}</p>
+                      <p className="yanmar-facility-card-desc">
+                        {item.description}
+                      </p>
+                      <p className="yanmar-facility-card-progress">
+                        이번 주 {purchase.count}/{item.weeklyLimit}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={busy || !canBuy}
+                      className="yanmar-facility-btn is-buy"
+                      onClick={() =>
+                        setConfirmShop({
+                          itemId: item.id as WorkshopShopItemId,
+                          label: item.label,
+                          icon: item.icon,
+                          cost: item.cost,
+                        })
+                      }
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={item.icon}
-                        alt=""
-                        className="h-12 w-12 shrink-0 object-contain"
-                        draggable={false}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold">{item.label}</p>
-                        <p className="text-xs text-stone-400">
-                          {item.description}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={busy || !canBuy}
-                        className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
-                        onClick={() =>
-                          setConfirmShop({
-                            itemId: item.id as WorkshopShopItemId,
-                            label: item.label,
-                            icon: item.icon,
-                            cost: item.cost,
-                          })
-                        }
-                      >
-                        <PointsAmount value={item.cost} size={14} />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+                      <PointsAmount value={item.cost} size={14} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           ) : null}
         </div>
 

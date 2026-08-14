@@ -276,8 +276,9 @@ export async function startWebAudioBgm(
     const resumed = await tryResume(slot.ctx);
     if (myGen !== slot.startGen) return false;
     if (resumed) return true;
-    // Drop the silent graph so a later gesture can start cleanly.
-    disconnectSlotGraph(slot);
+    // Keep the existing graph — a later gesture can resume without
+    // tearing down and restarting the loop from the beginning.
+    return false;
   }
 
   const ctx = await ensureContext(slot);

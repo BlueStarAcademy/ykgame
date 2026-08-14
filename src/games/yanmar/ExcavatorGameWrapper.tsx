@@ -1,5 +1,8 @@
 "use client";
 
+/** Must run before any `@react-three/drei` Text / Troika font request. */
+import "./troikaTextSetup";
+
 /* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/preserve-manual-memoization, react-hooks/set-state-in-effect */
 
 import {
@@ -35,7 +38,7 @@ import {
   cancelAutoArmPose,
   hasManualControlInput,
 } from "./controls";
-import { CockpitOverlay } from "./CockpitOverlay";
+import { CockpitOverlay, ENGINE_OFF_HINT } from "./CockpitOverlay";
 import { prepareAttachmentSwapClearance } from "./attachmentGround";
 import {
   ExcavatorScene,
@@ -134,7 +137,7 @@ import {
   type YanmarQuestState,
 } from "./quests/questState";
 import type { QuestMetric } from "./quests/types";
-import { createDigFeedback, type DigFeedback } from "./bucket";
+import { createDigFeedback, isDigFeedbackHudEqual, type DigFeedback } from "./bucket";
 import {
   loadDumpTruckCooldown,
   saveDumpTruckCooldown,
@@ -195,7 +198,7 @@ import {
   rollYanmarHillXp,
   type YanmarEquipmentStats,
 } from "./equipment";
-import { defaultFinalStats } from "./gearStats";
+import { defaultFinalStats, type RepairBuffKind } from "./gearStats";
 import { GearPanel, type GearPanelItem } from "./GearPanel";
 import { PlayerProfileModal } from "./PlayerProfileModal";
 import {
@@ -1248,6 +1251,8 @@ export function ExcavatorGameWrapper({
   const [repairBuffExpiresAt, setRepairBuffExpiresAt] = useState<string | null>(
     null,
   );
+  const [repairBuffKind, setRepairBuffKind] =
+    useState<Exclude<RepairBuffKind, "NONE"> | null>(null);
   const [maintenance, setMaintenance] = useState<MaintenanceSnapshot | null>(
     null,
   );
@@ -1353,6 +1358,7 @@ export function ExcavatorGameWrapper({
   const [tutorialHasWaypoint, setTutorialHasWaypoint] = useState(false);
   const digFeedbackRef = useRef<DigFeedback>(createDigFeedback());
   const [digFeedback, setDigFeedback] = useState<DigFeedback>(createDigFeedback());
+  const lastSyncedDigHudRef = useRef<DigFeedback>(digFeedback);
   const dumpTruckStateRef = useRef(createDumpTruckState());
   const dumpTruckPoseRef = useRef<DumpTruckPose>(getDumpTruckPose(dumpTruckStateRef.current));
   const digHudTickRef = useRef(0);
@@ -1577,72 +1583,22 @@ export function ExcavatorGameWrapper({
     }
     if (digHudTickRef.current % 3 !== 0 && !crashHitChanged) return;
     lastSyncedCrashHitTickRef.current = fb.crashHitTick;
-    setDigFeedback((prev) =>
-      prev.inDigZone === fb.inDigZone &&
-      prev.inDumpZone === fb.inDumpZone &&
-      prev.tipOnGround === fb.tipOnGround &&
-      prev.bucketCurled === fb.bucketCurled &&
-      prev.canLoad === fb.canLoad &&
-      Math.abs(prev.digZoneRemainingUnits - fb.digZoneRemainingUnits) < 1 &&
-      prev.canStrike === fb.canStrike &&
-      prev.breakerNeedsVertical === fb.breakerNeedsVertical &&
-      prev.crashTileHp === fb.crashTileHp &&
-      prev.crashTileMaxHp === fb.crashTileMaxHp &&
-      prev.crashHitTick === fb.crashHitTick &&
-      prev.canGrab === fb.canGrab &&
-      prev.grappleNeedsAlignment === fb.grappleNeedsAlignment &&
-      prev.canDropRock === fb.canDropRock &&
-      prev.showGripGauge === fb.showGripGauge &&
-      Math.round(prev.gripAdhesion * 100) ===
-        Math.round(Math.min(1, fb.gripAdhesion) * 100) &&
-      Math.round(prev.gripPressure * 100) ===
-        Math.round(Math.min(1, fb.gripPressure) * 100) &&
-      prev.grappleLiftResult === fb.grappleLiftResult &&
-      prev.grappleLiftResultTick === fb.grappleLiftResultTick &&
-      prev.digging === fb.digging &&
-      prev.bladeWorking === fb.bladeWorking &&
-      Math.abs(prev.groundDepth - fb.groundDepth) < 0.05 &&
-      prev.bucketOpenReady === fb.bucketOpenReady &&
-      prev.insertedDeepEnough === fb.insertedDeepEnough &&
-      prev.bucketCurlReady === fb.bucketCurlReady &&
-      prev.armPulling === fb.armPulling &&
-      prev.optimalDigPose === fb.optimalDigPose &&
-      prev.canDump === fb.canDump &&
-      prev.dumpBodyTouching === fb.dumpBodyTouching &&
-      prev.dumpFacingBed === fb.dumpFacingBed &&
-      prev.truckPresent === fb.truckPresent &&
-      prev.haulTruckPresent === fb.haulTruckPresent &&
-      prev.nearHaulTruck === fb.nearHaulTruck &&
-      prev.carryingRock === fb.carryingRock &&
-      prev.truckCanAccept === fb.truckCanAccept &&
-      Math.abs(prev.truckFillRatio - fb.truckFillRatio) < 0.02 &&
-      Math.abs(prev.truckCooldownRemaining - fb.truckCooldownRemaining) < 0.15 &&
-      prev.haulTruckCanAccept === fb.haulTruckCanAccept &&
-      Math.abs(prev.haulTruckFillRatio - fb.haulTruckFillRatio) < 0.02 &&
-      Math.abs(prev.haulTruckCooldownRemaining - fb.haulTruckCooldownRemaining) < 0.15 &&
-      prev.haulTruckLoadCount === fb.haulTruckLoadCount &&
-      prev.haulTruckCapacity === fb.haulTruckCapacity &&
-      prev.raiseArmForDump === fb.raiseArmForDump &&
-      prev.travelBlockedRaiseArm === fb.travelBlockedRaiseArm &&
-      Math.abs(prev.digPoseScore - fb.digPoseScore) < 0.01 &&
-      Math.abs(prev.soilRetention - fb.soilRetention) < 0.02 &&
-      prev.soilSpilling === fb.soilSpilling &&
-      prev.digCooldowns.length === fb.digCooldowns.length &&
-      prev.digCooldowns.every(
-        (item, i) =>
-          item.id === fb.digCooldowns[i]?.id &&
-          Math.abs(item.etaSec - (fb.digCooldowns[i]?.etaSec ?? 0)) < 0.15,
-      ) &&
-      Math.abs(prev.crashCooldownEtaSec - fb.crashCooldownEtaSec) < 0.15 &&
-      Math.abs(prev.hillCooldownEtaSec - fb.hillCooldownEtaSec) < 0.15
-        ? prev
-        : { ...fb, digCooldowns: fb.digCooldowns.map((item) => ({ ...item })) },
-    );
+
+    // Snapshot before setState so a later sim mutation cannot widen the update.
+    const nextDig: DigFeedback = {
+      ...fb,
+      digCooldowns: fb.digCooldowns.map((item) => ({ ...item })),
+    };
+    if (!isDigFeedbackHudEqual(lastSyncedDigHudRef.current, nextDig)) {
+      lastSyncedDigHudRef.current = nextDig;
+      setDigFeedback(nextDig);
+    }
+
+    const boom = simRef.current.boom;
+    const arm = simRef.current.arm;
+    const bucket = simRef.current.bucket;
+    const bucketLoad = simRef.current.bucketLoad;
     setHud((h) => {
-      const boom = simRef.current.boom;
-      const arm = simRef.current.arm;
-      const bucket = simRef.current.bucket;
-      const bucketLoad = simRef.current.bucketLoad;
       if (
         Math.abs(h.boom - boom) < 0.01 &&
         Math.abs(h.arm - arm) < 0.01 &&
@@ -1653,10 +1609,11 @@ export function ExcavatorGameWrapper({
       }
       return { ...h, boom, arm, bucket, bucketLoad };
     });
+    const executing = autoPoseRef.current.executing;
     setAutoPose((prev) =>
-      prev.executing === autoPoseRef.current.executing ? prev : { ...autoPoseRef.current },
+      prev.executing === executing ? prev : { ...autoPoseRef.current },
     );
-  }, [setDigFeedback, setHud]);
+  }, []);
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
@@ -1791,7 +1748,19 @@ export function ExcavatorGameWrapper({
     // while travel input is already active.
     inputRef.current = merged;
     applyFreeLookSurfacePointerEvents(merged.travel);
-    setInput(merged);
+    setInput((prev) => {
+      if (
+        prev.left.x === merged.left.x &&
+        prev.left.y === merged.left.y &&
+        prev.right.x === merged.right.x &&
+        prev.right.y === merged.right.y &&
+        prev.travel.left === merged.travel.left &&
+        prev.travel.right === merged.travel.right
+      ) {
+        return prev;
+      }
+      return merged;
+    });
   }, [applyFreeLookSurfacePointerEvents]);
 
   const clearAllInput = useCallback(() => {
@@ -1804,8 +1773,41 @@ export function ExcavatorGameWrapper({
     keyboardInputRef.current = zero;
     inputRef.current = zero;
     applyFreeLookSurfacePointerEvents(zero.travel);
-    setInput(zero);
+    setInput((prev) =>
+      prev.left.x === 0 &&
+      prev.left.y === 0 &&
+      prev.right.x === 0 &&
+      prev.right.y === 0 &&
+      prev.travel.left === 0 &&
+      prev.travel.right === 0
+        ? prev
+        : zero,
+    );
   }, [applyFreeLookSurfacePointerEvents]);
+
+  const handleTouchInputChange = useCallback(
+    (
+      next:
+        | ExcavatorControlState
+        | ((current: ExcavatorControlState) => ExcavatorControlState),
+    ) => {
+      touchInputRef.current =
+        typeof next === "function" ? next(touchInputRef.current) : next;
+      syncMergedInput();
+      const merged = filterInput(
+        mergeControlInputs(touchInputRef.current, keyboardInputRef.current),
+        allowedRef.current,
+      );
+      if (
+        autoPoseRef.current.executing &&
+        hasManualControlInput(merged, allowedRef.current, auxiliaryRef.current)
+      ) {
+        cancelAutoArmPose(autoPoseRef.current);
+        setAutoPose({ ...autoPoseRef.current });
+      }
+    },
+    [syncMergedInput],
+  );
 
   const clearFreeLook = useCallback(() => {
     resetCameraLookOffset(lookOffsetRef.current);
@@ -2053,7 +2055,10 @@ export function ExcavatorGameWrapper({
       : mode === "tutorial"
         ? (tutorialStep?.allowed ?? ALL_CONTROLS)
         : ALL_CONTROLS;
-  const allowed: ControlMask = auxiliary.safetyLocked ? LOCKED_CONTROLS : baseAllowed;
+  const allowed: ControlMask =
+    !auxiliary.engineOn || auxiliary.safetyLocked
+      ? LOCKED_CONTROLS
+      : baseAllowed;
 
   const allowedRef = useRef<ControlMask>(allowed);
 
@@ -3282,8 +3287,10 @@ export function ExcavatorGameWrapper({
             ? data.repair.buffExpiresAt
             : new Date(data.repair.buffExpiresAt).toISOString(),
         );
+        setRepairBuffKind(data.repair.buffKind as Exclude<RepairBuffKind, "NONE">);
       } else {
         setRepairBuffExpiresAt(null);
+        setRepairBuffKind(null);
       }
       if (typeof data.currency === "number") {
         currencyRef.current = data.currency;
@@ -3783,6 +3790,17 @@ export function ExcavatorGameWrapper({
         }
         if (data.repair) {
           repairStateRef.current = data.repair;
+          if (
+            data.repair.buffExpiresAt &&
+            (data.repair.buffKind === "SMALL" || data.repair.buffKind === "LARGE")
+          ) {
+            setRepairBuffExpiresAt(
+              typeof data.repair.buffExpiresAt === "string"
+                ? data.repair.buffExpiresAt
+                : new Date(data.repair.buffExpiresAt).toISOString(),
+            );
+            setRepairBuffKind(data.repair.buffKind);
+          }
         }
         if (data.maintenance) {
           setMaintenance(data.maintenance);
@@ -4588,6 +4606,7 @@ export function ExcavatorGameWrapper({
         prev.boomSwing !== resolved.boomSwing ||
         prev.highSpeed !== resolved.highSpeed ||
         prev.safetyLocked !== resolved.safetyLocked ||
+        prev.engineOn !== resolved.engineOn ||
         prev.blade !== resolved.blade ||
         prev.throttle !== resolved.throttle ||
         prev.attachmentPedal !== resolved.attachmentPedal
@@ -4604,8 +4623,9 @@ export function ExcavatorGameWrapper({
       ...resolved,
       grappleOpen: auxiliaryRef.current.grappleOpen,
     });
-    if (resolved.safetyLocked) {
+    if (resolved.safetyLocked || !resolved.engineOn) {
       clearAllInput();
+      yanmarAudio.stopActionSounds();
       if (resolved.attachmentPedal !== 0) {
         const unlocked = {
           ...resolved,
@@ -4658,6 +4678,7 @@ export function ExcavatorGameWrapper({
   const handleExecutePose = useCallback((slot: AutoPoseSlotIndex) => {
     const now = Date.now();
     if (now < executePoseCooldownUntil) return;
+    if (!auxiliaryRef.current.engineOn || auxiliaryRef.current.safetyLocked) return;
     if (!startAutoArmPose(autoPoseRef.current, slot)) return;
     setAutoPose({ ...autoPoseRef.current });
     setExecutePoseCooldownUntil(now + poseActionCooldownMs);
@@ -5472,25 +5493,48 @@ export function ExcavatorGameWrapper({
 
   const handleProgress = useCallback(
     (dumped: number, progress: number) => {
-      const dumpedUnits = Math.round(Math.max(0, dumped) * equipmentStats.maxLoadUnits);
-      if (progress !== lastHudProgressRef.current || hud.dumpedUnits !== dumpedUnits) {
+      const dumpedUnits = Math.round(
+        Math.max(0, dumped) * equipmentStatsRef.current.maxLoadUnits,
+      );
+      if (progress !== lastHudProgressRef.current) {
         lastHudProgressRef.current = progress;
-        setHud((h) => ({
-          ...h,
-          progress,
-          bucketLoad: simRef.current.bucketLoad,
-          dumpedUnits,
-        }));
+        setHud((h) =>
+          h.progress === progress &&
+          h.dumpedUnits === dumpedUnits &&
+          Math.abs(h.bucketLoad - simRef.current.bucketLoad) < 0.005
+            ? h
+            : {
+                ...h,
+                progress,
+                bucketLoad: simRef.current.bucketLoad,
+                dumpedUnits,
+              },
+        );
+      } else {
+        setHud((h) =>
+          h.dumpedUnits === dumpedUnits &&
+          Math.abs(h.bucketLoad - simRef.current.bucketLoad) < 0.005
+            ? h
+            : {
+                ...h,
+                bucketLoad: simRef.current.bucketLoad,
+                dumpedUnits,
+              },
+        );
       }
       if (!endedRef.current && dumped >= config.target) {
-        setHud((h) => ({
-          ...h,
-          progress: 100,
-          dumpedUnits,
-        }));
+        setHud((h) =>
+          h.progress === 100 && h.dumpedUnits === dumpedUnits
+            ? h
+            : {
+                ...h,
+                progress: 100,
+                dumpedUnits,
+              },
+        );
       }
     },
-    [config.target, equipmentStats.maxLoadUnits, hud.dumpedUnits, setHud],
+    [config.target],
   );
 
   const scheduleHideDumpScorePanel = useCallback(() => {
@@ -6576,7 +6620,7 @@ export function ExcavatorGameWrapper({
         config.duration > 0 ? scoreRef.current.timeLeft : elapsedRef.current;
       const progress = getProgress(scoreRef.current);
       setHud((h) =>
-        h.timeLeft === timeLeft && h.progress === progress
+        Math.abs(h.timeLeft - timeLeft) < 0.05 && h.progress === progress
           ? h
           : { ...h, timeLeft, progress },
       );
@@ -6633,6 +6677,26 @@ export function ExcavatorGameWrapper({
 
   useEffect(() => {
     const keys = new Set<string>();
+    const controlKeys = new Set([
+      "a",
+      "d",
+      "q",
+      "e",
+      "w",
+      "s",
+      "z",
+      "c",
+      "x",
+      "v",
+      "j",
+      "l",
+      "i",
+      "k",
+      "arrowleft",
+      "arrowright",
+      "arrowup",
+      "arrowdown",
+    ]);
     const updateKeys = () => {
       const left = { x: 0, y: 0 };
       const right = { x: 0, y: 0 };
@@ -6666,7 +6730,15 @@ export function ExcavatorGameWrapper({
     const down = (e: KeyboardEvent) => {
       const key = e.key?.toLowerCase();
       if (!key) return;
+      const wasHeld = keys.has(key);
       keys.add(key);
+      if (
+        !wasHeld &&
+        controlKeys.has(key) &&
+        !auxiliaryRef.current.engineOn
+      ) {
+        showAttachmentWarning(ENGINE_OFF_HINT);
+      }
       updateKeys();
     };
     const up = (e: KeyboardEvent) => {
@@ -6693,7 +6765,7 @@ export function ExcavatorGameWrapper({
       window.removeEventListener("blur", clearKeys);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [syncMergedInput]);
+  }, [showAttachmentWarning, syncMergedInput]);
 
   const loadOverlayPercent = Math.max(0, Math.min(100, hud.bucketLoad * 100));
   const loadOverlayUnits = getLoadUnits(hud.bucketLoad, equipmentStats.maxLoadUnits);
@@ -7959,6 +8031,14 @@ export function ExcavatorGameWrapper({
             <ActiveShopBuffIcons
               buffs={activeShopBuffs}
               onChange={persistActiveShopBuffs}
+              repairBuff={
+                repairBuffKind && repairBuffExpiresAt
+                  ? {
+                      kind: repairBuffKind,
+                      expiresAt: repairBuffExpiresAt,
+                    }
+                  : null
+              }
               worldPickupsRef={
                 mode === "game" && session?.user?.id
                   ? worldPickupsRef
@@ -8527,22 +8607,7 @@ export function ExcavatorGameWrapper({
           <CockpitOverlay
             mode={mode}
             input={input}
-            onInputChange={(next) => {
-              touchInputRef.current =
-                typeof next === "function" ? next(touchInputRef.current) : next;
-              syncMergedInput();
-              const merged = filterInput(
-                mergeControlInputs(touchInputRef.current, keyboardInputRef.current),
-                allowedRef.current,
-              );
-              if (
-                autoPoseRef.current.executing &&
-                hasManualControlInput(merged, allowedRef.current, auxiliaryRef.current)
-              ) {
-                cancelAutoArmPose(autoPoseRef.current);
-                setAutoPose({ ...autoPoseRef.current });
-              }
-            }}
+            onInputChange={handleTouchInputChange}
             auxiliary={auxiliary}
             onAuxiliaryChange={handleAuxiliaryChange}
             attachmentType={attachmentType}
@@ -8557,7 +8622,7 @@ export function ExcavatorGameWrapper({
             onSaveAutoPoseLabels={handleSaveAutoPoseLabels}
             savePoseDisabled={savePoseOnCooldown}
             executePoseDisabled={executePoseOnCooldown}
-            allowed={allowed}
+            allowed={baseAllowed}
             tutorialStep={tutorialStep}
             showTouchZones={false}
             hornId={soundSettings.hornId}

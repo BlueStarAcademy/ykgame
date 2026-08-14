@@ -175,6 +175,7 @@ export function MaintenanceBonusRoulette({
     return () => {
       if (spinRafRef.current) cancelAnimationFrame(spinRafRef.current);
       spinningRef.current = false;
+      yanmarAudio.stopRouletteSpin();
     };
   }, []);
 
@@ -188,6 +189,7 @@ export function MaintenanceBonusRoulette({
     spinningRef.current = true;
     stopRequestedRef.current = false;
     setPhase("spinning");
+    yanmarAudio.playRouletteSpin();
 
     const endOffset = stopIndex * ITEM_HEIGHT;
     const start = performance.now();
@@ -221,8 +223,10 @@ export function MaintenanceBonusRoulette({
 
       if (t >= 1) {
         spinningRef.current = false;
+        yanmarAudio.stopRouletteSpin();
         setReelOffsetRem(endOffset);
         setPhase("reveal");
+        yanmarAudio.playItemAcquire();
         if (granted.stars > 0) {
           yanmarAudio.playStarAcquire();
         }
@@ -253,7 +257,6 @@ export function MaintenanceBonusRoulette({
         <div className={styles.body}>
           {phase === "spinning" ? (
             <div className={styles.slotStage}>
-              <p className={styles.slotHint}>범위 보상 · 한 번에 전체 지급</p>
               <div className={styles.slotPointer} aria-hidden />
               <div className={styles.slotWindow}>
                 <div
@@ -270,7 +273,6 @@ export function MaintenanceBonusRoulette({
                       </div>
                       <div className={styles.slotLabelCol}>
                         <div className={styles.slotLabel}>{item.label}</div>
-                        <div className={styles.slotSub}>전체 지급분</div>
                       </div>
                     </div>
                   ))}
@@ -279,7 +281,6 @@ export function MaintenanceBonusRoulette({
             </div>
           ) : (
             <div className={styles.slotResult}>
-              <div className={styles.slotResultEyebrow}>TOTAL REWARD</div>
               <div className={styles.grantGrid} aria-label="획득한 전체 보상">
                 {chips.map((chip) => (
                   <span

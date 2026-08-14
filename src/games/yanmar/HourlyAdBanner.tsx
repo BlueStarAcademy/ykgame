@@ -127,24 +127,26 @@ export function HourlyAdBanner({
     const tick = () => {
       const active = getActiveHourlyAd();
       if (!active) {
-        setBannerSec(0);
-        setActiveSlotId(null);
-        setActiveHourBucket(null);
-        setCreative(null);
+        setBannerSec((prev) => (prev === 0 ? prev : 0));
+        setActiveSlotId((prev) => (prev === null ? prev : null));
+        setActiveHourBucket((prev) => (prev === null ? prev : null));
+        setCreative((prev) => (prev === null ? prev : null));
         activeSlotIdRef.current = null;
         activeHourBucketRef.current = null;
-        setClaimed(false);
+        setClaimed((prev) => (prev ? false : prev));
         return;
       }
 
       const { hourBucket, slot, remainingMs } = active;
       activeSlotIdRef.current = slot.id;
       activeHourBucketRef.current = hourBucket;
-      setActiveSlotId(slot.id);
-      setActiveHourBucket(hourBucket);
-      setCreative(slot.creative);
-      setClaimed(wasHourlyAdClaimedLocally(hourBucket, slot.id));
-      setBannerSec(remainingMs / 1000);
+      setActiveSlotId((prev) => (prev === slot.id ? prev : slot.id));
+      setActiveHourBucket((prev) => (prev === hourBucket ? prev : hourBucket));
+      setCreative((prev) => (prev === slot.creative ? prev : slot.creative));
+      const nextClaimed = wasHourlyAdClaimedLocally(hourBucket, slot.id);
+      setClaimed((prev) => (prev === nextClaimed ? prev : nextClaimed));
+      const nextSec = remainingMs / 1000;
+      setBannerSec((prev) => (Math.abs(prev - nextSec) < 0.05 ? prev : nextSec));
     };
 
     tick();
@@ -194,6 +196,8 @@ export function HourlyAdBanner({
   useEffect(() => {
     return () => {
       if (spinRafRef.current) cancelAnimationFrame(spinRafRef.current);
+      spinningRef.current = false;
+      yanmarAudio.stopRouletteSpin();
     };
   }, []);
 
@@ -250,6 +254,7 @@ export function HourlyAdBanner({
     spinningRef.current = true;
     stopRequestedRef.current = false;
     setPhase("spinning");
+    yanmarAudio.playRouletteSpin();
 
     const endOffset = stopIndex * ITEM_HEIGHT;
     const start = performance.now();
@@ -288,8 +293,10 @@ export function HourlyAdBanner({
 
       if (t >= 1) {
         spinningRef.current = false;
+        yanmarAudio.stopRouletteSpin();
         setReelOffsetRem(endOffset);
         setPhase("result");
+        yanmarAudio.playItemAcquire();
         if (won.kind === "stars") {
           yanmarAudio.playStarAcquire();
         }

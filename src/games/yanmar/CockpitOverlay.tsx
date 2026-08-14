@@ -74,6 +74,8 @@ interface JoystickLayout {
 }
 
 const PEDAL_SWING_SPEED_PER_SECOND = 0.85;
+/** Shown when the player tries to operate with the engine off. */
+export const ENGINE_OFF_HINT = "엔진을 켜세요.";
 
 function getJoystickZoneMetrics(isPortrait: boolean) {
   return {
@@ -99,6 +101,8 @@ function getAuxMenuButtonSize(isPortrait: boolean) {
 const AUX_MENU_TOGGLE_CY = 0.495;
 /** 경적 ↔ 자동 버튼 간격 */
 const HORN_AUTO_GAP = "0.42rem";
+/** 기능 ↔ 시동 버튼 간격 */
+const FUNCTION_ENGINE_GAP = "0.42rem";
 
 /** `as const` layout literals widened so portrait offsets type-check. */
 type WidenNumbers<T> = T extends number
@@ -833,6 +837,8 @@ interface GameJoystickProps {
   onChange: (x: number, y: number) => void;
   /** 드래그 중인 pointerId — 같은 손가락의 버튼 오입력만 걸러낼 때 사용 */
   onControlPointerDrag?: (pointerId: number, active: boolean) => void;
+  /** When set, disabled sticks still receive taps and call this instead of operating. */
+  onInactivePress?: () => void;
 }
 
 function GameJoystick({
@@ -845,6 +851,7 @@ function GameJoystick({
   useDPad,
   onChange,
   onControlPointerDrag,
+  onInactivePress,
 }: GameJoystickProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
   const activePointerIdRef = useRef<number | null>(null);
@@ -887,7 +894,13 @@ function GameJoystick({
   );
 
   const handleStart = (e: React.PointerEvent) => {
-    if (!enabled.x && !enabled.y) return;
+    if (!enabled.x && !enabled.y) {
+      if (onInactivePress) {
+        e.preventDefault();
+        onInactivePress();
+      }
+      return;
+    }
     e.preventDefault();
     activePointerIdRef.current = e.pointerId;
     dragActiveRef.current = true;
@@ -910,12 +923,17 @@ function GameJoystick({
   };
 
   const isDisabled = !enabled.x && !enabled.y;
+  const acceptsInactivePress = isDisabled && Boolean(onInactivePress);
 
   return (
     <>
       <div
         ref={zoneRef}
-        className={`absolute z-[62] touch-none rounded-2xl ${isDisabled ? "pointer-events-none" : "pointer-events-auto"}`}
+        className={`absolute z-[62] touch-none rounded-2xl ${
+          isDisabled && !acceptsInactivePress
+            ? "pointer-events-none"
+            : "pointer-events-auto"
+        }`}
         style={{
           left: useDPad
             ? side === "left"
@@ -969,6 +987,7 @@ interface TravelLeverProps {
   onChange: (value: number) => void;
   onDragActiveChange?: (active: boolean) => void;
   onControlPointerDrag?: (pointerId: number, active: boolean) => void;
+  onInactivePress?: () => void;
 }
 
 function TravelLever({
@@ -981,6 +1000,7 @@ function TravelLever({
   onChange,
   onDragActiveChange,
   onControlPointerDrag,
+  onInactivePress,
 }: TravelLeverProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
   const activePointerIdRef = useRef<number | null>(null);
@@ -1008,7 +1028,13 @@ function TravelLever({
   );
 
   const handleStart = (e: React.PointerEvent) => {
-    if (!enabled) return;
+    if (!enabled) {
+      if (onInactivePress) {
+        e.preventDefault();
+        onInactivePress();
+      }
+      return;
+    }
     e.preventDefault();
     activePointerIdRef.current = e.pointerId;
     onControlPointerDrag?.(e.pointerId, true);
@@ -1034,12 +1060,17 @@ function TravelLever({
       ? "-2.4%"
       : "2.4%";
   const hitboxWidth = isPortrait ? "10%" : "6.6%";
+  const acceptsInactivePress = !enabled && Boolean(onInactivePress);
 
   return (
     <>
       <div
         ref={zoneRef}
-        className={`absolute z-40 touch-none rounded-xl ${!enabled ? "pointer-events-none" : "pointer-events-auto"}`}
+        className={`absolute z-40 touch-none rounded-xl ${
+          !enabled && !acceptsInactivePress
+            ? "pointer-events-none"
+            : "pointer-events-auto"
+        }`}
         style={travelLeverHitboxStyle({
           cxPct: `${layout.cx * 100}%`,
           centerY: `${layout.cy * 100}%`,
@@ -1089,6 +1120,7 @@ interface DualTravelCenterProps {
   onChange: (value: number) => void;
   onDragActiveChange?: (active: boolean) => void;
   onControlPointerDrag?: (pointerId: number, active: boolean) => void;
+  onInactivePress?: () => void;
 }
 
 function DualTravelCenter({
@@ -1100,6 +1132,7 @@ function DualTravelCenter({
   onChange,
   onDragActiveChange,
   onControlPointerDrag,
+  onInactivePress,
 }: DualTravelCenterProps) {
   const zoneRef = useRef<HTMLDivElement>(null);
   const activePointerIdRef = useRef<number | null>(null);
@@ -1127,7 +1160,13 @@ function DualTravelCenter({
   );
 
   const handleStart = (e: React.PointerEvent) => {
-    if (!enabled) return;
+    if (!enabled) {
+      if (onInactivePress) {
+        e.preventDefault();
+        onInactivePress();
+      }
+      return;
+    }
     e.preventDefault();
     activePointerIdRef.current = e.pointerId;
     onControlPointerDrag?.(e.pointerId, true);
@@ -1145,10 +1184,16 @@ function DualTravelCenter({
     pointer.finish(e.pointerId);
   };
 
+  const acceptsInactivePress = !enabled && Boolean(onInactivePress);
+
   return (
     <div
       ref={zoneRef}
-      className={`absolute z-30 touch-none rounded-xl ${!enabled ? "pointer-events-none" : "pointer-events-auto"}`}
+      className={`absolute z-30 touch-none rounded-xl ${
+        !enabled && !acceptsInactivePress
+          ? "pointer-events-none"
+          : "pointer-events-auto"
+      }`}
       style={travelLeverHitboxStyle({
         cxPct: `${layout.cx * 100}%`,
         centerY: `${layout.cy * 100}%`,
@@ -1286,6 +1331,7 @@ function BladeLever({
   isPortrait,
   onChange,
   embedded = false,
+  onInactivePress,
 }: {
   value: number;
   enabled: boolean;
@@ -1294,6 +1340,7 @@ function BladeLever({
   isPortrait: boolean;
   onChange: (value: number) => void;
   embedded?: boolean;
+  onInactivePress?: () => void;
 }) {
   const blade = layout.blade;
   const zoneRef = useRef<HTMLDivElement>(null);
@@ -1397,7 +1444,13 @@ function BladeLever({
   const pointer = usePointerRelease(onRelease);
 
   const handleStart = (e: React.PointerEvent) => {
-    if (!enabled) return;
+    if (!enabled) {
+      if (onInactivePress) {
+        e.preventDefault();
+        onInactivePress();
+      }
+      return;
+    }
     e.preventDefault();
     setDragging(true);
     pointer.begin(e.pointerId, zoneRef.current);
@@ -1417,6 +1470,7 @@ function BladeLever({
   const visualValue = dragging
     ? stick
     : Math.max(-1, Math.min(1, value * 2 - 1));
+  const acceptsInactivePress = !enabled && Boolean(onInactivePress);
 
   if (embedded) {
     return (
@@ -1439,7 +1493,7 @@ function BladeLever({
         <div
           ref={zoneRef}
           className={`yanmar-blade-lever absolute inset-0 z-50 touch-none rounded-xl ${
-            !enabled ? "pointer-events-none is-disabled" : ""
+            !enabled && !acceptsInactivePress ? "pointer-events-none is-disabled" : ""
           }`}
           style={{ WebkitTouchCallout: "none" }}
           onPointerDown={handleStart}
@@ -1489,7 +1543,7 @@ function BladeLever({
       <div
         ref={zoneRef}
         className={`yanmar-blade-lever absolute z-50 touch-none rounded-xl ${
-          !enabled ? "pointer-events-none is-disabled" : ""
+          !enabled && !acceptsInactivePress ? "pointer-events-none is-disabled" : ""
         } ${isPortrait ? "yanmar-blade-lever-portrait" : ""}`}
         style={{
           left: `${blade.cx * 100}%`,
@@ -1671,16 +1725,20 @@ function AttachmentPedalControl({
 
 function PedalSwingControl({
   activeValue,
+  enabled = true,
   showTouchZone,
   onChange,
   layout,
   isPortrait,
+  onInactivePress,
 }: {
   activeValue: number;
+  enabled?: boolean;
   showTouchZone: boolean;
   onChange: (value: number) => void;
   layout: CockpitLayout;
   isPortrait: boolean;
+  onInactivePress?: () => void;
 }) {
   const pedal = layout.rightPedal;
   const valueRef = useRef(activeValue);
@@ -1745,6 +1803,10 @@ function PedalSwingControl({
 
   const press = (e: React.PointerEvent<HTMLButtonElement>, value: number) => {
     if (e.button !== 0) return;
+    if (!enabled) {
+      onInactivePress?.();
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     pointer.begin(e.pointerId, e.currentTarget);
@@ -1755,6 +1817,12 @@ function PedalSwingControl({
       frameRef.current = requestAnimationFrame(animate);
     }
   };
+
+  useEffect(() => {
+    if (enabled) return;
+    setPressedDirection(0);
+    stopAnimation();
+  }, [enabled, stopAnimation]);
 
   const handleEnd = (e: React.PointerEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -1771,7 +1839,9 @@ function PedalSwingControl({
           : pressedDirection < 0
             ? "is-right-active"
             : ""
-      } ${isPortrait ? "yanmar-breaker-pedal-button-portrait" : ""}`}
+      } ${!enabled ? "is-disabled" : ""} ${
+        isPortrait ? "yanmar-breaker-pedal-button-portrait" : ""
+      }`}
       style={{
         WebkitTouchCallout: "none",
         left: `${pedal.cx * 100}%`,
@@ -1830,6 +1900,7 @@ interface FunctionMenuProps {
   playerLevel: number;
   unlockAllAttachments?: boolean;
   onAttachmentChange: (attachment: AttachmentType) => void;
+  onInactiveMachinePress?: () => void;
 }
 
 const ATTACHMENTS: Array<{
@@ -1918,6 +1989,7 @@ function FunctionMenu({
   playerLevel,
   unlockAllAttachments,
   onAttachmentChange,
+  onInactiveMachinePress,
 }: FunctionMenuProps) {
   const anchorCx = layout.left.cx;
   const toggleCy = AUX_MENU_TOGGLE_CY;
@@ -2025,11 +2097,14 @@ function FunctionMenu({
         >
           <BladeLever
             value={auxiliary.blade}
-            enabled={!auxiliary.safetyLocked}
+            enabled={auxiliary.engineOn && !auxiliary.safetyLocked}
             showTouchZone={showTouchZones}
             layout={layout}
             isPortrait={isPortrait}
             embedded
+            onInactivePress={
+              !auxiliary.engineOn ? onInactiveMachinePress : undefined
+            }
             onChange={(blade) =>
               onAuxiliaryChange((current) => ({ ...current, blade }))
             }
@@ -2060,6 +2135,65 @@ function FunctionMenu({
   );
 }
 
+function EngineStartButton({
+  engineOn,
+  onToggle,
+  layout,
+  isPortrait,
+  showTouchZones,
+}: {
+  engineOn: boolean;
+  onToggle: () => void;
+  layout: CockpitLayout;
+  isPortrait: boolean;
+  showTouchZones: boolean;
+}) {
+  const buttonSize = getAuxMenuButtonSize(isPortrait);
+  const anchorCx = layout.left.cx;
+  const toggleCy = AUX_MENU_TOGGLE_CY;
+
+  return (
+    <button
+      type="button"
+      data-no-ui-click
+      className={`yanmar-engine-start-button touch-none active:scale-95${
+        engineOn ? " is-on" : " is-off"
+      }${isPortrait ? " yanmar-engine-start-button-portrait" : ""}`}
+      style={{
+        left: `${anchorCx * 100}%`,
+        top: `${toggleCy * 100}%`,
+        width: buttonSize,
+        height: buttonSize,
+        transform: `translate(calc(-50% + ${buttonSize} + ${FUNCTION_ENGINE_GAP}), -50%)`,
+      }}
+      onPointerDown={activateOnPointerDown(() => {
+        if (!engineOn) {
+          yanmarAudio.playEngineStart();
+        } else {
+          yanmarAudio.playEngineOff();
+        }
+        onToggle();
+      })}
+      aria-pressed={engineOn}
+      aria-label={engineOn ? "시동 끄기" : "시동 켜기"}
+    >
+      <span className="yanmar-engine-start-ring" aria-hidden />
+      <span className="yanmar-engine-start-core" aria-hidden>
+        <span className="yanmar-engine-start-led" />
+        <span className="yanmar-engine-start-mark">
+          <span className="yanmar-engine-start-power" />
+        </span>
+        <span className="yanmar-engine-start-caption">
+          {engineOn ? "ON" : "START"}
+        </span>
+      </span>
+      {showTouchZones ? (
+        <span className="pointer-events-none absolute inset-[-6%] rounded-full border border-emerald-200/65 bg-transparent" />
+      ) : null}
+    </button>
+  );
+}
+
 function AutoMenuActionButton({
   variant,
   slot,
@@ -2067,6 +2201,7 @@ function AutoMenuActionButton({
   active = false,
   disabled = false,
   onClick,
+  onDisabledPress,
   showTouchZone,
   ariaLabel,
 }: {
@@ -2076,21 +2211,25 @@ function AutoMenuActionButton({
   active?: boolean;
   disabled?: boolean;
   onClick: () => void;
+  onDisabledPress?: () => void;
   showTouchZone: boolean;
   ariaLabel: string;
 }) {
+  const visuallyDisabled = disabled || Boolean(onDisabledPress);
   return (
     <button
       type="button"
       className={`yanmar-auto-menu-action yanmar-aux-button relative h-full w-full touch-none active:scale-95${
         active ? " is-active" : ""
-      }${disabled ? " is-disabled" : ""}`}
+      }${visuallyDisabled ? " is-disabled" : ""}`}
       onPointerDown={
-        disabled
-          ? undefined
-          : activateOnPointerDown(onClick)
+        onDisabledPress
+          ? activateOnPointerDown(onDisabledPress)
+          : disabled
+            ? undefined
+            : activateOnPointerDown(onClick)
       }
-      disabled={disabled}
+      disabled={disabled && !onDisabledPress}
       aria-label={ariaLabel}
     >
       <span
@@ -2225,6 +2364,8 @@ interface AutoMenuProps {
   onEditLabels: () => void;
   savePoseDisabled?: boolean;
   executePoseDisabled?: boolean;
+  engineOn?: boolean;
+  onInactiveMachinePress?: () => void;
   isPortrait: boolean;
 }
 
@@ -2242,6 +2383,8 @@ function HornAutoCluster({
   onEditLabels,
   savePoseDisabled = false,
   executePoseDisabled = false,
+  engineOn = true,
+  onInactiveMachinePress,
 }: {
   layout: CockpitLayout;
   isPortrait: boolean;
@@ -2256,6 +2399,8 @@ function HornAutoCluster({
   onEditLabels: () => void;
   savePoseDisabled?: boolean;
   executePoseDisabled?: boolean;
+  engineOn?: boolean;
+  onInactiveMachinePress?: () => void;
 }) {
   const buttonSize = getAuxMenuButtonSize(isPortrait);
   const anchorCx = layout.horn.cx;
@@ -2310,6 +2455,8 @@ function HornAutoCluster({
         onEditLabels={onEditLabels}
         savePoseDisabled={savePoseDisabled}
         executePoseDisabled={executePoseDisabled}
+        engineOn={engineOn}
+        onInactiveMachinePress={onInactiveMachinePress}
       />
     </div>
   );
@@ -2328,6 +2475,8 @@ function AutoMenu({
   onEditLabels,
   savePoseDisabled = false,
   executePoseDisabled = false,
+  engineOn = true,
+  onInactiveMachinePress,
 }: AutoMenuProps) {
   const editOpenDelayMs = AUTO_POSE_SLOT_ORDER.length * 50;
   const editCloseDelayMs = 0;
@@ -2350,6 +2499,12 @@ function AutoMenu({
           const isExecutingThis =
             autoPose.executing && autoPose.activeSlot === slot;
           const executeLabel = autoPoseLabels[slot] || `실행${slot + 1}`;
+          const executeBlockedByEngine = !engineOn && hasSavedPose;
+          const executeDisabled =
+            !hasSavedPose ||
+            autoPose.executing ||
+            executePoseDisabled ||
+            !engineOn;
 
           return (
             <div
@@ -2372,15 +2527,22 @@ function AutoMenu({
                     slot={slot}
                     label={executeLabel}
                     active={isExecutingThis}
-                    disabled={!hasSavedPose || autoPose.executing || executePoseDisabled}
+                    disabled={executeDisabled}
+                    onDisabledPress={
+                      executeBlockedByEngine
+                        ? onInactiveMachinePress
+                        : undefined
+                    }
                     onClick={() => onExecutePose(slot)}
                     showTouchZone={showTouchZones}
                     ariaLabel={
-                      executePoseDisabled
-                        ? `${executeLabel} 자세 실행 대기 중`
-                        : isExecutingThis
-                          ? `${executeLabel} 자동 자세 실행 중`
-                          : `${executeLabel} 저장된 자세 실행`
+                      executeBlockedByEngine
+                        ? `${executeLabel} — 엔진을 켠 뒤 실행`
+                        : executePoseDisabled
+                          ? `${executeLabel} 자세 실행 대기 중`
+                          : isExecutingThis
+                            ? `${executeLabel} 자동 자세 실행 중`
+                            : `${executeLabel} 저장된 자세 실행`
                     }
                   />
                 </div>
@@ -2495,11 +2657,19 @@ export function CockpitOverlay({
   const sideTravelActiveRef = useRef({ left: false, right: false });
   /** 조작 드래그 중인 pointerId — 같은 손가락의 버튼 오입력만 차단 */
   const controlDragPointersRef = useRef(new Set<number>());
-  const travelEnabled = allowed.travel && !auxiliary.safetyLocked;
+  const travelEnabled =
+    allowed.travel && auxiliary.engineOn && !auxiliary.safetyLocked;
   const pedalAttachmentEquipped =
     attachmentType === "breaker" || attachmentType === "grapple";
   const attachmentPedalCanOperate =
-    pedalAttachmentEquipped && !auxiliary.safetyLocked;
+    pedalAttachmentEquipped &&
+    auxiliary.engineOn &&
+    !auxiliary.safetyLocked;
+  const notifyEngineOff = useCallback(() => {
+    onAttachmentWarning?.(ENGINE_OFF_HINT);
+  }, [onAttachmentWarning]);
+  const engineOffPress =
+    !auxiliary.engineOn ? notifyEngineOff : undefined;
 
   const setControlPointerDrag = useCallback((pointerId: number, active: boolean) => {
     if (active) {
@@ -2517,7 +2687,7 @@ export function CockpitOverlay({
   useEffect(() => {
     if (!travelEnabled) {
       sideTravelActiveRef.current = { left: false, right: false };
-      setTravelLock(null);
+      setTravelLock((prev) => (prev === null ? prev : null));
       if (input.travel.left !== 0 || input.travel.right !== 0) {
         onInputChange((current) => ({
           ...current,
@@ -2525,7 +2695,9 @@ export function CockpitOverlay({
         }));
       }
     }
-  }, [travelEnabled, input.travel.left, input.travel.right, onInputChange]);
+    // onInputChange is stable from the parent; omit to avoid effect churn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [travelEnabled, input.travel.left, input.travel.right]);
 
   useEffect(() => {
     if (attachmentPedalCanOperate) return;
@@ -2583,6 +2755,11 @@ export function CockpitOverlay({
             highlighted={highlightTravel}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
+            onInactivePress={
+              engineOffPress && allowed.travel && travelLock !== "both"
+                ? notifyEngineOff
+                : undefined
+            }
             onDragActiveChange={(active) => {
               sideTravelActiveRef.current.left = active;
               syncSideTravelLock();
@@ -2602,6 +2779,11 @@ export function CockpitOverlay({
             highlighted={highlightTravel}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
+            onInactivePress={
+              engineOffPress && allowed.travel && travelLock !== "both"
+                ? notifyEngineOff
+                : undefined
+            }
             onDragActiveChange={(active) => {
               sideTravelActiveRef.current.right = active;
               syncSideTravelLock();
@@ -2620,6 +2802,11 @@ export function CockpitOverlay({
             highlighted={highlightTravel}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
+            onInactivePress={
+              engineOffPress && allowed.travel && travelLock !== "sides"
+                ? notifyEngineOff
+                : undefined
+            }
             onDragActiveChange={(active) =>
               setTravelLock((current) => {
                 if (active) return "both";
@@ -2637,19 +2824,24 @@ export function CockpitOverlay({
           <AttachmentPedalControl
             direction={auxiliary.attachmentPedal}
             canOperate={attachmentPedalCanOperate}
-            dimmed={pedalAttachmentEquipped && auxiliary.safetyLocked}
+            dimmed={
+              pedalAttachmentEquipped &&
+              (!auxiliary.engineOn || auxiliary.safetyLocked)
+            }
             highlighted={highlightBreaker}
             showTouchZone={showTouchZones}
             layout={layout}
             isPortrait={isPortrait}
             attachmentType={attachmentType}
             onRequireAttachment={
-              pedalAttachmentEquipped
-                ? undefined
-                : () =>
-                    onAttachmentWarning?.(
-                      "브레이커 또는 집게를 장착 후 사용하세요.",
-                    )
+              !auxiliary.engineOn
+                ? notifyEngineOff
+                : pedalAttachmentEquipped
+                  ? undefined
+                  : () =>
+                      onAttachmentWarning?.(
+                        "브레이커 또는 집게를 장착 후 사용하세요.",
+                      )
             }
             onChange={(attachmentPedal) =>
               onAuxiliaryChange((current) => ({
@@ -2660,9 +2852,11 @@ export function CockpitOverlay({
           />
           <PedalSwingControl
             activeValue={auxiliary.boomSwing}
+            enabled={auxiliary.engineOn && !auxiliary.safetyLocked}
             showTouchZone={showTouchZones}
             layout={layout}
             isPortrait={isPortrait}
+            onInactivePress={engineOffPress}
             onChange={(boomSwing) =>
               onAuxiliaryChange((current) => ({ ...current, boomSwing }))
             }
@@ -2671,14 +2865,19 @@ export function CockpitOverlay({
             side="left"
             layout={layout.left}
             enabled={{
-              x: allowed.leftX && !auxiliary.safetyLocked,
-              y: allowed.leftY && !auxiliary.safetyLocked,
+              x: allowed.leftX && auxiliary.engineOn && !auxiliary.safetyLocked,
+              y: allowed.leftY && auxiliary.engineOn && !auxiliary.safetyLocked,
             }}
             highlighted={highlightLeft}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
             useDPad={useDPad}
             onControlPointerDrag={setControlPointerDrag}
+            onInactivePress={
+              engineOffPress && (allowed.leftX || allowed.leftY)
+                ? notifyEngineOff
+                : undefined
+            }
             onChange={(x, y) =>
               onInputChange((current) => ({ ...current, left: { x, y } }))
             }
@@ -2687,14 +2886,19 @@ export function CockpitOverlay({
             side="right"
             layout={layout.right}
             enabled={{
-              x: allowed.rightX && !auxiliary.safetyLocked,
-              y: allowed.rightY && !auxiliary.safetyLocked,
+              x: allowed.rightX && auxiliary.engineOn && !auxiliary.safetyLocked,
+              y: allowed.rightY && auxiliary.engineOn && !auxiliary.safetyLocked,
             }}
             highlighted={highlightRight}
             showTouchZone={showTouchZones}
             isPortrait={isPortrait}
             useDPad={useDPad}
             onControlPointerDrag={setControlPointerDrag}
+            onInactivePress={
+              engineOffPress && (allowed.rightX || allowed.rightY)
+                ? notifyEngineOff
+                : undefined
+            }
             onChange={(x, y) =>
               onInputChange((current) => ({ ...current, right: { x, y } }))
             }
@@ -2717,6 +2921,19 @@ export function CockpitOverlay({
             playerLevel={playerLevel}
             unlockAllAttachments={unlockAllAttachments}
             onAttachmentChange={onAttachmentChange}
+            onInactiveMachinePress={engineOffPress}
+          />
+          <EngineStartButton
+            engineOn={auxiliary.engineOn}
+            onToggle={() =>
+              onAuxiliaryChange((current) => ({
+                ...current,
+                engineOn: !current.engineOn,
+              }))
+            }
+            layout={layout}
+            isPortrait={isPortrait}
+            showTouchZones={showTouchZones}
           />
           <HornAutoCluster
             layout={layout}
@@ -2735,6 +2952,8 @@ export function CockpitOverlay({
             onEditLabels={() => setAutoLabelModalOpen(true)}
             savePoseDisabled={savePoseDisabled}
             executePoseDisabled={executePoseDisabled}
+            engineOn={auxiliary.engineOn}
+            onInactiveMachinePress={engineOffPress}
           />
         </div>
       </div>

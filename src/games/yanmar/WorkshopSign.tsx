@@ -1,6 +1,7 @@
 "use client";
 
 import { Billboard, Text } from "@react-three/drei";
+import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import type { WorkshopId } from "./workshop/types";
 import { WORKSHOP_DEFS } from "./workshop/catalog";
 import { isInDumpZone, isInsideDigZoneBounds, type TerrainData } from "./terrain";
@@ -20,6 +21,7 @@ function SignLabel({
   return (
     <Billboard position={[0, 3.35, 0]} follow lockX={false} lockZ={false}>
       <Text
+        font={YANMAR_SCENE_FONT}
         fontSize={0.42}
         color="#1a1a1a"
         anchorX="center"
@@ -33,6 +35,7 @@ function SignLabel({
       {claimable ? (
         <group position={[0, 0.85, 0]}>
           <Text
+            font={YANMAR_SCENE_FONT}
             fontSize={0.55}
             color="#16a34a"
             anchorX="center"
@@ -43,6 +46,7 @@ function SignLabel({
             V
           </Text>
           <Text
+            font={YANMAR_SCENE_FONT}
             position={[0, -0.55, 0]}
             fontSize={0.32}
             color="#15803d"

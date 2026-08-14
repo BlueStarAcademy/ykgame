@@ -1,15 +1,15 @@
 "use client";
 
-import { useLayoutEffect, useMemo } from "react";
-import { useLoader } from "@react-three/fiber";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useFrame, useLoader } from "@react-three/fiber";
 import { Outlines, Text } from "@react-three/drei";
+import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import * as THREE from "three";
 import {
   CRASH_ASPHALT_BOX_CENTER_Y,
   CRASH_ASPHALT_BOX_THICKNESS,
   CRASH_ASPHALT_SURFACE_SINK,
   getCrashZoneRespawnEtaSec,
-  type CrashZone,
   type TerrainData,
   sampleHeight,
 } from "./terrain";
@@ -19,14 +19,22 @@ import {
 } from "./siteTextures";
 import { formatDumpTruckReturnTime } from "./dumpTruckState";
 
+type TroikaLabel = THREE.Object3D & { text?: string };
+
+const TILE_VISUAL_MIN_MS = 125;
+
+function crashZoneLabelText(respawnEtaSec: number) {
+  return respawnEtaSec > 0
+    ? `노면 파쇄 · 리젠 ${formatDumpTruckReturnTime(respawnEtaSec)}`
+    : "노면 파쇄 작업구역";
+}
+
 export function CrashZoneDecor({
-  zone,
-  terrain,
+  terrainRef,
   showZoneLabel = true,
   highlightTiles = false,
 }: {
-  zone: CrashZone;
-  terrain: TerrainData;
+  terrainRef: React.MutableRefObject<TerrainData>;
   showZoneLabel?: boolean;
   highlightTiles?: boolean;
 }) {
@@ -40,6 +48,11 @@ export function CrashZoneDecor({
     [loaded],
   );
   const normalScale = useMemo(() => new THREE.Vector2(0.45, 0.45), []);
+  const [, setTileVisualRev] = useState(0);
+  const tileSigRef = useRef("");
+  const lastTileVisualAtRef = useRef(0);
+  const labelRef = useRef<TroikaLabel>(null);
+
   useLayoutEffect(() => {
     configureSiteTexture(albedo, 2, 2, true);
     configureSiteTexture(normal, 2);
@@ -51,14 +64,34 @@ export function CrashZoneDecor({
     };
   }, [albedo, normal, roughness]);
 
+  useFrame(() => {
+    const zone = terrainRef.current.crashZone;
+    if (!zone) return;
+
+    const label = labelRef.current;
+    if (label && "text" in label) {
+      const nextLabel = crashZoneLabelText(getCrashZoneRespawnEtaSec(zone));
+      if (label.text !== nextLabel) label.text = nextLabel;
+    }
+
+    const now = performance.now();
+    if (now - lastTileVisualAtRef.current < TILE_VISUAL_MIN_MS) return;
+    const tileSig = zone.tiles
+      .map((tile) => `${tile.id}:${tile.active ? 1 : 0}:${Math.floor(tile.hp)}`)
+      .join("|");
+    if (tileSig === tileSigRef.current) return;
+    tileSigRef.current = tileSig;
+    lastTileVisualAtRef.current = now;
+    setTileVisualRev((value) => value + 1);
+  });
+
+  const zone = terrainRef.current.crashZone;
+  if (!zone) return null;
+
+  const terrain = terrainRef.current;
   const tileWidth = zone.width / 3;
   const tileDepth = zone.depth / 3;
   const ground = sampleHeight(terrain, zone.centerX, zone.centerZ);
-  const respawnEtaSec = getCrashZoneRespawnEtaSec(zone);
-  const zoneLabel =
-    respawnEtaSec > 0
-      ? `노면 파쇄 · 리젠 ${formatDumpTruckReturnTime(respawnEtaSec)}`
-      : "노면 파쇄 작업구역";
 
   return (
     <group>
@@ -168,6 +201,8 @@ export function CrashZoneDecor({
       })}
       {showZoneLabel ? (
         <Text
+          font={YANMAR_SCENE_FONT}
+          ref={labelRef}
           position={[zone.centerX, ground + 0.08, zone.centerZ - zone.depth / 2 - 2]}
           rotation={[-Math.PI / 2, 0, Math.PI]}
           fontSize={1.3}
@@ -175,7 +210,7 @@ export function CrashZoneDecor({
           outlineWidth={0.06}
           outlineColor="#111827"
         >
-          {zoneLabel}
+          {crashZoneLabelText(getCrashZoneRespawnEtaSec(zone))}
         </Text>
       ) : null}
     </group>

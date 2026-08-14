@@ -19,6 +19,7 @@ const UI_CLICK_SKIP_SELECTOR = [
   ".yanmar-breaker-pedal-button",
   ".yanmar-horn-touch-zone",
   ".yanmar-horn-standalone",
+  ".yanmar-engine-start-button",
 ].join(",");
 
 function resolveUiClickTarget(target: EventTarget | null): HTMLElement | null {

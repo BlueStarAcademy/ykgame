@@ -37,6 +37,14 @@ import {
   instantCompleteStars,
   isUpgradeTimerReady,
 } from "./upgradeTimers";
+import {
+  ClaimButton,
+  DoneStamp,
+  PendingStamp,
+  QuestCard,
+  QuestPointsChip,
+  type QuestCardState,
+} from "./QuestCardUI";
 
 type TabId = "quest" | "upgrade" | "shop";
 
@@ -66,6 +74,19 @@ interface WorkshopPanelProps {
   onShopPurchase: (
     itemId: WorkshopShopItemId,
   ) => Promise<{ itemId: WorkshopShopItemId; grantedAmount: number } | null>;
+}
+
+function CloseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M6 6l12 12M18 6L6 18"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }
 
 function WorkshopPointsAmount({
@@ -251,36 +272,50 @@ export function WorkshopPanel({
       open={open}
       onClose={onClose}
       nested
-      panelClassName="!max-w-[min(96vw,26rem)] !overflow-hidden landscape:!max-h-[min(94dvh,32rem)]"
+      panelClassName="yanmar-facility-modal-shell"
     >
-      <div className="yanmar-workshop-panel relative flex h-[min(88dvh,36rem)] w-full flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md landscape:h-[min(92dvh,26rem)]">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-          <h2 className="min-w-0 flex-1 truncate text-lg font-black tracking-tight">
-            {def.label}
-          </h2>
-          <div className="flex shrink-0 items-center gap-2">
-            <div
-              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-sm font-black text-amber-100 shadow-inner"
+      <div className="yanmar-facility-modal is-workshop">
+        <header className="yanmar-facility-modal-head">
+          <span className="yanmar-facility-modal-emblem" aria-hidden>
+            <img
+              src="/images/yanmar/2d/cockpit/upgrade-anvil-premium.png"
+              alt=""
+              draggable={false}
+            />
+          </span>
+          <div className="yanmar-facility-modal-titles">
+            <p className="yanmar-facility-modal-eyebrow">SITE WORKSHOP</p>
+            <h2>{def.label}</h2>
+          </div>
+          <div className="yanmar-facility-modal-head-meta">
+            <span
+              className="yanmar-facility-modal-chip is-points"
               title={def.pointsLabel}
             >
               <WorkshopPointsAmount
                 icon={coin}
                 value={points}
                 label={def.pointsLabel}
-                size={20}
+                size={14}
               />
-            </div>
+            </span>
+            {claimableQuestCount > 0 ? (
+              <span className="yanmar-facility-modal-chip" title="수령 대기">
+                보상 <b className="tabular-nums">{claimableQuestCount}</b>
+              </span>
+            ) : null}
             <button
               type="button"
-              className="shrink-0 rounded-lg px-2 py-1 text-sm text-stone-300 hover:bg-white/10"
+              className="yanmar-facility-modal-close"
               onClick={onClose}
+              aria-label="작업장 닫기"
             >
-              닫기
+              <CloseGlyph />
             </button>
           </div>
         </header>
 
-        <div className="flex shrink-0 gap-1 border-b border-white/10 px-2 pt-2">
+        <div className="yanmar-facility-modal-tabs" role="tablist">
           {(
             [
               ["quest", "퀘스트"],
@@ -291,89 +326,111 @@ export function WorkshopPanel({
             <button
               key={id}
               type="button"
-              className={`relative flex-1 rounded-t-lg px-2 py-2 text-sm font-bold ${
-                tab === id
-                  ? "bg-white/15 text-white"
-                  : "text-stone-400 hover:bg-white/5"
-              }`}
+              role="tab"
+              aria-selected={tab === id}
+              className={`yanmar-facility-tab${tab === id ? " is-active" : ""}`}
               onClick={() => setTab(id)}
             >
-              {label}
+              <span>{label}</span>
               {id === "quest" && claimableQuestCount > 0 ? (
                 <span
-                  className="yanmar-quest-notify-badge is-dot"
+                  className="yanmar-quest-notify-badge is-tab"
                   aria-label={`미수령 보상 ${claimableQuestCount}개`}
-                />
+                >
+                  {claimableQuestCount > 9 ? "9+" : claimableQuestCount}
+                </span>
               ) : null}
             </button>
           ))}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3">
+        {tab === "quest" ? (
+          <div className="yanmar-quest-modal-rail">
+            <span className="yanmar-quest-modal-rail-label">작업장 퀘스트</span>
+            <span className="yanmar-quest-modal-rail-note">
+              완료 보상은 작업장 포인트로 지급됩니다
+            </span>
+            <span className="yanmar-quest-modal-rail-value tabular-nums">
+              수령대기 <b>{claimableQuestCount}</b>
+            </span>
+          </div>
+        ) : null}
+
+        {tab === "upgrade" ? (
+          <div className="yanmar-facility-modal-rail">
+            <span className="yanmar-facility-modal-rail-label">업그레이드</span>
+            <span className="yanmar-facility-modal-rail-note">
+              동시에 1개만 진행할 수 있습니다
+            </span>
+            <span className="yanmar-facility-modal-rail-value">
+              보유{" "}
+              <b>
+                <WorkshopPointsAmount icon={coin} value={points} size={12} />
+              </b>
+            </span>
+          </div>
+        ) : null}
+
+        {tab === "shop" ? (
+          <div className="yanmar-facility-modal-rail">
+            <span className="yanmar-facility-modal-rail-label">작업장 상점</span>
+            <span className="yanmar-facility-modal-rail-note">
+              상품당 주간 {WORKSHOP_SHOP_ITEMS[0]?.weeklyLimit ?? 3}회 · 월요일
+              0시(KST) 리셋
+            </span>
+          </div>
+        ) : null}
+
+        <div className="yanmar-facility-modal-body">
           {tab === "quest" ? (
-            <ul className="flex flex-col gap-2">
+            <ul className="yanmar-quest-list">
               {questRows.map(({ def: q, item }) => {
                 const canClaim = item.completed && !item.claimed;
-                const pct = Math.min(100, (item.progress / q.target) * 100);
+                const done = item.claimed && q.kind === "daily";
+                const state: QuestCardState = done
+                  ? "done"
+                  : canClaim
+                    ? "claimable"
+                    : "active";
                 return (
-                  <li
+                  <QuestCard
                     key={q.id}
-                    className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold">{q.title}</p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-stone-400">
-                            {q.kind === "daily" ? "일일" : "반복"}
-                          </span>
-                          <WorkshopPointsAmount
-                            icon={coin}
-                            value={q.rewardPoints}
-                            size={16}
-                            className="text-xs font-bold text-amber-200"
-                          />
-                        </div>
-                        {canClaim ? (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            className="relative rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
-                            onClick={() => void onClaimQuest(q.id)}
-                          >
-                            완료
-                            <span
-                              className="yanmar-quest-notify-badge is-dot"
-                              aria-hidden
-                            />
-                          </button>
-                        ) : item.claimed && q.kind === "daily" ? (
-                          <span className="text-xs font-semibold text-stone-500">
-                            수령됨
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-amber-400/80"
-                        style={{ width: `${pct}%` }}
+                    title={q.title}
+                    tag={{
+                      label: q.kind === "daily" ? "일일" : "반복",
+                      tone: q.kind === "daily" ? "required" : "bonus",
+                    }}
+                    rewardSlot={
+                      <QuestPointsChip
+                        iconSrc={coin}
+                        amount={q.rewardPoints}
+                        label={def.pointsLabel}
                       />
-                    </div>
-                    <p className="mt-1 text-right text-[11px] tabular-nums text-stone-400">
-                      {Math.min(item.progress, q.target).toLocaleString()} /{" "}
-                      {q.target.toLocaleString()}
-                    </p>
-                  </li>
+                    }
+                    value={item.progress}
+                    target={q.target}
+                    metric={q.metric}
+                    state={state}
+                    action={
+                      canClaim ? (
+                        <ClaimButton
+                          claiming={Boolean(busy)}
+                          onClaim={() => void onClaimQuest(q.id)}
+                        />
+                      ) : done ? (
+                        <DoneStamp label="수령됨" />
+                      ) : (
+                        <PendingStamp />
+                      )
+                    }
+                  />
                 );
               })}
             </ul>
           ) : null}
 
           {tab === "upgrade" ? (
-            <ul className="flex flex-col gap-2">
+            <ul className="yanmar-facility-list">
               {def.upgrades.map((u) => {
                 const level = levels[u.key] ?? 0;
                 const max = getWorkshopUpgradeMaxLevel(u.key);
@@ -407,44 +464,44 @@ export function WorkshopPanel({
                 return (
                   <li
                     key={u.key}
-                    className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
+                    className={`yanmar-facility-card${
+                      isThisPending ? " is-claimable" : ""
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold">
-                          {u.label}{" "}
-                          <span className="text-amber-200">
+                    <div className="yanmar-facility-card-top">
+                      <div className="yanmar-facility-card-main">
+                        <p className="yanmar-facility-card-title">
+                          {u.label}
+                          <em>
                             +{level}/{max}
-                          </span>
+                          </em>
                           {!maxed ? (
                             <span
-                              className={`ml-1.5 text-[11px] font-extrabold ${
-                                levelLocked
-                                  ? "text-red-400"
-                                  : "text-stone-400"
+                              className={`yanmar-facility-level-lock${
+                                levelLocked ? " is-locked" : ""
                               }`}
                             >
                               레벨제한{reqLevel}
                             </span>
                           ) : null}
                         </p>
-                        <p className="mt-0.5 text-xs text-stone-400">
+                        <p className="yanmar-facility-card-desc">
                           {u.description}
                         </p>
                         {!maxed ? (
-                          <p className="mt-1 text-[11px] text-sky-200/90">
+                          <p className="yanmar-facility-card-preview">
                             {effectPreview(workshopId, u.key, level)}
                           </p>
                         ) : null}
                       </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
+                      <div className="yanmar-facility-card-side">
                         {isThisPending && onInstantUpgrade ? (
                           <button
                             type="button"
                             disabled={
                               busy || (!timerReady && currency < instantCost)
                             }
-                            className="inline-flex items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                            className="yanmar-facility-btn is-instant"
                             onClick={() => {
                               if (timerReady) {
                                 void onInstantUpgrade();
@@ -478,7 +535,7 @@ export function WorkshopPanel({
                               !canBuy ||
                               otherPending
                             }
-                            className="inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
+                            className="yanmar-facility-btn is-upgrade"
                             onClick={() => {
                               if (
                                 cost == null ||
@@ -512,10 +569,8 @@ export function WorkshopPanel({
                           ? remainingMs != null
                           : durationMs != null) ? (
                           <p
-                            className={`text-[11px] tabular-nums ${
-                              isThisPending
-                                ? "font-semibold text-amber-200"
-                                : "text-stone-500"
+                            className={`yanmar-facility-timer${
+                              isThisPending ? " is-live" : ""
                             }`}
                           >
                             {formatUpgradeRemaining(
@@ -532,64 +587,54 @@ export function WorkshopPanel({
           ) : null}
 
           {tab === "shop" ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-[11px] text-stone-400">
-                상품당 주간 {WORKSHOP_SHOP_ITEMS[0]?.weeklyLimit ?? 3}회 ·
-                월요일 0시(KST) 리셋
-              </p>
-              <ul className="flex flex-col gap-2">
-                {WORKSHOP_SHOP_ITEMS.map((item) => {
-                  const purchase = shopPurchases[item.id] ?? {
-                    count: 0,
-                    remaining: item.weeklyLimit,
-                  };
-                  const canBuy =
-                    points >= item.cost && purchase.remaining > 0;
-                  return (
-                    <li
-                      key={item.id}
-                      className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 px-3 py-2.5"
+            <ul className="yanmar-facility-list">
+              {WORKSHOP_SHOP_ITEMS.map((item) => {
+                const purchase = shopPurchases[item.id] ?? {
+                  count: 0,
+                  remaining: item.weeklyLimit,
+                };
+                const canBuy = points >= item.cost && purchase.remaining > 0;
+                return (
+                  <li key={item.id} className="yanmar-facility-card is-row">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.icon}
+                      alt=""
+                      className="yanmar-facility-shop-art"
+                      draggable={false}
+                    />
+                    <div className="yanmar-facility-card-main">
+                      <p className="yanmar-facility-card-title">{item.label}</p>
+                      <p className="yanmar-facility-card-desc">
+                        {item.description}
+                      </p>
+                      <p className="yanmar-facility-card-progress">
+                        이번 주 {purchase.count}/{item.weeklyLimit}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={busy || !canBuy}
+                      className="yanmar-facility-btn is-buy"
+                      onClick={() =>
+                        setConfirmShop({
+                          itemId: item.id,
+                          label: item.label,
+                          icon: item.icon,
+                          cost: item.cost,
+                        })
+                      }
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={item.icon}
-                        alt=""
-                        className="h-12 w-12 shrink-0 object-contain"
-                        draggable={false}
+                      <WorkshopPointsAmount
+                        icon={coin}
+                        value={item.cost}
+                        size={14}
                       />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold">{item.label}</p>
-                        <p className="text-xs text-stone-400">
-                          {item.description}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-stone-500">
-                          이번 주 {purchase.count}/{item.weeklyLimit}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={busy || !canBuy}
-                        className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
-                        onClick={() =>
-                          setConfirmShop({
-                            itemId: item.id,
-                            label: item.label,
-                            icon: item.icon,
-                            cost: item.cost,
-                          })
-                        }
-                      >
-                        <WorkshopPointsAmount
-                          icon={coin}
-                          value={item.cost}
-                          size={14}
-                        />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           ) : null}
         </div>
 

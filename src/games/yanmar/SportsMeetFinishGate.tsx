@@ -3,6 +3,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
+import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import * as THREE from "three";
 import { getSportsMeetFinishGate } from "./sportsMeet/patterns";
 import type { SportsMeetPattern } from "./sportsMeet/patterns";
@@ -161,6 +162,7 @@ export function SportsMeetFinishGate({
         <meshStandardMaterial color="#0f172a" roughness={0.5} metalness={0.2} />
       </mesh>
       <Text
+        font={YANMAR_SCENE_FONT}
         position={[0, BEAM_Y + 0.55, 0.13]}
         fontSize={0.42}
         color="#f8fafc"

@@ -2,6 +2,7 @@
 
 import { Suspense, useLayoutEffect } from "react";
 import { Billboard, Text } from "@react-three/drei";
+import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { YANMAR_MARK_LOGO, YK_GEONGI_LOGO } from "@/lib/brand-assets";
@@ -48,6 +49,7 @@ function MonumentLabel({
       frustumCulled={false}
     >
       <Text
+        font={YANMAR_SCENE_FONT}
         fontSize={fontSize}
         color={color}
         anchorX="center"

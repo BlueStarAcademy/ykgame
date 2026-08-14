@@ -136,15 +136,25 @@ class SiteLegendLoginBgmController {
   }
 
   private applySettings(settings: SoundSettings) {
+    const prevEnabled = this.enabled;
+    const prevVolume = this.volume;
     this.enabled = settings.bgmEnabled;
     this.volume = bgmVolumeToGain(settings.bgmVolume);
     if (!this.enabled || !isSiteLegendBgmMasterEnabled()) {
       detachGestureHandler();
-      killLoginSiteLegendBgm({ unload: true });
+      if (prevEnabled) killLoginSiteLegendBgm({ unload: true });
       return;
     }
-    if (this.allowed && isWebAudioBgmPlaying("login")) {
+    if (prevVolume !== this.volume && isWebAudioBgmPlaying("login")) {
       setWebAudioBgmGain("login", this.volume);
+    }
+    // Volume-only changes: do not restart the loop.
+    if (prevEnabled === this.enabled && prevVolume !== this.volume) {
+      if (isWebAudioBgmPlaying("login")) {
+        setWebAudioBgmGain("login", this.volume);
+        return;
+      }
+      // Not audible yet — fall through to sync so a gesture can still start it.
     }
     this.sync();
   }

@@ -5,6 +5,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
+import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import * as THREE from "three";
 import {
   createCompactedDirtTexture,
@@ -495,6 +496,7 @@ function KoreanSafetySign({
         <meshStandardMaterial color="#dc2626" roughness={0.42} />
       </mesh>
       <Text
+        font={YANMAR_SCENE_FONT}
         position={[0, -0.12, 0.09]}
         fontSize={titleSize}
         maxWidth={SIGN_TEXT_MAX_WIDTH}
@@ -508,6 +510,7 @@ function KoreanSafetySign({
         {title}
       </Text>
       <Text
+        font={YANMAR_SCENE_FONT}
         position={[0, -0.48, 0.09]}
         fontSize={subtitleSize}
         maxWidth={SIGN_TEXT_MAX_WIDTH}

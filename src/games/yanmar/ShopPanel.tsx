@@ -45,6 +45,19 @@ interface ShopPanelProps {
   ) => void | Promise<void>;
 }
 
+function CloseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M6 6l12 12M18 6L6 18"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function formatCooldown(ms: number) {
   const totalSec = Math.max(0, Math.ceil(ms / 1000));
   const minutes = Math.floor(totalSec / 60);
@@ -376,17 +389,24 @@ export function ShopPanel({
     <AppModalOverlay
       open={open}
       onClose={onClose}
-      panelClassName="max-w-[min(96vw,26rem)] landscape:max-h-[min(94dvh,32rem)]"
+      panelClassName="yanmar-facility-modal-shell"
     >
-      <div className="flex h-[min(84dvh,38rem)] w-full flex-col overflow-hidden rounded-2xl border border-amber-200/20 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl landscape:h-[min(92dvh,26rem)]">
-        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="yanmar-shop-panel-badge" aria-hidden />
-            <h2 className="text-sm font-black text-amber-100">상점</h2>
+      <div className="yanmar-facility-modal is-shop">
+        <header className="yanmar-facility-modal-head">
+          <span className="yanmar-facility-modal-emblem" aria-hidden>
+            <img
+              src="/images/yanmar/2d/cockpit/shop-premium.png"
+              alt=""
+              draggable={false}
+            />
+          </span>
+          <div className="yanmar-facility-modal-titles">
+            <p className="yanmar-facility-modal-eyebrow">FIELD SUPPLY</p>
+            <h2>상점</h2>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="yanmar-facility-modal-head-meta">
             {typeof stars === "number" ? (
-              <span className="inline-flex items-center rounded-lg border border-amber-200/20 bg-black/35 px-2 py-1 text-amber-100">
+              <span className="yanmar-facility-modal-chip is-points">
                 <StarAmount
                   value={stars}
                   size={12}
@@ -394,10 +414,7 @@ export function ShopPanel({
                 />
               </span>
             ) : null}
-            <span
-              className="inline-flex items-center gap-1 rounded-lg border border-sky-200/20 bg-black/35 px-2 py-1"
-              title="일반 뽑기권"
-            >
+            <span className="yanmar-facility-modal-chip" title="일반 뽑기권">
               <img
                 src="/images/yanmar/2d/gacha-ticket-standard.svg"
                 alt=""
@@ -406,14 +423,11 @@ export function ShopPanel({
                 className="shrink-0"
                 draggable={false}
               />
-              <span className="text-[11px] font-black tabular-nums text-sky-100">
+              <b className="tabular-nums">
                 {gachaTicketsStandard.toLocaleString()}
-              </span>
+              </b>
             </span>
-            <span
-              className="inline-flex items-center gap-1 rounded-lg border border-violet-200/20 bg-black/35 px-2 py-1"
-              title="고급 뽑기권"
-            >
+            <span className="yanmar-facility-modal-chip" title="고급 뽑기권">
               <img
                 src="/images/yanmar/2d/gacha-ticket-premium.svg"
                 alt=""
@@ -422,42 +436,43 @@ export function ShopPanel({
                 className="shrink-0"
                 draggable={false}
               />
-              <span className="text-[11px] font-black tabular-nums text-violet-100">
+              <b className="tabular-nums">
                 {gachaTicketsPremium.toLocaleString()}
-              </span>
+              </b>
             </span>
             <button
               type="button"
+              className="yanmar-facility-modal-close"
               onClick={onClose}
-              className="rounded-lg px-2 py-1 text-[11px] font-bold text-white/70 hover:bg-white/10 hover:text-white"
+              aria-label="상점 닫기"
             >
-              닫기
+              <CloseGlyph />
             </button>
           </div>
-        </div>
+        </header>
 
-        <div className="flex shrink-0 gap-2 border-b border-white/10 px-3 py-2">
+        <div className="yanmar-facility-modal-tabs" role="tablist">
           <button
             type="button"
-            className={`rounded-lg px-3 py-1 text-[11px] font-bold ${
-              tab === "gear" ? "bg-amber-500/20 text-amber-100" : "text-white/60"
-            }`}
+            role="tab"
+            aria-selected={tab === "gear"}
+            className={`yanmar-facility-tab${tab === "gear" ? " is-active" : ""}`}
             onClick={() => setTab("gear")}
           >
             장비
           </button>
           <button
             type="button"
-            className={`rounded-lg px-3 py-1 text-[11px] font-bold ${
-              tab === "buff" ? "bg-amber-500/20 text-amber-100" : "text-white/60"
-            }`}
+            role="tab"
+            aria-selected={tab === "buff"}
+            className={`yanmar-facility-tab${tab === "buff" ? " is-active" : ""}`}
             onClick={() => setTab("buff")}
           >
             버프
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 [-webkit-overflow-scrolling:touch]">
+        <div className="yanmar-facility-modal-body">
           {tab === "buff" ? (
             <div className="yanmar-shop-grid">
               {SHOP_ITEMS.map((item) => (
