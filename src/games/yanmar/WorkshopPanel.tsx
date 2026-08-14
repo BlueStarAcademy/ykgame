@@ -1,8 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
+import {
+  workshopPointsLabel,
+  workshopQuestLabel,
+  workshopShopItemDescription,
+  workshopShopItemLabel,
+  workshopUpgradeDescription,
+  workshopUpgradeLabel,
+} from "@/i18n/yanmarCatalog";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import {
   WORKSHOP_DEFS,
@@ -123,6 +132,7 @@ function WorkshopPointsAmount({
 }
 
 function effectPreview(
+  t: ReturnType<typeof useTranslations>,
   workshopId: WorkshopId,
   key: WorkshopUpgradeKey,
   level: number,
@@ -132,13 +142,23 @@ function effectPreview(
     return `${getYanmarTruckCapacityUnits(level).toLocaleString()} → ${getYanmarTruckCapacityUnits(next).toLocaleString()}`;
   }
   if (key === "truck_cooldown") {
-    return `${getYanmarTruckCooldownSec(level)}초 → ${getYanmarTruckCooldownSec(next)}초`;
+    return t("secondsPreview", {
+      from: getYanmarTruckCooldownSec(level),
+      to: getYanmarTruckCooldownSec(next),
+    });
   }
   if (key === "haul_capacity") {
-    return `${workshopHaulTruckCapacity(level)} → ${workshopHaulTruckCapacity(Math.min(10, next))} (기본 ${YANMAR_BASE_HAUL_TRUCK_CAPACITY})`;
+    return t("capacityPreview", {
+      from: workshopHaulTruckCapacity(level),
+      to: workshopHaulTruckCapacity(Math.min(10, next)),
+      base: YANMAR_BASE_HAUL_TRUCK_CAPACITY,
+    });
   }
   if (key === "haul_cooldown") {
-    return `${getYanmarHaulTruckCooldownSec(level)}초 → ${getYanmarHaulTruckCooldownSec(next)}초`;
+    return t("secondsPreview", {
+      from: getYanmarHaulTruckCooldownSec(level),
+      to: getYanmarHaulTruckCooldownSec(next),
+    });
   }
   if (key === "breaker_power") {
     return `×${workshopBreakerPowerMult(level).toFixed(1)} → ×${workshopBreakerPowerMult(next).toFixed(1)}`;
@@ -153,7 +173,11 @@ function effectPreview(
     return `+${(workshopLuckyDropBonus(level) * 100).toFixed(1)}%p → +${(workshopLuckyDropBonus(next) * 100).toFixed(1)}%p`;
   }
   if (key === "rock_appraiser") {
-    return `${workshopHillBoulderCount(level)}개 → ${workshopHillBoulderCount(Math.min(5, next))}개 (기본 ${YANMAR_BASE_HILL_BOULDER_COUNT})`;
+    return t("countPreview", {
+      from: workshopHillBoulderCount(level),
+      to: workshopHillBoulderCount(Math.min(5, next)),
+      base: YANMAR_BASE_HILL_BOULDER_COUNT,
+    });
   }
   void workshopId;
   return "";
@@ -171,6 +195,8 @@ export function WorkshopPanel({
   onInstantUpgrade,
   onShopPurchase,
 }: WorkshopPanelProps) {
+  const t = useTranslations("yanmar.workshop");
+  const catalogT = useTranslations("yanmar");
   const [tab, setTab] = useState<TabId>("quest");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [confirmUpgrade, setConfirmUpgrade] = useState<{
@@ -285,30 +311,30 @@ export function WorkshopPanel({
           </span>
           <div className="yanmar-facility-modal-titles">
             <p className="yanmar-facility-modal-eyebrow">SITE WORKSHOP</p>
-            <h2>{def.label}</h2>
+            <h2>{t("title")}</h2>
           </div>
           <div className="yanmar-facility-modal-head-meta">
             <span
               className="yanmar-facility-modal-chip is-points"
-              title={def.pointsLabel}
+              title={workshopPointsLabel(catalogT, workshopId)}
             >
               <WorkshopPointsAmount
                 icon={coin}
                 value={points}
-                label={def.pointsLabel}
+                label={workshopPointsLabel(catalogT, workshopId)}
                 size={14}
               />
             </span>
             {claimableQuestCount > 0 ? (
-              <span className="yanmar-facility-modal-chip" title="수령 대기">
-                보상 <b className="tabular-nums">{claimableQuestCount}</b>
+              <span className="yanmar-facility-modal-chip" title={t("rewardsAwaiting")}>
+                {t("rewards")} <b className="tabular-nums">{claimableQuestCount}</b>
               </span>
             ) : null}
             <button
               type="button"
               className="yanmar-facility-modal-close"
               onClick={onClose}
-              aria-label="작업장 닫기"
+              aria-label={t("close")}
             >
               <CloseGlyph />
             </button>
@@ -318,9 +344,9 @@ export function WorkshopPanel({
         <div className="yanmar-facility-modal-tabs" role="tablist">
           {(
             [
-              ["quest", "퀘스트"],
-              ["upgrade", "업그레이드"],
-              ["shop", "상점"],
+              ["quest", t("tabs.quest")],
+              ["upgrade", t("tabs.upgrade")],
+              ["shop", t("tabs.shop")],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -335,7 +361,7 @@ export function WorkshopPanel({
               {id === "quest" && claimableQuestCount > 0 ? (
                 <span
                   className="yanmar-quest-notify-badge is-tab"
-                  aria-label={`미수령 보상 ${claimableQuestCount}개`}
+                  aria-label={t("unclaimedRewards", { count: claimableQuestCount })}
                 >
                   {claimableQuestCount > 9 ? "9+" : claimableQuestCount}
                 </span>
@@ -346,24 +372,24 @@ export function WorkshopPanel({
 
         {tab === "quest" ? (
           <div className="yanmar-quest-modal-rail">
-            <span className="yanmar-quest-modal-rail-label">작업장 퀘스트</span>
+            <span className="yanmar-quest-modal-rail-label">{t("questsTitle")}</span>
             <span className="yanmar-quest-modal-rail-note">
-              완료 보상은 작업장 포인트로 지급됩니다
+              {t("questRewardNote")}
             </span>
             <span className="yanmar-quest-modal-rail-value tabular-nums">
-              수령대기 <b>{claimableQuestCount}</b>
+              {t("rewardsAwaiting")} <b>{claimableQuestCount}</b>
             </span>
           </div>
         ) : null}
 
         {tab === "upgrade" ? (
           <div className="yanmar-facility-modal-rail">
-            <span className="yanmar-facility-modal-rail-label">업그레이드</span>
+            <span className="yanmar-facility-modal-rail-label">{t("upgrade")}</span>
             <span className="yanmar-facility-modal-rail-note">
-              동시에 1개만 진행할 수 있습니다
+              {t("oneUpgradeAtATime")}
             </span>
             <span className="yanmar-facility-modal-rail-value">
-              보유{" "}
+              {t("owned")}{" "}
               <b>
                 <WorkshopPointsAmount icon={coin} value={points} size={12} />
               </b>
@@ -373,10 +399,9 @@ export function WorkshopPanel({
 
         {tab === "shop" ? (
           <div className="yanmar-facility-modal-rail">
-            <span className="yanmar-facility-modal-rail-label">작업장 상점</span>
+            <span className="yanmar-facility-modal-rail-label">{t("shopTitle")}</span>
             <span className="yanmar-facility-modal-rail-note">
-              상품당 주간 {WORKSHOP_SHOP_ITEMS[0]?.weeklyLimit ?? 3}회 · 월요일
-              0시(KST) 리셋
+              {t("weeklyReset", { limit: WORKSHOP_SHOP_ITEMS[0]?.weeklyLimit ?? 3 })}
             </span>
           </div>
         ) : null}
@@ -395,16 +420,16 @@ export function WorkshopPanel({
                 return (
                   <QuestCard
                     key={q.id}
-                    title={q.title}
+                    title={workshopQuestLabel(catalogT, q.id)}
                     tag={{
-                      label: q.kind === "daily" ? "일일" : "반복",
+                      label: q.kind === "daily" ? t("tags.daily") : t("tags.repeat"),
                       tone: q.kind === "daily" ? "required" : "bonus",
                     }}
                     rewardSlot={
                       <QuestPointsChip
                         iconSrc={coin}
                         amount={q.rewardPoints}
-                        label={def.pointsLabel}
+                        label={workshopPointsLabel(catalogT, workshopId)}
                       />
                     }
                     value={item.progress}
@@ -418,7 +443,7 @@ export function WorkshopPanel({
                           onClaim={() => void onClaimQuest(q.id)}
                         />
                       ) : done ? (
-                        <DoneStamp label="수령됨" />
+                        <DoneStamp label={t("claimed")} />
                       ) : (
                         <PendingStamp />
                       )
@@ -471,7 +496,7 @@ export function WorkshopPanel({
                     <div className="yanmar-facility-card-top">
                       <div className="yanmar-facility-card-main">
                         <p className="yanmar-facility-card-title">
-                          {u.label}
+                          {workshopUpgradeLabel(catalogT, u.key)}
                           <em>
                             +{level}/{max}
                           </em>
@@ -481,16 +506,16 @@ export function WorkshopPanel({
                                 levelLocked ? " is-locked" : ""
                               }`}
                             >
-                              레벨제한{reqLevel}
+                              {t("levelRequirement", { level: reqLevel })}
                             </span>
                           ) : null}
                         </p>
                         <p className="yanmar-facility-card-desc">
-                          {u.description}
+                          {workshopUpgradeDescription(catalogT, u.key)}
                         </p>
                         {!maxed ? (
                           <p className="yanmar-facility-card-preview">
-                            {effectPreview(workshopId, u.key, level)}
+                            {effectPreview(t, workshopId, u.key, level)}
                           </p>
                         ) : null}
                       </div>
@@ -509,19 +534,19 @@ export function WorkshopPanel({
                               }
                               if (currency < instantCost) return;
                               setConfirmInstant({
-                                label: u.label,
+                                label: workshopUpgradeLabel(catalogT, u.key),
                                 toLevel: targetLevel,
                                 stars: instantCost,
                               });
                             }}
                           >
                             {timerReady ? (
-                              "완료"
+                              t("done")
                             ) : (
                               <>
-                                즉시완료{" "}
+                                {t("instantComplete")}{" "}
                                 <StarAmount value={instantCost} size={12} />
-                                {currency < instantCost ? " (부족)" : ""}
+                                {currency < instantCost ? t("insufficient") : ""}
                               </>
                             )}
                           </button>
@@ -545,7 +570,7 @@ export function WorkshopPanel({
                                 return;
                               setConfirmUpgrade({
                                 key: u.key,
-                                label: u.label,
+                                label: workshopUpgradeLabel(catalogT, u.key),
                                 fromLevel: level,
                                 toLevel: targetLevel,
                                 cost,
@@ -604,12 +629,14 @@ export function WorkshopPanel({
                       draggable={false}
                     />
                     <div className="yanmar-facility-card-main">
-                      <p className="yanmar-facility-card-title">{item.label}</p>
+                      <p className="yanmar-facility-card-title">
+                        {workshopShopItemLabel(catalogT, item.id)}
+                      </p>
                       <p className="yanmar-facility-card-desc">
-                        {item.description}
+                        {workshopShopItemDescription(catalogT, item.id)}
                       </p>
                       <p className="yanmar-facility-card-progress">
-                        이번 주 {purchase.count}/{item.weeklyLimit}
+                        {t("thisWeek", { count: purchase.count, limit: item.weeklyLimit })}
                       </p>
                     </div>
                     <button
@@ -619,7 +646,7 @@ export function WorkshopPanel({
                       onClick={() =>
                         setConfirmShop({
                           itemId: item.id,
-                          label: item.label,
+                          label: workshopShopItemLabel(catalogT, item.id),
                           icon: item.icon,
                           cost: item.cost,
                         })
@@ -646,13 +673,13 @@ export function WorkshopPanel({
             aria-labelledby="yanmar-workshop-shop-confirm-title"
           >
             <div className="yanmar-repair-confirm-card">
-              <h3 id="yanmar-workshop-shop-confirm-title">구매 확인</h3>
+              <h3 id="yanmar-workshop-shop-confirm-title">{t("purchaseConfirmation")}</h3>
               <p className="yanmar-repair-confirm-item">
-                {confirmShop.label}을(를) 구매하시겠습니까?
+                {t("purchasePrompt", { item: confirmShop.label })}
               </p>
               <ul className="yanmar-repair-confirm-facts">
                 <li className="yanmar-repair-confirm-cost">
-                  소모{" "}
+                  {t("consume")}{" "}
                   <WorkshopPointsAmount
                     icon={coin}
                     value={confirmShop.cost}
@@ -667,7 +694,7 @@ export function WorkshopPanel({
                   disabled={busy}
                   onClick={() => setConfirmShop(null)}
                 >
-                  취소
+                  {t("cancel")}
                 </button>
                 <button
                   type="button"
@@ -688,7 +715,7 @@ export function WorkshopPanel({
                     })();
                   }}
                 >
-                  구매
+                  {t("purchase")}
                 </button>
               </div>
             </div>
@@ -703,7 +730,7 @@ export function WorkshopPanel({
             aria-labelledby="yanmar-workshop-shop-result-title"
           >
             <div className="yanmar-repair-confirm-card is-result">
-              <h3 id="yanmar-workshop-shop-result-title">획득 결과</h3>
+              <h3 id="yanmar-workshop-shop-result-title">{t("acquiredResult")}</h3>
               <div className="flex flex-col items-center gap-2 py-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -722,7 +749,7 @@ export function WorkshopPanel({
                   className="yanmar-repair-confirm-ok"
                   onClick={() => setShopResult(null)}
                 >
-                  확인
+                  {t("confirm")}
                 </button>
               </div>
             </div>
@@ -737,14 +764,14 @@ export function WorkshopPanel({
             aria-labelledby="yanmar-workshop-upgrade-confirm-title"
           >
             <div className="yanmar-repair-confirm-card">
-              <h3 id="yanmar-workshop-upgrade-confirm-title">업그레이드 확인</h3>
+              <h3 id="yanmar-workshop-upgrade-confirm-title">{t("upgradeConfirmation")}</h3>
               <p className="yanmar-repair-confirm-item">
                 {confirmUpgrade.label} +{confirmUpgrade.fromLevel} → +
                 {confirmUpgrade.toLevel}
               </p>
               <ul className="yanmar-repair-confirm-facts">
                 <li className="yanmar-repair-confirm-cost">
-                  소모{" "}
+                  {t("consume")}{" "}
                   <WorkshopPointsAmount
                     icon={coin}
                     value={confirmUpgrade.cost}
@@ -752,7 +779,7 @@ export function WorkshopPanel({
                   />
                 </li>
                 <li>
-                  소요 시간{" "}
+                  {t("duration")}{" "}
                   {formatUpgradeRemaining(confirmUpgrade.durationMs)}
                 </li>
               </ul>
@@ -763,7 +790,7 @@ export function WorkshopPanel({
                   disabled={busy}
                   onClick={() => setConfirmUpgrade(null)}
                 >
-                  취소
+                  {t("cancel")}
                 </button>
                 <button
                   type="button"
@@ -775,7 +802,7 @@ export function WorkshopPanel({
                     void onUpgrade(key);
                   }}
                 >
-                  업그레이드
+                  {t("upgrade")}
                 </button>
               </div>
             </div>
@@ -790,13 +817,13 @@ export function WorkshopPanel({
             aria-labelledby="yanmar-workshop-instant-confirm-title"
           >
             <div className="yanmar-repair-confirm-card">
-              <h3 id="yanmar-workshop-instant-confirm-title">즉시완료 확인</h3>
+              <h3 id="yanmar-workshop-instant-confirm-title">{t("instantCompleteConfirmation")}</h3>
               <p className="yanmar-repair-confirm-item">
                 {confirmInstant.label} +{confirmInstant.toLevel}
               </p>
               <ul className="yanmar-repair-confirm-facts">
                 <li className="yanmar-repair-confirm-cost">
-                  소모 <StarAmount value={confirmInstant.stars} size={14} />
+                  {t("consume")} <StarAmount value={confirmInstant.stars} size={14} />
                 </li>
               </ul>
               <div className="yanmar-repair-confirm-actions">
@@ -806,7 +833,7 @@ export function WorkshopPanel({
                   disabled={busy}
                   onClick={() => setConfirmInstant(null)}
                 >
-                  취소
+                  {t("cancel")}
                 </button>
                 <button
                   type="button"
@@ -817,7 +844,7 @@ export function WorkshopPanel({
                     void onInstantUpgrade?.();
                   }}
                 >
-                  즉시완료
+                  {t("instantComplete")}
                 </button>
               </div>
             </div>

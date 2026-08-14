@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { GameTickerBoard } from "@/components/games/GameTickerBoard";
+import { useTranslations } from "next-intl";
+import { GameChatBoard } from "@/components/games/GameChatBoard";
 import { useGameFullscreen } from "@/hooks/useGameFullscreen";
 import {
   enableInGamePortrait,
@@ -60,6 +61,7 @@ export function GameImmersiveOverlay({
   showPracticeTicker = false,
   children,
 }: GameImmersiveOverlayProps) {
+  const t = useTranslations("games.immersive");
   const containerRef = useRef<HTMLDivElement>(null);
   const { canFullscreen, apiFullscreen, isStandalone, enter, leave } =
     useGameFullscreen({ active, containerRef });
@@ -125,7 +127,7 @@ export function GameImmersiveOverlay({
               }}
               className="shrink-0 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold"
             >
-              ✕ 종료
+              ✕ {t("exit")}
             </button>
           ) : null}
           <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 max-w-full flex-1 items-center overflow-visible" />
@@ -141,7 +143,7 @@ export function GameImmersiveOverlay({
           />
           {!hideHeaderStats && (
             <span className="shrink-0 text-[10px] opacity-80">
-              {myRank ? `#${myRank}` : "-"} · {bestScore > 0 ? `${bestScore}점` : "0점"}
+              {myRank ? `#${myRank}` : "-"} · {t("points", { score: bestScore > 0 ? bestScore : 0 })}
             </span>
           )}
           {!hideFullscreenButton && canFullscreen && !apiFullscreen && !isStandalone && (
@@ -152,7 +154,7 @@ export function GameImmersiveOverlay({
               }}
               className="shrink-0 rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
             >
-              ⛶ 전체화면
+              ⛶ {t("fullscreen")}
             </button>
           )}
           {!hideRankingButton && (
@@ -166,7 +168,7 @@ export function GameImmersiveOverlay({
           )}
         </div>
       </div>
-      <GameTickerBoard includePractice={showPracticeTicker} />
+      <GameChatBoard />
       {/* z-0 traps in-game stacking (e.g. minimap z-30) below the header menu dropdown */}
       <div className="relative z-0 min-h-0 flex-1 overflow-hidden">{children}</div>
       </div>

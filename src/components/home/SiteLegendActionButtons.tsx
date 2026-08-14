@@ -1,9 +1,11 @@
 "use client";
 
 import { forwardRef, type RefObject } from "react";
+import { useTranslations } from "next-intl";
 
 interface SiteLegendActionButtonsProps {
-  primaryLabel: "로그인" | "게임 시작";
+  primaryLabel: string;
+  primaryType: "login" | "start";
   onPrimary: () => void;
   /** Secondary action under the primary CTA. Login splash uses logout; home uses settings. */
   secondary:
@@ -30,6 +32,8 @@ export const SiteLegendSettingsButton = forwardRef<
     badge?: number;
   }
 >(function SiteLegendSettingsButton({ onClick, open, badge }, ref) {
+  const t = useTranslations("shell");
+
   return (
     <button
       ref={ref}
@@ -37,13 +41,13 @@ export const SiteLegendSettingsButton = forwardRef<
       className="site-legend-btn site-legend-btn-settings"
       onClick={onClick}
       aria-expanded={open}
-      aria-label="설정"
+      aria-label={t("settings.title")}
     >
       <span className="site-legend-btn-settings-inner">
         <span className="site-legend-btn-gear" aria-hidden>
           ⚙
         </span>
-        <span>설정</span>
+        <span>{t("settings.title")}</span>
       </span>
       {badge && badge > 0 ? (
         <span className="site-legend-settings-badge">
@@ -55,12 +59,14 @@ export const SiteLegendSettingsButton = forwardRef<
 });
 
 export function SiteLegendLogoutButton({ onClick }: { onClick: () => void }) {
+  const t = useTranslations("auth");
+
   return (
     <button
       type="button"
       className="site-legend-btn site-legend-btn-settings site-legend-btn-logout"
       onClick={onClick}
-      aria-label="로그아웃"
+      aria-label={t("logout")}
     >
       <span className="site-legend-btn-settings-inner">
         <svg
@@ -85,7 +91,7 @@ export function SiteLegendLogoutButton({ onClick }: { onClick: () => void }) {
             strokeLinejoin="round"
           />
         </svg>
-        <span>로그아웃</span>
+        <span>{t("logout")}</span>
       </span>
     </button>
   );
@@ -93,6 +99,7 @@ export function SiteLegendLogoutButton({ onClick }: { onClick: () => void }) {
 
 export function SiteLegendActionButtons({
   primaryLabel,
+  primaryType,
   onPrimary,
   secondary,
   switchAccountLabel,
@@ -113,7 +120,7 @@ export function SiteLegendActionButtons({
       <button
         type="button"
         className={`site-legend-btn site-legend-btn-primary ${
-          primaryLabel === "로그인" ? "is-login" : "is-start"
+          primaryType === "login" ? "is-login" : "is-start"
         }`}
         onClick={onPrimary}
       >

@@ -37,8 +37,15 @@ export const ADMIN_MENU_ITEMS = [
   {
     href: "/admin/notices",
     emoji: "📢",
-    title: "전광판 공지",
-    desc: "게임 상단 전광판 공지 작성·순서·표시 관리",
+    title: "채팅 공지",
+    desc: "채팅 모달 상단 공지 작성·순서·표시 관리",
     color: "border-rose-200 bg-gradient-to-br from-rose-50 to-white",
+  },
+  {
+    href: "/admin/chat",
+    emoji: "🗨️",
+    title: "채팅 관리",
+    desc: "채널 채팅 조회·숨김·제재",
+    color: "border-violet-200 bg-gradient-to-br from-violet-50 to-white",
   },
 ] as const;

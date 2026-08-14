@@ -1,17 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
+import {
+  maintenanceFluidBlurb,
+  maintenanceFluidLabel,
+  maintenanceFluidWhyReplace,
+  maintenancePointKindLabel,
+} from "@/i18n/yanmarCatalog";
 import {
   MAINTENANCE_CLAIM_BUFF,
   MAINTENANCE_FLUID_ART,
   MAINTENANCE_FLUID_IDS,
   MAINTENANCE_FLUIDS,
   MAINTENANCE_CLAIM_SKEW_MS,
-  formatCycleHours,
   formatRemainingHhMm,
   maintenancePayoutRanges,
-  pointKindLabel,
   type FluidSnapshot,
   type MaintenanceBonusOutcome,
   type MaintenanceClaimBuff,
@@ -106,12 +111,13 @@ function statusTone(
 }
 
 function statusLabel(
+  t: ReturnType<typeof useTranslations>,
   tone: "ok" | "warn" | "dead",
   exchangeEligible: boolean,
 ): string {
-  if (exchangeEligible || tone === "dead") return "교환 가능";
-  if (tone === "warn") return "곧 만료";
-  return "정상";
+  if (exchangeEligible || tone === "dead") return t("exchangeAvailable");
+  if (tone === "warn") return t("expiringSoon");
+  return t("normal");
 }
 
 function RewardPreview({
@@ -121,6 +127,8 @@ function RewardPreview({
   fluidId: MaintenanceFluidId;
   compact?: boolean;
 }) {
+  const t = useTranslations("yanmar.repair");
+  const catalogT = useTranslations("yanmar");
   const def = MAINTENANCE_FLUIDS[fluidId];
   const buff = MAINTENANCE_CLAIM_BUFF[fluidId];
   const ranges = maintenancePayoutRanges(fluidId);
@@ -128,10 +136,10 @@ function RewardPreview({
     <div
       className={`yanmar-repair-reward-preview-body${compact ? " is-compact" : ""}`}
     >
-      <div className="yanmar-repair-reward-grid" aria-label="교환 보상 범위">
+      <div className="yanmar-repair-reward-grid" aria-label={t("rewardRange")}>
         <RewardRangeChip
           src={STAR_ICON}
-          label="스타"
+          label={t("stars")}
           amountLabel={formatRangeAmount(
             ranges.stars.min,
             ranges.stars.max,
@@ -140,7 +148,7 @@ function RewardPreview({
         />
         <RewardRangeChip
           src={POINT_ICONS[def.pointKind]}
-          label={pointKindLabel(def.pointKind)}
+          label={maintenancePointKindLabel(catalogT, def.pointKind)}
           amountLabel={formatRangeAmount(
             ranges.workshopPoints.min,
             ranges.workshopPoints.max,
@@ -150,7 +158,7 @@ function RewardPreview({
         {ranges.enhanceCores ? (
           <RewardRangeChip
             src={CORE_ICON}
-            label="강화코어"
+            label={t("enhanceCore")}
             amountLabel={formatRangeAmount(
               ranges.enhanceCores.min,
               ranges.enhanceCores.max,
@@ -161,7 +169,7 @@ function RewardPreview({
         {ranges.gachaTicketsStandard ? (
           <RewardRangeChip
             src={TICKET_STANDARD_ICON}
-            label="일반 뽑기권"
+            label={t("standardTicket")}
             amountLabel={formatRangeAmount(
               ranges.gachaTicketsStandard.min,
               ranges.gachaTicketsStandard.max,
@@ -172,7 +180,7 @@ function RewardPreview({
         {ranges.gachaTicketsPremium ? (
           <RewardRangeChip
             src={TICKET_PREMIUM_ICON}
-            label="고급 뽑기권"
+            label={t("premiumTicket")}
             amountLabel={formatRangeAmount(
               ranges.gachaTicketsPremium.min,
               ranges.gachaTicketsPremium.max,
@@ -193,7 +201,7 @@ function RewardPreview({
           </span>
         ) : null}
         <span className="yanmar-repair-reward-chip is-buff">
-          <em>{buff.label}</em>
+          <em>{t(`catalog.buffs.${fluidId}`)}</em>
         </span>
       </div>
     </div>
@@ -208,6 +216,8 @@ export function RepairPanel({
   clockOffsetMs = 0,
   onRepair,
 }: RepairPanelProps) {
+  const t = useTranslations("yanmar.repair");
+  const catalogT = useTranslations("yanmar");
   const [activeId, setActiveId] = useState<MaintenanceFluidId>("engineOil");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [claimResult, setClaimResult] =
@@ -233,7 +243,7 @@ export function RepairPanel({
       maintenance?.fluids[activeId] ??
       ({
         id: activeId,
-        label: MAINTENANCE_FLUIDS[activeId].label,
+        label: maintenanceFluidLabel(catalogT, activeId),
         remaining: 1,
         percent: 100,
         capacityMult: 1,
@@ -312,14 +322,14 @@ export function RepairPanel({
               <img src={REPAIR_ART} alt="" draggable={false} />
             </span>
             <div className="yanmar-repair-panel-titles">
-              <h2>정비소</h2>
+              <h2>{t("title")}</h2>
             </div>
           </div>
           <button
             type="button"
             className="yanmar-repair-panel-close"
             onClick={closeAll}
-            aria-label="닫기"
+            aria-label={t("close")}
           >
             ×
           </button>
@@ -357,7 +367,7 @@ export function RepairPanel({
                     ) : null}
                   </span>
                   <span className="yanmar-repair-fluid-rail-label">
-                    {MAINTENANCE_FLUIDS[id].label}
+                    {maintenanceFluidLabel(catalogT, id)}
                   </span>
                   <span className="yanmar-repair-fluid-rail-bar" aria-hidden>
                     <span
@@ -384,13 +394,13 @@ export function RepairPanel({
 
               <div className="yanmar-repair-hero-info">
                 <div className="yanmar-repair-detail-name-row">
-                  <h3>{activeFluid.label}</h3>
+                  <h3>{maintenanceFluidLabel(catalogT, activeId)}</h3>
                   <span className={`yanmar-repair-status is-${tone}`}>
-                    {statusLabel(tone, canExchange)}
+                    {statusLabel(t, tone, canExchange)}
                   </span>
                 </div>
                 <p className="yanmar-repair-meta-line">
-                  {formatCycleHours(activeFluid.cycleHours)}
+                  {t("cycleHours", { hours: activeFluid.cycleHours })}
                 </p>
               </div>
 
@@ -398,7 +408,10 @@ export function RepairPanel({
                 <div
                   className="yanmar-repair-gauge"
                   style={{ ["--repair-pct" as string]: `${livePercent}%` }}
-                  aria-label={`${activeFluid.label} ${livePercent}%`}
+                  aria-label={t("gaugeLabel", {
+                    fluid: maintenanceFluidLabel(catalogT, activeId),
+                    percent: livePercent,
+                  })}
                 >
                   <div className="yanmar-repair-gauge-ring">
                     <strong>{livePercent}%</strong>
@@ -409,13 +422,17 @@ export function RepairPanel({
             </div>
 
             <div className="yanmar-repair-copy-block">
-              <p className="yanmar-repair-fluid-blurb">{def.blurb}</p>
-              <p className="yanmar-repair-fluid-why">{def.whyReplace}</p>
+              <p className="yanmar-repair-fluid-blurb">
+                {maintenanceFluidBlurb(catalogT, activeId)}
+              </p>
+              <p className="yanmar-repair-fluid-why">
+                {maintenanceFluidWhyReplace(catalogT, activeId)}
+              </p>
             </div>
           </section>
 
           <div className="yanmar-repair-reward-preview">
-            <h4>교환 시 보상</h4>
+            <h4>{t("exchangeRewards")}</h4>
             <RewardPreview fluidId={activeId} />
           </div>
         </div>
@@ -427,7 +444,7 @@ export function RepairPanel({
             disabled={busy || !canExchange}
             onClick={() => setConfirmOpen(true)}
           >
-            {canExchange ? "교환하기" : "대기 중"}
+            {canExchange ? t("exchange") : t("waiting")}
           </button>
         </footer>
 
@@ -447,7 +464,9 @@ export function RepairPanel({
                   draggable={false}
                 />
               </div>
-              <h3 id="yanmar-repair-confirm-title">{def.label}</h3>
+              <h3 id="yanmar-repair-confirm-title">
+                {maintenanceFluidLabel(catalogT, activeId)}
+              </h3>
               <RewardPreview fluidId={activeId} compact />
               <div className="yanmar-repair-confirm-actions">
                 <button
@@ -456,7 +475,7 @@ export function RepairPanel({
                   disabled={busy}
                   onClick={() => setConfirmOpen(false)}
                 >
-                  취소
+                  {t("cancel")}
                 </button>
                 <button
                   type="button"
@@ -464,7 +483,7 @@ export function RepairPanel({
                   disabled={busy}
                   onClick={() => void confirmExchange()}
                 >
-                  교환하기
+                  {t("exchange")}
                 </button>
               </div>
             </div>

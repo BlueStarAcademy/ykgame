@@ -198,6 +198,7 @@ interface ExcavatorSceneProps {
   sportsMeetPattern?: import("./sportsMeet/patterns").SportsMeetPattern | null;
   /** Start-gate open after countdown GO (false while ready/countdown). */
   sportsMeetGateOpen?: boolean;
+  levelUpBurst?: { key: number; level: number } | null;
 }
 
 function TerrainMesh({
@@ -1994,6 +1995,69 @@ function ExcavatorArm({
         <meshStandardMaterial color="#ff5722" />
       </mesh>
       </group>
+    </group>
+  );
+}
+
+function CabinLevelUpBurst({
+  simRef,
+  terrainRef,
+  burst,
+}: {
+  simRef: React.MutableRefObject<ExcavatorSimState>;
+  terrainRef: React.MutableRefObject<TerrainData>;
+  burst: { key: number; level: number } | null;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const startedAtRef = useRef(0);
+  useLayoutEffect(() => {
+    startedAtRef.current = performance.now();
+  }, [burst?.key]);
+  useFrame(() => {
+    const group = groupRef.current;
+    if (!group || !burst) return;
+    const sim = simRef.current;
+    const ground = sampleHeight(terrainRef.current, sim.posX, sim.posZ);
+    const t = Math.min(1, (performance.now() - startedAtRef.current) / 2200);
+    group.position.set(sim.posX, ground + 2.55 + t * 2.4, sim.posZ);
+    group.visible = t < 1;
+    const opacity = t < 0.15 ? t / 0.15 : t > 0.65 ? 1 - (t - 0.65) / 0.35 : 1;
+    group.traverse((obj) => {
+      const mat = (obj as THREE.Mesh).material;
+      if (mat && "opacity" in (mat as THREE.Material)) {
+        (mat as THREE.Material).transparent = true;
+        (mat as THREE.Material).opacity = opacity;
+      }
+    });
+  });
+  if (!burst) return null;
+  return (
+    <group ref={groupRef}>
+      <Billboard follow lockX={false} lockZ={false}>
+        <Text
+          font={YANMAR_SCENE_FONT}
+          fontSize={0.42}
+          color="#fde68a"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.035}
+          outlineColor="#111827"
+        >
+          Level Up!
+        </Text>
+        <Text
+          font={YANMAR_SCENE_FONT}
+          position={[0, -0.48, 0]}
+          fontSize={0.32}
+          color="#ffffff"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.028}
+          outlineColor="#1e3a8a"
+        >
+          {`${burst.level}레벨`}
+        </Text>
+      </Billboard>
     </group>
   );
 }
@@ -4060,6 +4124,11 @@ function SceneContent(props: ExcavatorSceneProps) {
       <WaypointMarker
         tutorialStepRef={props.tutorialStepRef}
         tutorialWaypointRef={props.tutorialWaypointRef}
+      />
+      <CabinLevelUpBurst
+        simRef={props.simRef}
+        terrainRef={props.terrainRef}
+        burst={props.levelUpBurst ?? null}
       />
       <AuxiliarySceneEffects auxiliaryRef={props.auxiliaryRef} />
       <GameCamera

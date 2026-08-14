@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
   // 하단 콕핏 조작과 Next DevTools 드래그 인디케이터가 겹치면
@@ -8,6 +11,14 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["bcryptjs", "pg", "@prisma/client", "@prisma/adapter-pg"],
   async headers() {
     return [
+      {
+        source: "/api/chat/stream",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-transform, no-store" },
+          { key: "X-Accel-Buffering", value: "no" },
+          { key: "Connection", value: "keep-alive" },
+        ],
+      },
       {
         source: "/images/:path*",
         headers: [
@@ -40,4 +51,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

@@ -385,3 +385,14 @@ vus_max: 1000
       동일 사용자 쿠키를 재로그인으로 append하면 sessionVersion supersede → 대량 401.
 임계치 통과 여부: PASS
 ```
+
+## 채팅 (Redis Pub/Sub + SSE)
+
+- 채널 1~100, 채널당 최대 100명. 입장 시 1채널부터 빈자리를 자동 탐색한다.
+- presence·3초 쿨다운·Pub/Sub는 `REDIS_URL` 필수(장애 시 fail-closed).
+- 클라이언트는 화면당 SSE 1연결.
+- Railway public networking 한계 (설정 토글 없음, 앱에서 대응):
+  - 무통신 5분이면 연결 종료 → 서버가 **15초마다** SSE comment + `ping` 전송
+  - HTTP 요청 최대 **15분** → 클라이언트가 **12분마다** 스트림 재연결
+  - 버퍼링 방지: 응답/`next.config`에 `X-Accel-Buffering: no`, `Cache-Control: no-cache, no-transform`
+- 발행은 `publishChatEvent()` 한 곳으로 모아 이후 전용 WS 분리에 대비한다.

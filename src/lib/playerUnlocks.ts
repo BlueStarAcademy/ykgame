@@ -1,6 +1,8 @@
 import type { AttachmentType } from "@/games/yanmar/types";
 
 export const PLAYER_UNLOCKS = {
+  GEAR_CRAFT: 6,
+  QUESTS: 7,
   BREAKER: 10,
   GRAPPLE: 15,
   MONUMENT: 20,
@@ -11,6 +13,12 @@ export const PLAYER_UNLOCKS = {
 export const PRACTICE_FULL_UNLOCK_LEVEL = PLAYER_UNLOCKS.GRAPPLE;
 
 export type PlayerUnlockKind = keyof typeof PLAYER_UNLOCKS;
+
+/** Unlock kinds added after launch — already-qualified players skip the overlay. */
+const GRANDFATHER_UNLOCKS: readonly PlayerUnlockKind[] = [
+  "GEAR_CRAFT",
+  "QUESTS",
+];
 
 export function getAttachmentRequiredLevel(type: AttachmentType): number {
   if (type === "breaker") return PLAYER_UNLOCKS.BREAKER;
@@ -158,4 +166,24 @@ export function getUnseenUnlocksForLevel(
   return (Object.keys(PLAYER_UNLOCKS) as PlayerUnlockKind[]).filter((kind) => {
     return level >= PLAYER_UNLOCKS[kind] && !hasSeenPlayerUnlock(ownerId, kind);
   });
+}
+
+/**
+ * Existing accounts already past the new unlock levels should not see the
+ * celebration overlay on next login. Live level-ups still use getCrossedUnlocks.
+ */
+export function grandfatherNewUnlocks(ownerId: string, level: number) {
+  for (const kind of GRANDFATHER_UNLOCKS) {
+    if (level >= PLAYER_UNLOCKS[kind] && !hasSeenPlayerUnlock(ownerId, kind)) {
+      markPlayerUnlockSeen(ownerId, kind);
+    }
+  }
+}
+
+export function isGearCraftUnlocked(playerLevel: number) {
+  return playerLevel >= PLAYER_UNLOCKS.GEAR_CRAFT;
+}
+
+export function isQuestPanelUnlocked(playerLevel: number) {
+  return playerLevel >= PLAYER_UNLOCKS.QUESTS;
 }

@@ -1,6 +1,7 @@
-const STORAGE_KEY = "ykgame:yanmar:sound-settings:v5";
+const STORAGE_KEY = "ykgame:yanmar:sound-settings:v6";
 /** Previous keys kept for one-shot migration. */
 const LEGACY_STORAGE_KEYS = [
+  "ykgame:yanmar:sound-settings:v5",
   "ykgame:yanmar:sound-settings:v4",
   "ykgame:yanmar:sound-settings:v3",
   "ykgame:yanmar:sound-settings:v2",
@@ -16,6 +17,36 @@ export const HORN_OPTIONS = [
 
 export type HornId = (typeof HORN_OPTIONS)[number]["id"];
 
+export const SFX_DETAIL_OPTIONS = [
+  { id: "horn", label: "경적" },
+  { id: "enhance", label: "강화 결과" },
+  { id: "ui", label: "UI 클릭" },
+  { id: "engine", label: "엔진 시동·정지" },
+  { id: "travel", label: "주행" },
+  { id: "breaker", label: "브레이커" },
+  { id: "service", label: "정비소 진입" },
+  { id: "monument", label: "기념비 진입" },
+  { id: "star", label: "스타 획득" },
+  { id: "buff", label: "버프 획득" },
+  { id: "item", label: "장비 획득" },
+  { id: "masterItem", label: "마스터 장비 획득" },
+  { id: "sports", label: "운동회 카운트다운" },
+  { id: "roulette", label: "룰렛 회전" },
+  { id: "attachment", label: "어태치먼트 해금" },
+] as const;
+
+export type SfxDetailId = (typeof SFX_DETAIL_OPTIONS)[number]["id"];
+
+export type SfxDetailSettings = Record<
+  SfxDetailId,
+  { enabled: boolean; volume: number }
+>;
+
+export const DEFAULT_SFX_DETAILS: SfxDetailSettings =
+  Object.fromEntries(
+    SFX_DETAIL_OPTIONS.map(({ id }) => [id, { enabled: true, volume: 100 }]),
+  ) as SfxDetailSettings;
+
 export interface SoundSettings {
   hornId: HornId;
   /** In-game / title looping BGM; persisted with settings menu toggle. */
@@ -28,6 +59,8 @@ export interface SoundSettings {
   sfxVolume: number;
   /** Breaker strike loop SFX (under master sfx). */
   breakerSfxEnabled: boolean;
+  /** Per-effect gate and relative loudness (under master SFX). */
+  sfxDetails: SfxDetailSettings;
 }
 
 export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
@@ -38,6 +71,7 @@ export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
   sfxEnabled: true,
   sfxVolume: 85,
   breakerSfxEnabled: true,
+  sfxDetails: DEFAULT_SFX_DETAILS,
 };
 
 /**
@@ -59,6 +93,28 @@ function clampVolume(value: unknown, fallback: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function normalizeSfxDetails(value: unknown): SfxDetailSettings {
+  const raw = value && typeof value === "object" ? value : {};
+  return Object.fromEntries(
+    SFX_DETAIL_OPTIONS.map(({ id }) => {
+      const candidate = (raw as Partial<SfxDetailSettings>)[id];
+      return [
+        id,
+        {
+          enabled:
+            typeof candidate?.enabled === "boolean"
+              ? candidate.enabled
+              : DEFAULT_SFX_DETAILS[id].enabled,
+          volume: clampVolume(
+            candidate?.volume,
+            DEFAULT_SFX_DETAILS[id].volume,
+          ),
+        },
+      ];
+    }),
+  ) as SfxDetailSettings;
+}
+
 function isValidSettings(value: unknown): value is SoundSettings {
   if (!value || typeof value !== "object") return false;
   const settings = value as Partial<SoundSettings>;
@@ -70,7 +126,8 @@ function isValidSettings(value: unknown): value is SoundSettings {
     isBoolean(settings.sfxEnabled) &&
     typeof settings.sfxVolume === "number" &&
     Number.isFinite(settings.sfxVolume) &&
-    isBoolean(settings.breakerSfxEnabled)
+    isBoolean(settings.breakerSfxEnabled) &&
+    settings.sfxDetails != null
   );
 }
 
@@ -88,6 +145,7 @@ function normalizeSettings(partial: Partial<SoundSettings> & { hornId: HornId })
     breakerSfxEnabled: isBoolean(partial.breakerSfxEnabled)
       ? partial.breakerSfxEnabled
       : DEFAULT_SOUND_SETTINGS.breakerSfxEnabled,
+    sfxDetails: normalizeSfxDetails(partial.sfxDetails),
   };
 }
 

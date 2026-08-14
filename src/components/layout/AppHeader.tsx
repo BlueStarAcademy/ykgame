@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { clientLogout } from "@/lib/client-logout";
 import { MailboxModal, useMailboxBadge } from "@/components/layout/MailboxModal";
 import {
@@ -28,11 +29,15 @@ function HamburgerButton({
   open,
   badgeCount,
   buttonRef,
+  openLabel,
+  closeLabel,
 }: {
   onClick: () => void;
   open: boolean;
   badgeCount: number;
   buttonRef?: React.RefObject<HTMLButtonElement | null>;
+  openLabel: string;
+  closeLabel: string;
 }) {
   return (
     <button
@@ -40,7 +45,7 @@ function HamburgerButton({
       type="button"
       onClick={onClick}
       className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white shadow-sm hover:bg-slate-50"
-      aria-label={open ? "메뉴 닫기" : "메뉴 열기"}
+      aria-label={open ? closeLabel : openLabel}
       aria-expanded={open}
     >
       <span className="flex w-4 flex-col items-center justify-center gap-1">
@@ -70,6 +75,8 @@ function HamburgerButton({
 }
 
 export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
+  const t = useTranslations("shell");
+  const common = useTranslations("common");
   const { data: session, status, update } = useSession();
   const [liveCurrency, setLiveCurrency] = useState<number | null>(null);
   const seenSessionCurrencyRef = useRef<number | undefined>(undefined);
@@ -132,7 +139,7 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
   }, [currency, sessionCurrency]);
 
   const displayNickname =
-    session?.user?.nickname ?? nickname ?? "플레이어";
+    session?.user?.nickname ?? nickname ?? common("player");
   const displayCurrency = liveCurrency ?? currency ?? sessionCurrency ?? 0;
   const displayRole = session?.user?.role ?? role ?? "USER";
 
@@ -158,6 +165,8 @@ export function AppHeader({ nickname, currency, role }: AppHeaderProps) {
               open={menuOpen}
               badgeCount={menuNotifyCount}
               buttonRef={menuButtonRef}
+              openLabel={t("openMenu")}
+              closeLabel={t("closeMenu")}
               onClick={() => setMenuOpen((prev) => !prev)}
             />
           </div>

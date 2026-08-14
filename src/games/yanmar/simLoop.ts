@@ -1554,7 +1554,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       !grip.liftChecked &&
       liftedEnough
     ) {
-      const success = Math.random() < grip.adhesion01;
+      const success = mode === "tutorial" ? true : Math.random() < grip.adhesion01;
       grip.liftChecked = true;
       grip.liftResult = success ? "success" : "fail";
       grip.liftResultTick += 1;

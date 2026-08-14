@@ -1,18 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import {
-  abilityLabel,
   emptyAbilityAlloc,
   recommendAbilityAlloc,
   spentAbilityPoints,
   type AbilityAlloc,
 } from "./abilityAlloc";
 import {
-  CHASSIS_CLASS_LABEL,
   DEFAULT_CHASSIS_ID,
-  formatChassisWeightKg,
   getChassisDef,
   type ChassisModelId,
 } from "./chassisCatalog";
@@ -46,6 +44,7 @@ export function ChassisGallery({
   abilityAlloc,
   onAbilityAllocSave,
 }: Omit<ChassisPanelProps, "open" | "onClose" | "embedded">) {
+  const t = useTranslations("yanmar.chassis");
   const selected = getChassisDef(DEFAULT_CHASSIS_ID);
   const [artPreviewOpen, setArtPreviewOpen] = useState(false);
   const allocEnabled = Boolean(abilityAlloc && onAbilityAllocSave);
@@ -76,6 +75,11 @@ export function ChassisGallery({
   };
 
   const thumbSrc = chassisModelThumbSrc(selected.id);
+  const statLabel = (key: MainOptionKey) => t(`stats.${key}`);
+  const classLabel = t(`class.${selected.chassisClass.toLowerCase()}`);
+  const weightLabel = t("weight", {
+    weight: selected.weightKg.toLocaleString(),
+  });
 
   return (
     <div className="yanmar-chassis-gallery">
@@ -94,7 +98,7 @@ export function ChassisGallery({
             className="yanmar-chassis-zoom-btn"
             onClick={() => setArtPreviewOpen(true)}
           >
-            크게보기
+            {t("zoom")}
           </button>
         </div>
 
@@ -102,22 +106,22 @@ export function ChassisGallery({
           <h4 className="yanmar-chassis-showcase-name">{selected.label}</h4>
           <div className="yanmar-chassis-showcase-info">
             <span className="yanmar-chassis-class-pill">
-              {CHASSIS_CLASS_LABEL[selected.chassisClass]}
+              {classLabel}
             </span>
             <span className="yanmar-chassis-weight-pill">
-              {formatChassisWeightKg(selected.weightKg)}
+              {weightLabel}
             </span>
           </div>
-          <p className="yanmar-chassis-trait">{selected.trait}</p>
+          <p className="yanmar-chassis-trait">{t("defaultTrait")}</p>
           {allocEnabled ? (
             <div className="yanmar-chassis-bonus-block">
               <span
                 className={`yanmar-chassis-bonus-points${
                   remaining > 0 ? " has-remain" : ""
                 }`}
-                title="분배 가능 보너스 포인트"
+                title={t("bonusPointsTitle")}
               >
-                보너스 {remaining}
+                {t("bonus", { points: remaining })}
               </span>
               <div className="yanmar-chassis-bonus-actions">
                 <button
@@ -126,7 +130,7 @@ export function ChassisGallery({
                   disabled={busy || !dirty}
                   onClick={() => void onAbilityAllocSave?.(draft)}
                 >
-                  저장
+                  {t("save")}
                   {dirty && remaining > 0 ? (
                     <em className="yanmar-bonus-point-badge is-on-btn" aria-hidden />
                   ) : null}
@@ -141,7 +145,7 @@ export function ChassisGallery({
                     )
                   }
                 >
-                  추천분배
+                  {t("recommendedAllocation")}
                 </button>
               </div>
             </div>
@@ -152,7 +156,7 @@ export function ChassisGallery({
           className={`yanmar-chassis-stat-grid yanmar-chassis-stat-grid--2x3${
             allocEnabled ? " yanmar-chassis-stat-grid--editable" : ""
           }`}
-          aria-label="차체 능력치"
+          aria-label={t("statsAriaLabel")}
         >
           {MAIN_OPTION_KEYS.map((key) => {
             const base = selected.stats[key];
@@ -160,7 +164,7 @@ export function ChassisGallery({
             const preview = base + alloc;
             return (
               <li key={key}>
-                <span>{abilityLabel(key)}</span>
+                <span>{statLabel(key)}</span>
                 <div className="yanmar-chassis-stat-right">
                   <strong>
                     {preview}
@@ -174,7 +178,7 @@ export function ChassisGallery({
                         type="button"
                         disabled={busy || alloc <= 0}
                         onClick={() => bump(key, -1)}
-                        aria-label={`${abilityLabel(key)} 감소`}
+                        aria-label={t("decreaseStat", { stat: statLabel(key) })}
                       >
                         −
                       </button>
@@ -182,7 +186,7 @@ export function ChassisGallery({
                         type="button"
                         disabled={busy || remaining <= 0}
                         onClick={() => bump(key, 1)}
-                        aria-label={`${abilityLabel(key)} 증가`}
+                        aria-label={t("increaseStat", { stat: statLabel(key) })}
                       >
                         +
                       </button>
@@ -200,12 +204,12 @@ export function ChassisGallery({
           className="yanmar-chassis-art-preview-layer"
           role="dialog"
           aria-modal="true"
-          aria-label="차체 이미지 크게보기"
+          aria-label={t("zoomAriaLabel")}
         >
           <button
             type="button"
             className="yanmar-chassis-art-preview-backdrop"
-            aria-label="크게보기 닫기"
+            aria-label={t("closeZoom")}
             onClick={() => setArtPreviewOpen(false)}
           />
           <div className="yanmar-chassis-art-preview-card">
@@ -219,15 +223,14 @@ export function ChassisGallery({
             />
             <p className="yanmar-chassis-art-preview-name">{selected.label}</p>
             <p className="yanmar-chassis-art-preview-meta">
-              {CHASSIS_CLASS_LABEL[selected.chassisClass]} ·{" "}
-              {formatChassisWeightKg(selected.weightKg)}
+              {classLabel} · {weightLabel}
             </p>
             <button
               type="button"
               className="yanmar-chassis-art-preview-close"
               onClick={() => setArtPreviewOpen(false)}
             >
-              닫기
+              {t("close")}
             </button>
           </div>
         </div>
@@ -250,6 +253,7 @@ export function ChassisPanel({
   onEquip,
   onAbilityAllocSave,
 }: ChassisPanelProps) {
+  const t = useTranslations("yanmar.chassis");
   const gallery = (
     <ChassisGallery
       playerLevel={playerLevel}
@@ -274,8 +278,8 @@ export function ChassisPanel({
     <AppModalOverlay open={open} onClose={onClose ?? (() => undefined)}>
       <div className="yanmar-shop-panel" style={{ maxWidth: 860 }}>
         <div className="yanmar-shop-panel-header">
-          <h2>차체</h2>
-          <button type="button" onClick={onClose} aria-label="닫기">
+          <h2>{t("title")}</h2>
+          <button type="button" onClick={onClose} aria-label={t("close")}>
             ×
           </button>
         </div>

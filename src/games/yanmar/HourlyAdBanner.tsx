@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useLocale, useTranslations } from "next-intl";
 import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
+import type { Locale } from "@/i18n/config";
+import { localizedAsset } from "@/i18n/localizedAsset";
 import styles from "./HourlyAdBanner.module.css";
 import {
   HOURLY_AD_REWARD_POOL,
@@ -93,6 +96,8 @@ export function HourlyAdBanner({
   isLoggedIn,
   onClaimed,
 }: HourlyAdBannerProps) {
+  const t = useTranslations("yanmar");
+  const locale = useLocale();
   const [mounted, setMounted] = useState(false);
   const [bannerSec, setBannerSec] = useState(0);
   const [claimed, setClaimed] = useState(false);
@@ -161,6 +166,18 @@ export function HourlyAdBanner({
     bannerSec > 0 &&
     creative !== null &&
     phase === "idle";
+  const creativeCopy =
+    activeSlotId && creative
+      ? {
+          teaserTitle: t(`ads.${activeSlotId}.teaserTitle`),
+          teaserSub: t(`ads.${activeSlotId}.teaserSub`),
+          panelEyebrow: t(`ads.${activeSlotId}.panelEyebrow`),
+          panelTitle: t(`ads.${activeSlotId}.panelTitle`),
+          imageAlt: t(`ads.${activeSlotId}.imageAlt`),
+          ariaLabel: t(`ads.${activeSlotId}.ariaLabel`),
+          image: localizedAsset(creative.image, locale as Locale),
+        }
+      : null;
 
   const adOpen = phase === "ad" || phase === "claiming";
   const rewardOpen = phase === "spinning" || phase === "result";
@@ -380,12 +397,12 @@ export function HourlyAdBanner({
 
   return (
     <>
-      {showTeaser && creative ? (
+      {showTeaser && creative && creativeCopy ? (
         <button
           type="button"
           className={styles.teaser}
           onClick={openAd}
-          aria-label={`${creative.ariaLabel} 보상 보기`}
+          aria-label={`${creativeCopy.ariaLabel} — ${t("ads.rewardHint")}`}
         >
           <span className={styles.teaserShine} aria-hidden />
           <div className={styles.teaserMedia}>
@@ -393,11 +410,19 @@ export function HourlyAdBanner({
               AD
             </span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={creative.image} alt="" draggable={false} />
+            <img
+              src={creativeCopy.image}
+              alt=""
+              draggable={false}
+              onError={(event) => {
+                event.currentTarget.onerror = null;
+                event.currentTarget.src = creative.image;
+              }}
+            />
           </div>
           <div className={styles.teaserBody}>
-            <div className={styles.teaserTitle}>{creative.teaserTitle}</div>
-            <div className={styles.teaserSub}>{creative.teaserSub}</div>
+            <div className={styles.teaserTitle}>{creativeCopy.teaserTitle}</div>
+            <div className={styles.teaserSub}>{creativeCopy.teaserSub}</div>
             <div className={styles.teaserTimer}>
               <span className={styles.teaserTimerLabel}>남은 시간</span>
               <span>{formatMmSs(bannerSec)}</span>
@@ -406,7 +431,7 @@ export function HourlyAdBanner({
         </button>
       ) : null}
 
-      {adOpen && creative
+      {adOpen && creative && creativeCopy
         ? createPortal(
             <div className={styles.backdrop} onClick={requestCloseAd}>
               <div
@@ -414,14 +439,14 @@ export function HourlyAdBanner({
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
-                aria-label={creative.ariaLabel}
+                aria-label={creativeCopy.ariaLabel}
               >
                 <div className={styles.panelHeader}>
                   <div>
                     <div className={styles.panelEyebrow}>
-                      {creative.panelEyebrow}
+                      {creativeCopy.panelEyebrow}
                     </div>
-                    <h2 className={styles.panelTitle}>{creative.panelTitle}</h2>
+                    <h2 className={styles.panelTitle}>{creativeCopy.panelTitle}</h2>
                   </div>
                   <button
                     type="button"
@@ -439,7 +464,14 @@ export function HourlyAdBanner({
                       AD
                     </span>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={creative.image} alt={creative.imageAlt} />
+                    <img
+                      src={creativeCopy.image}
+                      alt={creativeCopy.imageAlt}
+                      onError={(event) => {
+                        event.currentTarget.onerror = null;
+                        event.currentTarget.src = creative.image;
+                      }}
+                    />
                   </div>
                   {watchLeft > 0 ? (
                     <p className={styles.adHint}>{watchLeft}초 후 보상 획득</p>

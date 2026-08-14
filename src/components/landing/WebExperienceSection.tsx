@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { useTranslations } from "next-intl";
 import { buildPwaLoginUrl } from "@/lib/pwa-mode";
 
 interface WebExperienceSectionProps {
@@ -9,6 +10,7 @@ interface WebExperienceSectionProps {
 }
 
 export function WebExperienceSection({ compact = false }: WebExperienceSectionProps) {
+  const t = useTranslations("landing");
   const [gameUrl, setGameUrl] = useState("");
 
   useEffect(() => {
@@ -22,10 +24,10 @@ export function WebExperienceSection({ compact = false }: WebExperienceSectionPr
           {gameUrl ? (
             <QRCodeSVG value={gameUrl} size={84} level="M" />
           ) : (
-            <span className="text-[10px] text-gray-400">QR 생성 중...</span>
+            <span className="text-[10px] text-gray-400">{t("generatingQr")}</span>
           )}
         </div>
-        <p className="mt-1 text-[10px] font-bold text-gray-700">게임 체험</p>
+        <p className="mt-1 text-[10px] font-bold text-gray-700">{t("gameExperience")}</p>
       </div>
     );
   }
@@ -45,10 +47,10 @@ export function WebExperienceSection({ compact = false }: WebExperienceSectionPr
             {gameUrl ? (
               <QRCodeSVG value={gameUrl} size={116} level="M" />
             ) : (
-              <span className="text-xs text-gray-400">QR 생성 중...</span>
+              <span className="text-xs text-gray-400">{t("generatingQr")}</span>
             )}
           </div>
-          <p className="mt-2 text-xs font-bold text-gray-800">게임 체험</p>
+          <p className="mt-2 text-xs font-bold text-gray-800">{t("gameExperience")}</p>
         </div>
 
         <div className="max-w-xs space-y-2 text-center sm:text-left">

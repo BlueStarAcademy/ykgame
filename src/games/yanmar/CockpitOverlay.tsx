@@ -2,7 +2,16 @@
 
 /* eslint-disable react-hooks/immutability */
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import { useTranslations } from "next-intl";
 import type {
   AuxiliaryControlState,
   ControlMask,
@@ -30,6 +39,19 @@ import {
 } from "@/lib/playerUnlocks";
 import type { HornId } from "./soundSettings";
 import { yanmarAudio } from "./yanmarAudio";
+
+type TranslateFn = (key: string) => string;
+
+const CockpitTranslationContext = createContext<{
+  cockpit: TranslateFn;
+  hud: TranslateFn;
+} | null>(null);
+
+function useCockpitTranslations() {
+  const translations = useContext(CockpitTranslationContext);
+  if (!translations) throw new Error("Cockpit translations are unavailable");
+  return translations;
+}
 
 interface CockpitOverlayProps {
   mode: GameMode;
@@ -1240,6 +1262,7 @@ function RpmLever({
   isPortrait: boolean;
   embedded?: boolean;
 }) {
+  const { hud } = useCockpitTranslations();
   const buttonSize = isPortrait ? "2.85rem" : "2.75rem";
 
   return (
@@ -1261,12 +1284,14 @@ function RpmLever({
       }
       onPointerDown={activateOnPointerDown(onToggle)}
       aria-pressed={active}
-      aria-label={active ? "RPM(x2)" : "RPM(x1)"}
+      aria-label={`${hud("rpm")}(x${active ? 2 : 1})`}
     >
       <span className="yanmar-aux-lever-well" aria-hidden>
         <span className="yanmar-menu-control-art yanmar-menu-control-art-rpm" />
       </span>
-      <span className="yanmar-aux-button-label">{active ? "RPM(x2)" : "RPM(x1)"}</span>
+      <span className="yanmar-aux-button-label">
+        {hud("rpm")}(x{active ? 2 : 1})
+      </span>
       {showTouchZone && (
         <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-sky-200/65 bg-transparent" />
       )}
@@ -1291,6 +1316,7 @@ function SafetyLever({
   isPortrait: boolean;
   embedded?: boolean;
 }) {
+  const { cockpit } = useCockpitTranslations();
   return (
     <button
       type="button"
@@ -1310,12 +1336,12 @@ function SafetyLever({
       }
       onPointerDown={activateOnPointerDown(onToggle)}
       aria-pressed={active}
-      aria-label={active ? "안전(잠금)" : "안전(해제)"}
+      aria-label={cockpit("safety")}
     >
       <span className="yanmar-aux-lever-well" aria-hidden>
         <span className="yanmar-menu-control-art yanmar-menu-control-art-safety" />
       </span>
-      <span className="yanmar-aux-button-label">{active ? "안전(잠금)" : "안전(해제)"}</span>
+      <span className="yanmar-aux-button-label">{cockpit("safety")}</span>
       {showTouchZone && (
         <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-slate-200/65 bg-transparent" />
       )}
@@ -1342,6 +1368,7 @@ function BladeLever({
   embedded?: boolean;
   onInactivePress?: () => void;
 }) {
+  const { cockpit } = useCockpitTranslations();
   const blade = layout.blade;
   const zoneRef = useRef<HTMLDivElement>(null);
   const valueRef = useRef(value);
@@ -1488,7 +1515,7 @@ function BladeLever({
             color="dark"
             variant="travel"
           />
-          <span className="yanmar-blade-lever-label">블레이드</span>
+          <span className="yanmar-blade-lever-label">{cockpit("blade")}</span>
         </div>
         <div
           ref={zoneRef}
@@ -1538,7 +1565,7 @@ function BladeLever({
           color="dark"
           variant="travel"
         />
-        <span className="yanmar-blade-lever-label">블레이드</span>
+        <span className="yanmar-blade-lever-label">{cockpit("blade")}</span>
       </div>
       <div
         ref={zoneRef}
@@ -1916,7 +1943,7 @@ const ATTACHMENTS: Array<{
   {
     type: "breaker",
     label: "브레이커",
-    icon: "/images/yanmar/2d/attachments/breaker.png",
+    icon: "/images/yanmar/2d/attachments/breaker.png?v=2",
   },
   {
     type: "grapple",
@@ -1991,6 +2018,7 @@ function FunctionMenu({
   onAttachmentChange,
   onInactiveMachinePress,
 }: FunctionMenuProps) {
+  const { cockpit } = useCockpitTranslations();
   const anchorCx = layout.left.cx;
   const toggleCy = AUX_MENU_TOGGLE_CY;
   const buttonSize = getAuxMenuButtonSize(isPortrait);
@@ -2019,6 +2047,13 @@ function FunctionMenu({
             <AttachmentButton
               key={item.type}
               {...item}
+              label={cockpit(
+                item.type === "breaker"
+                  ? "pedalBreaker"
+                  : item.type === "grapple"
+                    ? "pedalGrapple"
+                    : "bucket",
+              )}
               selected={attachmentType === item.type}
               playerLevel={playerLevel}
               unlockAll={unlockAllAttachments}
@@ -2123,10 +2158,10 @@ function FunctionMenu({
         }}
         onPointerDown={activateOnPointerDown(onToggle)}
         aria-expanded={expanded}
-        aria-label={expanded ? "기능 메뉴 닫기" : "기능 메뉴 열기"}
+        aria-label={cockpit("function")}
       >
         <span className="yanmar-function-menu-icon" aria-hidden />
-        <span className="yanmar-function-menu-toggle-label">기능</span>
+        <span className="yanmar-function-menu-toggle-label">{cockpit("function")}</span>
         {showTouchZones ? (
           <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-emerald-200/65 bg-transparent" />
         ) : null}
@@ -2148,6 +2183,7 @@ function EngineStartButton({
   isPortrait: boolean;
   showTouchZones: boolean;
 }) {
+  const { hud } = useCockpitTranslations();
   const buttonSize = getAuxMenuButtonSize(isPortrait);
   const anchorCx = layout.left.cx;
   const toggleCy = AUX_MENU_TOGGLE_CY;
@@ -2175,7 +2211,7 @@ function EngineStartButton({
         onToggle();
       })}
       aria-pressed={engineOn}
-      aria-label={engineOn ? "시동 끄기" : "시동 켜기"}
+      aria-label={engineOn ? hud("engineOn") : hud("engineOff")}
     >
       <span className="yanmar-engine-start-ring" aria-hidden />
       <span className="yanmar-engine-start-core" aria-hidden>
@@ -2184,7 +2220,7 @@ function EngineStartButton({
           <span className="yanmar-engine-start-power" />
         </span>
         <span className="yanmar-engine-start-caption">
-          {engineOn ? "ON" : "START"}
+          {engineOn ? hud("engineOn") : hud("engineOff")}
         </span>
       </span>
       {showTouchZones ? (
@@ -2402,6 +2438,7 @@ function HornAutoCluster({
   engineOn?: boolean;
   onInactiveMachinePress?: () => void;
 }) {
+  const { cockpit } = useCockpitTranslations();
   const buttonSize = getAuxMenuButtonSize(isPortrait);
   const anchorCx = layout.horn.cx;
   const toggleCy = AUX_MENU_TOGGLE_CY;
@@ -2429,7 +2466,7 @@ function HornAutoCluster({
           minHeight: buttonSize,
         }}
         onPointerDown={activateOnPointerDown(onHorn)}
-        aria-label="경적"
+        aria-label={cockpit("horn")}
       >
         <img
           className="yanmar-horn-standalone-icon"
@@ -2437,7 +2474,7 @@ function HornAutoCluster({
           alt=""
           draggable={false}
         />
-        <span className="yanmar-horn-standalone-label">경적</span>
+        <span className="yanmar-horn-standalone-label">{cockpit("horn")}</span>
         {showTouchZones ? (
           <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-amber-200/65 bg-transparent" />
         ) : null}
@@ -2478,6 +2515,7 @@ function AutoMenu({
   engineOn = true,
   onInactiveMachinePress,
 }: AutoMenuProps) {
+  const { cockpit } = useCockpitTranslations();
   const editOpenDelayMs = AUTO_POSE_SLOT_ORDER.length * 50;
   const editCloseDelayMs = 0;
 
@@ -2603,10 +2641,10 @@ function AutoMenu({
         }}
         onPointerDown={activateOnPointerDown(onToggle)}
         aria-expanded={expanded}
-        aria-label={expanded ? "자동 메뉴 닫기" : "자동 메뉴 열기"}
+        aria-label={cockpit("auto")}
       >
         <span className="yanmar-auto-menu-icon yanmar-auto-menu-icon-auto" aria-hidden />
-        <span className="yanmar-auto-menu-toggle-label">자동</span>
+        <span className="yanmar-auto-menu-toggle-label">{cockpit("auto")}</span>
         {showTouchZones ? (
           <span className="pointer-events-none absolute inset-[-6%] rounded-xl border border-violet-200/65 bg-transparent" />
         ) : null}
@@ -2640,6 +2678,8 @@ export function CockpitOverlay({
   hornId = 1,
   onHorn,
 }: CockpitOverlayProps) {
+  const cockpit = useTranslations("yanmar.cockpit");
+  const hud = useTranslations("yanmar.hud");
   const highlightLeft =
     tutorialStep?.highlight === "left" || tutorialStep?.highlight === "both";
   const highlightRight =
@@ -2710,7 +2750,7 @@ export function CockpitOverlay({
   ]);
 
   return (
-    <>
+    <CockpitTranslationContext.Provider value={{ cockpit, hud }}>
       <div className="yanmar-control-deck pointer-events-none absolute inset-x-0 z-10 mx-auto">
         <div className="relative h-full w-full">
           {!hideVisualDeck ? (
@@ -2964,6 +3004,6 @@ export function CockpitOverlay({
         onClose={() => setAutoLabelModalOpen(false)}
         onSave={onSaveAutoPoseLabels}
       />
-    </>
+    </CockpitTranslationContext.Provider>
   );
 }

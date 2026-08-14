@@ -1,3 +1,6 @@
+import type { Locale } from "@/i18n/config";
+import { localizedAsset } from "@/i18n/localizedAsset";
+
 export type YanmarCouponType =
   | "YK_PARTS_DISCOUNT"
   | "EQUIPMENT_RENTAL_DISCOUNT"
@@ -28,6 +31,6 @@ export function getYanmarCouponLabel(type: YanmarCouponType) {
   return YANMAR_COUPON_VISUALS[type].label;
 }
 
-export function getYanmarCouponImage(type: YanmarCouponType) {
-  return YANMAR_COUPON_VISUALS[type].image;
+export function getYanmarCouponImage(type: YanmarCouponType, locale?: Locale) {
+  return localizedAsset(YANMAR_COUPON_VISUALS[type].image, locale);
 }

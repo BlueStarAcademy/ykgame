@@ -14,7 +14,7 @@ export const YANMAR_UPGRADE_ATTACHMENT_TABS = [
     id: "breaker" as const,
     label: "브레이커",
     part: "CRASH_RESPAWN" as const,
-    icon: "/images/yanmar/2d/attachments/breaker.png",
+    icon: "/images/yanmar/2d/attachments/breaker.png?v=2",
     diagram: "/images/yanmar/2d/excavator-side-diagram-breaker.png",
   },
   {

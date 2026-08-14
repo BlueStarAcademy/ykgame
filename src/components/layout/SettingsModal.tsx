@@ -2,9 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
+import { LanguagePicker } from "@/components/i18n/LanguagePicker";
 import { StarAmount } from "@/components/StarAmount";
-import { NICKNAME_CHANGE_COST_STARS, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH, validateNickname } from "@/lib/profile";
+import {
+  NICKNAME_CHANGE_COST_STARS,
+  NICKNAME_MAX_LENGTH,
+  NICKNAME_MIN_LENGTH,
+  validateNickname,
+} from "@/lib/profile";
 
 interface SettingsModalProps {
   open: boolean;
@@ -12,6 +19,8 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
+  const t = useTranslations("shell.settings");
+  const tc = useTranslations("common");
   const { data: session, update } = useSession();
   const [loginId, setLoginId] = useState("");
   const [nickname, setNickname] = useState("");
@@ -81,7 +90,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "설정 저장에 실패했습니다.");
+        setError(data.error ?? t("saveFailed"));
         return;
       }
       if (typeof data.currency === "number") {
@@ -96,7 +105,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
       });
       onClose();
     } catch {
-      setError("설정 저장에 실패했습니다.");
+      setError(t("saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -106,22 +115,26 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     <AppModalOverlay open={open} onClose={onClose}>
       <div className="overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between bg-slate-700 px-4 py-3 text-white">
-          <h2 className="text-base font-black">설정</h2>
+          <h2 className="text-base font-black">{t("title")}</h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg bg-white/20 px-2.5 py-1 text-xs font-bold hover:bg-white/30"
           >
-            닫기
+            {tc("close")}
           </button>
         </div>
 
         {loading ? (
-          <p className="py-10 text-center text-xs text-gray-400">설정 불러오는 중...</p>
+          <p className="py-10 text-center text-xs text-gray-400">{t("loading")}</p>
         ) : (
           <form onSubmit={handleSave} className="space-y-4 p-4">
+            <LanguagePicker />
+
             <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-500">아이디</label>
+              <label className="mb-1 block text-xs font-semibold text-gray-500">
+                {t("loginId")}
+              </label>
               <input
                 type="text"
                 value={loginId}
@@ -131,19 +144,24 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-500">닉네임</label>
+              <label className="mb-1 block text-xs font-semibold text-gray-500">
+                {t("nickname")}
+              </label>
               <input
                 type="text"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                placeholder={`닉네임 (${NICKNAME_MIN_LENGTH}~${NICKNAME_MAX_LENGTH}글자)`}
+                placeholder={t("nicknamePlaceholder", {
+                  min: NICKNAME_MIN_LENGTH,
+                  max: NICKNAME_MAX_LENGTH,
+                })}
                 minLength={NICKNAME_MIN_LENGTH}
                 maxLength={NICKNAME_MAX_LENGTH}
                 required
               />
               <p className="mt-1.5 text-[11px] font-semibold text-amber-700">
-                닉네임 변경 시 스타 {NICKNAME_CHANGE_COST_STARS}개가 필요합니다. 중복 불가.
+                {t("nicknameHint", { cost: NICKNAME_CHANGE_COST_STARS })}
               </p>
             </div>
 
@@ -155,10 +173,10 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-500 disabled:opacity-60"
             >
               {saving ? (
-                "저장 중..."
+                tc("saving")
               ) : nicknameDirty ? (
                 <>
-                  <span>변경</span>
+                  <span>{t("change")}</span>
                   <StarAmount
                     value={NICKNAME_CHANGE_COST_STARS}
                     size={14}
@@ -166,7 +184,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                   />
                 </>
               ) : (
-                "저장"
+                tc("save")
               )}
             </button>
           </form>

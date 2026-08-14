@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import {
   GEAR_SLOTS,
-  ITEM_GRADE_LABEL,
   type GachaBanner,
   type GearSlot,
   type ItemGrade,
@@ -12,6 +12,7 @@ import {
 import { gearIconSrc, preloadGearIconSrcs } from "./gearArt";
 import { GearIconCell } from "./GearIconCell";
 import { yanmarAudio } from "./yanmarAudio";
+import { gearGradeLabel } from "@/i18n/yanmarCatalog";
 
 export type GachaResultItem = {
   nameSnapshot: string;
@@ -39,6 +40,7 @@ interface GachaResultModalProps {
   banner?: GachaBanner | null;
   /** 기본: 획득 결과 / 합성: 합성 결과 */
   title?: string;
+  titleKey?: "title" | "synthesisTitle";
   /** 카드마다 획득 효과음 (기본: 연속 공개 시 항상, 단건도 강제하려면 true) */
   perRevealSfx?: boolean;
 }
@@ -76,9 +78,12 @@ export function GachaResultModal({
   onClose,
   results,
   banner = "STANDARD",
-  title = "획득 결과",
+  title,
+  titleKey = "title",
   perRevealSfx = false,
 }: GachaResultModalProps) {
+  const t = useTranslations("yanmar.gacha");
+  const catalogT = useTranslations("yanmar");
   const items = results ?? [];
   const count = items.length;
   const activeBanner: GachaBanner = banner === "PREMIUM" ? "PREMIUM" : "STANDARD";
@@ -235,7 +240,7 @@ export function GachaResultModal({
         }${phase === "playing" ? " is-playing" : ""}`}
       >
         <div className="yanmar-gacha-result-modal-header">
-          <h2>{title}</h2>
+          <h2>{title ?? t(titleKey)}</h2>
           <span className="yanmar-gacha-result-modal-count">
             {Math.min(revealedCount, count)}/{count}
           </span>
@@ -246,7 +251,7 @@ export function GachaResultModal({
                 className="yanmar-gacha-result-skip"
                 onClick={handleSkip}
               >
-                스킵
+                {t("skip")}
               </button>
             ) : null}
             {canClose ? (
@@ -254,7 +259,7 @@ export function GachaResultModal({
                 type="button"
                 className="yanmar-gacha-result-close"
                 onClick={onClose}
-                aria-label="닫기"
+                aria-label={t("close")}
               >
                 ×
               </button>
@@ -300,7 +305,7 @@ export function GachaResultModal({
                 {revealed ? (
                   <>
                     <span className="yanmar-gacha-result-modal-grade">
-                      {ITEM_GRADE_LABEL[grade]}
+                      {gearGradeLabel(catalogT, grade)}
                     </span>
                     <span className="yanmar-gacha-result-modal-name">
                       {r.nameSnapshot}
@@ -322,11 +327,11 @@ export function GachaResultModal({
             className="yanmar-gacha-result-modal-confirm"
             onClick={onClose}
           >
-            확인
+            {t("confirm")}
           </button>
         ) : (
           <p className="yanmar-gacha-result-modal-hint">
-            {isMulti ? "장비를 여는 중…" : "장비를 확인하는 중…"}
+            {isMulti ? t("openingEquipment") : t("checkingEquipment")}
           </p>
         )}
 
@@ -338,9 +343,9 @@ export function GachaResultModal({
             <div className="yanmar-gacha-jackpot-burst" aria-hidden />
             <div className="yanmar-gacha-jackpot-rays" aria-hidden />
             <p className="yanmar-gacha-jackpot-label">
-              {ITEM_GRADE_LABEL[flashGrade]}
+              {gearGradeLabel(catalogT, flashGrade)}
             </p>
-            <p className="yanmar-gacha-jackpot-sub">HIGH GRADE</p>
+            <p className="yanmar-gacha-jackpot-sub">{t("highGrade")}</p>
           </div>
         ) : null}
       </div>

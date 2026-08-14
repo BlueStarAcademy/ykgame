@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import type { GameId } from "@/lib/games";
 import { getGameById, calculateStars } from "@/lib/games";
 import type { GameResult } from "@/games/shared/types";
@@ -65,6 +66,7 @@ export function GameResultScreen({
   onScoreSaved,
   seasonScoreBase = 0,
 }: GameResultScreenProps) {
+  const t = useTranslations("games.results");
   const game = getGameById(gameId);
   const isYanmar = gameId === "yanmar";
   const isYanmarArcade = gameId === "yanmar" && typeof result.arcadeScore === "number";
@@ -192,13 +194,13 @@ export function GameResultScreen({
   const nickname = session?.user?.nickname ?? "";
   const isRide = result.mode === "ride";
   const title = isRide
-    ? "탑승 체험 종료"
+    ? t("rideTitle")
     : isYanmar
-      ? "운행 결과"
+      ? t("yanmarTitle")
       : result.completed
-        ? "미션 완료!"
-        : "시간 종료";
-  const homeLabel = isRide ? "탑승 홈으로" : isYanmar ? "나가기" : "홈으로";
+        ? t("completedTitle")
+        : t("timeOverTitle");
+  const homeLabel = isRide ? t("rideHome") : isYanmar ? t("exit") : t("home");
   const savePending = isYanmarArcade && !saved && !saveFailed;
   const yRankingRows = rankings.slice(0, 10);
   const sessionArcadeScore = result.arcadeScore ?? 0;
@@ -222,7 +224,7 @@ export function GameResultScreen({
           disabled={savePending}
           className="flex-1 rounded-xl border border-white/10 bg-white/10 py-3 text-center text-sm font-bold text-white hover:bg-white/15 disabled:cursor-wait disabled:opacity-50"
         >
-          머무르기
+          {t("stay")}
         </button>
       ) : onRetry ? (
         <button
@@ -230,14 +232,14 @@ export function GameResultScreen({
           onClick={onRetry}
           className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300"
         >
-          재시도
+          {t("retry")}
         </button>
       ) : (
         <Link
           href={isYanmar ? "/home" : `/games/${gameId}`}
           className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300"
         >
-          재시도
+          {t("retry")}
         </Link>
       )}
       {onExit ? (
@@ -269,8 +271,8 @@ export function GameResultScreen({
       }`}
     >
       {saveFailed
-        ? "점수를 저장하지 못했습니다. 나중에 다시 시도해 주세요."
-        : "점수 저장 중..."}
+        ? t("saveFailed")
+        : t("saving")}
     </p>
   ) : null;
 
@@ -304,29 +306,29 @@ export function GameResultScreen({
         <div className="shrink-0 rounded-xl border border-white/8 bg-white/[0.04] px-4 py-4 text-center">
           <p className="text-[11px] font-semibold text-white/50">
             {isRide
-              ? "탑승 체험"
+              ? t("rideExperience")
               : result.mode === "game"
-                ? "누적 점수"
-                : "연습 점수"}
+                ? t("cumulativeScore")
+                : t("practiceScore")}
           </p>
           <p className="mt-1 text-[2rem] font-black leading-none tabular-nums tracking-tight text-white">
             {isRide
-              ? "완료"
+              ? t("complete")
               : result.mode === "game"
                 ? yanmarDisplayScore.toLocaleString()
                 : (result.arcadeScore ?? 0).toLocaleString()}
           </p>
           <p className="mt-2 text-[11px] font-medium text-white/45">
-            플레이 {result.playTime}초
-            {result.timeLeft > 0 ? ` · 남은 ${result.timeLeft}초` : ""}
+            {t("playTime", { seconds: result.playTime })}
+            {result.timeLeft > 0 ? ` · ${t("timeRemaining", { seconds: result.timeLeft })}` : ""}
             {result.mode === "game" && sessionArcadeScore > 0
-              ? ` · 이번 운행 +${sessionArcadeScore.toLocaleString()}`
+              ? ` · ${t("thisRunScore", { score: sessionArcadeScore.toLocaleString() })}`
               : ""}
-            {result.mode === "game" && myRank ? ` · 시즌 #${myRank}` : ""}
+            {result.mode === "game" && myRank ? ` · ${t("seasonRank", { rank: myRank })}` : ""}
           </p>
           {result.mode === "practice" ? (
             <p className="mt-2 text-[10px] font-medium text-white/35">
-              연습 운행 결과는 랭킹에 저장되지 않습니다.
+              {t("practiceNotRanked")}
             </p>
           ) : null}
         </div>
@@ -334,8 +336,8 @@ export function GameResultScreen({
         {result.mode === "game" ? (
           <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/8 bg-black/25">
             <div className="flex shrink-0 items-center justify-between border-b border-white/8 px-3 py-2">
-              <h3 className="text-[11px] font-bold text-white/70">누적 점수 Top 10</h3>
-              <span className="text-[10px] font-semibold text-white/40">시즌</span>
+              <h3 className="text-[11px] font-bold text-white/70">{t("cumulativeTop10")}</h3>
+              <span className="text-[10px] font-semibold text-white/40">{t("season")}</span>
             </div>
 
             <div
@@ -344,10 +346,10 @@ export function GameResultScreen({
             >
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="font-bold text-white">
-                  나의 순위 {myRank ? `#${myRank}` : "—"}
+                  {t("myRank", { rank: myRank ? `#${myRank}` : "—" })}
                 </span>
                 <span className="shrink-0 font-black tabular-nums text-white">
-                  {yanmarDisplayScore.toLocaleString()}점
+                  {t("points", { score: yanmarDisplayScore.toLocaleString() })}
                 </span>
               </div>
             </div>
@@ -355,7 +357,7 @@ export function GameResultScreen({
             <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 [-webkit-overflow-scrolling:touch]">
               {yRankingRows.length === 0 ? (
                 <p className="px-2 py-6 text-center text-[11px] text-white/35">
-                  {savePending ? "랭킹 불러오는 중..." : "랭킹 데이터 없음"}
+                  {savePending ? t("rankingLoading") : t("noRankingData")}
                 </p>
               ) : (
                 <ul className="space-y-1">
@@ -415,30 +417,30 @@ export function GameResultScreen({
         </p>
         <p className="mt-2 text-2xl font-bold text-gray-800">{result.progress}%</p>
         <p className="text-sm text-gray-500">
-          플레이 시간 {result.playTime}초
-          {result.timeLeft > 0 ? ` · 남은 시간 ${result.timeLeft}초` : ""}
+          {t("playTime", { seconds: result.playTime })}
+          {result.timeLeft > 0 ? ` · ${t("timeRemaining", { seconds: result.timeLeft })}` : ""}
         </p>
         {saved && stars > 0 && (
-          <p className="mt-2 text-sm text-green-600">⭐ {stars}별 획득!</p>
+          <p className="mt-2 text-sm text-green-600">⭐ {t("starsEarned", { stars })}</p>
         )}
         {result.mode === "game" && saved && myRank && (
-          <p className="mt-1 text-sm text-blue-600">시즌 순위 #{myRank}</p>
+          <p className="mt-1 text-sm text-blue-600">{t("seasonRank", { rank: myRank })}</p>
         )}
       </div>
 
       <div className="mb-4 rounded-xl bg-gray-50 p-4">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-gray-700">이번 달 Top 10</h3>
+          <h3 className="text-sm font-bold text-gray-700">{t("monthlyTop10")}</h3>
           <button
             type="button"
             onClick={() => setShowRanking(true)}
             className="text-xs font-medium text-blue-600 hover:underline"
           >
-            전체 보기
+            {t("viewAll")}
           </button>
         </div>
         {rankings.length === 0 ? (
-          <p className="text-xs text-gray-400">랭킹 데이터 없음</p>
+          <p className="text-xs text-gray-400">{t("noRankingData")}</p>
         ) : (
           <ul className="space-y-1">
             {rankings.slice(0, 5).map((r) => (
@@ -447,7 +449,7 @@ export function GameResultScreen({
                   <RankBadge rank={r.rank} size="sm" tone="light" />
                   <span className="truncate">{r.nickname}</span>
                 </span>
-                <span className="shrink-0 text-gray-600">{r.score}점</span>
+                <span className="shrink-0 text-gray-600">{t("points", { score: r.score })}</span>
               </li>
             ))}
           </ul>
@@ -461,14 +463,14 @@ export function GameResultScreen({
             onClick={onRetry}
             className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300"
           >
-            재시도
+            {t("retry")}
           </button>
         ) : (
           <Link
             href={`/games/${gameId}`}
             className="flex-1 rounded-lg bg-gray-200 py-3 text-center font-medium text-gray-700 hover:bg-gray-300"
           >
-            재시도
+            {t("retry")}
           </Link>
         )}
         {onExit ? (
@@ -492,7 +494,7 @@ export function GameResultScreen({
       </div>
       {!saved && (
         <p className={`mt-2 text-center text-xs ${saveFailed ? "text-red-500" : "text-gray-400"}`}>
-          {saveFailed ? "점수를 저장하지 못했습니다. 나중에 다시 시도해 주세요." : "점수 저장 중..."}
+          {saveFailed ? t("saveFailed") : t("saving")}
         </p>
       )}
     </div>

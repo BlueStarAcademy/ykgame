@@ -10,7 +10,7 @@
     "build": "prisma generate && next build",
     "start": "node scripts/start.mjs",
     "lint": "eslint",
-    "test:scale": "tsx --test tests/database-pool-config.test.ts tests/request-idempotency.test.ts tests/dump-reward-outbox.test.ts tests/hot-api-observability.test.ts tests/redis-scale.test.ts tests/session-scale.test.ts tests/atomic-mutation.test.ts tests/load-test-config.test.mjs",
+    "test:scale": "tsx --test tests/database-pool-config.test.ts tests/request-idempotency.test.ts tests/dump-reward-outbox.test.ts tests/hot-api-observability.test.ts tests/redis-scale.test.ts tests/session-scale.test.ts tests/atomic-mutation.test.ts tests/load-test-config.test.mjs tests/chat.test.ts",
     "load:check": "node scripts/load/validate-config.mjs",
     "load:smoke": "node scripts/load/run.mjs --smoke",
     "load:mixed": "node scripts/load/run.mjs",
@@ -20,6 +20,10 @@
     "db:reset": "node scripts/run-prisma-direct.mjs migrate reset --force",
     "assets:generate": "node scripts/generate-game-sprites.mjs",
     "assets:yanmar-controls": "node scripts/generate-yanmar-premium-controls.mjs",
+    "assets:locale-copy": "node scripts/copy-locale-assets.mjs",
+    "assets:site-legend-titles": "node scripts/gen-site-legend-titles.mjs",
+    "assets:hourly-ads-locale": "node scripts/gen-hourly-ad-locales.mjs",
+    "i18n:smoke": "node scripts/i18n-smoke.mjs",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs"
   },
   "prisma": {
@@ -35,6 +39,7 @@
     "dotenv": "^17.4.2",
     "next": "16.2.9",
     "next-auth": "^5.0.0-beta.31",
+    "next-intl": "^4.13.6",
     "pg": "^8.22.0",
     "phaser": "^4.2.0",
     "prisma": "^7.8.0",

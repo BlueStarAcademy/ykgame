@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   SPORTS_MEET_WEEKLY_REWARD_TIERS,
   type SportsMeetPlayMode,
@@ -48,12 +49,6 @@ function formatTimeMs(ms: number) {
   return `${m}:${s.toFixed(2).padStart(5, "0")}`;
 }
 
-function formatRewardRankLabel(minRank: number, maxRank: number) {
-  if (minRank === maxRank) return `${minRank}위`;
-  if (maxRank === Number.POSITIVE_INFINITY) return `${minRank}위~`;
-  return `${minRank}~${maxRank}위`;
-}
-
 export function SportsMeetModePanel({
   open,
   onClose,
@@ -65,6 +60,7 @@ export function SportsMeetModePanel({
   onEnter: (mode: SportsMeetPlayMode) => void;
   onOpenRankings: (week: "current" | "previous") => void;
 }) {
+  const t = useTranslations("yanmar.sportsMeet");
   const [data, setData] = useState<TicketPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +72,7 @@ export function SportsMeetModePanel({
     setError(null);
     void fetch("/api/sports-meet/yanmar/ticket")
       .then(async (res) => {
-        if (!res.ok) throw new Error("티켓 정보를 불러오지 못했습니다.");
+        if (!res.ok) throw new Error(t("ticketLoadFailed"));
         return (await res.json()) as TicketPayload;
       })
       .then((json) => {
@@ -84,7 +80,7 @@ export function SportsMeetModePanel({
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "오류");
+          setError(err instanceof Error ? err.message : t("error"));
         }
       })
       .finally(() => {
@@ -107,30 +103,30 @@ export function SportsMeetModePanel({
         className="yanmar-unlock-panel yanmar-sports-meet-entry"
         role="dialog"
         aria-modal="true"
-        aria-label="굴착기 운동회"
+        aria-label={t("title")}
       >
         <button
           type="button"
           className="yanmar-sports-meet-entry-close"
           onClick={onClose}
-          aria-label="닫기"
+          aria-label={t("close")}
         >
           ×
         </button>
         <div className="yanmar-unlock-body yanmar-sports-meet-entry-body">
           <h2 className="yanmar-unlock-title yanmar-sports-meet-entry-title">
-            굴착기 운동회
+            {t("title")}
           </h2>
 
           {loading ? (
-            <p className="yanmar-unlock-lead">불러오는 중…</p>
+            <p className="yanmar-unlock-lead">{t("loading")}</p>
           ) : error ? (
             <p className="yanmar-unlock-lead">{error}</p>
           ) : (
             <div className="yanmar-sports-meet-entry-grid">
               <section className="yanmar-sports-meet-entry-card yanmar-sports-meet-entry-course">
                 <h3 className="yanmar-sports-meet-entry-card-title">
-                  이번 주 코스
+                  {t("thisWeekCourse")}
                 </h3>
                 <p className="yanmar-sports-meet-entry-card-name">
                   {data?.patternName ?? "—"}
@@ -142,7 +138,7 @@ export function SportsMeetModePanel({
 
               <section className="yanmar-sports-meet-entry-card yanmar-sports-meet-entry-rewards-panel">
                 <h3 className="yanmar-sports-meet-entry-card-title">
-                  순위별 보상
+                  {t("rankRewards")}
                 </h3>
                 <ul className="yanmar-sports-meet-entry-reward-rows">
                   {SPORTS_MEET_WEEKLY_REWARD_TIERS.map((tier) => {
@@ -173,7 +169,14 @@ export function SportsMeetModePanel({
                             </span>
                           ) : null}
                           <span>
-                            {formatRewardRankLabel(tier.minRank, tier.maxRank)}
+                            {tier.minRank === tier.maxRank
+                              ? t("rank", { rank: tier.minRank })
+                              : tier.maxRank === Number.POSITIVE_INFINITY
+                                ? t("rankOrLower", { rank: tier.minRank })
+                                : t("rankRange", {
+                                    min: tier.minRank,
+                                    max: tier.maxRank,
+                                  })}
                           </span>
                         </span>
                         <span className="yanmar-sports-meet-entry-reward-stars">
@@ -191,7 +194,7 @@ export function SportsMeetModePanel({
                   })}
                 </ul>
                 <p className="yanmar-sports-meet-entry-reward-note">
-                  월요일 0시 코스 초기화 · 지난주 순위 보상 지급
+                  {t("weeklyResetNote")}
                 </p>
               </section>
             </div>
@@ -203,14 +206,14 @@ export function SportsMeetModePanel({
               className="yanmar-sports-meet-entry-rank-btn"
               onClick={() => onOpenRankings("current")}
             >
-              이번 주 랭킹
+              {t("thisWeekRankings")}
             </button>
             <button
               type="button"
               className="yanmar-sports-meet-entry-rank-btn"
               onClick={() => onOpenRankings("previous")}
             >
-              지난주 랭킹
+              {t("previousWeekRankings")}
             </button>
           </div>
 
@@ -222,7 +225,7 @@ export function SportsMeetModePanel({
               onClick={() => onEnter("ranked")}
             >
               <span className="yanmar-sports-meet-entry-enter-label">
-                랭킹모드
+                {t("rankedMode")}
               </span>
               <span className="yanmar-sports-meet-entry-enter-ticket">
                 <img
@@ -242,7 +245,7 @@ export function SportsMeetModePanel({
               className="yanmar-sports-meet-entry-practice"
               onClick={() => onEnter("practice")}
             >
-              연습모드
+              {t("practiceMode")}
             </button>
           </div>
         </div>
@@ -262,6 +265,7 @@ export function SportsMeetRankingsPanel({
   onClose: () => void;
   onSwitchWeek: (week: "current" | "previous") => void;
 }) {
+  const t = useTranslations("yanmar.sportsMeet");
   const [data, setData] = useState<RankingsPayload | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -296,7 +300,7 @@ export function SportsMeetRankingsPanel({
         className="yanmar-unlock-panel yanmar-sports-meet-rankings"
         role="dialog"
         aria-modal="true"
-        aria-label="굴착기 운동회 랭킹"
+        aria-label={t("rankingsAriaLabel")}
         style={{
           width: "min(28rem, 94vw)",
           maxWidth: "28rem",
@@ -310,12 +314,12 @@ export function SportsMeetRankingsPanel({
       >
         <div className="yanmar-unlock-body yanmar-sports-meet-rankings-body">
           <h2 className="yanmar-unlock-title yanmar-sports-meet-rankings-title">
-            {week === "previous" ? "지난주 랭킹" : "이번 주 랭킹"}
+            {week === "previous" ? t("previousWeekRankings") : t("thisWeekRankings")}
           </h2>
 
           <div className="yanmar-sports-meet-rankings-meta">
             {loading ? (
-              <p className="yanmar-unlock-lead">불러오는 중…</p>
+              <p className="yanmar-unlock-lead">{t("loading")}</p>
             ) : data ? (
               <>
                 <p className="yanmar-unlock-lead">
@@ -325,47 +329,47 @@ export function SportsMeetRankingsPanel({
                 </p>
                 {data.myStats?.rank != null ? (
                   <p className="yanmar-sports-meet-rankings-mine">
-                    내 순위 {data.myStats.rank}위 ·{" "}
+                    {t("myRank", { rank: data.myStats.rank })} ·{" "}
                     {data.myStats.bestTimeMs != null
                       ? formatTimeMs(data.myStats.bestTimeMs)
                       : "-"}
                     {data.myStats.rewardStars != null
-                      ? ` · 보상 ${data.myStats.rewardStars.toLocaleString()}★`
+                      ? ` · ${t("reward", { stars: data.myStats.rewardStars.toLocaleString() })}`
                       : ""}
                   </p>
                 ) : (
                   <p className="yanmar-sports-meet-rankings-empty">
                     {week === "previous"
-                      ? "지난주 기록이 없습니다"
-                      : "이번 주 기록이 없습니다"}
+                      ? t("noPreviousWeekRecords")
+                      : t("noThisWeekRecords")}
                   </p>
                 )}
               </>
             ) : (
-              <p className="yanmar-unlock-lead">랭킹을 불러오지 못했습니다.</p>
+              <p className="yanmar-unlock-lead">{t("rankingsLoadFailed")}</p>
             )}
           </div>
 
           <div className="yanmar-sports-meet-rankings-table-wrap">
             {loading ? (
               <p className="yanmar-sports-meet-rankings-placeholder">
-                불러오는 중…
+                {t("loading")}
               </p>
             ) : !data ? (
               <p className="yanmar-sports-meet-rankings-placeholder">
-                랭킹을 불러오지 못했습니다.
+                {t("rankingsLoadFailed")}
               </p>
             ) : data.rankings.length === 0 ? (
               <p className="yanmar-sports-meet-rankings-placeholder">
-                기록이 없습니다
+                {t("noRecords")}
               </p>
             ) : (
               <table className="yanmar-sports-meet-rankings-table">
                 <thead>
                   <tr>
-                    <th>순위</th>
-                    <th>닉네임</th>
-                    <th>시간</th>
+                    <th>{t("rankHeader")}</th>
+                    <th>{t("nicknameHeader")}</th>
+                    <th>{t("timeHeader")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -391,14 +395,14 @@ export function SportsMeetRankingsPanel({
                 onSwitchWeek(week === "current" ? "previous" : "current")
               }
             >
-              {week === "current" ? "지난주 랭킹" : "이번 주 랭킹"}
+              {week === "current" ? t("previousWeekRankings") : t("thisWeekRankings")}
             </button>
             <button
               type="button"
               className="yanmar-sports-meet-rankings-action-btn yanmar-sports-meet-rankings-action-btn--close"
               onClick={onClose}
             >
-              닫기
+              {t("close")}
             </button>
           </div>
         </div>
@@ -433,6 +437,7 @@ export function SportsMeetHud({
   onStart: () => void;
   onExit: () => void;
 }) {
+  const t = useTranslations("yanmar.sportsMeet");
   const [liveElapsedMs, setLiveElapsedMs] = useState(elapsedMs);
   const [countdownSec, setCountdownSec] = useState<number | null>(null);
 
@@ -470,8 +475,11 @@ export function SportsMeetHud({
 
   const courseLabel =
     stageTotal > 0
-      ? `코스 ${Math.min(stageIndex + 1, stageTotal)}/${stageTotal}`
-      : "코스";
+      ? t("courseProgress", {
+          current: Math.min(stageIndex + 1, stageTotal),
+          total: stageTotal,
+        })
+      : t("course");
 
   return (
     <div className="yanmar-mission-hud-panel relative w-full overflow-hidden rounded-xl border border-white/8 bg-black/15 text-white shadow-none backdrop-blur-[1px]">
@@ -480,7 +488,7 @@ export function SportsMeetHud({
           {courseLabel}
         </span>
         <span className="shrink-0 text-[8px] font-bold leading-none text-amber-200/85">
-          운동회
+          {t("meet")}
         </span>
       </div>
 
@@ -505,7 +513,7 @@ export function SportsMeetHud({
 
         {phase === "ready" ? (
           <p className="mt-1 text-[8px] font-bold leading-snug text-white/55">
-            시작 대기
+            {t("waitingToStart")}
           </p>
         ) : null}
 
@@ -527,7 +535,7 @@ export function SportsMeetHud({
               className="min-h-6 flex-1 rounded-md bg-amber-400 px-1 text-[9px] font-black text-slate-900 active:scale-95"
               onClick={onStart}
             >
-              시작
+              {t("start")}
             </button>
           ) : null}
           <button
@@ -535,7 +543,7 @@ export function SportsMeetHud({
             className="min-h-6 flex-1 rounded-md border border-white/25 bg-black/35 px-1 text-[9px] font-bold text-white active:scale-95"
             onClick={onExit}
           >
-            나가기
+            {t("exit")}
           </button>
         </div>
       </div>
@@ -564,6 +572,7 @@ export function SportsMeetResultPanel({
   onExit: () => void;
   onOpenRankings: () => void;
 }) {
+  const t = useTranslations("yanmar.sportsMeet");
   if (!open) return null;
 
   let prev = 0;
@@ -579,19 +588,19 @@ export function SportsMeetResultPanel({
         className="yanmar-unlock-panel"
         role="dialog"
         aria-modal="true"
-        aria-label="굴착기 운동회 결과"
+        aria-label={t("resultAriaLabel")}
         style={{ maxWidth: "26rem" }}
       >
         <div className="yanmar-unlock-body">
-          <h2 className="yanmar-unlock-title">완주!</h2>
+          <h2 className="yanmar-unlock-title">{t("finish")}</h2>
           <p className="yanmar-unlock-lead">
             {patternName}
             <br />
             {playMode === "ranked"
               ? submitted
-                ? "랭킹에 기록이 반영되었습니다"
-                : "랭킹 제출 중…"
-              : "연습 기록 · 랭킹 미반영"}
+                ? t("rankingRecorded")
+                : t("submittingRanking")
+              : t("practiceNotRanked")}
           </p>
           <p className="mt-2 font-mono text-3xl font-black tabular-nums text-amber-200">
             {formatTimeMs(finalTimeMs)}
@@ -600,9 +609,9 @@ export function SportsMeetResultPanel({
             <table className="w-full text-left text-xs text-white/90">
               <thead className="bg-black/40 text-white/60">
                 <tr>
-                  <th className="px-2 py-1.5">코스</th>
-                  <th className="px-2 py-1.5">구간</th>
-                  <th className="px-2 py-1.5">누적</th>
+                  <th className="px-2 py-1.5">{t("course")}</th>
+                  <th className="px-2 py-1.5">{t("segment")}</th>
+                  <th className="px-2 py-1.5">{t("cumulative")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -627,7 +636,7 @@ export function SportsMeetResultPanel({
                 className="yanmar-unlock-cta"
                 onClick={onRetryPractice}
               >
-                연습 다시하기
+                {t("retryPractice")}
               </button>
             ) : (
               <button
@@ -635,7 +644,7 @@ export function SportsMeetResultPanel({
                 className="yanmar-unlock-cta"
                 onClick={onOpenRankings}
               >
-                이번 주 랭킹 보기
+                {t("viewThisWeekRankings")}
               </button>
             )}
             <button
@@ -643,7 +652,7 @@ export function SportsMeetResultPanel({
               className="rounded-lg border border-white/25 bg-white/5 px-4 py-2.5 text-sm font-bold text-white"
               onClick={onExit}
             >
-              작업장으로 돌아가기
+              {t("returnToWorkshop")}
             </button>
           </div>
         </div>

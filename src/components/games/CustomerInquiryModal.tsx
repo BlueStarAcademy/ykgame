@@ -2,12 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  formatInquiryDate,
-  formatInquiryDay,
-  playerInquiryStatus,
-  type InquiryStatusKey,
-} from "@/lib/inquiries";
+import { useLocale, useTranslations } from "next-intl";
+import { type InquiryStatusKey } from "@/lib/inquiries";
 import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
 
 type TabId = "write" | "mine";
@@ -29,6 +25,8 @@ export function CustomerInquiryModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const t = useTranslations("shell.inquiry");
+  const locale = useLocale();
   const [tab, setTab] = useState<TabId>("write");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -47,15 +45,15 @@ export function CustomerInquiryModal({
     try {
       const res = await fetch("/api/inquiries");
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "목록 불러오기 실패");
+      if (!res.ok) throw new Error(data.error ?? t("listLoadFailed"));
       setInquiries((data.inquiries ?? []) as PlayerInquiry[]);
     } catch (err) {
       setInquiries([]);
-      setListError(err instanceof Error ? err.message : "목록 불러오기 실패");
+      setListError(err instanceof Error ? err.message : t("listLoadFailed"));
     } finally {
       setListLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!open) return;
@@ -75,10 +73,32 @@ export function CustomerInquiryModal({
   if (!open || typeof document === "undefined") return null;
 
   const selected = inquiries.find((item) => item.id === selectedId) ?? null;
+  const formatDate = (value: string) =>
+    new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  const formatDay = (value: string) =>
+    new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(value));
+  const getStatus = (status: InquiryStatusKey, adminNote: string | null) => {
+    const answered =
+      status === "RESOLVED" || status === "CLOSED" || Boolean(adminNote?.trim());
+    return {
+      key: answered ? "answered" : "pending",
+      label: t(answered ? "statusAnswered" : "statusPending"),
+    };
+  };
 
   async function submit() {
     if (!title.trim() || !body.trim()) {
-      setError("제목과 내용을 입력해주세요.");
+      setError(t("requiredFields"));
       return;
     }
     setSending(true);
@@ -90,12 +110,12 @@ export function CustomerInquiryModal({
         body: JSON.stringify({ title: title.trim(), body: body.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "접수 실패");
+      if (!res.ok) throw new Error(data.error ?? t("submitFailed"));
       setDone(true);
       setTitle("");
       setBody("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "접수 실패");
+      setError(err instanceof Error ? err.message : t("submitFailed"));
     } finally {
       setSending(false);
     }
@@ -107,24 +127,24 @@ export function CustomerInquiryModal({
         className="flex h-[min(82dvh,28rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/15 bg-slate-950 text-white shadow-2xl"
         role="dialog"
         aria-modal="true"
-        aria-label="고객문의"
+        aria-label={t("ariaLabel")}
       >
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <h2 className="text-sm font-black">고객문의</h2>
+          <h2 className="text-sm font-black">{t("title")}</h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-xs font-bold text-white/70 hover:bg-white/10 hover:text-white"
           >
-            닫기
+            {t("close")}
           </button>
         </div>
 
         <div className="flex border-b border-white/10 px-2 pt-2">
           {(
             [
-              { id: "write", label: "문의하기" },
-              { id: "mine", label: "내 문의" },
+              { id: "write", label: t("writeTab") },
+              { id: "mine", label: t("mineTab") },
             ] as const
           ).map((item) => {
             const active = tab === item.id;
@@ -153,9 +173,9 @@ export function CustomerInquiryModal({
         {tab === "write" ? (
           done ? (
             <div className="flex min-h-0 flex-1 flex-col justify-center space-y-4 px-4 py-5">
-              <p className="text-sm font-bold text-emerald-300">문의가 접수되었습니다.</p>
+              <p className="text-sm font-bold text-emerald-300">{t("submitted")}</p>
               <p className="text-xs leading-relaxed text-white/65">
-                운영팀이 확인 후 조치합니다. 내 문의 탭에서 답변을 확인할 수 있습니다.
+                {t("submittedDescription")}
               </p>
               <div className="flex gap-2">
                 <button
@@ -166,28 +186,28 @@ export function CustomerInquiryModal({
                   }}
                   className="flex-1 rounded-xl border border-white/20 py-2.5 text-sm font-black text-white hover:bg-white/10"
                 >
-                  내 문의 보기
+                  {t("viewMyInquiries")}
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
                   className="flex-1 rounded-xl bg-white py-2.5 text-sm font-black text-slate-900"
                 >
-                  확인
+                  {t("confirm")}
                 </button>
               </div>
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col space-y-3 overflow-y-auto px-4 py-4">
               <p className="shrink-0 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-100/90">
-                욕설/폭언 및 고의적인 악용문의를 할 경우 제재를 받을 수 있습니다.
+                {t("warning")}
               </p>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={80}
-                placeholder="제목"
+                placeholder={t("titlePlaceholder")}
                 className="w-full shrink-0 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/35"
               />
               <textarea
@@ -195,7 +215,7 @@ export function CustomerInquiryModal({
                 onChange={(e) => setBody(e.target.value)}
                 maxLength={2000}
                 rows={6}
-                placeholder="문의 내용을 적어 주세요"
+                placeholder={t("bodyPlaceholder")}
                 className="min-h-0 w-full flex-1 resize-none rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/35"
               />
               {error ? <p className="shrink-0 text-xs font-bold text-rose-300">{error}</p> : null}
@@ -205,7 +225,7 @@ export function CustomerInquiryModal({
                 onClick={() => void submit()}
                 className="w-full shrink-0 rounded-xl bg-sky-500 py-2.5 text-sm font-black text-white hover:bg-sky-400 disabled:opacity-60"
               >
-                {sending ? "접수 중..." : "문의 접수"}
+                {sending ? t("submitting") : t("submit")}
               </button>
             </div>
           )
@@ -217,29 +237,28 @@ export function CustomerInquiryModal({
                 onClick={() => setSelectedId(null)}
                 className="rounded-lg px-2 py-1 text-[11px] font-bold text-white/70 hover:bg-white/10 hover:text-white"
               >
-                ← 목록
+                {t("backToList")}
               </button>
               <span
                 className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                  playerInquiryStatus(selected.status, selected.adminNote).key ===
-                  "answered"
+                  getStatus(selected.status, selected.adminNote).key === "answered"
                     ? "bg-emerald-500/20 text-emerald-300"
                     : "bg-amber-500/20 text-amber-300"
                 }`}
               >
-                {playerInquiryStatus(selected.status, selected.adminNote).label}
+                {getStatus(selected.status, selected.adminNote).label}
               </span>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
               <div className="shrink-0">
                 <h3 className="truncate text-sm font-black text-white">{selected.title}</h3>
                 <p className="mt-1 text-[11px] text-white/45">
-                  {formatInquiryDate(selected.createdAt)}
+                  {formatDate(selected.createdAt)}
                 </p>
               </div>
               <section className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-3">
                 <p className="text-[10px] font-bold tracking-wide text-white/45">
-                  내 문의
+                  {t("myInquiry")}
                 </p>
                 <div className="mt-2 max-h-[calc(1.625em*5)] overflow-y-auto overscroll-contain text-sm leading-relaxed">
                   <p className="whitespace-pre-wrap text-white/90">{selected.body}</p>
@@ -247,13 +266,13 @@ export function CustomerInquiryModal({
               </section>
               <section className="shrink-0 rounded-xl border border-sky-400/25 bg-sky-500/10 px-3 py-3">
                 <p className="text-[10px] font-bold tracking-wide text-sky-300/80">
-                  답변
+                  {t("answer")}
                 </p>
                 <div className="mt-2 max-h-[calc(1.625em*5)] overflow-y-auto overscroll-contain text-sm leading-relaxed">
                   {selected.adminNote?.trim() ? (
                     <p className="whitespace-pre-wrap text-sky-50">{selected.adminNote}</p>
                   ) : (
-                    <p className="text-white/45">아직 답변이 등록되지 않았습니다.</p>
+                    <p className="text-white/45">{t("noAnswer")}</p>
                   )}
                 </div>
               </section>
@@ -262,17 +281,17 @@ export function CustomerInquiryModal({
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
             {listLoading ? (
-              <p className="py-10 text-center text-xs text-white/45">불러오는 중...</p>
+              <p className="py-10 text-center text-xs text-white/45">{t("loading")}</p>
             ) : listError ? (
               <p className="py-10 text-center text-xs font-bold text-rose-300">{listError}</p>
             ) : inquiries.length === 0 ? (
               <p className="py-10 text-center text-xs text-white/45">
-                아직 문의 내역이 없습니다.
+                {t("empty")}
               </p>
             ) : (
               <ul className="space-y-2">
                 {inquiries.map((item) => {
-                  const status = playerInquiryStatus(item.status, item.adminNote);
+                  const status = getStatus(item.status, item.adminNote);
                   return (
                     <li key={item.id}>
                       <button
@@ -285,7 +304,7 @@ export function CustomerInquiryModal({
                             {item.title}
                           </p>
                           <p className="mt-1 text-[11px] text-white/45">
-                            {formatInquiryDay(item.createdAt)}
+                            {formatDay(item.createdAt)}
                           </p>
                         </div>
                         <span

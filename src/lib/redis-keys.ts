@@ -64,3 +64,22 @@ export function userStatsKey(
 ): string {
   return redisKey(prefix, "rank:user", gameId, seasonKey, userId, mode);
 }
+
+/** Channel membership set — members are raw userIds (SCARD / SISMEMBER). */
+export function chatChannelMembersKey(prefix: string, channel: number): string {
+  return `${prefix}:${KEY_VERSION}:chat:ch:${channel}:members`;
+}
+
+/** userId → channel + connectionId */
+export function chatUserPresenceKey(prefix: string, userId: string): string {
+  return redisKey(prefix, "chat:presence", userId);
+}
+
+export function chatCooldownKey(prefix: string, userId: string): string {
+  return redisKey(prefix, "chat:cd", userId);
+}
+
+/** Pub/Sub topic for channel fan-out (includes global). */
+export function chatPubSubChannel(prefix: string): string {
+  return `${prefix}:${KEY_VERSION}:chat:pubsub`;
+}

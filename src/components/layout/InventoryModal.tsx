@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useLocale, useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 
 export interface InventoryCoupon {
@@ -13,24 +14,13 @@ export interface InventoryCoupon {
   usedAt: string | null;
 }
 
-function couponTitle(type: InventoryCoupon["type"]) {
-  switch (type) {
-    case "YK_PARTS_DISCOUNT":
-      return "YK건기 부품 할인권";
-    case "EQUIPMENT_RENTAL_DISCOUNT":
-      return "중장비 대여 할인권";
-    case "FILTER_SET_EXCHANGE":
-      return "필터세트 교환쿠폰";
-  }
-}
-
-function couponBadge(coupon: InventoryCoupon) {
-  if (coupon.type === "FILTER_SET_EXCHANGE") return "교환";
+function couponBadge(coupon: InventoryCoupon, exchangeLabel: string) {
+  if (coupon.type === "FILTER_SET_EXCHANGE") return exchangeLabel;
   return `${coupon.discountPct}%`;
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
+function formatDate(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -83,9 +73,11 @@ function BarcodePreview({ code }: { code: string }) {
 function ExpiryBadge({
   expiresAt,
   usedAt,
+  t,
 }: {
   expiresAt: string;
   usedAt: string | null;
+  t: ReturnType<typeof useTranslations>;
 }) {
   const expired = isCouponExpired(expiresAt);
   const daysLeft = daysUntilExpiry(expiresAt);
@@ -93,7 +85,7 @@ function ExpiryBadge({
   if (usedAt) {
     return (
       <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-        사용됨
+        {t("used")}
       </span>
     );
   }
@@ -101,7 +93,7 @@ function ExpiryBadge({
   if (expired) {
     return (
       <span className="rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
-        기간 만료
+        {t("expired")}
       </span>
     );
   }
@@ -116,7 +108,7 @@ function ExpiryBadge({
 
   return (
     <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-      {daysLeft}일 남음
+      {t("daysLeft", { days: daysLeft })}
     </span>
   );
 }
@@ -227,6 +219,10 @@ export function InventoryModal({
   onClose,
   onInventoryChange,
 }: InventoryModalProps) {
+  const t = useTranslations("shell.inventoryModal");
+  const couponsT = useTranslations("shell.coupons");
+  const common = useTranslations("common");
+  const locale = useLocale();
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const [coupons, setCoupons] = useState<InventoryCoupon[]>([]);
@@ -279,13 +275,13 @@ export function InventoryModal({
     <AppModalOverlay open={open} onClose={onClose}>
       <div className="flex h-[min(82dvh,36rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl landscape:h-[min(90dvh,22rem)]">
         <div className="flex shrink-0 items-center justify-between bg-amber-500 px-4 py-3 text-white">
-          <h2 className="text-base font-black">쿠폰함</h2>
+          <h2 className="text-base font-black">{t("title")}</h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg bg-white/20 px-2.5 py-1 text-xs font-bold hover:bg-white/30"
           >
-            닫기
+            {common("close")}
           </button>
         </div>
 
@@ -293,21 +289,21 @@ export function InventoryModal({
           <div className="h-[7.25rem] shrink-0">
             {loading ? (
               <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50">
-                <p className="text-xs text-gray-400">불러오는 중...</p>
+                <p className="text-xs text-gray-400">{t("loading")}</p>
               </div>
             ) : !selectedCoupon ? (
               <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50">
-                <p className="text-xs text-gray-400">쿠폰을 선택하세요</p>
+                <p className="text-xs text-gray-400">{t("select")}</p>
               </div>
             ) : canShowBarcode ? (
               <BarcodePreview code={selectedCoupon.barcodeCode} />
             ) : (
               <div className="flex h-full flex-col items-center justify-center rounded-xl border border-red-100 bg-red-50 px-3 text-center">
                 <p className="text-xs font-black text-red-700">
-                  {selectedUsed ? "이미 사용된 쿠폰입니다" : "유효기간이 만료되었습니다"}
+                  {selectedUsed ? t("alreadyUsed") : t("expired")}
                 </p>
                 <p className="mt-1 text-[10px] text-red-500">
-                  바코드를 표시할 수 없습니다
+                  {t("noBarcode")}
                 </p>
               </div>
             )}
@@ -316,7 +312,7 @@ export function InventoryModal({
           <div className="min-h-0 flex-1 overflow-hidden">
             {loading ? null : coupons.length === 0 ? (
               <p className="py-6 text-center text-xs text-gray-400">
-                보유 쿠폰이 없습니다.
+                {t("empty")}
               </p>
             ) : (
               <div className="h-full space-y-2 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
@@ -342,10 +338,10 @@ export function InventoryModal({
                             expired ? "text-gray-500" : "text-gray-800"
                           }`}
                         >
-                          {couponTitle(coupon.type)}
+                          {couponsT(coupon.type)}
                         </span>
                         <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
-                          {couponBadge(coupon)}
+                          {couponBadge(coupon, t("exchange"))}
                         </span>
                       </div>
                       <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -354,11 +350,14 @@ export function InventoryModal({
                             expired ? "text-red-600" : "text-gray-700"
                           }`}
                         >
-                          유효기간 {formatDate(coupon.expiresAt)}
+                          {t("expiresAt", {
+                            date: formatDate(coupon.expiresAt, locale),
+                          })}
                         </p>
                         <ExpiryBadge
                           expiresAt={coupon.expiresAt}
                           usedAt={coupon.usedAt}
+                          t={common}
                         />
                       </div>
                     </button>

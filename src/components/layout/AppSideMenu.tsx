@@ -8,6 +8,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
 
 interface AppSideMenuProps {
   open: boolean;
@@ -84,6 +85,9 @@ export function AppSideMenu({
   onOpenSettings,
   onLogout,
 }: AppSideMenuProps) {
+  const t = useTranslations("shell");
+  const common = useTranslations("common");
+  const auth = useTranslations("auth");
   const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(
     null,
   );
@@ -146,14 +150,14 @@ export function AppSideMenu({
       <button
         type="button"
         className="fixed inset-0 z-[300] cursor-default bg-transparent"
-        aria-label="메뉴 닫기"
+        aria-label={t("closeMenu")}
         onClick={onClose}
       />
       <div
         className="fixed z-[310] w-[min(100%,17.5rem)] overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-md"
         role="dialog"
         aria-modal="true"
-        aria-label="메뉴"
+        aria-label={t("menu")}
         style={
           panelPos
             ? { top: panelPos.top, right: panelPos.right }
@@ -166,42 +170,42 @@ export function AppSideMenu({
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-gray-900">{nickname}</p>
-            <p className="text-[11px] text-gray-400">메뉴</p>
+            <p className="text-[11px] text-gray-400">{t("menu")}</p>
           </div>
         </div>
 
         <nav className="space-y-0.5 p-1.5">
           <MenuItem
             icon="📬"
-            label="우편함"
+            label={t("mailbox")}
             badge={mailNotifyCount}
             onClick={() => handleMenuAction(onOpenMailbox)}
           />
           <MenuItem
             icon="🎟️"
-            label="쿠폰함"
+            label={t("inventory")}
             badge={couponNotifyCount}
             onClick={() => handleMenuAction(onOpenInventory)}
           />
           <MenuItem
             icon="📊"
-            label="랭킹정보"
+            label={t("ranking")}
             onClick={() => handleMenuAction(onOpenRanking)}
           />
           <MenuItem
             icon="⚙️"
-            label="설정"
+            label={t("settings.title")}
             onClick={() => handleMenuAction(onOpenSettings)}
           />
           {isAdmin ? (
-            <MenuItem icon="🛠️" label="관리" href="/admin" onClick={onClose} />
+            <MenuItem icon="🛠️" label={common("admin")} href="/admin" onClick={onClose} />
           ) : null}
         </nav>
 
         <div className="border-t border-gray-100 p-1.5">
           <MenuItem
             icon="🚪"
-            label="로그아웃"
+            label={auth("logout")}
             danger
             onClick={() => {
               onClose();

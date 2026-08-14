@@ -27,6 +27,7 @@ export async function GET() {
       id: true,
       loginId: true,
       nickname: true,
+      locale: true,
       profileAvatarId: true,
       currency: true,
       totalXp: true,
@@ -84,19 +85,32 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const { nickname, profileAvatarId } = body as {
+  const { nickname, profileAvatarId, locale } = body as {
     nickname?: unknown;
     profileAvatarId?: unknown;
+    locale?: unknown;
   };
 
   const wantsNickname = nickname !== undefined;
   const wantsAvatar = profileAvatarId !== undefined;
+  const wantsLocale = locale !== undefined;
 
-  if (!wantsNickname && !wantsAvatar) {
+  if (!wantsNickname && !wantsAvatar && !wantsLocale) {
     return NextResponse.json(
       { error: "변경할 항목이 없습니다." },
       { status: 400 },
     );
+  }
+
+  let nextLocale: string | undefined;
+  if (wantsLocale) {
+    if (locale !== "ko" && locale !== "ja" && locale !== "en") {
+      return NextResponse.json(
+        { error: "유효하지 않은 언어입니다." },
+        { status: 400 },
+      );
+    }
+    nextLocale = locale;
   }
 
   if (wantsAvatar && !isValidProfileAvatarId(profileAvatarId)) {
@@ -123,6 +137,7 @@ export async function PATCH(request: Request) {
           nickname: true,
           profileAvatarId: true,
           currency: true,
+          locale: true,
         },
       });
       if (!current) {
@@ -133,10 +148,14 @@ export async function PATCH(request: Request) {
         nickname?: string;
         profileAvatarId?: string;
         currency?: number;
+        locale?: string;
       } = {};
 
       if (wantsAvatar) {
         data.profileAvatarId = profileAvatarId as string;
+      }
+      if (nextLocale !== undefined) {
+        data.locale = nextLocale;
       }
 
       let chargedStars = 0;
@@ -172,6 +191,7 @@ export async function PATCH(request: Request) {
           nickname: current.nickname,
           profileAvatarId: current.profileAvatarId,
           currency: current.currency,
+          locale: current.locale,
           totalXp: undefined as number | undefined,
           chargedStars: 0,
         };
@@ -184,6 +204,7 @@ export async function PATCH(request: Request) {
           nickname: true,
           profileAvatarId: true,
           currency: true,
+          locale: true,
           totalXp: true,
         },
       });

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { experienceDestination, getExperienceMode } from "@/lib/experience-mode";
 import {
   NICKNAME_MAX_LENGTH,
@@ -13,6 +14,8 @@ import {
 import { withPwaQuery } from "@/lib/pwa-mode";
 
 export function NicknameForm() {
+  const t = useTranslations("auth");
+  const common = useTranslations("common");
   const router = useRouter();
   const { update } = useSession();
   const [nickname, setNickname] = useState("");
@@ -22,12 +25,15 @@ export function NicknameForm() {
   const length = useMemo(() => nicknameCharLength(nickname.trim()), [nickname]);
   const hint =
     length === 0
-      ? `한글 기준 ${NICKNAME_MIN_LENGTH}~${NICKNAME_MAX_LENGTH}글자로 입력해 주세요.`
+      ? t("nicknameInitialHint", {
+          min: NICKNAME_MIN_LENGTH,
+          max: NICKNAME_MAX_LENGTH,
+        })
       : length < NICKNAME_MIN_LENGTH
-        ? `닉네임은 ${NICKNAME_MIN_LENGTH}글자 이상이어야 합니다. (현재 ${length}글자)`
+        ? t("nicknameMinHint", { min: NICKNAME_MIN_LENGTH, length })
         : length > NICKNAME_MAX_LENGTH
-          ? `닉네임은 ${NICKNAME_MAX_LENGTH}글자 이하여야 합니다. (현재 ${length}글자)`
-          : `${length}/${NICKNAME_MAX_LENGTH}글자`;
+          ? t("nicknameMaxHint", { max: NICKNAME_MAX_LENGTH, length })
+          : t("nicknameLength", { length, max: NICKNAME_MAX_LENGTH });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,7 +56,7 @@ export function NicknameForm() {
     setLoading(false);
 
     if (!res.ok) {
-      setError(data.error ?? "닉네임 설정에 실패했습니다.");
+      setError(data.error ?? t("nicknameSetFailed"));
       return;
     }
 
@@ -63,12 +69,15 @@ export function NicknameForm() {
 
   return (
     <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
-      <h1 className="mb-2 text-center text-xl font-bold text-gray-900">닉네임 설정</h1>
+      <h1 className="mb-2 text-center text-xl font-bold text-gray-900">{t("nicknameTitle")}</h1>
       <p className="mb-6 text-center text-sm text-gray-500">
-        게임에서 사용할 닉네임을 설정해주세요
+        {t("nicknameSubtitle")}
         <br />
         <span className="text-xs text-gray-400">
-          한글 기준 {NICKNAME_MIN_LENGTH}~{NICKNAME_MAX_LENGTH}글자 · 중복 불가
+          {t("nicknameRequirements", {
+            min: NICKNAME_MIN_LENGTH,
+            max: NICKNAME_MAX_LENGTH,
+          })}
         </span>
       </p>
 
@@ -82,7 +91,10 @@ export function NicknameForm() {
               if (error) setError("");
             }}
             className="w-full rounded-lg border border-gray-300 px-4 py-3 text-center text-lg outline-none focus:border-blue-500"
-            placeholder={`닉네임 (${NICKNAME_MIN_LENGTH}~${NICKNAME_MAX_LENGTH}글자)`}
+            placeholder={t("nicknamePlaceholder", {
+              min: NICKNAME_MIN_LENGTH,
+              max: NICKNAME_MAX_LENGTH,
+            })}
             maxLength={NICKNAME_MAX_LENGTH}
             autoComplete="nickname"
             required
@@ -104,7 +116,7 @@ export function NicknameForm() {
           disabled={loading}
           className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {loading ? "저장 중..." : "시작하기"}
+          {loading ? common("saving") : t("nicknameContinue")}
         </button>
       </form>
     </div>

@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
+import {
+  monumentQuestLabel,
+  monumentUpgradeLabel,
+  workshopShopItemDescription,
+  workshopShopItemLabel,
+} from "@/i18n/yanmarCatalog";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import {
   MONUMENT_BUILD_QUESTS,
@@ -129,6 +136,8 @@ export function MonumentPanel({
   onClaimStars,
   onRefresh,
 }: MonumentPanelProps) {
+  const t = useTranslations("yanmar.monument");
+  const catalogT = useTranslations("yanmar");
   const [tab, setTab] = useState<TabId>("quest");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [confirmUpgrade, setConfirmUpgrade] = useState<{
@@ -265,25 +274,25 @@ export function MonumentPanel({
           </span>
           <div className="yanmar-facility-modal-titles">
             <p className="yanmar-facility-modal-eyebrow">YK MONUMENT</p>
-            <h2>YK 조형물</h2>
+            <h2>{t("title")}</h2>
           </div>
           <div className="yanmar-facility-modal-head-meta">
             <span
               className="yanmar-facility-modal-chip is-points"
-              title="조형물 포인트"
+              title={t("points")}
             >
               <PointsAmount value={panelState.points} size={14} />
             </span>
             {claimableQuestCount > 0 ? (
-              <span className="yanmar-facility-modal-chip" title="수령 대기">
-                보상 <b className="tabular-nums">{claimableQuestCount}</b>
+              <span className="yanmar-facility-modal-chip" title={t("rewardsAwaiting")}>
+                {t("rewards")} <b className="tabular-nums">{claimableQuestCount}</b>
               </span>
             ) : null}
             <button
               type="button"
               className="yanmar-facility-modal-close"
               onClick={onClose}
-              aria-label="조형물 닫기"
+              aria-label={t("close")}
             >
               <CloseGlyph />
             </button>
@@ -310,17 +319,17 @@ export function MonumentPanel({
                 </span>
                 {!storageFull ? (
                   <span className="yanmar-facility-storage-note">
-                    · 다음{" "}
+                    · {t("next")}{" "}
                     <b>{formatUpgradeRemaining(nextProdRemainingMs)}</b>
                     {" · "}
                     {MONUMENT_STARS_PER_TICK}/
                     {intervalMs >= 60_000
-                      ? `${Math.round(intervalMs / 60_000)}분`
-                      : `${Math.round(intervalMs / 1000)}초`}
+                      ? t("minutes", { value: Math.round(intervalMs / 60_000) })
+                      : t("seconds", { value: Math.round(intervalMs / 1000) })}
                   </span>
                 ) : (
                   <span className="yanmar-facility-storage-note is-full">
-                    · 저장 가득 참
+                    · {t("storageFull")}
                   </span>
                 )}
               </div>
@@ -336,7 +345,7 @@ export function MonumentPanel({
             >
               {canClaimStars ? (
                 <>
-                  수령
+                  {t("claim")}
                   <img
                     src="/images/star-currency.svg"
                     alt=""
@@ -348,7 +357,7 @@ export function MonumentPanel({
                   {starsStored.toLocaleString()}
                 </>
               ) : (
-                "수령"
+                t("claim")
               )}
             </button>
           </div>
@@ -358,9 +367,9 @@ export function MonumentPanel({
           <div className="yanmar-facility-modal-tabs" role="tablist">
             {(
               [
-                ["quest", "퀘스트"],
-                ["upgrade", "업그레이드"],
-                ["shop", "상점"],
+                ["quest", t("tabs.quest")],
+                ["upgrade", t("tabs.upgrade")],
+                ["shop", t("tabs.shop")],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -375,7 +384,7 @@ export function MonumentPanel({
                 {id === "quest" && claimableQuestCount > 0 ? (
                   <span
                     className="yanmar-quest-notify-badge is-tab"
-                    aria-label={`미수령 보상 ${claimableQuestCount}개`}
+                    aria-label={t("unclaimedRewards", { count: claimableQuestCount })}
                   >
                     {claimableQuestCount > 9 ? "9+" : claimableQuestCount}
                   </span>
@@ -387,21 +396,21 @@ export function MonumentPanel({
 
         {phase === "quest" ? (
           <div className="yanmar-quest-modal-rail">
-            <span className="yanmar-quest-modal-rail-label">건설 미션</span>
+            <span className="yanmar-quest-modal-rail-label">{t("constructionMissions")}</span>
             <span className="yanmar-quest-modal-rail-note">
-              기본 미션을 완료하면 건설을 시작할 수 있습니다
+              {t("constructionMissionNote")}
             </span>
           </div>
         ) : null}
 
         {showManage && tab === "quest" ? (
           <div className="yanmar-quest-modal-rail">
-            <span className="yanmar-quest-modal-rail-label">조형물 퀘스트</span>
+            <span className="yanmar-quest-modal-rail-label">{t("questsTitle")}</span>
             <span className="yanmar-quest-modal-rail-note">
-              완료 보상은 조형물 포인트로 지급됩니다
+              {t("questRewardNote")}
             </span>
             <span className="yanmar-quest-modal-rail-value tabular-nums">
-              수령대기 <b>{claimableQuestCount}</b>
+              {t("rewardsAwaiting")} <b>{claimableQuestCount}</b>
             </span>
           </div>
         ) : null}
@@ -425,15 +434,15 @@ export function MonumentPanel({
                   return (
                     <QuestCard
                       key={q.id}
-                      title={q.title}
-                      tag={{ label: "건설", tone: "required" }}
+                      title={monumentQuestLabel(catalogT, q.metric, q.target)}
+                      tag={{ label: t("tags.build"), tone: "required" }}
                       value={item.progress}
                       target={q.target}
                       metric={q.metric}
                       state={state}
                       action={
                         item.completed ? (
-                          <DoneStamp label="완료" />
+                          <DoneStamp label={t("done")} />
                         ) : (
                           <PendingStamp />
                         )
@@ -449,7 +458,7 @@ export function MonumentPanel({
                   className="yanmar-facility-btn is-primary"
                   onClick={() => void onStartConstruction()}
                 >
-                  건설 시작 (60분)
+                  {t("startConstruction")}
                 </button>
               ) : null}
             </div>
@@ -457,7 +466,7 @@ export function MonumentPanel({
 
           {phase === "building" ? (
             <div className="yanmar-facility-hero">
-              <p className="yanmar-facility-hero-title">건설 진행 중</p>
+              <p className="yanmar-facility-hero-title">{t("constructionInProgress")}</p>
               <p className="yanmar-facility-hero-value">
                 {panelState.constructionEndsAt
                   ? formatUpgradeRemaining(
@@ -466,7 +475,7 @@ export function MonumentPanel({
                   : "—"}
               </p>
               <p className="yanmar-facility-hero-note">
-                시간이 끝나면 가까이에서 건설완료를 눌러 주세요.
+                {t("constructionInProgressNote")}
               </p>
             </div>
           ) : null}
@@ -474,7 +483,7 @@ export function MonumentPanel({
           {phase === "claimable" ? (
             <div className="yanmar-facility-hero">
               <p className="yanmar-facility-hero-title is-success">
-                건설이 완료되었습니다!
+                {t("constructionComplete")}
               </p>
               {onClaimConstruction ? (
                 <button
@@ -483,7 +492,7 @@ export function MonumentPanel({
                   className="yanmar-facility-btn is-primary"
                   onClick={() => void onClaimConstruction()}
                 >
-                  건설완료
+                  {t("completeConstruction")}
                 </button>
               ) : null}
             </div>
@@ -507,13 +516,13 @@ export function MonumentPanel({
                 return (
                   <QuestCard
                     key={q.id}
-                    title={q.title}
-                    tag={{ label: "일일", tone: "required" }}
+                    title={monumentQuestLabel(catalogT, q.metric, q.target)}
+                    tag={{ label: t("tags.daily"), tone: "required" }}
                     rewardSlot={
                       <QuestPointsChip
                         iconSrc={MONUMENT_POINTS_ICON}
                         amount={q.rewardPoints}
-                        label="조형물 포인트"
+                        label={t("points")}
                       />
                     }
                     value={item.progress}
@@ -529,7 +538,7 @@ export function MonumentPanel({
                           }
                         />
                       ) : item.claimed ? (
-                        <DoneStamp label="수령됨" />
+                        <DoneStamp label={t("claimed")} />
                       ) : (
                         <PendingStamp />
                       )
@@ -551,13 +560,13 @@ export function MonumentPanel({
                 return (
                   <QuestCard
                     key={q.id}
-                    title={q.title}
-                    tag={{ label: "반복", tone: "bonus" }}
+                    title={monumentQuestLabel(catalogT, q.metric, q.target)}
+                    tag={{ label: t("tags.repeat"), tone: "bonus" }}
                     rewardSlot={
                       <QuestPointsChip
                         iconSrc={MONUMENT_POINTS_ICON}
                         amount={q.rewardPoints}
-                        label="조형물 포인트"
+                        label={t("points")}
                       />
                     }
                     value={item.progress}
@@ -627,7 +636,7 @@ export function MonumentPanel({
                     <div className="yanmar-facility-card-top">
                       <div className="yanmar-facility-card-main">
                         <p className="yanmar-facility-card-title">
-                          {u.label}
+                          {monumentUpgradeLabel(catalogT, u.key)}
                           <em>
                             +{level}/{max}
                           </em>
@@ -637,7 +646,7 @@ export function MonumentPanel({
                                 levelLocked ? " is-locked" : ""
                               }`}
                             >
-                              레벨제한{reqLevel}
+                              {t("levelRequirement", { level: reqLevel })}
                             </span>
                           ) : null}
                         </p>
@@ -658,12 +667,12 @@ export function MonumentPanel({
                             onClick={() => void onInstantUpgrade()}
                           >
                             {timerReady ? (
-                              "완료"
+                              t("done")
                             ) : (
                               <>
-                                즉시완료{" "}
+                                {t("instantComplete")}{" "}
                                 <StarAmount value={instantCost} size={12} />
-                                {currency < instantCost ? " (부족)" : ""}
+                                {currency < instantCost ? t("insufficient") : ""}
                               </>
                             )}
                           </button>
@@ -687,7 +696,7 @@ export function MonumentPanel({
                                 return;
                               setConfirmUpgrade({
                                 key: u.key,
-                                label: u.label,
+                                label: monumentUpgradeLabel(catalogT, u.key),
                                 fromLevel: level,
                                 toLevel: targetLevel,
                                 cost,
@@ -727,8 +736,7 @@ export function MonumentPanel({
           {showManage && tab === "shop" ? (
             <ul className="yanmar-facility-list">
               <li className="yanmar-facility-card-desc" style={{ listStyle: "none", margin: 0 }}>
-                상품당 주간 {MONUMENT_SHOP_ITEMS[0]?.weeklyLimit ?? 3}회 · 월요일
-                0시(KST) 리셋
+                {t("weeklyReset", { limit: MONUMENT_SHOP_ITEMS[0]?.weeklyLimit ?? 3 })}
               </li>
               {MONUMENT_SHOP_ITEMS.map((item) => {
                 const purchase = panelState.shopPurchases[item.id] ?? {
@@ -747,12 +755,14 @@ export function MonumentPanel({
                       draggable={false}
                     />
                     <div className="yanmar-facility-card-main">
-                      <p className="yanmar-facility-card-title">{item.label}</p>
+                      <p className="yanmar-facility-card-title">
+                        {workshopShopItemLabel(catalogT, item.id)}
+                      </p>
                       <p className="yanmar-facility-card-desc">
-                        {item.description}
+                        {workshopShopItemDescription(catalogT, item.id)}
                       </p>
                       <p className="yanmar-facility-card-progress">
-                        이번 주 {purchase.count}/{item.weeklyLimit}
+                        {t("thisWeek", { count: purchase.count, limit: item.weeklyLimit })}
                       </p>
                     </div>
                     <button
@@ -762,7 +772,7 @@ export function MonumentPanel({
                       onClick={() =>
                         setConfirmShop({
                           itemId: item.id as WorkshopShopItemId,
-                          label: item.label,
+                          label: workshopShopItemLabel(catalogT, item.id),
                           icon: item.icon,
                           cost: item.cost,
                         })
@@ -785,13 +795,13 @@ export function MonumentPanel({
             aria-labelledby="yanmar-monument-shop-confirm-title"
           >
             <div className="yanmar-repair-confirm-card">
-              <h3 id="yanmar-monument-shop-confirm-title">구매 확인</h3>
+              <h3 id="yanmar-monument-shop-confirm-title">{t("purchaseConfirmation")}</h3>
               <p className="yanmar-repair-confirm-item">
-                {confirmShop.label}을(를) 구매하시겠습니까?
+                {t("purchasePrompt", { item: confirmShop.label })}
               </p>
               <ul className="yanmar-repair-confirm-facts">
                 <li className="yanmar-repair-confirm-cost">
-                  소모 <PointsAmount value={confirmShop.cost} size={14} />
+                  {t("consume")} <PointsAmount value={confirmShop.cost} size={14} />
                 </li>
               </ul>
               <div className="yanmar-repair-confirm-actions">
@@ -801,7 +811,7 @@ export function MonumentPanel({
                   disabled={busy}
                   onClick={() => setConfirmShop(null)}
                 >
-                  취소
+                  {t("cancel")}
                 </button>
                 <button
                   type="button"
@@ -822,7 +832,7 @@ export function MonumentPanel({
                     })();
                   }}
                 >
-                  구매
+                  {t("purchase")}
                 </button>
               </div>
             </div>
@@ -837,7 +847,7 @@ export function MonumentPanel({
             aria-labelledby="yanmar-monument-shop-result-title"
           >
             <div className="yanmar-repair-confirm-card is-result">
-              <h3 id="yanmar-monument-shop-result-title">획득 결과</h3>
+              <h3 id="yanmar-monument-shop-result-title">{t("acquiredResult")}</h3>
               <div className="flex flex-col items-center gap-2 py-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -856,7 +866,7 @@ export function MonumentPanel({
                   className="yanmar-repair-confirm-ok"
                   onClick={() => setShopResult(null)}
                 >
-                  확인
+                  {t("confirm")}
                 </button>
               </div>
             </div>
@@ -871,17 +881,17 @@ export function MonumentPanel({
             aria-labelledby="yanmar-monument-upgrade-confirm-title"
           >
             <div className="yanmar-repair-confirm-card">
-              <h3 id="yanmar-monument-upgrade-confirm-title">업그레이드 확인</h3>
+              <h3 id="yanmar-monument-upgrade-confirm-title">{t("upgradeConfirmation")}</h3>
               <p className="yanmar-repair-confirm-item">
                 {confirmUpgrade.label} +{confirmUpgrade.fromLevel} → +
                 {confirmUpgrade.toLevel}
               </p>
               <ul className="yanmar-repair-confirm-facts">
                 <li className="yanmar-repair-confirm-cost">
-                  소모 <PointsAmount value={confirmUpgrade.cost} size={14} />
+                  {t("consume")} <PointsAmount value={confirmUpgrade.cost} size={14} />
                 </li>
                 <li>
-                  소요 시간{" "}
+                  {t("duration")}{" "}
                   {formatUpgradeRemaining(confirmUpgrade.durationMs)}
                 </li>
               </ul>
@@ -892,7 +902,7 @@ export function MonumentPanel({
                   disabled={busy}
                   onClick={() => setConfirmUpgrade(null)}
                 >
-                  취소
+                  {t("cancel")}
                 </button>
                 <button
                   type="button"
@@ -904,7 +914,7 @@ export function MonumentPanel({
                     void onUpgrade(key);
                   }}
                 >
-                  업그레이드
+                  {t("upgrade")}
                 </button>
               </div>
             </div>

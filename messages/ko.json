@@ -1,0 +1,1178 @@
+{
+  "common": {
+    "close": "닫기",
+    "cancel": "취소",
+    "save": "저장",
+    "saving": "저장 중...",
+    "loading": "불러오는 중...",
+    "confirm": "확인",
+    "back": "뒤로",
+    "next": "다음",
+    "yes": "예",
+    "no": "아니오",
+    "error": "오류가 발생했습니다.",
+    "player": "플레이어",
+    "admin": "관리",
+    "stars": "스타",
+    "daysLeft": "{days}일 남음",
+    "used": "사용됨",
+    "expired": "기간 만료"
+  },
+  "meta": {
+    "title": "YK건기 중장비 체험",
+    "description": "YK건기 중장비를 게임으로 직접 체험하세요. 얀마 굴착기 1인칭 시뮬레이터와 8종 브랜드 미니게임.",
+    "appleTitle": "YK게임"
+  },
+  "auth": {
+    "login": "로그인",
+    "loggingIn": "로그인 중...",
+    "signup": "회원가입",
+    "logout": "로그아웃",
+    "loginId": "아이디",
+    "password": "비밀번호",
+    "loginIdPlaceholder": "아이디 입력",
+    "passwordPlaceholder": "비밀번호 입력",
+    "saveId": "아이디 저장",
+    "autoLogin": "자동 로그인",
+    "noAccount": "계정이 없으신가요?",
+    "brandTitle": "YK건기 브랜드 캐주얼 게임",
+    "brandSubtitle": "로그인 후 미니게임을 즐겨보세요",
+    "registeredNotice": "회원가입이 완료되었습니다. 로그인해 주세요.",
+    "invalidCredentials": "아이디 또는 비밀번호가 올바르지 않습니다.",
+    "loginError": "로그인 중 오류가 발생했습니다.",
+    "conflictTitle": "로그인 중인 계정입니다. 로그아웃 처리하고 접속하시겠습니까?",
+    "connect": "접속",
+    "nicknameTitle": "닉네임 설정",
+    "nicknameSubtitle": "게임에 표시될 닉네임을 정해 주세요",
+    "nicknamePlaceholder": "닉네임 ({min}~{max}글자)",
+    "nicknameContinue": "시작하기",
+    "signupTitle": "회원가입",
+    "email": "이메일",
+    "confirmPassword": "비밀번호 확인",
+    "createAccount": "계정 만들기",
+    "alreadyHaveAccount": "이미 계정이 있으신가요?",
+    "signupFailed": "회원가입에 실패했습니다.",
+    "signingUp": "가입 중...",
+    "checkEmail": "중복확인",
+    "emailAvailable": "사용 가능한 이메일입니다.",
+    "emailInUse": "이미 사용 중인 이메일입니다.",
+    "nicknameSetFailed": "닉네임 설정에 실패했습니다.",
+    "nicknameRequirements": "한글 기준 {min}~{max}글자 · 중복 불가",
+    "nicknameInitialHint": "한글 기준 {min}~{max}글자로 입력해 주세요.",
+    "nicknameMinHint": "닉네임은 {min}글자 이상이어야 합니다. (현재 {length}글자)",
+    "nicknameMaxHint": "닉네임은 {max}글자 이하여야 합니다. (현재 {length}글자)",
+    "nicknameLength": "{length}/{max}글자",
+    "startGame": "게임 시작",
+    "loadingGameInfo": "정보 불러오는 중",
+    "loginWithDifferentAccount": "다른 아이디로 로그인"
+  },
+  "landing": {
+    "heroTitle": "중장비 체험존",
+    "gameExperience": "게임 체험",
+    "globalLineupEyebrow": "Global Lineup",
+    "globalLineupTitle": "글로벌 브랜드 라인업",
+    "globalLineupDesc": "YK건기가 수입·판매하는 8개 브랜드 중장비",
+    "howToPlayEyebrow": "How to Play",
+    "howToPlayTitle": "체험 방법",
+    "companyTagline": "전세계 명품 중장비, 최고의 가치를 전합니다",
+    "statYears": "년 업력",
+    "statBrands": "글로벌 브랜드",
+    "statCenters": "전국 직영센터",
+    "statNetwork": "서비스 네트워크",
+    "step1Title": "소개 페이지",
+    "step1Desc": "홈 추가 또는 게임 체험으로 시작",
+    "step2Title": "로그인",
+    "step2Desc": "QR·버튼으로 로그인 (이미 로그인 시 바로 이동)",
+    "step3Title": "장비 선택",
+    "step3Desc": "「얀마! 너 뭐해?」로비로 이동해 체험할 장비를 고릅니다",
+    "step4Title": "플레이",
+    "step4Desc": "흙더미·하역·브레이커·석재 미션에 도전하고 보상을 획득합니다",
+    "footer": "© YK건기 · 실감 조작으로 체험하는 장비 아케이드",
+    "footerPrompt": "게임 체험으로 장비를 만나보세요",
+    "installing": "설치 중...",
+    "addToHome": "홈 추가",
+    "iosInstallTitle": "iPhone / iPad 설치 방법",
+    "iosInstallStep1": "Safari 하단 공유 버튼을 탭합니다",
+    "iosInstallStep2": "홈 화면에 추가를 선택합니다",
+    "iosInstallStep3": "이름 확인 후 추가를 누르면 YK게임 아이콘이 생성됩니다",
+    "addToHomeTitle": "홈 추가 방법",
+    "addToHomeDescription": "브라우저 메뉴에서 앱 설치 또는 홈 화면에 추가를 선택하면 YK게임 아이콘이 홈 화면에 생성됩니다.",
+    "generatingQr": "QR 생성 중..."
+  },
+  "shell": {
+    "menu": "메뉴",
+    "openMenu": "메뉴 열기",
+    "closeMenu": "메뉴 닫기",
+    "mailbox": "우편함",
+    "inventory": "쿠폰함",
+    "ranking": "랭킹정보",
+    "settings": {
+      "title": "설정",
+      "language": "언어",
+      "loginId": "아이디",
+      "nickname": "닉네임",
+      "nicknameHint": "닉네임 변경 시 스타 {cost}개가 필요합니다. 중복 불가.",
+      "nicknamePlaceholder": "닉네임 ({min}~{max}글자)",
+      "loading": "설정 불러오는 중...",
+      "saveFailed": "설정 저장에 실패했습니다.",
+      "change": "변경"
+    },
+    "mailboxModal": {
+      "title": "우편함",
+      "loading": "우편함 불러오는 중...",
+      "empty": "받은 우편이 없습니다.",
+      "unclaimed": "미수령",
+      "claim": "보상 수령",
+      "claiming": "수령 중...",
+      "claimed": "수령 완료",
+      "claimFailed": "보상 수령에 실패했습니다.",
+      "starReward": "⭐ 스타 {amount}"
+    },
+    "inventoryModal": {
+      "title": "쿠폰함",
+      "loading": "불러오는 중...",
+      "empty": "보유 쿠폰이 없습니다.",
+      "select": "쿠폰을 선택하세요",
+      "alreadyUsed": "이미 사용된 쿠폰입니다",
+      "expired": "유효기간이 만료되었습니다",
+      "noBarcode": "바코드를 표시할 수 없습니다",
+      "expiresAt": "유효기간 {date}",
+      "exchange": "교환"
+    },
+    "coupons": {
+      "YK_PARTS_DISCOUNT": "YK건기 부품 할인권",
+      "EQUIPMENT_RENTAL_DISCOUNT": "중장비 대여 할인권",
+      "FILTER_SET_EXCHANGE": "필터세트 교환쿠폰"
+    },
+    "chat": {
+      "title": "채팅",
+      "close": "닫기",
+      "openAriaLabel": "채팅창 열기",
+      "noticesAriaLabel": "공지사항",
+      "noNotices": "공지사항이 없습니다.",
+      "anonymous": "익명",
+      "inspectGear": "장비 구경",
+      "allChannelsFull": "모든 채널이 가득 찼습니다.",
+      "channelFull": "선택한 채널이 가득 찼습니다.",
+      "unavailable": "채팅 서버에 연결할 수 없습니다.",
+      "joinFailed": "채널 입장에 실패했습니다.",
+      "cooldownError": "{seconds}초 후에 다시 채팅할 수 있습니다.",
+      "rejoinChannel": "채널에 다시 입장해 주세요.",
+      "sendFailed": "메시지 전송에 실패했습니다.",
+      "warning": "부적절한 대화는 제재를 받을 수 있습니다.",
+      "channel": "채널",
+      "channelOption": "{channel}채널",
+      "noMessages": "아직 채팅이 없습니다.",
+      "emojiPickerAriaLabel": "이모지 선택",
+      "inputAvailableAfter": "{seconds}초 후 입력 가능",
+      "messagePlaceholder": "메시지 입력",
+      "send": "전송"
+    },
+    "inquiry": {
+      "title": "고객문의",
+      "close": "닫기",
+      "confirm": "확인",
+      "ariaLabel": "고객문의",
+      "writeTab": "문의하기",
+      "mineTab": "내 문의",
+      "submitted": "문의가 접수되었습니다.",
+      "submittedDescription": "운영팀이 확인 후 조치합니다. 내 문의 탭에서 답변을 확인할 수 있습니다.",
+      "viewMyInquiries": "내 문의 보기",
+      "warning": "욕설/폭언 및 고의적인 악용문의를 할 경우 제재를 받을 수 있습니다.",
+      "titlePlaceholder": "제목",
+      "bodyPlaceholder": "문의 내용을 적어 주세요",
+      "requiredFields": "제목과 내용을 입력해주세요.",
+      "submitting": "접수 중...",
+      "submit": "문의 접수",
+      "submitFailed": "접수 실패",
+      "listLoadFailed": "목록 불러오기 실패",
+      "backToList": "← 목록",
+      "statusAnswered": "답변완료",
+      "statusPending": "문의중",
+      "myInquiry": "내 문의",
+      "answer": "답변",
+      "noAnswer": "아직 답변이 등록되지 않았습니다.",
+      "loading": "불러오는 중...",
+      "empty": "아직 문의 내역이 없습니다."
+    }
+  },
+  "games": {
+    "results": {
+      "rideTitle": "탑승 체험 종료",
+      "yanmarTitle": "운행 결과",
+      "completedTitle": "미션 완료!",
+      "timeOverTitle": "시간 종료",
+      "rideHome": "탑승 홈으로",
+      "exit": "나가기",
+      "home": "홈으로",
+      "stay": "머무르기",
+      "retry": "재시도",
+      "saveFailed": "점수를 저장하지 못했습니다. 나중에 다시 시도해 주세요.",
+      "saving": "점수 저장 중...",
+      "rideExperience": "탑승 체험",
+      "cumulativeScore": "누적 점수",
+      "practiceScore": "연습 점수",
+      "complete": "완료",
+      "playTime": "플레이 {seconds}초",
+      "timeRemaining": "남은 {seconds}초",
+      "thisRunScore": "이번 운행 +{score}",
+      "seasonRank": "시즌 #{rank}",
+      "practiceNotRanked": "연습 운행 결과는 랭킹에 저장되지 않습니다.",
+      "cumulativeTop10": "누적 점수 Top 10",
+      "season": "시즌",
+      "myRank": "나의 순위 {rank}",
+      "points": "{score}점",
+      "rankingLoading": "랭킹 불러오는 중...",
+      "noRankingData": "랭킹 데이터 없음",
+      "starsEarned": "{stars}별 획득!",
+      "monthlyTop10": "이번 달 Top 10",
+      "viewAll": "전체 보기"
+    },
+    "ranking": {
+      "me": "나",
+      "cumulativeScore": "누적 점수",
+      "pointUnit": "점",
+      "noRecords": "아직 기록이 없습니다",
+      "firstPlayHint": "첫 플레이로 시즌 순위에 이름을 올려보세요.",
+      "myRank": "내 순위",
+      "top10": "TOP 10",
+      "noTop10Records": "아직 TOP 10 기록이 없습니다.",
+      "previousSportsMeet": "지난주 운동회",
+      "weeklySportsMeet": "주간 굴착기 운동회",
+      "seasonRanking": "시즌 랭킹",
+      "seasonLabelRanking": "{season} 랭킹",
+      "sportsMeetEyebrow": "운동회",
+      "seasonRankingEyebrow": "시즌 랭킹",
+      "close": "닫기",
+      "seasonEndsIn": "시즌 종료까지",
+      "seasonCumulative": "시즌 누적",
+      "viewPreviousWeek": "지난주 보기",
+      "viewCurrentWeek": "이번 주 보기",
+      "liveTop10": "Top 10 · 실시간 누적 순위",
+      "seasonTop10": "Top 10 · 시즌 누적 점수",
+      "loading": "불러오는 중…",
+      "sportsMyRank": "내 순위 {rank}위",
+      "reward": "보상 {stars}★"
+    },
+    "immersive": {
+      "exit": "종료",
+      "points": "{score}점",
+      "fullscreen": "전체화면"
+    }
+  },
+  "yanmar": {
+    "settings": {
+      "title": "설정",
+      "display": "화면",
+      "sound": "소리",
+      "other": "기타",
+      "minimap": "미니맵",
+      "missionQuest": "미션퀘스트",
+      "bgm": "배경음",
+      "sfx": "효과음",
+      "breakerSfx": "브레이커 효과음",
+      "horn": "경적",
+      "resetPosition": "초기위치(끼임시 탈출)",
+      "fullscreen": "전체화면",
+      "mailbox": "우편함",
+      "inventory": "쿠폰함",
+      "guide": "게임방법",
+      "tutorial": "튜토리얼",
+      "ranking": "랭킹",
+      "saveAndExit": "저장 후 나가기",
+      "logout": "로그아웃",
+      "admin": "관리",
+      "inquiry": "고객문의",
+      "language": "언어"
+    },
+    "ads": {
+      "rewardHint": "보상 보기",
+      "m15": {
+        "teaserTitle": "SV10·SV11 출시!",
+        "teaserSub": "탭하고 보상 받기",
+        "panelEyebrow": "Yanmar New Model",
+        "panelTitle": "SV10·SV11 출시!",
+        "imageAlt": "얀마 SV10·SV11 미니굴착기 출시",
+        "ariaLabel": "SV10·SV11 출시 광고"
+      },
+      "m30": {
+        "teaserTitle": "부품 사전 주문!",
+        "teaserSub": "탭하고 보상 받기",
+        "panelEyebrow": "Yanmar Parts Promo",
+        "panelTitle": "부품 사전 주문 프로모션",
+        "imageAlt": "얀마 부품 사전 주문 프로모션 — 고무트랙·롤러·스프로켓·아이들러",
+        "ariaLabel": "부품 사전 주문 프로모션 광고"
+      },
+      "m45": {
+        "teaserTitle": "존디어 부품 20%!",
+        "teaserSub": "탭하고 보상 받기",
+        "panelEyebrow": "YK건기 × John Deere",
+        "panelTitle": "존디어 순정 부품 20% 인하",
+        "imageAlt": "YK건기 × 존디어 — 존디어 모든 순정 부품 20% 인하 프로모션",
+        "ariaLabel": "존디어 순정 부품 20% 인하 광고"
+      }
+    },
+    "hud": {
+      "engineOn": "시동 ON",
+      "engineOff": "시동 OFF",
+      "safety": "안전",
+      "rpm": "RPM",
+      "fuel": "연료",
+      "score": "점수",
+      "stars": "스타",
+      "dump": "하역",
+      "crash": "파쇄",
+      "mission": "미션",
+      "practice": "연습",
+      "game": "게임",
+      "pause": "일시정지",
+      "resume": "계속",
+      "exit": "나가기"
+    },
+    "toasts": {
+      "inventoryFullTitle": "인벤토리 공간이 부족합니다.",
+      "inventoryFullLead": "장비를 분해·판매하거나 슬롯을 확장한 뒤 다시 획득할 수 있습니다.",
+      "manageGear": "장비관리",
+      "congratulations": "축하합니다!",
+      "couponFoundExchange": "{label}을 발견했습니다!!",
+      "couponFoundDiscount": "{label} {pct}% 할인 쿠폰을 발견했습니다!!",
+      "inventoryFullShort": "인벤토리 가득!",
+      "gearAcquired": "장비 획득!",
+      "mailedAsStars": "스타 우편으로 전환되었습니다"
+    },
+    "unlocks": {
+      "gear": {
+        "ariaLabel": "레벨 6 장비 분해·강화·합성 개방 안내",
+        "alt": "장비",
+        "dismantle": "분해",
+        "enhance": "강화",
+        "synthesize": "합성",
+        "title": "장비가 개방되었습니다",
+        "lead": "장비를 분해·강화·합성할 수 있습니다. 튜토리얼 목록에 안내가 추가됩니다.",
+        "perk1Title": "분해",
+        "perk1Desc": "불필요한 장비에서 강화코어를 획득합니다",
+        "perk2Title": "강화",
+        "perk2Desc": "강화코어로 장착 장비의 성능을 올립니다",
+        "perk3Title": "합성",
+        "perk3Desc": "같은 등급 장비 3개로 다음 등급을 노립니다"
+      },
+      "quests": {
+        "ariaLabel": "레벨 7 퀘스트 개방 안내",
+        "alt": "퀘스트",
+        "title": "퀘스트가 개방되었습니다",
+        "lead": "일일·주간 퀘스트를 확인하고 쌓여 있던 보상을 수령할 수 있습니다.",
+        "perk1Title": "퀘스트 패널",
+        "perk1Desc": "HUD 퀘스트 버튼에서 목록과 보상을 엽니다",
+        "perk2Title": "백그라운드 진행",
+        "perk2Desc": "잠겨 있는 동안에도 출석 등은 계속 쌓입니다"
+      },
+      "monument": {
+        "ariaLabel": "레벨 20 YK 조형물 개방 안내",
+        "title": "YK 조형물이 개방되었습니다",
+        "lead": "맵 북쪽(미니맵 12시) 조형물 예정지로 이동합니다. 기본 미션 3개를 완료하면 건설을 시작할 수 있습니다.",
+        "perk1Title": "덤프트럭 보내기",
+        "perk1Desc": "흙 하역장에서 트럭을 1회 출발시키세요",
+        "perk2Title": "파쇄 9개",
+        "perk2Desc": "브레이커로 노면을 파쇄하세요",
+        "perk3Title": "돌 트럭 보내기",
+        "perk3Desc": "언덕 하역장에서 돌 트럭을 1회 출발시키세요",
+        "cta": "조형물로 이동"
+      },
+      "sportsMeet": {
+        "ariaLabel": "레벨 25 굴착기 운동회 개방 안내",
+        "title": "굴착기 운동회가 개방되었습니다",
+        "lead": "미니맵 좌측 하단 포탈에서 주간 타임어택에 도전하세요. 매일 도전권 1회, 연습 모드는 무제한입니다. 월요일 0시(KST)에 코스가 바뀌고 지난주 순위로 스타 우편이 지급됩니다.",
+        "perk1Title": "랭킹 · 연습",
+        "perk1Desc": "도전권(1/1)으로 랭킹, 연습은 기록 미반영",
+        "perk2Title": "주간 코스",
+        "perk2Desc": "5종 패턴이 월요일마다 자동 로테이션",
+        "perk3Title": "주간 보상",
+        "perk3Desc": "1위 3000★ ~ 참가 100★ 우편 지급",
+        "cta": "포탈로 이동"
+      },
+      "attachment": {
+        "ariaLabel": "레벨 {level} {attachment} 및 신규 작업장 개방 안내",
+        "machineAlt": "블레이드가 장착된 얀마 굴착기와 {attachment}",
+        "breaker": "브레이커",
+        "grapple": "집게",
+        "zoneBreaker": "파쇄 작업장",
+        "zoneGrapple": "석재 운반 작업장",
+        "title": "새로운 작업이 개방되었습니다",
+        "lead": "{zone}과 {attachment} 장비가 해금되었습니다.",
+        "equipTitle": "{attachment} 장착",
+        "equipDesc": "기능 메뉴에서 부착물을 교체할 수 있습니다",
+        "zoneDesc": "전용 작업 구역으로 이동해 미션을 수행하세요"
+      }
+    },
+    "gear": {
+      "title": "장비",
+      "enhance": "강화",
+      "inventory": "인벤토리",
+      "equip": "장착",
+      "unequip": "해제",
+      "success": "강화 성공!",
+      "fail": "강화 실패",
+      "maxLevel": "최대 강화",
+      "empty": "장비가 없습니다",
+      "slots": {
+        "bucket": "버킷",
+        "breaker": "브레이커",
+        "grapple": "집게",
+        "track": "트랙",
+        "cabin": "캐빈",
+        "engine": "엔진"
+      }
+    },
+    "cockpit": {
+      "bucket": "버킷",
+      "horn": "경적",
+      "safety": "안전레버",
+      "throttle": "스로틀",
+      "blade": "블레이드",
+      "auto": "오토",
+      "function": "기능",
+      "boomSwing": "붐스윙",
+      "travel": "주행",
+      "pedalBreaker": "브레이커",
+      "pedalGrapple": "집게"
+    },
+    "quest": {
+      "title": "퀘스트",
+      "claim": "수령",
+      "claimed": "완료",
+      "progress": "진행",
+      "empty": "진행 중인 퀘스트가 없습니다",
+      "defs": {
+        "repeat-soil-dump-10000": "흙 하역하기 {target}",
+        "repeat-asphalt-10": "파쇄하기 {target}개",
+        "repeat-rock-dump-10": "돌 하역하기 {target}개",
+        "repeat-travel-10000": "주행거리 {target}m",
+        "daily-login": "로그인 하기",
+        "daily-horn": "경적 울리기 {target}회",
+        "daily-soil-load": "흙 {target} 적재하기",
+        "daily-truck-depart": "트럭 출발 {target}회",
+        "daily-travel-3000": "주행거리 {target}m",
+        "daily-asphalt-9": "파쇄하기 {target}회",
+        "daily-rock-load-5": "돌 적재 성공하기 {target}회",
+        "daily-all-complete": "일일 퀘스트 모두 완료하기",
+        "daily-mission-clear-3": "미션퀘스트 {target}회 완료하기"
+      }
+    },
+    "shop": {
+      "title": "상점",
+      "buy": "구매",
+      "buying": "구매중",
+      "extend": "연장",
+      "owned": "적용중",
+      "soldOut": "품절",
+      "duration1h": "지속시간 1시간",
+      "items": {
+        "cylinder-oil-arm": {
+          "name": "실린더오일(암)",
+          "effect": "크리티컬 확률 +25%"
+        },
+        "cylinder-oil-boom": {
+          "name": "실린더오일(붐)",
+          "effect": "크리티컬 점수 +50%"
+        },
+        "engine-fluorine-clean": {
+          "name": "엔진불소제거",
+          "effect": "주행속도 +50%"
+        },
+        "rock-load-manual": {
+          "name": "돌적재교본",
+          "effect": "밀착감 +20%"
+        },
+        "truck-racer": {
+          "name": "트럭레이서",
+          "effect": "트럭복귀시간 -60초"
+        },
+        "ranker-will": {
+          "name": "랭커의의지",
+          "effect": "점수 2배 확률 35%"
+        }
+      }
+    },
+    "workshop": {
+      "title": "???",
+      "upgrade": "?????",
+      "level": "Lv.{level}",
+      "close": "??? ??",
+      "rewards": "??",
+      "rewardsAwaiting": "?? ??",
+      "unclaimedRewards": "??? ?? {count}?",
+      "tabs": {
+        "quest": "???",
+        "upgrade": "?????",
+        "shop": "??"
+      },
+      "questsTitle": "??? ???",
+      "questRewardNote": "?? ??? ??? ???? ?????",
+      "oneUpgradeAtATime": "??? 1?? ??? ? ????",
+      "owned": "??",
+      "shopTitle": "??? ??",
+      "weeklyReset": "??? ?? {limit}? ? ??? 0?(KST) ??",
+      "tags": {
+        "daily": "??",
+        "repeat": "??"
+      },
+      "claimed": "???",
+      "done": "??",
+      "levelRequirement": "???? {level}",
+      "instantComplete": "????",
+      "insufficient": " (??)",
+      "thisWeek": "?? ? {count}/{limit}",
+      "purchaseConfirmation": "?? ??",
+      "purchasePrompt": "{item}?(?) ?????????",
+      "consume": "??",
+      "cancel": "??",
+      "purchase": "??",
+      "acquiredResult": "?? ??",
+      "confirm": "??",
+      "upgradeConfirmation": "????? ??",
+      "duration": "?? ??",
+      "instantCompleteConfirmation": "???? ??",
+      "secondsPreview": "{from}? ? {to}?",
+      "capacityPreview": "{from} ? {to} (?? {base})",
+      "countPreview": "{from}? ? {to}? (?? {base})",
+      "catalog": {
+        "workshops": {
+          "dump": {
+            "label": "? ???",
+            "pointsLabel": "??? ???"
+          },
+          "crash": {
+            "label": "???? ???",
+            "pointsLabel": "???? ???"
+          },
+          "hill": {
+            "label": "? ???",
+            "pointsLabel": "? ??? ???"
+          }
+        },
+        "upgrades": {
+          "truck_capacity": {
+            "label": "?? ???",
+            "description": "???? ?? ??? ??"
+          },
+          "truck_cooldown": {
+            "label": "?? ????",
+            "description": "???? ?? ???? ??"
+          },
+          "haul_capacity": {
+            "label": "??? ???",
+            "description": "? ?? ?? ?? +1"
+          },
+          "haul_cooldown": {
+            "label": "??? ????",
+            "description": "? ?? ?? ???? ??"
+          },
+          "breaker_power": {
+            "label": "???? ??",
+            "description": "???? ??? +10%"
+          },
+          "score_rank": {
+            "label": "?? ??",
+            "description": "?? ?? ?? +10%"
+          },
+          "xp_expert": {
+            "label": "?? ???",
+            "description": "?? ?? ??? +5%"
+          },
+          "lucky_drop": {
+            "label": "??? ???",
+            "description": "?? ?? ?? +1%p"
+          },
+          "rock_appraiser": {
+            "label": "? ???",
+            "description": "? ?? ? +1?"
+          }
+        },
+        "quests": {
+          "dump-daily-soil-8000": "? ?? 8,000",
+          "dump-daily-truck-2": "???? ?? 2?",
+          "dump-repeat-soil-4000": "? ?? 4,000",
+          "crash-daily-asphalt-9": "?? 9?",
+          "crash-daily-asphalt-18": "?? 18?",
+          "crash-repeat-asphalt-3": "?? 3?",
+          "hill-daily-rock-5": "? ?? 5?",
+          "hill-daily-haul-1": "???? ?? 1?",
+          "hill-repeat-rock-2": "? ?? 2?"
+        },
+        "shop": {
+          "ticket_standard": {
+            "label": "?? ???",
+            "description": "?? ? 1~5? ?? ??"
+          },
+          "ticket_premium": {
+            "label": "?? ???",
+            "description": "?? ? 1~3? ?? ??"
+          },
+          "enhance_core": {
+            "label": "????",
+            "description": "?? ? 1~10? ?? ??"
+          }
+        }
+      }
+    },
+    "repair": {
+      "title": "??",
+      "repair": "??",
+      "free": "??",
+      "durability": "???",
+      "close": "?? ??",
+      "exchangeAvailable": "?? ??",
+      "expiringSoon": "? ??",
+      "normal": "??",
+      "rewardRange": "?? ?? ??",
+      "stars": "??",
+      "enhanceCore": "????",
+      "standardTicket": "?? ???",
+      "premiumTicket": "?? ???",
+      "gaugeLabel": "{fluid} {percent}%",
+      "exchangeRewards": "?? ? ??",
+      "exchange": "????",
+      "waiting": "?? ?",
+      "cancel": "??",
+      "cycleHours": "?? ?? {hours}??",
+      "items": "?",
+      "catalog": {
+        "pointKinds": {
+          "dump": "?? ???",
+          "crash": "???? ???",
+          "hill": "??? ???",
+          "monument": "??? ???"
+        },
+        "fluids": {
+          "engineOil": {
+            "label": "????",
+            "blurb": "?? ??? ??? ?? ?? ?? ??????.",
+            "whyReplace": "???? ??? ??? ?????? ???? ?? ??? ????."
+          },
+          "engineOilFilter": {
+            "label": "??????",
+            "blurb": "???? ? ???????? ?? ?? ?????.",
+            "whyReplace": "??? ?? ??? ??? ?? ??? ?? ??? ?????."
+          },
+          "hydraulicOil": {
+            "label": "???",
+            "blurb": "??????? ???? ?? ??? ??????.",
+            "whyReplace": "???? ?? ??? ? ?? ??????? ?? ?????."
+          },
+          "hydraulicFilter": {
+            "label": "????",
+            "blurb": "??? ? ???? ?? ?????? ?????.",
+            "whyReplace": "??? ?? ??? ?????? ?? ?????? ?????."
+          },
+          "fuelFilter": {
+            "label": "????",
+            "blurb": "?? ? ??????? ?? ??? ??? ??? ????.",
+            "whyReplace": "??? ?? ??? ????? ????? ??? ?????."
+          },
+          "gearOil": {
+            "label": "????",
+            "blurb": "????? ????? ??? ???? ?? ?? ?? ???.",
+            "whyReplace": "????? ? ?? ??? ?? ?????? ??? ??? ???."
+          }
+        },
+        "buffs": {
+          "engineOil": "?? +5% ? 45?",
+          "engineOilFilter": "?? +5% ? 1??",
+          "hydraulicOil": "?? +5% ? 1?? 30?",
+          "hydraulicFilter": "???? +8% ? 2??",
+          "fuelFilter": "???? +8% ? 4??",
+          "gearOil": "???? +8% ? 8??"
+        }
+      }
+    },
+    "monument": {
+      "title": "YK ???",
+      "upgrade": "?????",
+      "points": "??? ???",
+      "close": "??? ??",
+      "rewards": "??",
+      "rewardsAwaiting": "?? ??",
+      "next": "??",
+      "minutes": "{value}?",
+      "seconds": "{value}?",
+      "storageFull": "?? ?? ?",
+      "claim": "??",
+      "tabs": {
+        "quest": "???",
+        "upgrade": "?????",
+        "shop": "??"
+      },
+      "unclaimedRewards": "??? ?? {count}?",
+      "constructionMissions": "?? ??",
+      "constructionMissionNote": "?? ??? ???? ??? ??? ? ????",
+      "questsTitle": "??? ???",
+      "questRewardNote": "?? ??? ??? ???? ?????",
+      "tags": {
+        "build": "??",
+        "daily": "??",
+        "repeat": "??"
+      },
+      "done": "??",
+      "claimed": "???",
+      "startConstruction": "?? ?? (60?)",
+      "constructionInProgress": "?? ?? ?",
+      "constructionInProgressNote": "??? ??? ????? ????? ?? ???.",
+      "constructionComplete": "??? ???????!",
+      "completeConstruction": "????",
+      "levelRequirement": "???? {level}",
+      "instantComplete": "????",
+      "insufficient": " (??)",
+      "weeklyReset": "??? ?? {limit}? ? ??? 0?(KST) ??",
+      "thisWeek": "?? ? {count}/{limit}",
+      "purchaseConfirmation": "?? ??",
+      "purchasePrompt": "{item}?(?) ?????????",
+      "consume": "??",
+      "cancel": "??",
+      "purchase": "??",
+      "acquiredResult": "?? ??",
+      "confirm": "??",
+      "upgradeConfirmation": "????? ??",
+      "duration": "?? ??",
+      "catalog": {
+        "upgrades": {
+          "storage_cap": {
+            "label": "?? ???"
+          },
+          "prod_speed": {
+            "label": "?? ??"
+          }
+        },
+        "questMetrics": {
+          "soilDump": "? ?? {target}",
+          "dumpTruckDepart": "???? {target}? ???",
+          "asphaltBreak": "?? {target}?",
+          "haulTruckDepart": "? ?? {target}? ???",
+          "rockDump": "? ?? {target}?",
+          "travel": "?? ?? {target}m"
+        }
+      }
+    },
+    "controlsGuide": {
+      "title": "조작 가이드",
+      "heading": "부품별 조작 기능",
+      "ariaLabel": "얀마 SV08-1 조작 기능 안내",
+      "imageAlt": "얀마 SV08-1 굴착기 조작 도면 — 조이스틱, 주행 레버, 붐·버켓·암 기능",
+      "hint": "① 좌 조이스틱 · ② 주행 레버 · ⑤ 우 조이스틱 — 핀치로 확대해 보세요",
+      "close": "닫기"
+    },
+    "tutorial": {
+      "ariaLabel": "튜토리얼",
+      "title": "조작 연습",
+      "close": "닫기",
+      "new": "New",
+      "unlockLevel": "레벨 {level}에 개방",
+      "claimed": "수령 완료",
+      "claiming": "수령 중",
+      "claimReward": "보상 수령",
+      "completionReward": "완료 보상",
+      "claim": "수령",
+      "skipToGame": "SKIP · 게임으로",
+      "goalDistance": "목표까지 {meters}m",
+      "steps": {
+        "travel": {
+          "title": "주행",
+          "instruction": "전진·후진·왼레버 우회전·오른레버 좌회전을 각각 10m씩 연습합니다"
+        },
+        "boom": {
+          "title": "붐",
+          "instruction": "붐을 최대로 올렸다가 최대로 내리기를 3회 반복합니다"
+        },
+        "arm": {
+          "title": "암",
+          "instruction": "암을 최대로 올렸다가 최대로 내리기를 3회 반복합니다"
+        },
+        "bucket": {
+          "title": "버켓",
+          "instruction": "흙지역에서 적재한 뒤 덤프트럭에 하역합니다"
+        },
+        "breaker": {
+          "title": "브레이커",
+          "instruction": "아스팔트에 수직으로 대고 발판 좌측으로 파쇄합니다"
+        },
+        "grapple": {
+          "title": "집게",
+          "instruction": "돌을 집어 적재한 뒤 돌트럭에 하역합니다"
+        },
+        "gearDismantle": {
+          "title": "장비 분해",
+          "instruction": "장비를 분해하면 강화코어를 획득합니다"
+        },
+        "gearEnhance": {
+          "title": "장비 강화",
+          "instruction": "강화코어를 사용해 장비를 강화합니다"
+        },
+        "gearSynth": {
+          "title": "장비 합성",
+          "instruction": "같은 등급 장비 3개를 합성합니다"
+        }
+      }
+    },
+    "gacha": {
+      "title": "획득 결과",
+      "synthesisTitle": "합성 결과",
+      "skip": "스킵",
+      "close": "닫기",
+      "confirm": "확인",
+      "openingEquipment": "장비를 여는 중…",
+      "checkingEquipment": "장비를 확인하는 중…",
+      "highGrade": "HIGH GRADE"
+    },
+    "map": {
+      "eyebrow": "Site Survey",
+      "title": "현장 맵",
+      "closeAriaLabel": "맵 닫기",
+      "subtitle": "빨간 화살표가 현재 위치와 진행 방향입니다",
+      "legendAriaLabel": "맵 범례",
+      "legend": {
+        "dig": "흙더미",
+        "dump": "하역",
+        "crash": "파쇄",
+        "hill": "석재",
+        "repair": "정비",
+        "monument": "조형",
+        "sports": "운동회"
+      }
+    },
+    "sportsMeet": {
+      "title": "굴착기 운동회",
+      "close": "닫기",
+      "loading": "불러오는 중…",
+      "error": "오류",
+      "ticketLoadFailed": "티켓 정보를 불러오지 못했습니다.",
+      "thisWeekCourse": "이번 주 코스",
+      "rankRewards": "순위별 보상",
+      "rank": "{rank}위",
+      "rankOrLower": "{rank}위~",
+      "rankRange": "{min}~{max}위",
+      "weeklyResetNote": "월요일 0시 코스 초기화 · 지난주 순위 보상 지급",
+      "thisWeekRankings": "이번 주 랭킹",
+      "previousWeekRankings": "지난주 랭킹",
+      "rankedMode": "랭킹모드",
+      "practiceMode": "연습모드",
+      "rankingsAriaLabel": "굴착기 운동회 랭킹",
+      "myRank": "내 순위 {rank}위",
+      "reward": "보상 {stars}★",
+      "noPreviousWeekRecords": "지난주 기록이 없습니다",
+      "noThisWeekRecords": "이번 주 기록이 없습니다",
+      "rankingsLoadFailed": "랭킹을 불러오지 못했습니다.",
+      "noRecords": "기록이 없습니다",
+      "rankHeader": "순위",
+      "nicknameHeader": "닉네임",
+      "timeHeader": "시간",
+      "courseProgress": "코스 {current}/{total}",
+      "course": "코스",
+      "meet": "운동회",
+      "waitingToStart": "시작 대기",
+      "start": "시작",
+      "exit": "나가기",
+      "resultAriaLabel": "굴착기 운동회 결과",
+      "finish": "완주!",
+      "rankingRecorded": "랭킹에 기록이 반영되었습니다",
+      "submittingRanking": "랭킹 제출 중…",
+      "practiceNotRanked": "연습 기록 · 랭킹 미반영",
+      "segment": "구간",
+      "cumulative": "누적",
+      "retryPractice": "연습 다시하기",
+      "viewThisWeekRankings": "이번 주 랭킹 보기",
+      "returnToWorkshop": "작업장으로 돌아가기"
+    },
+    "chassis": {
+      "title": "차체",
+      "close": "닫기",
+      "zoom": "크게보기",
+      "zoomAriaLabel": "차체 이미지 크게보기",
+      "closeZoom": "크게보기 닫기",
+      "class": {
+        "light": "경량",
+        "medium": "중형",
+        "heavy": "대형"
+      },
+      "weight": "{weight}kg",
+      "defaultTrait": "기본 지급·캐노피",
+      "bonusPointsTitle": "분배 가능 보너스 포인트",
+      "bonus": "보너스 {points}",
+      "save": "저장",
+      "recommendedAllocation": "추천분배",
+      "statsAriaLabel": "차체 능력치",
+      "decreaseStat": "{stat} 감소",
+      "increaseStat": "{stat} 증가",
+      "stats": {
+        "strength": "힘",
+        "agility": "민첩",
+        "stamina": "지구력",
+        "endurance": "인내",
+        "balance": "안정",
+        "technique": "기술"
+      }
+    },
+    "catalog": {
+      "slots": {
+        "ARM": "암",
+        "BOOM": "붐",
+        "TRACK": "트랙",
+        "BUCKET": "버켓",
+        "BREAKER": "브레이커",
+        "GRAPPLE": "집게"
+      },
+      "grades": {
+        "NORMAL": "일반",
+        "ENHANCED": "강화",
+        "PRECISION": "정밀",
+        "MASTER": "마스터"
+      },
+      "gradePrefix": {
+        "NORMAL": "평범한",
+        "ENHANCED": "개량된",
+        "PRECISION": "고성능",
+        "MASTER": "최상급"
+      },
+      "stats": {
+        "strength": "힘",
+        "agility": "민첩",
+        "stamina": "지구력",
+        "endurance": "인내",
+        "balance": "안정",
+        "technique": "기술"
+      },
+      "gear": {
+        "ARM": {
+          "name": "암",
+          "desc": "작업 반경과 인양력"
+        },
+        "BOOM": {
+          "name": "붐",
+          "desc": "굴착 깊이와 도달 거리"
+        },
+        "TRACK": {
+          "name": "트랙",
+          "desc": "주행 성능과 안정성"
+        },
+        "BUCKET": {
+          "name": "버켓",
+          "desc": "굴착·적재용 기본 버켓"
+        },
+        "BREAKER": {
+          "name": "브레이커",
+          "desc": "암반·콘크리트 파쇄용 어태치먼트"
+        },
+        "GRAPPLE": {
+          "name": "집게",
+          "desc": "석재·잔해 파지용 집게"
+        }
+      }
+    },
+    "guide": {
+      "title": "게임방법",
+      "eyebrow": "Operator Guide",
+      "subtitle": "조작 · 작업 · 성장 · 보상을 한눈에",
+      "lead": "얀마 굴착기 체험의 조작·작업·성장·보상을 한눈에 정리한 도움말입니다.",
+      "diagramAlt": "얀마 굴착기 조작 도면 — 조이스틱, 주행 레버, 붐·버켓·암 기능",
+      "diagramHint": "① 좌 조이스틱 · ② 주행 레버 · ⑤ 우 조이스틱 — 핀치로 확대해 보세요",
+      "sections": {
+        "modes": {
+          "title": "모드",
+          "intro": "홈에서 바로 게임 모드로 진입할 수 있습니다. 연습·튜토리얼로 조작을 익힌 뒤 랭킹에 도전하세요.",
+          "items": {
+            "game": {
+              "label": "게임",
+              "desc": "점수·스타·경험치·쿠폰이 반영되며 시즌 랭킹에 기록됩니다."
+            },
+            "practice": {
+              "label": "연습",
+              "desc": "맵의 모든 작업 구역을 열어 자유 연습합니다. 랭킹·시즌 보상에는 반영되지 않습니다."
+            },
+            "tutorial": {
+              "label": "튜토리얼",
+              "desc": "주행 → 스윙 → 암 → 붐 → 버켓 → 흙더미 → 하역 → 브레이커 → 돌 적재 → 돌 하역 순으로 단계별 학습합니다."
+            },
+            "ride": {
+              "label": "탑승 체험",
+              "desc": "조작만 체험하는 모드입니다. 점수와 보상은 없습니다."
+            }
+          }
+        },
+        "controls": {
+          "title": "기본 조작",
+          "items": {
+            "leftLever": {
+              "label": "좌측 레버",
+              "desc": "좌우로 스윙, 앞뒤로 암을 조작합니다."
+            },
+            "rightLever": {
+              "label": "우측 레버",
+              "desc": "앞뒤로 붐, 좌우로 버켓을 조작합니다."
+            },
+            "travel": {
+              "label": "주행 레버",
+              "desc": "전진·후진·좌우 선회합니다."
+            },
+            "functionMenu": {
+              "label": "기능 메뉴",
+              "desc": "부착물 교체, 도저, 안전 잠금, 유압 고속, 붐 스윙, 스로틀 등을 설정합니다."
+            },
+            "pedals": {
+              "label": "페달 · 경적",
+              "desc": "브레이커 타격·집게 개폐, 붐 스윙 페달, 경적을 사용합니다."
+            },
+            "camera": {
+              "label": "카메라 · 미니맵",
+              "desc": "시점 자유 회전과 미니맵으로 위치를 확인합니다. 자동 포즈 슬롯으로 자세를 저장·불러올 수 있습니다."
+            }
+          }
+        },
+        "attachments": {
+          "title": "부착물 · 작업 구역",
+          "intro": "구역에 맞는 부착물을 장착해야 작업할 수 있습니다. 버켓에 흙이 남아 있으면 부착물을 바꿀 수 없습니다.",
+          "items": {
+            "bucket": {
+              "label": "버켓 · 흙더미/하역",
+              "desc": "주황 흙더미 구역에서 흙을 담고, 덤프 트럭에 하역합니다."
+            },
+            "breaker": {
+              "label": "브레이커 · 파쇄",
+              "desc": "파쇄 구역에서 노면 타일을 깨뜨립니다. 깨진 타일은 일정 시간 후 재생됩니다."
+            },
+            "grapple": {
+              "label": "집게 · 석재",
+              "desc": "돌을 집어 밀착감을 채운 뒤 들어 올리고, 운반 트럭에 하역합니다. 들기 판정에 실패할 수 있습니다."
+            }
+          }
+        },
+        "rewards": {
+          "title": "작업 보상",
+          "intro": "게임 모드에서 작업하면 점수·스타·경험치를 얻고, 매우 낮은 확률로 쿠폰이 드롭됩니다.",
+          "items": {
+            "soilDump": {
+              "label": "흙 하역",
+              "desc": "적재량 단위마다 점수와 스타(1~3)를 받습니다. 크리티컬이 나면 점수가 배율로 오릅니다."
+            },
+            "crash": {
+              "label": "파쇄",
+              "desc": "타일당 점수·스타(5~15)·경험치를 받습니다."
+            },
+            "rockDump": {
+              "label": "돌 하역",
+              "desc": "돌 1개 하역 시 높은 점수·스타(20~30)·경험치를 받습니다."
+            },
+            "stars": {
+              "label": "스타",
+              "desc": "장비 강화·가챠·상점 등에 쓰는 재화입니다. 보유 한도는 없습니다."
+            },
+            "coupons": {
+              "label": "쿠폰",
+              "desc": "YK 부품 할인권(10/15/20%), 장비 대여 할인권(10/20/30%), 필터 세트 교환 쿠폰. 시즌 한도(각각 50/50/1)와 유효기간(365일)이 있습니다."
+            }
+          }
+        },
+        "unlocks": {
+          "title": "레벨 · 맵 해금",
+          "intro": "레벨이 오르면 맵과 퀘스트가 넓어집니다.",
+          "items": {
+            "tier1": {
+              "label": "1단계 (Lv.1~)",
+              "desc": "흙더미·하역 구역을 이용합니다."
+            },
+            "tier2": {
+              "label": "2단계 (Lv.10~)",
+              "desc": "브레이커·파쇄 구역과 관련 퀘스트가 해금됩니다."
+            },
+            "tier3": {
+              "label": "3단계 (Lv.15~)",
+              "desc": "집게·석재 구역과 관련 퀘스트가 해금됩니다."
+            },
+            "sportsMeet": {
+              "label": "굴착기 운동회 (Lv.25~)",
+              "desc": "미니맵 좌측 하단 포탈. 일일 도전권 1회 랭킹·무제한 연습. 월요일 0시(KST) 코스 변경 및 지난주 순위 스타 우편."
+            }
+          }
+        },
+        "quests": {
+          "title": "퀘스트 · 미션",
+          "items": {
+            "daily": {
+              "label": "일일 퀘스트",
+              "desc": "로그인, 경적, 하역·파쇄·주행 등 매일 갱신되는 목표입니다."
+            },
+            "repeat": {
+              "label": "반복 퀘스트",
+              "desc": "수령 후 다시 진행할 수 있는 장기 목표입니다."
+            },
+            "mission": {
+              "label": "일일 미션",
+              "desc": "하루 3개, 레벨대에 맞는 난이도로 출제됩니다. 클리어 시 스타·경험치·강화 코어·가챠권 등을 받습니다."
+            }
+          }
+        },
+        "gear": {
+          "title": "장비 · 강화 · 차체",
+          "items": {
+            "gacha": {
+              "label": "기어",
+              "desc": "암·붐·트랙·버켓·브레이커·집게 장비를 가챠로 획득합니다. 등급과 주/부 옵션이 성능을 바꿉니다."
+            },
+            "enhance": {
+              "label": "강화",
+              "desc": "부위별 +1~+10 강화. 스타를 소모하며 단계가 높을수록 성공률이 낮고, 실패 시 보너스가 쌓입니다."
+            },
+            "chassis": {
+              "label": "차체",
+              "desc": "기본 차체(ViO17-1) 능력치(힘·민첩·지구력·인내·안정·기술)를 배분합니다."
+            }
+          }
+        },
+        "workshop": {
+          "title": "작업장 · 상점",
+          "items": {
+            "facility": {
+              "label": "작업장",
+              "desc": "흙더미·파쇄·석재 작업장에서 포인트를 모아 업그레이드하고, 티켓·코어 등을 구매합니다."
+            },
+            "shopBuff": {
+              "label": "상점 버프",
+              "desc": "크리티컬·이동속도·그립·트럭 쿨다운·점수 2배 확률 등 1시간 버프를 구매할 수 있습니다."
+            }
+          }
+        },
+        "field": {
+          "title": "필드 · 정비",
+          "items": {
+            "fieldStar": {
+              "label": "필드 스타",
+              "desc": "맵에 떠 있는 스타를 주우면 50~200 스타를 얻습니다. 매 정시에 1개씩 등장합니다."
+            },
+            "speedBuff": {
+              "label": "속도 버프",
+              "desc": "필드 속도 아이템을 주우면 약 30초간 이동속도가 2배가 됩니다. 약 3분마다 등장하며 시간당 최대 10회."
+            },
+            "repairTent": {
+              "label": "정비 텐트",
+              "desc": "각 소모품은 시간이 지나면 만료됩니다. 만료·임박 시 붉은 아이콘이 뜨고 터치하면 내용을 볼 수 있습니다. 정비소에서 설명·남은 시간·보상 범위를 확인한 뒤 무료로 교환하세요. 교환 시 보상은 범위 안에서 한 번에 뽑혀 지급됩니다. 만료를 방치하면 능력치 페널티가 적용됩니다."
+            }
+          }
+        },
+        "season": {
+          "title": "시즌 · 기타",
+          "items": {
+            "ranking": {
+              "label": "시즌 랭킹",
+              "desc": "분기(KST) 시즌 점수로 순위를 겨룹니다. 설정·메뉴의 랭킹정보에서 확인할 수 있습니다."
+            },
+            "mailbox": {
+              "label": "우편함 · 쿠폰함",
+              "desc": "우편으로 지급된 보상을 받고, 쿠폰함에서 보유 쿠폰을 확인합니다."
+            },
+            "saveExit": {
+              "label": "저장 후 종료",
+              "desc": "설정에서 게임 저장 후 종료하면 진행 상황이 보관됩니다."
+            }
+          }
+        }
+      }
+    }
+  }
+}

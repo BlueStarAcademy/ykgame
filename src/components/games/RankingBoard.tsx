@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
 import type { GameId } from "@/lib/games";
 import { formatSeasonRemaining, getGameById } from "@/lib/games";
 import { RankBadge } from "@/components/games/RankBadge";
@@ -91,11 +92,13 @@ function RankingRow({
   gameId,
   isMe = false,
   index = 0,
+  t,
 }: {
   entry: RankingEntry;
   gameId: GameId;
   isMe?: boolean;
   index?: number;
+  t: ReturnType<typeof useTranslations>;
 }) {
   const isYanmar = gameId === "yanmar";
   const isTop3 = entry.rank > 0 && entry.rank <= 3;
@@ -112,11 +115,11 @@ function RankingRow({
         <div className="min-w-0">
           <p className="ranking-modal-row-name truncate">
             {entry.nickname}
-            {isMe ? <span className="ranking-modal-me-tag">나</span> : null}
+            {isMe ? <span className="ranking-modal-me-tag">{t("me")}</span> : null}
           </p>
           <p className="ranking-modal-row-meta">
             {isYanmar ? (
-              "누적 점수"
+              t("cumulativeScore")
             ) : (
               <>
                 <span className="text-amber-500">
@@ -132,7 +135,7 @@ function RankingRow({
       </div>
       <span className="ranking-modal-row-score shrink-0 tabular-nums">
         {entry.score > 0 ? entry.score.toLocaleString() : "—"}
-        {entry.score > 0 ? <span className="ranking-modal-row-unit">점</span> : null}
+        {entry.score > 0 ? <span className="ranking-modal-row-unit">{t("pointUnit")}</span> : null}
       </span>
     </li>
   );
@@ -153,11 +156,13 @@ function RankingList({
   myStats,
   loading,
   gameId,
+  t,
 }: {
   rankings: RankingEntry[];
   myStats: MyRankingStats | null;
   loading: boolean;
   gameId: GameId;
+  t: ReturnType<typeof useTranslations>;
 }) {
   if (loading) {
     return <RankingListSkeleton />;
@@ -178,8 +183,8 @@ function RankingList({
   if (!myEntry && top10.length === 0) {
     return (
       <div className="ranking-modal-empty">
-        <p className="ranking-modal-empty-title">아직 기록이 없습니다</p>
-        <p className="ranking-modal-empty-desc">첫 플레이로 시즌 순위에 이름을 올려보세요.</p>
+        <p className="ranking-modal-empty-title">{t("noRecords")}</p>
+        <p className="ranking-modal-empty-desc">{t("firstPlayHint")}</p>
       </div>
     );
   }
@@ -189,10 +194,10 @@ function RankingList({
       {myEntry ? (
         <section className="ranking-modal-section">
           <div className="ranking-modal-section-label">
-            <span>내 순위</span>
+            <span>{t("myRank")}</span>
           </div>
           <ul>
-            <RankingRow entry={myEntry} gameId={gameId} isMe />
+            <RankingRow entry={myEntry} gameId={gameId} isMe t={t} />
           </ul>
         </section>
       ) : null}
@@ -200,7 +205,7 @@ function RankingList({
         <section className="ranking-modal-section ranking-modal-section-list">
           {myEntry ? (
             <div className="ranking-modal-section-label">
-              <span>TOP 10</span>
+                <span>{t("top10")}</span>
             </div>
           ) : null}
           <ul className="ranking-modal-list">
@@ -211,12 +216,13 @@ function RankingList({
                 gameId={gameId}
                 isMe={myEntry?.nickname === r.nickname}
                 index={index}
+                t={t}
               />
             ))}
           </ul>
         </section>
       ) : myEntry ? (
-        <p className="ranking-modal-empty-inline">아직 TOP 10 기록이 없습니다.</p>
+        <p className="ranking-modal-empty-inline">{t("noTop10Records")}</p>
       ) : null}
     </div>
   );
@@ -272,6 +278,7 @@ export function RankingBoardPanel({
   embedded = false,
   onClose,
 }: RankingBoardPanelProps) {
+  const t = useTranslations("games.ranking");
   const game = getGameById(gameId);
   const isYanmar = gameId === "yanmar";
   const [boardTab, setBoardTab] = useState<"season" | "sports">("season");
@@ -297,11 +304,11 @@ export function RankingBoardPanel({
   const periodTitle =
     isYanmar && boardTab === "sports"
       ? sportsWeek === "previous"
-        ? "지난주 운동회"
-        : "주간 굴착기 운동회"
+        ? t("previousSportsMeet")
+        : t("weeklySportsMeet")
       : seasonLabel
-        ? `${seasonLabel} 랭킹`
-        : "시즌 랭킹";
+        ? t("seasonLabelRanking", { season: seasonLabel })
+        : t("seasonRanking");
   const brandVars = {
     "--ranking-brand": brandColor,
     "--ranking-header": headerColor,
@@ -313,14 +320,14 @@ export function RankingBoardPanel({
       <div className="ranking-modal-header-grid" aria-hidden />
       <div className="ranking-modal-header-top">
         <p className="ranking-modal-eyebrow">
-          {isYanmar && boardTab === "sports" ? "Sports Meet" : "Season Ranking"}
+          {isYanmar && boardTab === "sports" ? t("sportsMeetEyebrow") : t("seasonRankingEyebrow")}
         </p>
         {onClose ? (
           <button
             type="button"
             onClick={onClose}
             className="ranking-modal-close"
-            aria-label="닫기"
+            aria-label={t("close")}
           >
             ✕
           </button>
@@ -334,7 +341,7 @@ export function RankingBoardPanel({
           {periodTitle}
         </h3>
         {boardTab === "season" && seasonRemaining ? (
-          <span className="ranking-modal-timer" title="시즌 종료까지">
+          <span className="ranking-modal-timer" title={t("seasonEndsIn")}>
             <span className="ranking-modal-timer-dot" aria-hidden />
             {seasonRemaining}
           </span>
@@ -351,7 +358,7 @@ export function RankingBoardPanel({
             }`}
             onClick={() => setBoardTab("season")}
           >
-            시즌 누적
+            {t("seasonCumulative")}
           </button>
           <button
             type="button"
@@ -362,7 +369,7 @@ export function RankingBoardPanel({
             }`}
             onClick={() => setBoardTab("sports")}
           >
-            주간 운동회
+            {t("weeklySportsMeet")}
           </button>
           {boardTab === "sports" ? (
             <button
@@ -374,12 +381,12 @@ export function RankingBoardPanel({
                 )
               }
             >
-              {sportsWeek === "current" ? "지난주 보기" : "이번 주 보기"}
+              {sportsWeek === "current" ? t("viewPreviousWeek") : t("viewCurrentWeek")}
             </button>
           ) : null}
         </div>
       ) : (
-        <p className="ranking-modal-subtitle">Top 10 · 실시간 누적 순위</p>
+        <p className="ranking-modal-subtitle">{t("liveTop10")}</p>
       )}
       {isYanmar && boardTab === "sports" && sports.meta ? (
         <p className="ranking-modal-subtitle mt-1">
@@ -387,7 +394,7 @@ export function RankingBoardPanel({
           {sports.meta.stageOrderLabel}
         </p>
       ) : isYanmar && boardTab === "season" ? (
-        <p className="ranking-modal-subtitle">Top 10 · 시즌 누적 점수</p>
+        <p className="ranking-modal-subtitle">{t("seasonTop10")}</p>
       ) : null}
     </header>
   );
@@ -395,22 +402,22 @@ export function RankingBoardPanel({
   const sportsBody = (
     <div className="ranking-modal-body">
       {sports.loading ? (
-        <p className="ranking-modal-empty-inline">불러오는 중…</p>
+        <p className="ranking-modal-empty-inline">{t("loading")}</p>
       ) : (
         <>
           {sports.myStats?.rank != null ? (
             <p className="mb-2 text-sm font-bold text-amber-100">
-              내 순위 {sports.myStats.rank}위 ·{" "}
+              {t("sportsMyRank", { rank: sports.myStats.rank })} ·{" "}
               {sports.myStats.bestTimeMs != null
                 ? formatSportsTimeMs(sports.myStats.bestTimeMs)
                 : "-"}
               {sports.myStats.rewardStars != null
-                ? ` · 보상 ${sports.myStats.rewardStars}★`
+                ? ` · ${t("reward", { stars: sports.myStats.rewardStars })}`
                 : ""}
             </p>
           ) : null}
           {sports.rankings.length === 0 ? (
-            <p className="ranking-modal-empty-inline">아직 기록이 없습니다.</p>
+            <p className="ranking-modal-empty-inline">{t("noRecords")}</p>
           ) : (
             <ul className="ranking-modal-list">
               {sports.rankings.slice(0, 10).map((row, index) => (
@@ -447,6 +454,7 @@ export function RankingBoardPanel({
           myStats={myStats}
           loading={loading}
           gameId={gameId}
+          t={t}
         />
       </div>
     );

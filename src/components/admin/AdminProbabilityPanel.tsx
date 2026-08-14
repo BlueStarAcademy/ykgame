@@ -40,7 +40,12 @@ const PROBABILITY_TABS: {
   {
     id: "rewards",
     label: "점수 · 보상",
-    sectionTitles: ["기본 점수", "하역 보상 확률 (1회 롤)"],
+    sectionTitles: [
+      "기본 점수",
+      "하역·파괴·돌 하역 보상 확률 (1회 롤)",
+      "파쇄 보상 (타일 1개)",
+      "Hill 돌 운반 보상 (돌 1개 트럭 적재)",
+    ],
   },
   {
     id: "truck",
@@ -50,7 +55,13 @@ const PROBABILITY_TABS: {
   {
     id: "upgrade",
     label: "장비강화",
-    sectionTitles: ["장비강화 효과", "강화 비용 공식"],
+    sectionTitles: [
+      "작업 중 장비 드롭",
+      "작업 중 강화코어 드롭",
+      "장비 가챠 — 일반뽑기",
+      "장비 가챠 — 고급뽑기",
+      "장비 강화",
+    ],
   },
 ];
 

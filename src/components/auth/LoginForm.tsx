@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { YkGeongiLogo } from "@/components/brand/YkGeongiLogo";
@@ -35,6 +36,8 @@ function LoginFormInner({
   variant: LoginFormVariant;
   onSuccess?: () => void;
 }) {
+  const t = useTranslations("auth");
+  const common = useTranslations("common");
   const isSiteLegend = variant === "siteLegend";
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,7 +82,7 @@ function LoginFormInner({
     });
 
     if (result?.error) {
-      setError("아이디 또는 비밀번호가 올바르지 않습니다.");
+      setError(t("invalidCredentials"));
       return false;
     }
 
@@ -117,7 +120,7 @@ function LoginFormInner({
       };
 
       if (!preRes.ok) {
-        setError(preData.error ?? "아이디 또는 비밀번호가 올바르지 않습니다.");
+        setError(preData.error ?? t("invalidCredentials"));
         return;
       }
 
@@ -128,7 +131,7 @@ function LoginFormInner({
 
       await completeSignIn();
     } catch {
-      setError("로그인 중 오류가 발생했습니다.");
+      setError(t("loginError"));
     } finally {
       setLoading(false);
     }
@@ -141,7 +144,7 @@ function LoginFormInner({
     try {
       await completeSignIn();
     } catch {
-      setError("로그인 중 오류가 발생했습니다.");
+      setError(t("loginError"));
     } finally {
       setLoading(false);
     }
@@ -166,18 +169,18 @@ function LoginFormInner({
             priority
             className="mx-auto mb-3 h-12 w-auto max-w-[14rem] object-contain"
           />
-          <h1 className="text-xl font-bold text-gray-900">YK건기 브랜드 캐주얼 게임</h1>
-          <p className="mt-1 text-sm text-gray-500">로그인 후 미니게임을 즐겨보세요</p>
+          <h1 className="text-xl font-bold text-gray-900">{t("brandTitle")}</h1>
+          <p className="mt-1 text-sm text-gray-500">{t("brandSubtitle")}</p>
         </div>
       ) : (
         <div className="site-legend-login-heading">
-          <h1>로그인</h1>
+          <h1>{t("login")}</h1>
         </div>
       )}
 
       {registeredNotice ? (
         <p className={isSiteLegend ? "site-legend-login-success" : "mb-3 text-sm text-green-600"}>
-          회원가입이 완료되었습니다. 로그인해 주세요.
+          {t("registeredNotice")}
         </p>
       ) : null}
 
@@ -190,7 +193,7 @@ function LoginFormInner({
                 : "mb-1 block text-sm font-medium text-gray-700"
             }
           >
-            아이디
+            {t("loginId")}
           </label>
           <input
             type="text"
@@ -201,7 +204,7 @@ function LoginFormInner({
                 ? "site-legend-login-input"
                 : "w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-blue-500"
             }
-            placeholder="아이디 입력"
+            placeholder={t("loginIdPlaceholder")}
             autoComplete="username"
             required
           />
@@ -214,7 +217,7 @@ function LoginFormInner({
                 : "mb-1 block text-sm font-medium text-gray-700"
             }
           >
-            비밀번호
+            {t("password")}
           </label>
           <input
             type="password"
@@ -225,7 +228,7 @@ function LoginFormInner({
                 ? "site-legend-login-input"
                 : "w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none focus:border-blue-500"
             }
-            placeholder="비밀번호 입력"
+            placeholder={t("passwordPlaceholder")}
             autoComplete="current-password"
             required
           />
@@ -249,7 +252,7 @@ function LoginFormInner({
                 <span className="site-legend-check-box" aria-hidden>
                   ✓
                 </span>
-                아이디 저장
+                {t("saveId")}
               </label>
               <label className="site-legend-login-check">
                 <input
@@ -260,7 +263,7 @@ function LoginFormInner({
                 <span className="site-legend-check-box" aria-hidden>
                   ✓
                 </span>
-                자동 로그인
+                {t("autoLogin")}
               </label>
             </>
           ) : (
@@ -271,7 +274,7 @@ function LoginFormInner({
                   checked={saveId}
                   onChange={(e) => setSaveId(e.target.checked)}
                 />
-                아이디 저장
+                {t("saveId")}
               </label>
               <label className="flex items-center gap-2 text-gray-600">
                 <input
@@ -279,7 +282,7 @@ function LoginFormInner({
                   checked={autoLogin}
                   onChange={(e) => setAutoLogin(e.target.checked)}
                 />
-                자동 로그인
+                {t("autoLogin")}
               </label>
             </>
           )}
@@ -302,33 +305,33 @@ function LoginFormInner({
             <>
               <span className="site-legend-btn-primary-shine" aria-hidden />
               <span className="site-legend-btn-primary-label">
-                {loading ? "로그인 중..." : "로그인"}
+                {loading ? t("loggingIn") : t("login")}
               </span>
             </>
           ) : loading ? (
-            "로그인 중..."
+            t("loggingIn")
           ) : (
-            "로그인"
+            t("login")
           )}
         </button>
       </form>
 
       <p className={isSiteLegend ? "site-legend-login-footer" : "mt-5 text-center text-sm text-gray-500"}>
-        계정이 없으신가요?{" "}
+        {t("noAccount")}{" "}
         {isSiteLegend ? (
           <button
             type="button"
             className="site-legend-login-link"
             onClick={() => setSignupOpen(true)}
           >
-            회원가입
+            {t("signup")}
           </button>
         ) : (
           <Link
             href={withPwaQuery("/signup")}
             className="font-medium text-blue-600 hover:underline"
           >
-            회원가입
+            {t("signup")}
           </Link>
         )}
       </p>
@@ -358,7 +361,7 @@ function LoginFormInner({
         <div className="overflow-hidden rounded-2xl bg-white shadow-2xl">
           <div className="px-5 py-6">
             <p className="text-center text-base font-semibold text-gray-900">
-              로그인 중인 계정입니다. 로그아웃 처리하고 접속하시겠습니까?
+              {t("conflictTitle")}
             </p>
             <div className="mt-5 flex gap-2">
               <button
@@ -366,14 +369,14 @@ function LoginFormInner({
                 onClick={handleConflictCancel}
                 className="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
-                취소
+                {common("cancel")}
               </button>
               <button
                 type="button"
                 onClick={() => void handleConflictConfirm()}
                 className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
               >
-                접속
+                {t("connect")}
               </button>
             </div>
           </div>

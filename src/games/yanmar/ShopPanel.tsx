@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
 import {
@@ -78,9 +79,12 @@ function ShopProductCard({
   purchasing: boolean;
   onPurchase?: (itemId: ShopItemId) => void | Promise<void>;
 }) {
+  const t = useTranslations("yanmar.shop");
   const canAfford =
     typeof stars !== "number" || stars >= item.priceStars;
   const disabled = purchasing || !canAfford || !onPurchase;
+  const name = t(`items.${item.id}.name`);
+  const effect = t(`items.${item.id}.effect`);
 
   return (
     <article className="yanmar-shop-card">
@@ -91,14 +95,14 @@ function ShopProductCard({
           className="yanmar-shop-card-image"
           draggable={false}
         />
-        <h3 className="yanmar-shop-card-title">{item.name}</h3>
+        <h3 className="yanmar-shop-card-title">{name}</h3>
         {active ? (
-          <span className="yanmar-shop-card-active-badge">적용중</span>
+          <span className="yanmar-shop-card-active-badge">{t("owned")}</span>
         ) : null}
       </div>
       <div className="yanmar-shop-card-effect">
-        <p className="yanmar-shop-card-effect-main">{item.effect}</p>
-        <p className="yanmar-shop-card-effect-time">{item.durationLabel}</p>
+        <p className="yanmar-shop-card-effect-main">{effect}</p>
+        <p className="yanmar-shop-card-effect-time">{t("duration1h")}</p>
       </div>
       <button
         type="button"
@@ -114,7 +118,7 @@ function ShopProductCard({
           valueClassName="yanmar-shop-card-star-value"
         />
         <span className="yanmar-shop-card-buy-label">
-          {purchasing ? "구매중" : active ? "연장" : "구매"}
+          {purchasing ? t("buying") : active ? t("extend") : t("buy")}
         </span>
       </button>
     </article>
@@ -331,6 +335,7 @@ export function ShopPanel({
   gachaBusy,
   onGacha,
 }: ShopPanelProps) {
+  const t = useTranslations("yanmar.shop");
   const [tab, setTab] = useState<"gear" | "buff">("gear");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [cooldownAnchor, setCooldownAnchor] = useState<{
@@ -402,7 +407,7 @@ export function ShopPanel({
           </span>
           <div className="yanmar-facility-modal-titles">
             <p className="yanmar-facility-modal-eyebrow">FIELD SUPPLY</p>
-            <h2>상점</h2>
+            <h2>{t("title")}</h2>
           </div>
           <div className="yanmar-facility-modal-head-meta">
             {typeof stars === "number" ? (

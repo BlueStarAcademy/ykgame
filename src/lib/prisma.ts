@@ -75,6 +75,7 @@ function isStalePrismaClient(client: PrismaClient): boolean {
     tickerNotice?: unknown;
     userWorkshopUpgrade?: unknown;
     userWorkshopShopPurchase?: unknown;
+    chatMessage?: unknown;
   };
   if (
     delegates.userMail == null ||
@@ -82,7 +83,8 @@ function isStalePrismaClient(client: PrismaClient): boolean {
     delegates.tickerNotice == null ||
     delegates.tickerSettings == null ||
     delegates.userWorkshopUpgrade == null ||
-    delegates.userWorkshopShopPurchase == null
+    delegates.userWorkshopShopPurchase == null ||
+    delegates.chatMessage == null
   ) {
     return true;
   }

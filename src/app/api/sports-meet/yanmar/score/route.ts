@@ -7,6 +7,20 @@ import {
 } from "@/games/yanmar/sportsMeet/patterns";
 import { getSportsMeetWeekKey } from "@/games/yanmar/sportsMeet/weekKey";
 import { ensurePreviousSportsMeetWeekSettled } from "@/games/yanmar/sportsMeet/settleServer";
+import { announceSportsMeetTakeover } from "@/lib/chat/announcements";
+
+async function getWeekLeader(weekKey: string) {
+  return prisma.yanmarSportsMeetScore.findFirst({
+    where: { weekKey },
+    orderBy: [{ bestTimeMs: "asc" }, { updatedAt: "asc" }],
+    select: {
+      userId: true,
+      bestTimeMs: true,
+      updatedAt: true,
+      user: { select: { nickname: true } },
+    },
+  });
+}
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -73,6 +87,8 @@ export async function POST(request: Request) {
     });
   }
 
+  const previousLeader = await getWeekLeader(weekKey);
+
   const improved =
     !existing || clearTimeMs < existing.bestTimeMs;
 
@@ -95,6 +111,25 @@ export async function POST(request: Request) {
       lastRunId: runId ?? existing?.lastRunId,
     },
   });
+
+  if (improved) {
+    const newLeader = await getWeekLeader(weekKey);
+    if (
+      previousLeader &&
+      newLeader &&
+      previousLeader.userId !== session.user.id &&
+      newLeader.userId === session.user.id
+    ) {
+      void announceSportsMeetTakeover({
+        winnerUserId: session.user.id,
+        winnerNickname: session.user.nickname,
+        previousUserId: previousLeader.userId,
+        previousNickname: previousLeader.user.nickname,
+      }).catch((error) => {
+        console.error("[chat] sports-meet takeover announce failed:", error);
+      });
+    }
+  }
 
   const pattern = getSportsMeetPattern(weekKey);
   return NextResponse.json({

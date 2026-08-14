@@ -23,10 +23,19 @@ import {
   requestFullscreen,
   shouldUseBrowserFullscreen,
 } from "@/lib/fullscreen";
+import { LanguagePicker } from "@/components/i18n/LanguagePicker";
 import { disablePwaMode } from "@/lib/pwa-mode";
 import { markResumeInGame } from "@/lib/resumeInGame";
 import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
-import { HORN_OPTIONS, type HornId } from "./soundSettings";
+import { useTranslations } from "next-intl";
+import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
+import {
+  HORN_OPTIONS,
+  SFX_DETAIL_OPTIONS,
+  type HornId,
+  type SfxDetailId,
+  type SfxDetailSettings,
+} from "./soundSettings";
 
 type SettingsTab = "display" | "sound" | "other";
 
@@ -69,6 +78,16 @@ function VolumeSlider({
   onChange: (value: number) => void;
   disabled?: boolean;
 }) {
+  const originRef = useRef<{ x: number; y: number; value: number } | null>(
+    null,
+  );
+  const modeRef = useRef<"pending" | "scrub" | "scroll">("pending");
+
+  const resetPointer = () => {
+    originRef.current = null;
+    modeRef.current = "pending";
+  };
+
   return (
     <div
       className={`flex items-center gap-2 px-2.5 pb-2 pt-0.5 ${
@@ -84,8 +103,41 @@ function VolumeSlider({
         disabled={disabled}
         aria-label="음량"
         aria-valuetext={`${value}`}
-        onChange={(e) => onChange(Number(e.target.value))}
-        onPointerDown={(e) => e.stopPropagation()}
+        style={{ touchAction: "pan-y" }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          originRef.current = { x: e.clientX, y: e.clientY, value };
+          modeRef.current = "pending";
+        }}
+        onPointerMove={(e) => {
+          const origin = originRef.current;
+          if (!origin || modeRef.current !== "pending") return;
+          const dx = Math.abs(e.clientX - origin.x);
+          const dy = Math.abs(e.clientY - origin.y);
+          if (dx < 8 && dy < 8) return;
+          if (dy >= dx) {
+            modeRef.current = "scroll";
+            if (value !== origin.value) onChange(origin.value);
+            return;
+          }
+          modeRef.current = "scrub";
+        }}
+        onPointerUp={resetPointer}
+        onPointerCancel={() => {
+          const origin = originRef.current;
+          if (
+            origin &&
+            modeRef.current !== "scrub" &&
+            value !== origin.value
+          ) {
+            onChange(origin.value);
+          }
+          resetPointer();
+        }}
+        onChange={(e) => {
+          if (modeRef.current === "scroll") return;
+          onChange(Number(e.target.value));
+        }}
         className="yanmar-volume-slider h-1.5 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-white/20 accent-sky-400 disabled:cursor-not-allowed"
       />
       <span className="w-7 shrink-0 text-right text-[10px] font-bold tabular-nums text-white/80">
@@ -99,11 +151,13 @@ function SoundSection({
   title,
   enabled,
   onToggle,
+  trailing,
   children,
 }: {
   title: string;
   enabled: boolean;
   onToggle: () => void;
+  trailing?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -112,120 +166,128 @@ function SoundSection({
         <h3 className="text-[11px] font-bold tracking-wide text-white">
           {title}
         </h3>
-        <button
-          type="button"
-          onClick={onToggle}
-          onPointerDown={(e) => e.stopPropagation()}
-          aria-pressed={enabled}
-          className={`rounded-md px-2.5 py-1 text-[10px] font-black tracking-wide transition-colors ${
-            enabled
-              ? "bg-sky-400/20 text-sky-300 ring-1 ring-sky-300/40"
-              : "bg-white/8 text-white/40 ring-1 ring-white/10"
-          }`}
-        >
-          {enabled ? "ON" : "OFF"}
-        </button>
+        <div className="flex items-center gap-1.5">
+          {trailing}
+          <button
+            type="button"
+            onClick={onToggle}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-pressed={enabled}
+            className={`rounded-md px-2.5 py-1 text-[10px] font-black tracking-wide transition-colors ${
+              enabled
+                ? "bg-sky-400/20 text-sky-300 ring-1 ring-sky-300/40"
+                : "bg-white/8 text-white/40 ring-1 ring-white/10"
+            }`}
+          >
+            {enabled ? "ON" : "OFF"}
+          </button>
+        </div>
       </div>
       {children}
     </section>
   );
 }
 
-function SfxDetailGroup({
+function SfxSettingsModal({
+  open,
+  onClose,
+  details,
   disabled,
-  children,
-}: {
-  disabled?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div
-      className={`mx-2 mt-1 rounded-md border border-white/10 bg-black/25 py-1 ${
-        disabled ? "opacity-40" : ""
-      }`}
-    >
-      <p className="px-2.5 pb-0.5 text-[9px] font-bold tracking-wide text-white/40">
-        세부 효과음
-      </p>
-      <div className="flex flex-col">{children}</div>
-    </div>
-  );
-}
-
-function SfxDetailRow({
-  label,
-  disabled,
-  children,
-}: {
-  label: string;
-  disabled?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div
-      className={`grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-2 px-2.5 py-1.5 ${
-        disabled ? "pointer-events-none" : ""
-      }`}
-    >
-      <span className="truncate text-[10px] font-semibold text-white">{label}</span>
-      <div className="flex w-full justify-end">{children}</div>
-    </div>
-  );
-}
-
-function BreakerDetailRow({
-  on,
-  onToggle,
-  disabled,
-}: {
-  on: boolean;
-  onToggle: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <SfxDetailRow label="브레이커 타격" disabled={disabled}>
-      <button
-        type="button"
-        onClick={onToggle}
-        disabled={disabled}
-        aria-pressed={on}
-        className={`w-full rounded-md px-2 py-1 text-center text-[10px] font-black tracking-wide transition-colors disabled:cursor-not-allowed ${
-          on && !disabled
-            ? "bg-sky-400/20 text-sky-300 ring-1 ring-sky-300/40"
-            : "bg-white/8 text-white/40 ring-1 ring-white/10"
-        }`}
-      >
-        {on ? "ON" : "OFF"}
-      </button>
-    </SfxDetailRow>
-  );
-}
-
-function HornDetailRow({
+  onChange,
   hornId,
   onHornIdChange,
-  disabled,
 }: {
+  open: boolean;
+  onClose: () => void;
+  details: SfxDetailSettings;
+  disabled: boolean;
+  onChange: (id: SfxDetailId, next: { enabled: boolean; volume: number }) => void;
   hornId: HornId;
   onHornIdChange: (hornId: HornId) => void;
-  disabled?: boolean;
 }) {
   return (
-    <SfxDetailRow label="경적 소리" disabled={disabled}>
-      <select
-        value={hornId}
-        disabled={disabled}
-        onChange={(e) => onHornIdChange(Number(e.target.value) as HornId)}
-        onPointerDown={(e) => e.stopPropagation()}
-        className="w-full rounded-md border border-white/15 bg-black/70 px-1.5 py-1 text-[10px] font-semibold text-white outline-none focus:border-sky-400/60 disabled:cursor-not-allowed"
-      >
-        {HORN_OPTIONS.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </SfxDetailRow>
+    <AppModalOverlay
+      open={open}
+      onClose={onClose}
+      nested
+      panelClassName="max-w-md bg-[#17110d] text-white"
+    >
+      <div className="flex max-h-[80dvh] min-h-0 flex-col">
+        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <div>
+            <h3 className="text-sm font-black">상세 효과음 설정</h3>
+            <p className="mt-0.5 text-[10px] text-white/55">
+              전체 효과음 볼륨에 각 항목의 볼륨이 추가로 적용됩니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-md bg-white/10 px-2 py-1 text-xs"
+            onClick={onClose}
+          >
+            닫기
+          </button>
+        </div>
+        <div
+          className={`min-h-0 touch-pan-y overflow-y-auto overscroll-contain px-3 py-2 ${
+            disabled ? "opacity-40" : ""
+          }`}
+        >
+          {SFX_DETAIL_OPTIONS.map(({ id, label }) => {
+            const detail = details[id];
+            return (
+              <div
+                key={id}
+                className="mb-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-2"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-bold">{label}</span>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    aria-pressed={detail.enabled}
+                    onClick={() =>
+                      onChange(id, { ...detail, enabled: !detail.enabled })
+                    }
+                    className={`rounded-md px-2.5 py-1 text-[10px] font-black ${
+                      detail.enabled && !disabled
+                        ? "bg-sky-400/20 text-sky-300 ring-1 ring-sky-300/40"
+                        : "bg-white/8 text-white/40 ring-1 ring-white/10"
+                    }`}
+                  >
+                    {detail.enabled ? "ON" : "OFF"}
+                  </button>
+                </div>
+                <VolumeSlider
+                  value={detail.volume}
+                  disabled={disabled || !detail.enabled}
+                  onChange={(volume) => onChange(id, { ...detail, volume })}
+                />
+                {id === "horn" ? (
+                  <div className="px-0.5 pb-1">
+                    <select
+                      value={hornId}
+                      disabled={disabled || !detail.enabled}
+                      onChange={(e) =>
+                        onHornIdChange(Number(e.target.value) as HornId)
+                      }
+                      onPointerDown={(e) => e.stopPropagation()}
+                      className="w-full rounded-md border border-white/15 bg-black/70 px-1.5 py-1 text-[10px] font-semibold text-white outline-none focus:border-sky-400/60 disabled:cursor-not-allowed"
+                    >
+                      {HORN_OPTIONS.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </AppModalOverlay>
   );
 }
 
@@ -233,19 +295,24 @@ function ActionRow({
   label,
   onClick,
   disabled,
+  notify,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  notify?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10 disabled:text-white/35"
+      className="relative flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10 disabled:text-white/35"
     >
-      {label}
+      <span>{label}</span>
+      {notify ? (
+        <span className="yanmar-quest-notify-badge is-dot" aria-hidden />
+      ) : null}
     </button>
   );
 }
@@ -275,10 +342,17 @@ interface YanmarGameSettingsMenuProps {
   onSfxVolumeChange: (volume: number) => void;
   breakerSfxEnabled: boolean;
   onToggleBreakerSfx: () => void;
+  sfxDetails: SfxDetailSettings;
+  onSfxDetailChange: (
+    id: SfxDetailId,
+    next: { enabled: boolean; volume: number },
+  ) => void;
   hornId: HornId;
   onHornIdChange: (hornId: HornId) => void;
   onResetPosition?: () => void;
   onShowGuide?: () => void;
+  onShowTutorial?: () => void;
+  tutorialNotify?: boolean;
   onShowRanking?: () => void;
   onSaveAndExit?: () => void;
   onLogout?: () => void;
@@ -287,12 +361,6 @@ interface YanmarGameSettingsMenuProps {
   /** Called before navigating to /admin (e.g. persist session). */
   onBeforeOpenAdmin?: () => void;
 }
-
-const TABS: { id: SettingsTab; label: string }[] = [
-  { id: "display", label: "화면" },
-  { id: "sound", label: "소리" },
-  { id: "other", label: "기타" },
-];
 
 export function YanmarGameSettingsMenu({
   immersive,
@@ -314,18 +382,26 @@ export function YanmarGameSettingsMenu({
   onToggleSfx,
   sfxVolume,
   onSfxVolumeChange,
-  breakerSfxEnabled,
-  onToggleBreakerSfx,
+  breakerSfxEnabled: _breakerSfxEnabled,
+  onToggleBreakerSfx: _onToggleBreakerSfx,
+  sfxDetails,
+  onSfxDetailChange,
   hornId,
   onHornIdChange,
   onResetPosition,
   onShowGuide,
+  onShowTutorial,
+  tutorialNotify = false,
   onShowRanking,
   onSaveAndExit,
   onLogout,
   isAdmin = false,
   onBeforeOpenAdmin,
 }: YanmarGameSettingsMenuProps) {
+  void _breakerSfxEnabled;
+  void _onToggleBreakerSfx;
+  const t = useTranslations("yanmar.settings");
+  const common = useTranslations("common");
   const isModal = presentation === "modal";
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(
@@ -336,6 +412,7 @@ export function YanmarGameSettingsMenu({
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [apiFullscreen, setApiFullscreen] = useState(false);
   const [tab, setTab] = useState<SettingsTab>("display");
+  const [sfxSettingsOpen, setSfxSettingsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const immersiveFullscreen = useImmersiveFullscreenControl();
   const isStandalone = immersiveFullscreen?.isStandalone ?? isStandalonePwa();
@@ -436,7 +513,7 @@ export function YanmarGameSettingsMenu({
     <div
       role="dialog"
       aria-modal={isModal ? true : undefined}
-      aria-label="설정"
+      aria-label={t("title")}
       className={`flex flex-col overflow-hidden rounded-xl border border-white/15 bg-black/90 shadow-2xl backdrop-blur-md ${
         isModal
           ? "relative z-[410] w-[min(100%,19.5rem)]"
@@ -452,7 +529,8 @@ export function YanmarGameSettingsMenu({
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex border-b border-white/10 px-1 pt-1">
-        {TABS.map((item) => {
+        {(["display", "sound", "other"] as const).map((id) => {
+          const item = { id, label: t(id) };
           const active = tab === item.id;
           return (
             <button
@@ -474,9 +552,10 @@ export function YanmarGameSettingsMenu({
       <div className="min-h-[9.5rem] px-1 py-1">
         {tab === "display" ? (
           <>
-            <ToggleRow label="미니맵" on={showMinimap} onToggle={onToggleMinimap} />
+            <LanguagePicker variant="game" />
+            <ToggleRow label={t("minimap")} on={showMinimap} onToggle={onToggleMinimap} />
             <ToggleRow
-              label="미션퀘스트"
+              label={t("missionQuest")}
               on={showMissionQuest}
               onToggle={onToggleMissionQuest}
             />
@@ -485,7 +564,7 @@ export function YanmarGameSettingsMenu({
 
         {tab === "sound" ? (
           <>
-            <SoundSection title="배경음" enabled={bgmEnabled} onToggle={onToggleBgm}>
+            <SoundSection title={t("bgm")} enabled={bgmEnabled} onToggle={onToggleBgm}>
               <VolumeSlider
                 value={bgmVolume}
                 onChange={onBgmVolumeChange}
@@ -493,24 +572,25 @@ export function YanmarGameSettingsMenu({
               />
             </SoundSection>
 
-            <SoundSection title="효과음" enabled={sfxEnabled} onToggle={onToggleSfx}>
+            <SoundSection
+              title={t("sfx")}
+              enabled={sfxEnabled}
+              onToggle={onToggleSfx}
+              trailing={
+                <button
+                  type="button"
+                  onClick={() => setSfxSettingsOpen(true)}
+                  className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-bold text-white/75 hover:bg-white/10"
+                >
+                  상세 설정
+                </button>
+              }
+            >
               <VolumeSlider
                 value={sfxVolume}
                 onChange={onSfxVolumeChange}
                 disabled={!sfxEnabled}
               />
-              <SfxDetailGroup disabled={!sfxEnabled}>
-                <BreakerDetailRow
-                  on={breakerSfxEnabled}
-                  onToggle={onToggleBreakerSfx}
-                  disabled={!sfxEnabled}
-                />
-                <HornDetailRow
-                  hornId={hornId}
-                  onHornIdChange={onHornIdChange}
-                  disabled={!sfxEnabled}
-                />
-              </SfxDetailGroup>
             </SoundSection>
           </>
         ) : null}
@@ -519,7 +599,7 @@ export function YanmarGameSettingsMenu({
           <>
             {onResetPosition ? (
               <ActionRow
-                label="초기위치(끼임시 탈출)"
+                label={t("resetPosition")}
                 onClick={() => {
                   onOpenChange(false);
                   onResetPosition();
@@ -528,7 +608,7 @@ export function YanmarGameSettingsMenu({
             ) : null}
             {canFullscreen && !inApiFullscreen && !isStandalone ? (
               <ActionRow
-                label="전체화면"
+                label={t("fullscreen")}
                 onClick={() => {
                   onOpenChange(false);
                   if (immersiveFullscreen) {
@@ -540,21 +620,21 @@ export function YanmarGameSettingsMenu({
               />
             ) : null}
             <ActionRow
-              label="우편함"
+              label={t("mailbox")}
               onClick={() => {
                 onOpenChange(false);
                 setMailboxOpen(true);
               }}
             />
             <ActionRow
-              label="쿠폰함"
+              label={t("inventory")}
               onClick={() => {
                 onOpenChange(false);
                 setInventoryOpen(true);
               }}
             />
             <ActionRow
-              label="게임방법"
+              label={t("guide")}
               onClick={() => {
                 onOpenChange(false);
                 onShowGuide?.();
@@ -562,7 +642,16 @@ export function YanmarGameSettingsMenu({
               disabled={!onShowGuide}
             />
             <ActionRow
-              label="랭킹정보"
+              label={t("tutorial")}
+              onClick={() => {
+                onOpenChange(false);
+                onShowTutorial?.();
+              }}
+              disabled={!onShowTutorial}
+              notify={tutorialNotify}
+            />
+            <ActionRow
+              label={t("ranking")}
               onClick={() => {
                 onOpenChange(false);
                 onShowRanking?.();
@@ -570,7 +659,7 @@ export function YanmarGameSettingsMenu({
               disabled={!onShowRanking}
             />
             <ActionRow
-              label="고객문의"
+              label={t("inquiry")}
               onClick={() => {
                 onOpenChange(false);
                 setInquiryOpen(true);
@@ -578,7 +667,7 @@ export function YanmarGameSettingsMenu({
             />
             {isAdmin ? (
               <ActionRow
-                label="관리"
+                label={t("admin")}
                 onClick={() => {
                   onOpenChange(false);
                   onBeforeOpenAdmin?.();
@@ -593,7 +682,7 @@ export function YanmarGameSettingsMenu({
             ) : null}
             {onLogout ? (
               <ActionRow
-                label="로그아웃"
+                label={t("logout")}
                 onClick={() => {
                   onOpenChange(false);
                   onLogout();
@@ -615,7 +704,7 @@ export function YanmarGameSettingsMenu({
             }}
             className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-rose-300 hover:bg-white/10"
           >
-            게임 저장 후 종료
+            {t("saveAndExit")}
           </button>
         </div>
       ) : null}
@@ -628,7 +717,7 @@ export function YanmarGameSettingsMenu({
         <button
           type="button"
           className="absolute inset-0 cursor-default bg-black/55"
-          aria-label="메뉴 닫기"
+          aria-label={common("close")}
           onClick={() => onOpenChange(false)}
         />
         {panelBody}
@@ -638,7 +727,7 @@ export function YanmarGameSettingsMenu({
         <button
           type="button"
           className="fixed inset-0 z-[400] cursor-default"
-          aria-label="메뉴 닫기"
+          aria-label={common("close")}
           onClick={() => onOpenChange(false)}
         />
         {panelBody}
@@ -652,8 +741,8 @@ export function YanmarGameSettingsMenu({
         ref={buttonRef}
         type="button"
         onClick={() => onOpenChange(!open)}
-        className={`yanmar-settings-menu-trigger${open ? " is-open" : ""}`}
-        aria-label="메뉴"
+        className={`relative yanmar-settings-menu-trigger${open ? " is-open" : ""}`}
+        aria-label={t("title")}
         aria-expanded={open}
       >
         <span className="yanmar-settings-menu-trigger-glyph" aria-hidden>
@@ -666,6 +755,9 @@ export function YanmarGameSettingsMenu({
             />
           </svg>
         </span>
+        {tutorialNotify ? (
+          <span className="yanmar-quest-notify-badge is-dot" aria-hidden />
+        ) : null}
       </button>
     </div>
   );
@@ -682,6 +774,15 @@ export function YanmarGameSettingsMenu({
       <CustomerInquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} />
       <MailboxModal open={mailboxOpen} onClose={() => setMailboxOpen(false)} />
       <InventoryModal open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
+      <SfxSettingsModal
+        open={sfxSettingsOpen}
+        onClose={() => setSfxSettingsOpen(false)}
+        details={sfxDetails}
+        disabled={!sfxEnabled}
+        onChange={onSfxDetailChange}
+        hornId={hornId}
+        onHornIdChange={onHornIdChange}
+      />
     </>
   );
 

@@ -1,7 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
+import { LocalizedImage } from "@/components/i18n/LocalizedImage";
+import { YANMAR_ASSETS } from "./controls";
 import { YANMAR_GUIDE_SECTIONS } from "./yanmarLobbyInfo";
 
 function InfoModalShell({
@@ -10,6 +13,7 @@ function InfoModalShell({
   title,
   eyebrow,
   subtitle,
+  closeAriaLabel,
   children,
 }: {
   open: boolean;
@@ -17,6 +21,7 @@ function InfoModalShell({
   title: string;
   eyebrow: string;
   subtitle: string;
+  closeAriaLabel: string;
   children: ReactNode;
 }) {
   return (
@@ -35,7 +40,7 @@ function InfoModalShell({
               type="button"
               onClick={onClose}
               className="yanmar-info-modal-close"
-              aria-label="닫기"
+              aria-label={closeAriaLabel}
             >
               ✕
             </button>
@@ -56,29 +61,46 @@ export function YanmarGuideModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const t = useTranslations("yanmar.guide");
+  const tc = useTranslations("common");
+
   return (
     <InfoModalShell
       open={open}
       onClose={onClose}
-      title="게임방법"
-      eyebrow="Operator Guide"
-      subtitle="조작 · 작업 · 성장 · 보상을 한눈에"
+      title={t("title")}
+      eyebrow={t("eyebrow")}
+      subtitle={t("subtitle")}
+      closeAriaLabel={tc("close")}
     >
       <div className="yanmar-help">
-        <p className="yanmar-help-lead">
-          얀마 굴착기 체험의 조작·작업·성장·보상을 한눈에 정리한 도움말입니다.
-        </p>
+        <LocalizedImage
+          src={YANMAR_ASSETS.controlsGuide}
+          alt={t("diagramAlt")}
+          className="mx-auto mb-2 w-full max-w-lg rounded-lg"
+          draggable={false}
+        />
+        <p className="yanmar-help-diagram-hint">{t("diagramHint")}</p>
+        <p className="yanmar-help-lead">{t("lead")}</p>
         {YANMAR_GUIDE_SECTIONS.map((section) => (
-          <section key={section.title} className="yanmar-help-section">
-            <h3 className="yanmar-help-section-title">{section.title}</h3>
-            {section.intro ? (
-              <p className="yanmar-help-section-intro">{section.intro}</p>
+          <section key={section.id} className="yanmar-help-section">
+            <h3 className="yanmar-help-section-title">
+              {t(`sections.${section.id}.title`)}
+            </h3>
+            {section.hasIntro ? (
+              <p className="yanmar-help-section-intro">
+                {t(`sections.${section.id}.intro`)}
+              </p>
             ) : null}
             <ul className="yanmar-help-list">
-              {section.items.map((item) => (
-                <li key={item.label} className="yanmar-help-item">
-                  <span className="yanmar-help-item-label">{item.label}</span>
-                  <span className="yanmar-help-item-desc">{item.desc}</span>
+              {section.itemIds.map((itemId) => (
+                <li key={itemId} className="yanmar-help-item">
+                  <span className="yanmar-help-item-label">
+                    {t(`sections.${section.id}.items.${itemId}.label`)}
+                  </span>
+                  <span className="yanmar-help-item-desc">
+                    {t(`sections.${section.id}.items.${itemId}.desc`)}
+                  </span>
                 </li>
               ))}
             </ul>

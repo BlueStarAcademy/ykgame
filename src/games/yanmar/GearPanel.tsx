@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
 import {
@@ -8,8 +9,6 @@ import {
   GEAR_INVENTORY_BASE,
   GEAR_INVENTORY_EXPAND_STEP,
   GEAR_SLOTS,
-  GEAR_SLOT_LABEL,
-  ITEM_GRADE_LABEL,
   MAIN_OPTION_BY_SLOT,
   SELL_STARS_BY_GRADE,
   SUB_OPTION_POOL,
@@ -32,6 +31,7 @@ import {
   canonicalizeSubOptions,
 } from "./gearGenerate";
 import { GearIconCell } from "./GearIconCell";
+import type { TutorialGearAction } from "./tutorial";
 import {
   GachaResultModal,
   type GachaResultItem,
@@ -45,6 +45,12 @@ import { type ChassisModelId } from "./chassisCatalog";
 import { calculateFinalYanmarStats } from "./gearStats";
 import type { YanmarEquipmentStats } from "./equipment";
 import { yanmarAudio } from "./yanmarAudio";
+import {
+  gearGradeLabel,
+  gearItemDisplayName,
+  gearSlotLabel,
+  gearStatLabel,
+} from "@/i18n/yanmarCatalog";
 
 export interface GearPanelItem {
   id: string;
@@ -186,6 +192,8 @@ interface GearPanelProps {
     | null
     | void;
   onExpandInventory?: () => void | Promise<void>;
+  tutorialGearAction?: TutorialGearAction | null;
+  onTutorialGearAction?: (action: TutorialGearAction) => void;
 }
 
 type BubbleState =
@@ -236,16 +244,19 @@ function EquipLevelText({
   );
 }
 
-function formatMain(item: GearPanelItem) {
+function formatMain(item: GearPanelItem, catalogT: (key: string) => string) {
   const def = MAIN_OPTION_BY_SLOT[item.slot];
-  const label = item.mainLabel ?? def.label;
+  const label = gearStatLabel(catalogT, item.mainOption.key) || item.mainLabel || def.label;
   const unit = def.isPercent ? "%" : "";
   return `${label} +${Math.round(item.mainOption.value)}${unit}`;
 }
 
-function formatSub(sub: GearPanelItem["subOptions"][number]) {
+function formatSub(
+  sub: GearPanelItem["subOptions"][number],
+  catalogT: (key: string) => string,
+) {
   const def = SUB_OPTION_POOL.find((s) => s.key === sub.key);
-  const label = def?.label ?? sub.key;
+  const label = gearStatLabel(catalogT, sub.key) || def?.label || sub.key;
   const unit = sub.isPercent ? "%" : "";
   const tier = Math.max(1, Math.floor(Number(sub.tier) || 1));
   const rangeMin = Math.round(sub.rollMin) * tier;
@@ -272,6 +283,7 @@ function GearBubbleCard({
   highlight,
   playerLevel = 1,
   onZoom,
+  catalogT,
 }: {
   title: string;
   item: GearPanelItem | null;
@@ -282,6 +294,7 @@ function GearBubbleCard({
   highlight?: boolean;
   playerLevel?: number;
   onZoom?: (item: GearPanelItem) => void;
+  catalogT: (key: string) => string;
 }) {
   if (!item) {
     return (
@@ -289,7 +302,7 @@ function GearBubbleCard({
         <div className="yanmar-gear-bubble-card-head">
           <p className="yanmar-gear-bubble-card-title">{title}</p>
         </div>
-        <p className="yanmar-gear-muted">{emptyLabel ?? "비어 있음"}</p>
+        <p className="yanmar-gear-muted">{emptyLabel ?? "Empty"}</p>
       </div>
     );
   }
@@ -309,7 +322,7 @@ function GearBubbleCard({
         <p className="yanmar-gear-bubble-card-title">{title}</p>
         <div className="yanmar-gear-bubble-card-head-trail">
           <span className={`yanmar-gear-bubble-grade ${gradeTextClass(item.grade)}`}>
-            {ITEM_GRADE_LABEL[item.grade]}
+            {gearGradeLabel(catalogT, item.grade)}
           </span>
           {onZoom ? (
             <button
@@ -332,17 +345,17 @@ function GearBubbleCard({
         />
         <div className="yanmar-gear-mgr-detail-meta">
           <p className={`yanmar-gear-mgr-name ${gradeTextClass(item.grade)}`}>
-            {item.nameSnapshot}
+            {gearItemDisplayName(catalogT, item.slot, item.grade)}
             {item.enhanceLevel > 0 ? ` +${item.enhanceLevel}` : ""}
           </p>
           <p className="yanmar-gear-mgr-grade">
-            {GEAR_SLOT_LABEL[item.slot]}
+            {gearSlotLabel(catalogT, item.slot)}
             {" · "}
             <EquipLevelText grade={item.grade} playerLevel={playerLevel} />
             {item.equippedSlot ? " · 장착중" : ""}
           </p>
           <p className="yanmar-gear-mgr-main">
-            <span className="yanmar-gear-mgr-attr-main">{formatMain(item)}</span>
+            <span className="yanmar-gear-mgr-attr-main">{formatMain(item, catalogT)}</span>
             {mainDelta ? (
               <span
                 className={
@@ -362,7 +375,7 @@ function GearBubbleCard({
       </div>
       <ul className="yanmar-gear-mgr-attr-list">
         {item.subOptions.map((sub) => {
-          const row = formatSub(sub);
+          const row = formatSub(sub, catalogT);
           return (
             <li key={`${sub.key}-${sub.tier}-${sub.value}`}>
               <span className="yanmar-gear-mgr-attr-stat">{row.text}</span>
@@ -414,7 +427,12 @@ export function GearPanel({
   onSellMany,
   onSynthesize,
   onExpandInventory,
+  tutorialGearAction = null,
+  onTutorialGearAction,
 }: GearPanelProps) {
+  const t = useTranslations("yanmar.gear");
+  const catalogT = useTranslations("yanmar");
+  const common = useTranslations("common");
   const [slotFilters, setSlotFilters] = useState<Record<GearSlot, boolean>>(
     () => Object.fromEntries(GEAR_SLOTS.map((s) => [s, true])) as Record<
       GearSlot,
@@ -1179,9 +1197,9 @@ export function GearPanel({
   };
 
   const filterSummary = filterAll
-    ? "전체"
+    ? t("inventory")
     : GEAR_SLOTS.filter((s) => slotFilters[s])
-        .map((s) => GEAR_SLOT_LABEL[s])
+        .map((s) => gearSlotLabel(catalogT, s))
         .join(", ");
 
   const equipButton = (item: GearPanelItem) => {
@@ -1196,7 +1214,7 @@ export function GearPanel({
             closeBubble();
           }}
         >
-          해제
+          {t("unequip")}
         </button>
       );
     }
@@ -1217,7 +1235,7 @@ export function GearPanel({
           closeBubble();
         }}
       >
-        장착
+        {t("equip")}
       </button>
     );
   };
@@ -1226,29 +1244,40 @@ export function GearPanel({
     <div className="yanmar-gear-mgr-actions yanmar-gear-mgr-actions--four">
       <button
         type="button"
-        className="yanmar-gear-btn yanmar-gear-btn--enhance"
+        className={`yanmar-gear-btn yanmar-gear-btn--enhance${
+          tutorialGearAction === "enhance" ? " is-tutorial-target" : ""
+        }`}
         disabled={busy || item.enhanceLevel >= 10}
         onClick={() => {
           setEnhanceItemId(item.id);
+          onTutorialGearAction?.("enhance");
         }}
       >
-        강화
+        {t("enhance")}
       </button>
       <button
         type="button"
-        className="yanmar-gear-btn yanmar-gear-btn--synth"
+        className={`yanmar-gear-btn yanmar-gear-btn--synth${
+          tutorialGearAction === "synthesize" ? " is-tutorial-target" : ""
+        }`}
         disabled={busy || !!item.equippedSlot}
-        onClick={() => openSynth(item)}
+        onClick={() => {
+          openSynth(item);
+          onTutorialGearAction?.("synthesize");
+        }}
       >
         합성
       </button>
       <button
         type="button"
-        className="yanmar-gear-btn yanmar-gear-btn--sell"
+        className={`yanmar-gear-btn yanmar-gear-btn--sell${
+          tutorialGearAction === "dismantle" ? " is-tutorial-target" : ""
+        }`}
         disabled={busy || !!item.equippedSlot}
         onClick={() => {
           setPendingDismantleId(item.id);
           closeBubble();
+          onTutorialGearAction?.("dismantle");
         }}
       >
         분해
@@ -1281,7 +1310,7 @@ export function GearPanel({
     >
       {!embedded ? (
         <div className="yanmar-gear-mgr-header">
-          <h2>장비 관리</h2>
+          <h2>{t("title")}</h2>
           <div className="yanmar-gear-mgr-header-trailing">
             <span className="yanmar-gear-core-chip" title="보유 강화코어">
               <img
@@ -1293,7 +1322,7 @@ export function GearPanel({
               />
               <span className="tabular-nums">{enhanceCores}</span>
             </span>
-            <button type="button" onClick={onClose} aria-label="닫기">
+            <button type="button" onClick={onClose} aria-label={common("close")}>
               ×
             </button>
           </div>
@@ -1304,7 +1333,7 @@ export function GearPanel({
         <section className="yanmar-gear-mgr-compact">
           <div className="yanmar-gear-mgr-compact-left">
             <header className="yanmar-gear-mgr-pane-head">
-              <h3>장착 장비</h3>
+              <h3>{t("equip")}</h3>
             </header>
             <div className="yanmar-gear-mgr-equip-grid yanmar-gear-mgr-equip-grid--2x3">
               {GEAR_EQUIP_GRID_ORDER.map((slot) => {
@@ -1340,7 +1369,7 @@ export function GearPanel({
                           ? `${eq.nameSnapshot}${
                               eq.enhanceLevel > 0 ? ` +${eq.enhanceLevel}` : ""
                             }`
-                          : `${GEAR_SLOT_LABEL[slot]} (비어 있음)`
+                          : `${gearSlotLabel(catalogT, slot)} (${t("empty")})`
                       }
                     />
                   </div>
@@ -1422,7 +1451,7 @@ export function GearPanel({
                             }));
                           }}
                         />
-                        {GEAR_SLOT_LABEL[slot]}
+                        {gearSlotLabel(catalogT, slot)}
                       </label>
                     ))}
                   </div>
@@ -1432,9 +1461,14 @@ export function GearPanel({
                 <>
                   <button
                     type="button"
-                    className="yanmar-gear-bulk-btn yanmar-gear-bulk-btn--dismantle"
+                    className={`yanmar-gear-bulk-btn yanmar-gear-bulk-btn--dismantle${
+                      tutorialGearAction === "dismantle" ? " is-tutorial-target" : ""
+                    }`}
                     disabled={busy}
-                    onClick={() => enterBulkMode("dismantle")}
+                    onClick={() => {
+                      enterBulkMode("dismantle");
+                      onTutorialGearAction?.("dismantle");
+                    }}
                   >
                     선택분해
                   </button>
@@ -1448,9 +1482,14 @@ export function GearPanel({
                   </button>
                   <button
                     type="button"
-                    className="yanmar-gear-bulk-btn yanmar-gear-bulk-btn--synth"
+                    className={`yanmar-gear-bulk-btn yanmar-gear-bulk-btn--synth${
+                      tutorialGearAction === "synthesize" ? " is-tutorial-target" : ""
+                    }`}
                     disabled={busy}
-                    onClick={() => enterBulkMode("synth")}
+                    onClick={() => {
+                      enterBulkMode("synth");
+                      onTutorialGearAction?.("synthesize");
+                    }}
                   >
                     선택합성
                   </button>
@@ -1593,7 +1632,7 @@ export function GearPanel({
                       empty
                       size="md"
                       className="yanmar-gear-mgr-inv-cell"
-                      title="빈 슬롯"
+                      title={t("empty")}
                     />
                   ))
                 : null}
@@ -1637,7 +1676,7 @@ export function GearPanel({
                       장비 비교
                     </span>
                     <p className="yanmar-gear-bubble-compare-sub">
-                      {GEAR_SLOT_LABEL[bubble.slot]} 슬롯
+                      {gearSlotLabel(catalogT, bubble.slot)}
                     </p>
                   </>
                 ) : (
@@ -1664,6 +1703,7 @@ export function GearPanel({
                   playerLevel={playerLevel}
                   onZoom={setArtPreview}
                   equipAction={bubbleItem ? equipButton(bubbleItem) : null}
+                  catalogT={catalogT}
                 />
                 {bubbleItem ? actionButtons(bubbleItem) : null}
               </>
@@ -1673,7 +1713,8 @@ export function GearPanel({
                   <GearBubbleCard
                     title="장착 중"
                     item={bubbleEquipped}
-                    emptyLabel={`${GEAR_SLOT_LABEL[bubble.slot]} 슬롯 비어 있음`}
+                    emptyLabel={`${gearSlotLabel(catalogT, bubble.slot)} ${t("empty")}`}
+                    catalogT={catalogT}
                     playerLevel={playerLevel}
                     onZoom={setArtPreview}
                     equipAction={
@@ -1694,6 +1735,7 @@ export function GearPanel({
                         ? bubbleEquipped
                         : null
                     }
+                    catalogT={catalogT}
                   />
                 </div>
                 {bubbleItem ? actionButtons(bubbleItem) : null}
@@ -1733,8 +1775,8 @@ export function GearPanel({
                 : ""}
             </p>
             <p className="yanmar-gear-mgr-grade">
-              [{ITEM_GRADE_LABEL[artPreview.grade]}] ·{" "}
-              {GEAR_SLOT_LABEL[artPreview.slot]}
+              [{gearGradeLabel(catalogT, artPreview.grade)}] ·{" "}
+              {gearSlotLabel(catalogT, artPreview.slot)}
               {" · "}
               <EquipLevelText
                 grade={artPreview.grade}
@@ -1821,8 +1863,8 @@ export function GearPanel({
                       enhanceViewItem.grade,
                     )}`}
                   >
-                    [{ITEM_GRADE_LABEL[enhanceViewItem.grade]}] ·{" "}
-                    {GEAR_SLOT_LABEL[enhanceViewItem.slot]}
+                    [{gearGradeLabel(catalogT, enhanceViewItem.grade)}] ·{" "}
+                    {gearSlotLabel(catalogT, enhanceViewItem.slot)}
                     {" · "}
                     <EquipLevelText
                       grade={enhanceViewItem.grade}
@@ -1831,7 +1873,7 @@ export function GearPanel({
                   </p>
                   <p className="yanmar-gear-mgr-main">
                     <span className="yanmar-gear-mgr-attr-main">
-                      {formatMain(enhanceViewItem)}
+                      {formatMain(enhanceViewItem, catalogT)}
                     </span>
                   </p>
                 </div>
@@ -2135,8 +2177,8 @@ export function GearPanel({
                     pendingDismantle.grade,
                   )}`}
                 >
-                  [{ITEM_GRADE_LABEL[pendingDismantle.grade]}] ·{" "}
-                  {GEAR_SLOT_LABEL[pendingDismantle.slot]}
+                  [{gearGradeLabel(catalogT, pendingDismantle.grade)}] ·{" "}
+                  {gearSlotLabel(catalogT, pendingDismantle.slot)}
                 </p>
               </div>
             </div>
@@ -2219,8 +2261,8 @@ export function GearPanel({
                     dismantleResult.grade,
                   )}`}
                 >
-                  [{ITEM_GRADE_LABEL[dismantleResult.grade]}] ·{" "}
-                  {GEAR_SLOT_LABEL[dismantleResult.slot]}
+                  [{gearGradeLabel(catalogT, dismantleResult.grade)}] ·{" "}
+                  {gearSlotLabel(catalogT, dismantleResult.slot)}
                 </p>
               </div>
             </div>
@@ -2292,8 +2334,8 @@ export function GearPanel({
                     pendingSell.grade,
                   )}`}
                 >
-                  [{ITEM_GRADE_LABEL[pendingSell.grade]}] ·{" "}
-                  {GEAR_SLOT_LABEL[pendingSell.slot]}
+                  [{gearGradeLabel(catalogT, pendingSell.grade)}] ·{" "}
+                  {gearSlotLabel(catalogT, pendingSell.slot)}
                 </p>
               </div>
             </div>
@@ -2369,8 +2411,8 @@ export function GearPanel({
                     sellResult.grade,
                   )}`}
                 >
-                  [{ITEM_GRADE_LABEL[sellResult.grade]}] ·{" "}
-                  {GEAR_SLOT_LABEL[sellResult.slot]}
+                  [{gearGradeLabel(catalogT, sellResult.grade)}] ·{" "}
+                  {gearSlotLabel(catalogT, sellResult.slot)}
                 </p>
               </div>
             </div>
@@ -2434,7 +2476,7 @@ export function GearPanel({
                     }
                   />
                   <span className={gradeTextClass(grade)}>
-                    {ITEM_GRADE_LABEL[grade]}
+                    {gearGradeLabel(catalogT, grade)}
                   </span>
                   <span className="yanmar-gear-bulk-grade-count tabular-nums">
                     {
@@ -2508,13 +2550,13 @@ export function GearPanel({
                 <span className="yanmar-gear-confirm-reward-value">
                   <strong>
                     {bulkSynthGrade
-                      ? ITEM_GRADE_LABEL[bulkSynthGrade]
+                      ? gearGradeLabel(catalogT, bulkSynthGrade)
                       : ""}{" "}
                     × {bulkItems.length}
                   </strong>
                   {bulkSynthNextGrade ? (
                     <span>
-                      → {ITEM_GRADE_LABEL[bulkSynthNextGrade]}{" "}
+                      → {gearGradeLabel(catalogT, bulkSynthNextGrade)}{" "}
                       {bulkSynthUpgradeChance}%
                     </span>
                   ) : (
@@ -2715,7 +2757,7 @@ export function GearPanel({
           setSynthPullResults(null);
         }}
         results={synthPullResults}
-        title="합성 결과"
+        titleKey="synthesisTitle"
         perRevealSfx
       />
 
@@ -2740,7 +2782,7 @@ export function GearPanel({
                 ? "합성 완료"
                 : synthPhase === "fusing"
                   ? "합성 중…"
-                  : `${synthGrade ? ITEM_GRADE_LABEL[synthGrade] : ""} 장비 3개 합성`}
+                  : `${synthGrade ? gearGradeLabel(catalogT, synthGrade) : ""} 장비 3개 합성`}
             </h3>
 
             {synthPhase === "result" && synthResult ? (
@@ -2765,8 +2807,8 @@ export function GearPanel({
                         synthResult.item.grade,
                       )}`}
                     >
-                      [{ITEM_GRADE_LABEL[synthResult.item.grade]}] ·{" "}
-                      {GEAR_SLOT_LABEL[synthResult.item.slot]}
+                  [{gearGradeLabel(catalogT, synthResult.item.grade)}] ·{" "}
+                  {gearSlotLabel(catalogT, synthResult.item.slot)}
                     </p>
                     {synthResult.upgraded ? (
                       <p className="yanmar-gear-synth-upgraded">등급 상승!</p>
@@ -2878,7 +2920,7 @@ export function GearPanel({
                           synthGrade,
                         )}`}
                       >
-                        {ITEM_GRADE_LABEL[synthGrade]} {100 - synthUpgradeChance}%
+                        {gearGradeLabel(catalogT, synthGrade)} {100 - synthUpgradeChance}%
                       </span>
                       <span className="yanmar-gear-synth-odds-sep" aria-hidden>
                         /
@@ -2888,7 +2930,7 @@ export function GearPanel({
                           synthNextGrade,
                         )}`}
                       >
-                        {ITEM_GRADE_LABEL[synthNextGrade]} {synthUpgradeChance}%
+                        {gearGradeLabel(catalogT, synthNextGrade)} {synthUpgradeChance}%
                       </span>
                     </>
                   ) : synthGrade === "MASTER" ? (
@@ -2928,18 +2970,18 @@ export function GearPanel({
                             synthFocusItem.grade,
                           )}`}
                         >
-                          [{ITEM_GRADE_LABEL[synthFocusItem.grade]}] ·{" "}
-                          {GEAR_SLOT_LABEL[synthFocusItem.slot]}
+                          [{gearGradeLabel(catalogT, synthFocusItem.grade)}] ·{" "}
+                          {gearSlotLabel(catalogT, synthFocusItem.slot)}
                         </p>
                         <p className="yanmar-gear-mgr-main">
                           <span className="yanmar-gear-mgr-attr-main">
-                            {formatMain(synthFocusItem)}
+                            {formatMain(synthFocusItem, catalogT)}
                           </span>
                         </p>
                         {synthFocusItem.subOptions.length > 0 ? (
                           <ul className="yanmar-gear-synth-viewer-subs">
                             {synthFocusItem.subOptions.map((sub) => {
-                              const row = formatSub(sub);
+                              const row = formatSub(sub, catalogT);
                               return (
                                 <li key={`${sub.key}-${sub.tier}-${sub.value}`}>
                                   {row.text}
@@ -2974,7 +3016,7 @@ export function GearPanel({
                 <div className="yanmar-gear-synth-inv">
                   <div className="yanmar-gear-synth-inv-bar">
                     <span>
-                      {ITEM_GRADE_LABEL[synthGrade ?? "NORMAL"]} 인벤
+                      {gearGradeLabel(catalogT, synthGrade ?? "NORMAL")} 인벤
                     </span>
                     <span className="yanmar-gear-mgr-cap">
                       {synthReadyCount} / 3 선택

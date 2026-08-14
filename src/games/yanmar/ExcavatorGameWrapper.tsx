@@ -17,6 +17,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/config";
 import {
   GAME_IMMERSIVE_HEADER_CENTER_ID,
   GAME_IMMERSIVE_HEADER_LEFT_ID,
@@ -285,23 +287,40 @@ import {
   getTutorialPhaseSuccessLabel,
   getTutorialWaypoint,
   TUTORIAL_STEPS,
+  getNewTutorialStepIds,
   waypointDistance,
   type GameMode,
+  type TutorialGearAction,
   type TutorialPhaseProgress,
   type TutorialStep,
+  type TutorialStepId,
   type TutorialWaypoint,
 } from "./tutorial";
+import { TutorialListPanel } from "./TutorialListPanel";
+import {
+  EMPTY_YANMAR_TUTORIAL,
+  grandfatherIntroIfPlayed,
+  parseYanmarTutorialState,
+  withCompletedStep,
+  withSeenNew,
+  type YanmarTutorialState,
+} from "./tutorialProgress";
 import {
   getYanmarCouponImage,
   getYanmarCouponLabel,
 } from "./rewardVisualConfig";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
+import { gearGradeLabel, gearSlotLabel } from "@/i18n/yanmarCatalog";
 import {
+  grandfatherNewUnlocks,
   getCrossedUnlocks,
   getUnseenUnlocksForLevel,
   hasSeenPlayerUnlock,
   isAttachmentUnlocked,
+  isGearCraftUnlocked,
+  isQuestPanelUnlocked,
   markPlayerUnlockSeen,
+  PLAYER_UNLOCKS,
   PRACTICE_FULL_UNLOCK_LEVEL,
   type PlayerUnlockKind,
 } from "@/lib/playerUnlocks";
@@ -383,66 +402,76 @@ function resetSim(sim: import("./types").ExcavatorSimState, vel: HydraulicVeloci
   Object.assign(vel, createHydraulicVelocity());
 }
 
-function TutorialSelectModal({
-  open,
-  activeId,
-  onClose,
-  onSelect,
-  onFreePlay,
-}: {
-  open: boolean;
-  activeId: string | null;
-  onClose: () => void;
-  onSelect: (index: number) => void;
-  onFreePlay: () => void;
-}) {
-  useRegisterInGameBackDismiss(open, onClose);
-
-  if (!open) return null;
-
+function HudFeatureLock({ locked, level }: { locked: boolean; level: number }) {
+  if (!locked) return null;
   return (
-    <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm landscape:items-start landscape:overflow-y-auto landscape:py-2">
-      <div className="flex max-h-[min(92dvh,40rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-2xl landscape:max-h-[min(94dvh,22rem)]">
-        <div className="shrink-0 bg-gradient-to-br from-red-600 to-red-800 px-4 py-3 text-white">
-          <h2 className="text-base font-black">튜토리얼 선택</h2>
-        </div>
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 [-webkit-overflow-scrolling:touch] [touch-action:pan-y]">
-          <button
-            type="button"
-            onClick={onFreePlay}
-            className={`w-full rounded-xl border px-3 py-2 text-left text-xs font-bold ${
-              activeId == null
-                ? "border-red-300 bg-red-50 text-red-700"
-                : "border-gray-200 text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            자유동작
-          </button>
-          {TUTORIAL_STEPS.map((step, index) => (
-            <button
-              key={step.id}
-              type="button"
-              onClick={() => onSelect(index)}
-              className={`w-full rounded-xl border px-3 py-2 text-left text-xs font-bold ${
-                activeId === step.id
-                  ? "border-amber-300 bg-amber-50 text-amber-800"
-                  : "border-gray-200 text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {step.title}
-            </button>
-          ))}
-        </div>
-        <div className="shrink-0 border-t border-gray-100 p-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full rounded-xl border border-gray-200 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-          >
-            닫기
-          </button>
-        </div>
+    <span className="yanmar-hud-lock" aria-hidden>
+      <svg
+        className="yanmar-hud-lock-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <rect
+          x="5.5"
+          y="11"
+          width="13"
+          height="9.5"
+          rx="1.6"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
+        <path
+          d="M8.2 11V8.4a3.8 3.8 0 0 1 7.6 0V11"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+      <span className="yanmar-hud-lock-label">Lv.{level}</span>
+    </span>
+  );
+}
+
+function TutorialGuideHud({
+  step,
+  phaseDisplay,
+  flash,
+  guide,
+  showWaypoint,
+  goalDist,
+}: {
+  step: TutorialStep;
+  phaseDisplay: { current: number; total: number };
+  flash: { kind: "phase" | "complete"; message: string; key: number } | null;
+  guide: string;
+  showWaypoint: boolean;
+  goalDist: number;
+}) {
+  const t = useTranslations("yanmar.tutorial");
+  return (
+    <div className="yanmar-tutorial-guide" role="status" aria-live="polite">
+      <div className="yanmar-tutorial-guide-head">
+        <p className="yanmar-tutorial-guide-title">{step.title}</p>
+        <p className="yanmar-tutorial-guide-phase">
+          {phaseDisplay.current}/{phaseDisplay.total}
+        </p>
       </div>
+      <p
+        className={`yanmar-tutorial-guide-copy${
+          flash?.kind === "phase"
+            ? " is-phase"
+            : flash?.kind === "complete"
+              ? " is-complete"
+              : ""
+        }`}
+      >
+        {flash ? `✓ ${flash.message}` : guide || step.instruction}
+      </p>
+      {showWaypoint ? (
+        <p className="yanmar-tutorial-guide-goal">
+          {t("goalDistance", { meters: goalDist })}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -456,6 +485,8 @@ function InventoryFullModal({
   onClose: () => void;
   onOpenGear: () => void;
 }) {
+  const t = useTranslations("yanmar.toasts");
+  const common = useTranslations("common");
   return (
     <AppModalOverlay
       open={open}
@@ -470,24 +501,22 @@ function InventoryFullModal({
         aria-labelledby="yanmar-inventory-full-title"
       >
         <p className="yanmar-gear-confirm-eyebrow">INVENTORY FULL</p>
-        <h3 id="yanmar-inventory-full-title">인벤토리 공간이 부족합니다.</h3>
-        <p className="yanmar-inventory-full-lead">
-          장비를 분해·판매하거나 슬롯을 확장한 뒤 다시 획득할 수 있습니다.
-        </p>
+        <h3 id="yanmar-inventory-full-title">{t("inventoryFullTitle")}</h3>
+        <p className="yanmar-inventory-full-lead">{t("inventoryFullLead")}</p>
         <div className="yanmar-gear-confirm-actions">
           <button
             type="button"
             className="yanmar-gear-btn yanmar-gear-btn--unequip"
             onClick={onClose}
           >
-            닫기
+            {common("close")}
           </button>
           <button
             type="button"
             className="yanmar-gear-btn yanmar-gear-btn--enhance"
             onClick={onOpenGear}
           >
-            장비관리
+            {t("manageGear")}
           </button>
         </div>
       </div>
@@ -549,6 +578,7 @@ function CrashAsphaltHpPanel({
   hitTick: number;
   hitDamage: number;
 }) {
+  const t = useTranslations("yanmar.hud");
   const safeMax = Math.max(1, maxHp);
   const ratio = Math.max(0, Math.min(1, hp / safeMax));
   const pct = Math.round(ratio * 100);
@@ -558,7 +588,7 @@ function CrashAsphaltHpPanel({
     <div className="relative w-[8.25rem] rounded-xl border border-white/20 bg-black/55 px-2 py-1.5 shadow-lg backdrop-blur-sm">
       <div className="flex items-center justify-between gap-1">
         <span className="text-[8px] font-black uppercase tracking-[0.12em] text-white/70">
-          파쇄
+          {t("crash")}
         </span>
         <span className="text-[9px] font-black tabular-nums text-white">
           ({Math.round(hp).toLocaleString()}
@@ -771,9 +801,13 @@ function RewardPopupOverlay({ panel }: { panel: DumpScorePanelState | null }) {
 }
 
 function CouponDiscoveryOverlay({ discovery }: { discovery: CouponDiscoveryState | null }) {
+  const locale = useLocale() as Locale;
+  const t = useTranslations("yanmar.toasts");
+  const couponsT = useTranslations("shell.coupons");
   if (!discovery) return null;
 
-  const label = getYanmarCouponLabel(discovery.couponType);
+  const label =
+    couponsT(discovery.couponType) || getYanmarCouponLabel(discovery.couponType);
 
   return (
     <div
@@ -782,7 +816,7 @@ function CouponDiscoveryOverlay({ discovery }: { discovery: CouponDiscoveryState
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={getYanmarCouponImage(discovery.couponType)}
+        src={getYanmarCouponImage(discovery.couponType, locale)}
         alt=""
         width={140}
         height={84}
@@ -790,11 +824,16 @@ function CouponDiscoveryOverlay({ discovery }: { discovery: CouponDiscoveryState
         draggable={false}
         aria-hidden
       />
-      <p className="mt-2 text-base font-black tracking-tight text-yellow-50">축하합니다!</p>
+      <p className="mt-2 text-base font-black tracking-tight text-yellow-50">
+        {t("congratulations")}
+      </p>
       <p className="mt-1 text-xs font-bold leading-snug text-white">
         {discovery.couponType === "FILTER_SET_EXCHANGE"
-          ? `${label}을 발견했습니다!!`
-          : `${label} ${discovery.discountPct}% 할인 쿠폰을 발견했습니다!!`}
+          ? t("couponFoundExchange", { label })
+          : t("couponFoundDiscount", {
+              label,
+              pct: discovery.discountPct,
+            })}
       </p>
     </div>
   );
@@ -814,12 +853,14 @@ function isGearDiscoveryGrade(v: unknown): v is ItemGrade {
 }
 
 function GearDiscoveryOverlay({ discovery }: { discovery: GearDiscoveryState | null }) {
+  const t = useTranslations("yanmar.toasts");
+  const catalogT = useTranslations("yanmar");
   if (!discovery) return null;
 
   const grade = isGearDiscoveryGrade(discovery.grade) ? discovery.grade : "NORMAL";
   const slot = isGearDiscoverySlot(discovery.slot) ? discovery.slot : null;
-  const gradeLabel = ITEM_GRADE_LABEL[grade];
-  const slotLabel = slot ? GEAR_SLOT_LABEL[slot] : null;
+  const gradeLabel = gearGradeLabel(catalogT, grade);
+  const slotLabel = slot ? gearSlotLabel(catalogT, slot) : null;
   const gradeTone =
     grade === "MASTER"
       ? "yanmar-gear-discovery-grade--master"
@@ -839,7 +880,7 @@ function GearDiscoveryOverlay({ discovery }: { discovery: GearDiscoveryState | n
         <GearIconCell slot={slot} grade={grade} size="lg" empty={!slot} />
       </div>
       <p className="mt-2.5 text-base font-black tracking-tight text-slate-50">
-        {discovery.mailed ? "인벤토리 가득!" : "장비 획득!"}
+        {discovery.mailed ? t("inventoryFullShort") : t("gearAcquired")}
       </p>
       <p
         className={`yanmar-gear-discovery-grade mt-1 text-[11px] font-bold uppercase ${gradeTone}`}
@@ -852,7 +893,7 @@ function GearDiscoveryOverlay({ discovery }: { discovery: GearDiscoveryState | n
       </p>
       {discovery.mailed ? (
         <p className="mt-1.5 text-[10px] font-semibold leading-snug text-amber-200/90">
-          스타 우편으로 전환되었습니다
+          {t("mailedAsStars")}
         </p>
       ) : null}
     </div>
@@ -866,12 +907,147 @@ function AttachmentUnlockOverlay({
   unlock: PlayerUnlockKind | undefined;
   onClose: () => void;
 }) {
+  const t = useTranslations("yanmar.unlocks");
+  const common = useTranslations("common");
+
   useEffect(() => {
-    if (unlock !== "BREAKER" && unlock !== "GRAPPLE") return;
+    if (unlock !== "BREAKER" && unlock !== "GRAPPLE" && unlock !== "GEAR_CRAFT" && unlock !== "QUESTS") {
+      return;
+    }
     yanmarAudio.playAttachmentUnlock();
   }, [unlock]);
 
   if (!unlock) return null;
+
+  if (unlock === "GEAR_CRAFT") {
+    return (
+      <div className="yanmar-unlock-overlay" role="presentation">
+        <div
+          className="yanmar-unlock-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("gear.ariaLabel")}
+        >
+          <div className="yanmar-unlock-panel-glow" aria-hidden />
+          <div className="yanmar-unlock-panel-frame" aria-hidden />
+          <header className="yanmar-unlock-brand">
+            <span className="yanmar-unlock-brand-mark">YANMAR</span>
+            <span className="yanmar-unlock-brand-rule" aria-hidden />
+            <span className="yanmar-unlock-brand-sub">
+              SV08-1 · GEAR UNLOCK
+            </span>
+          </header>
+          <div className="yanmar-unlock-hero yanmar-unlock-hero--feature">
+            <div className="yanmar-unlock-feature">
+              <img
+                className="yanmar-unlock-feature-icon"
+                src="/images/yanmar/2d/cockpit/upgrade-anvil-premium.png?v=2"
+                alt={t("gear.alt")}
+                draggable={false}
+              />
+              <ul className="yanmar-unlock-feature-tags">
+                <li>{t("gear.dismantle")}</li>
+                <li>{t("gear.enhance")}</li>
+                <li>{t("gear.synthesize")}</li>
+              </ul>
+            </div>
+          </div>
+          <div className="yanmar-unlock-body">
+            <p className="yanmar-unlock-level">
+              <span>LEVEL</span> {PLAYER_UNLOCKS.GEAR_CRAFT}
+            </p>
+            <h2 className="yanmar-unlock-title">{t("gear.title")}</h2>
+            <p className="yanmar-unlock-lead">{t("gear.lead")}</p>
+            <ul className="yanmar-unlock-perks">
+              <li>
+                <span className="yanmar-unlock-perk-index">01</span>
+                <div>
+                  <strong>{t("gear.perk1Title")}</strong>
+                  <span>{t("gear.perk1Desc")}</span>
+                </div>
+              </li>
+              <li>
+                <span className="yanmar-unlock-perk-index">02</span>
+                <div>
+                  <strong>{t("gear.perk2Title")}</strong>
+                  <span>{t("gear.perk2Desc")}</span>
+                </div>
+              </li>
+              <li>
+                <span className="yanmar-unlock-perk-index">03</span>
+                <div>
+                  <strong>{t("gear.perk3Title")}</strong>
+                  <span>{t("gear.perk3Desc")}</span>
+                </div>
+              </li>
+            </ul>
+            <button type="button" className="yanmar-unlock-cta" onClick={onClose}>
+              {common("confirm")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (unlock === "QUESTS") {
+    return (
+      <div className="yanmar-unlock-overlay" role="presentation">
+        <div
+          className="yanmar-unlock-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("quests.ariaLabel")}
+        >
+          <div className="yanmar-unlock-panel-glow" aria-hidden />
+          <div className="yanmar-unlock-panel-frame" aria-hidden />
+          <header className="yanmar-unlock-brand">
+            <span className="yanmar-unlock-brand-mark">YANMAR</span>
+            <span className="yanmar-unlock-brand-rule" aria-hidden />
+            <span className="yanmar-unlock-brand-sub">
+              SV08-1 · QUEST UNLOCK
+            </span>
+          </header>
+          <div className="yanmar-unlock-hero yanmar-unlock-hero--feature">
+            <div className="yanmar-unlock-feature">
+              <img
+                className="yanmar-unlock-feature-icon is-quest"
+                src="/images/yanmar/2d/cockpit/quest-premium.png?v=3"
+                alt={t("quests.alt")}
+                draggable={false}
+              />
+            </div>
+          </div>
+          <div className="yanmar-unlock-body">
+            <p className="yanmar-unlock-level">
+              <span>LEVEL</span> {PLAYER_UNLOCKS.QUESTS}
+            </p>
+            <h2 className="yanmar-unlock-title">{t("quests.title")}</h2>
+            <p className="yanmar-unlock-lead">{t("quests.lead")}</p>
+            <ul className="yanmar-unlock-perks">
+              <li>
+                <span className="yanmar-unlock-perk-index">01</span>
+                <div>
+                  <strong>{t("quests.perk1Title")}</strong>
+                  <span>{t("quests.perk1Desc")}</span>
+                </div>
+              </li>
+              <li>
+                <span className="yanmar-unlock-perk-index">02</span>
+                <div>
+                  <strong>{t("quests.perk2Title")}</strong>
+                  <span>{t("quests.perk2Desc")}</span>
+                </div>
+              </li>
+            </ul>
+            <button type="button" className="yanmar-unlock-cta" onClick={onClose}>
+              {common("confirm")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (unlock === "MONUMENT") {
     return (
@@ -880,7 +1056,7 @@ function AttachmentUnlockOverlay({
           className="yanmar-unlock-panel"
           role="dialog"
           aria-modal="true"
-          aria-label="레벨 20 YK 조형물 개방 안내"
+          aria-label={t("monument.ariaLabel")}
         >
           <div className="yanmar-unlock-panel-glow" aria-hidden />
           <div className="yanmar-unlock-panel-frame" aria-hidden />
@@ -895,31 +1071,28 @@ function AttachmentUnlockOverlay({
             <p className="yanmar-unlock-level">
               <span>LEVEL</span> 20
             </p>
-            <h2 className="yanmar-unlock-title">YK 조형물이 개방되었습니다</h2>
-            <p className="yanmar-unlock-lead">
-              맵 북쪽(미니맵 12시) 조형물 예정지로 이동합니다. 기본 미션 3개를
-              완료하면 건설을 시작할 수 있습니다.
-            </p>
+            <h2 className="yanmar-unlock-title">{t("monument.title")}</h2>
+            <p className="yanmar-unlock-lead">{t("monument.lead")}</p>
             <ul className="yanmar-unlock-perks">
               <li>
                 <span className="yanmar-unlock-perk-index">01</span>
                 <div>
-                  <strong>덤프트럭 보내기</strong>
-                  <span>흙 하역장에서 트럭을 1회 출발시키세요</span>
+                  <strong>{t("monument.perk1Title")}</strong>
+                  <span>{t("monument.perk1Desc")}</span>
                 </div>
               </li>
               <li>
                 <span className="yanmar-unlock-perk-index">02</span>
                 <div>
-                  <strong>파쇄 9개</strong>
-                  <span>브레이커로 노면을 파쇄하세요</span>
+                  <strong>{t("monument.perk2Title")}</strong>
+                  <span>{t("monument.perk2Desc")}</span>
                 </div>
               </li>
               <li>
                 <span className="yanmar-unlock-perk-index">03</span>
                 <div>
-                  <strong>돌 트럭 보내기</strong>
-                  <span>언덕 하역장에서 돌 트럭을 1회 출발시키세요</span>
+                  <strong>{t("monument.perk3Title")}</strong>
+                  <span>{t("monument.perk3Desc")}</span>
                 </div>
               </li>
             </ul>
@@ -928,7 +1101,7 @@ function AttachmentUnlockOverlay({
               className="yanmar-unlock-cta"
               onClick={onClose}
             >
-              조형물로 이동
+              {t("monument.cta")}
             </button>
           </div>
         </div>
@@ -943,7 +1116,7 @@ function AttachmentUnlockOverlay({
           className="yanmar-unlock-panel"
           role="dialog"
           aria-modal="true"
-          aria-label="레벨 25 굴착기 운동회 개방 안내"
+          aria-label={t("sportsMeet.ariaLabel")}
         >
           <div className="yanmar-unlock-panel-glow" aria-hidden />
           <div className="yanmar-unlock-panel-frame" aria-hidden />
@@ -958,34 +1131,28 @@ function AttachmentUnlockOverlay({
             <p className="yanmar-unlock-level">
               <span>LEVEL</span> 25
             </p>
-            <h2 className="yanmar-unlock-title">
-              굴착기 운동회가 개방되었습니다
-            </h2>
-            <p className="yanmar-unlock-lead">
-              미니맵 좌측 하단 포탈에서 주간 타임어택에 도전하세요. 매일
-              도전권 1회, 연습 모드는 무제한입니다. 월요일 0시(KST)에 코스가
-              바뀌고 지난주 순위로 스타 우편이 지급됩니다.
-            </p>
+            <h2 className="yanmar-unlock-title">{t("sportsMeet.title")}</h2>
+            <p className="yanmar-unlock-lead">{t("sportsMeet.lead")}</p>
             <ul className="yanmar-unlock-perks">
               <li>
                 <span className="yanmar-unlock-perk-index">01</span>
                 <div>
-                  <strong>랭킹 · 연습</strong>
-                  <span>도전권(1/1)으로 랭킹, 연습은 기록 미반영</span>
+                  <strong>{t("sportsMeet.perk1Title")}</strong>
+                  <span>{t("sportsMeet.perk1Desc")}</span>
                 </div>
               </li>
               <li>
                 <span className="yanmar-unlock-perk-index">02</span>
                 <div>
-                  <strong>주간 코스</strong>
-                  <span>5종 패턴이 월요일마다 자동 로테이션</span>
+                  <strong>{t("sportsMeet.perk2Title")}</strong>
+                  <span>{t("sportsMeet.perk2Desc")}</span>
                 </div>
               </li>
               <li>
                 <span className="yanmar-unlock-perk-index">03</span>
                 <div>
-                  <strong>주간 보상</strong>
-                  <span>1위 3000★ ~ 참가 100★ 우편 지급</span>
+                  <strong>{t("sportsMeet.perk3Title")}</strong>
+                  <span>{t("sportsMeet.perk3Desc")}</span>
                 </div>
               </li>
             </ul>
@@ -994,7 +1161,7 @@ function AttachmentUnlockOverlay({
               className="yanmar-unlock-cta"
               onClick={onClose}
             >
-              포탈로 이동
+              {t("sportsMeet.cta")}
             </button>
           </div>
         </div>
@@ -1004,13 +1171,17 @@ function AttachmentUnlockOverlay({
 
   const breaker = unlock === "BREAKER";
   const level = breaker ? 10 : 15;
-  const attachmentLabel = breaker ? "브레이커" : "집게";
-  const zoneLabel = breaker ? "파쇄 작업장" : "석재 운반 작업장";
+  const attachmentLabel = breaker
+    ? t("attachment.breaker")
+    : t("attachment.grapple");
+  const zoneLabel = breaker
+    ? t("attachment.zoneBreaker")
+    : t("attachment.zoneGrapple");
   const machineSrc = breaker
     ? "/images/yanmar/2d/excavator-side-diagram-breaker.png"
     : "/images/yanmar/2d/excavator-side-diagram-grapple.png";
   const attachmentSrc = breaker
-    ? "/images/yanmar/2d/attachments/breaker.png"
+    ? "/images/yanmar/2d/attachments/breaker.png?v=2"
     : "/images/yanmar/2d/attachments/grapple.png";
 
   return (
@@ -1019,7 +1190,10 @@ function AttachmentUnlockOverlay({
         className="yanmar-unlock-panel"
         role="dialog"
         aria-modal="true"
-        aria-label={`레벨 ${level} ${attachmentLabel} 및 신규 작업장 개방 안내`}
+        aria-label={t("attachment.ariaLabel", {
+          level,
+          attachment: attachmentLabel,
+        })}
       >
         <div className="yanmar-unlock-panel-glow" aria-hidden />
         <div className="yanmar-unlock-panel-frame" aria-hidden />
@@ -1035,7 +1209,7 @@ function AttachmentUnlockOverlay({
             <img
               className="yanmar-unlock-machine"
               src={machineSrc}
-              alt={`블레이드가 장착된 얀마 굴착기와 ${attachmentLabel}`}
+              alt={t("attachment.machineAlt", { attachment: attachmentLabel })}
               draggable={false}
             />
             <div className="yanmar-unlock-blade-sheen" aria-hidden />
@@ -1055,30 +1229,35 @@ function AttachmentUnlockOverlay({
           <p className="yanmar-unlock-level">
             <span>LEVEL</span> {level}
           </p>
-          <h2 className="yanmar-unlock-title">새로운 작업이 개방되었습니다</h2>
+          <h2 className="yanmar-unlock-title">{t("attachment.title")}</h2>
           <p className="yanmar-unlock-lead">
-            {zoneLabel}과 {attachmentLabel} 장비가 해금되었습니다.
+            {t("attachment.lead", {
+              zone: zoneLabel,
+              attachment: attachmentLabel,
+            })}
           </p>
 
           <ul className="yanmar-unlock-perks">
             <li>
               <span className="yanmar-unlock-perk-index">01</span>
               <div>
-                <strong>{attachmentLabel} 장착</strong>
-                <span>기능 메뉴에서 부착물을 교체할 수 있습니다</span>
+                <strong>
+                  {t("attachment.equipTitle", { attachment: attachmentLabel })}
+                </strong>
+                <span>{t("attachment.equipDesc")}</span>
               </div>
             </li>
             <li>
               <span className="yanmar-unlock-perk-index">02</span>
               <div>
                 <strong>{zoneLabel}</strong>
-                <span>전용 작업 구역으로 이동해 미션을 수행하세요</span>
+                <span>{t("attachment.zoneDesc")}</span>
               </div>
             </li>
           </ul>
 
           <button type="button" className="yanmar-unlock-cta" onClick={onClose}>
-            <span>확인</span>
+            <span>{common("confirm")}</span>
             <span className="yanmar-unlock-cta-shine" aria-hidden />
           </button>
         </div>
@@ -1102,6 +1281,7 @@ export function ExcavatorGameWrapper({
 }: ExcavatorGameWrapperProps) {
   const config = getMissionConfig("yanmar");
   const { data: session, status: sessionStatus, update } = useSession();
+  const hudT = useTranslations("yanmar.hud");
   const defaultEquipmentStats = defaultFinalStats();
   const [mode, setMode] = useState<GameMode>("intro");
   const [audioArmed, setAudioArmed] = useState(false);
@@ -1131,7 +1311,7 @@ export function ExcavatorGameWrapper({
   );
   const [poseSaveToastKey, setPoseSaveToastKey] = useState(0);
   const [poseSaveToastVisible, setPoseSaveToastVisible] = useState(false);
-  const [levelUpToast, setLevelUpToast] = useState<{
+  const [levelUpBurst, setLevelUpBurst] = useState<{
     key: number;
     level: number;
   } | null>(null);
@@ -1225,6 +1405,14 @@ export function ExcavatorGameWrapper({
   const [showMapModal, setShowMapModal] = useState(false);
   const [showMissionQuest, setShowMissionQuest] = useState(true);
   const [showTutorialMenu, setShowTutorialMenu] = useState(false);
+  const [tutorialState, setTutorialState] = useState<YanmarTutorialState>(
+    EMPTY_YANMAR_TUTORIAL,
+  );
+  const tutorialStateRef = useRef(tutorialState);
+  tutorialStateRef.current = tutorialState;
+  const [claimingTutorialId, setClaimingTutorialId] =
+    useState<TutorialStepId | null>(null);
+  const tutorialGearOpenedRef = useRef(false);
   const [showQuestPanel, setShowQuestPanel] = useState(false);
   const [showShopPanel, setShowShopPanel] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -1350,6 +1538,8 @@ export function ExcavatorGameWrapper({
   const tutorialCrashHitsRef = useRef(0);
   const tutorialHillDeliverRef = useRef(0);
   const tutorialCompletingRef = useRef(false);
+  const startTutorialRef = useRef<(index: number) => void>(() => {});
+  const tutorialHydratedRef = useRef(false);
   const tutorialIndexRef = useRef(0);
   const tutorialPhaseRef = useRef<TutorialPhaseProgress | null>(null);
   const tutorialWaypointRef = useRef<TutorialWaypoint | null>(null);
@@ -2088,18 +2278,18 @@ export function ExcavatorGameWrapper({
     }, 2100);
   }, []);
 
-  const showLevelUpToast = useCallback((level: number) => {
+  const showWorldLevelUp = useCallback((level: number) => {
     if (levelUpToastTimerRef.current != null) {
       window.clearTimeout(levelUpToastTimerRef.current);
     }
-    setLevelUpToast((prev) => ({
+    setLevelUpBurst((prev) => ({
       key: (prev?.key ?? 0) + 1,
       level,
     }));
     levelUpToastTimerRef.current = window.setTimeout(() => {
-      setLevelUpToast(null);
+      setLevelUpBurst(null);
       levelUpToastTimerRef.current = null;
-    }, 2800);
+    }, 2300);
   }, []);
 
   const showAttachmentWarning = useCallback(
@@ -2272,11 +2462,15 @@ export function ExcavatorGameWrapper({
         wasHydrated &&
         nextLevel > prevLevel
       ) {
-        showLevelUpToast(nextLevel);
-        enqueueUnlockNotices(getCrossedUnlocks(prevLevel, nextLevel));
+        const crossed = getCrossedUnlocks(prevLevel, nextLevel);
+        if (crossed.length > 0) {
+          enqueueUnlockNotices(crossed);
+        } else {
+          showWorldLevelUp(nextLevel);
+        }
       }
     },
-    [enqueueUnlockNotices, showLevelUpToast],
+    [enqueueUnlockNotices, showWorldLevelUp],
   );
   const applyTotalXpRef = useRef(applyTotalXp);
   applyTotalXpRef.current = applyTotalXp;
@@ -2863,6 +3057,63 @@ export function ExcavatorGameWrapper({
     refreshSportsMeetTicket,
   ]);
 
+  useLayoutEffect(() => {
+    if (sessionStatus === "loading") return;
+    if (!session?.user?.id) {
+      try {
+        const introDone =
+          window.localStorage.getItem("ykgame:yanmar:tutorial-intro") === "1";
+        const next = grandfatherIntroIfPlayed(
+          introDone
+            ? { ...EMPTY_YANMAR_TUTORIAL, introDone: true }
+            : EMPTY_YANMAR_TUTORIAL,
+          totalXpRef.current,
+        );
+        tutorialStateRef.current = next;
+        setTutorialState(next);
+      } catch {
+        tutorialStateRef.current = grandfatherIntroIfPlayed(
+          EMPTY_YANMAR_TUTORIAL,
+          totalXpRef.current,
+        );
+        setTutorialState(tutorialStateRef.current);
+      }
+      tutorialHydratedRef.current = true;
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/yanmar/tutorial");
+        if (!res.ok || cancelled) {
+          if (!cancelled) {
+            tutorialStateRef.current = grandfatherIntroIfPlayed(
+              tutorialStateRef.current,
+              Math.max(totalXpRef.current, session.user.totalXp ?? 0),
+            );
+            setTutorialState(tutorialStateRef.current);
+            tutorialHydratedRef.current = true;
+          }
+          return;
+        }
+        const data = (await res.json()) as { tutorial?: unknown };
+        const parsed = grandfatherIntroIfPlayed(
+          parseYanmarTutorialState(data.tutorial),
+          Math.max(totalXpRef.current, session.user.totalXp ?? 0),
+        );
+        if (cancelled) return;
+        tutorialStateRef.current = parsed;
+        tutorialHydratedRef.current = true;
+        setTutorialState(parsed);
+      } catch {
+        tutorialHydratedRef.current = true;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, session?.user?.totalXp, sessionStatus]);
+
   // If the player force-quit after claim (before pressing 확인), restore wallets
   // from the persisted grant + server state so the reward stays received.
   useEffect(() => {
@@ -3204,6 +3455,7 @@ export function ExcavatorGameWrapper({
     if (!xpHydratedRef.current && effectiveLevel <= 1 && (session?.user?.totalXp ?? 0) <= 0) {
       return;
     }
+    grandfatherNewUnlocks(ownerId, effectiveLevel);
     enqueueUnlockNotices(
       getUnseenUnlocksForLevel(ownerId, effectiveLevel),
     );
@@ -4851,8 +5103,14 @@ export function ExcavatorGameWrapper({
   }, [resetYanmarSession, setMode, setShowTutorialMenu, setTutorialIndex]);
 
   const startGameDirect = useCallback(() => {
+    if (!tutorialStateRef.current.introDone) {
+      startTutorialRef.current(0);
+      setShowTutorialMenu(true);
+      return;
+    }
     tutorialStepRef.current = null;
     setShowTutorialMenu(false);
+    setShowEquipmentUpgrade(false);
     endedRef.current = false;
     elapsedRef.current = 0;
 
@@ -5013,17 +5271,20 @@ export function ExcavatorGameWrapper({
     if (hasBootstrappedRef.current) return;
     const bootMode = initialPlayModeRef.current ?? initialPlayMode;
     if (!bootMode) return;
-    hasBootstrappedRef.current = true;
     if (bootMode === "ride") {
+      hasBootstrappedRef.current = true;
       enterRideMode();
       tryNotifyEntryReady();
       return;
     }
-    // 홈 「게임 시작」 및 game 모드는 무조건 게임모드 진입 (연습/튜토리얼 우회)
     if (bootMode === "game") {
+      if (sessionStatus === "loading") return;
+      if (!tutorialHydratedRef.current) return;
+      hasBootstrappedRef.current = true;
       startGameDirect();
       return;
     }
+    hasBootstrappedRef.current = true;
     if (bootMode === "practice") {
       enterPracticeMode();
     }
@@ -5031,8 +5292,11 @@ export function ExcavatorGameWrapper({
     enterRideMode,
     enterPracticeMode,
     initialPlayMode,
+    session?.user?.id,
+    sessionStatus,
     startGameDirect,
     tryNotifyEntryReady,
+    tutorialState,
   ]);
 
   const clearTutorialFlashTimers = useCallback(() => {
@@ -5098,9 +5362,11 @@ export function ExcavatorGameWrapper({
           tutorialWaypointRef.current = null;
           tutorialGuideRef.current = "";
           tutorialCelebratedPhaseRef.current = -1;
+          setTutorialIndex(-1);
           setTutorialGuide("");
           setTutorialHasWaypoint(false);
-          setMode("practice");
+          setShowEquipmentUpgrade(false);
+          setShowTutorialMenu(true);
         }, 1400);
         tutorialFlashTimersRef.current.push(hideId, doneId);
       };
@@ -5172,56 +5438,129 @@ export function ExcavatorGameWrapper({
     }
 
     resetDumpTruckState(dumpTruckStateRef.current);
-    if (step?.id === "dump") {
-      const stats = equipmentStatsRef.current;
-      // 한 번 하역하면 만차가 되어, 구역을 벗어나면 트럭이 출발하도록 미리 채움
-      dumpTruckStateRef.current.fillUnits = Math.max(
-        0,
-        stats.truckCapacityUnits - Math.max(8, stats.maxLoadUnits * 0.15),
-      );
-    }
-    if (step?.id === "rockDump") {
-      const hill = terrainRef.current.hillZone;
-      const capacity = Math.max(
-        1,
-        Math.floor(equipmentStatsRef.current.haulTruckCapacity),
-      );
-      if (hill) {
-        hill.haulTruck.loadCount = Math.max(0, capacity - 1);
-      }
-    }
     dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
+    tutorialGearOpenedRef.current = false;
+    if (step?.gearAction) {
+      setShowEquipmentUpgrade(true);
+    } else {
+      setShowEquipmentUpgrade(false);
+    }
 
     setTutorialIndex(index);
     setShowQuestPanel(false);
     setShowShopPanel(false);
-    setShowTutorialMenu(false);
     setMode("tutorial");
   }, [
     clearTutorialFlashTimers,
     resetYanmarSession,
     setMode,
-    setShowTutorialMenu,
     setTutorialIndex,
   ]);
+  startTutorialRef.current = startTutorial;
 
-  const startFreePractice = useCallback(() => {
-    clearTutorialFlashTimers();
-    resetYanmarSession({ terrainLevel: PRACTICE_FULL_UNLOCK_LEVEL });
-    terrainRef.current = createInitialTerrain(true, PRACTICE_FULL_UNLOCK_LEVEL);
-    setTerrainRevision((key) => key + 1);
-    tutorialStepRef.current = null;
-    tutorialPhaseRef.current = null;
-    tutorialWaypointRef.current = null;
-    tutorialGuideRef.current = "";
-    tutorialCelebratedPhaseRef.current = -1;
-    setTutorialGuide("");
-    setTutorialHasWaypoint(false);
-    setShowQuestPanel(false);
-    setShowShopPanel(false);
-    setShowTutorialMenu(false);
-    setMode("practice");
-  }, [clearTutorialFlashTimers, resetYanmarSession, setMode, setShowTutorialMenu]);
+  const persistTutorialPatch = useCallback(
+    (patch: Partial<YanmarTutorialState>) => {
+      const next = { ...tutorialStateRef.current, ...patch };
+      tutorialStateRef.current = next;
+      setTutorialState(next);
+      if (session?.user?.id) {
+        void fetch("/api/yanmar/tutorial", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        }).catch(() => undefined);
+      } else if (patch.introDone) {
+        try {
+          window.localStorage.setItem("ykgame:yanmar:tutorial-intro", "1");
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+    [session?.user?.id],
+  );
+
+  const openTutorialList = useCallback(() => {
+    const playerLevel = getPlayerLevelProgress(totalXpRef.current).level;
+    const fresh = getNewTutorialStepIds(playerLevel, tutorialStateRef.current.seenNew);
+    if (fresh.length > 0) {
+      persistTutorialPatch({
+        seenNew: withSeenNew(tutorialStateRef.current, fresh).seenNew,
+      });
+    }
+    setShowTutorialMenu(true);
+  }, [persistTutorialPatch]);
+
+  useEffect(() => {
+    const listOpen =
+      showTutorialMenu || (mode === "tutorial" && !tutorialState.introDone);
+    if (!listOpen) return;
+    const fresh = getNewTutorialStepIds(
+      getPlayerLevelProgress(totalXp).level,
+      tutorialState.seenNew,
+    );
+    if (fresh.length === 0) return;
+    persistTutorialPatch({
+      seenNew: withSeenNew(tutorialState, fresh).seenNew,
+    });
+  }, [
+    mode,
+    persistTutorialPatch,
+    showTutorialMenu,
+    totalXp,
+    tutorialState,
+  ]);
+
+  const skipTutorialIntro = useCallback(() => {
+    persistTutorialPatch({ introDone: true });
+    startGameDirect();
+  }, [persistTutorialPatch, startGameDirect]);
+
+  useRegisterInGameBackDismiss(
+    showTutorialMenu && tutorialState.introDone,
+    () => setShowTutorialMenu(false),
+  );
+
+  const claimTutorialReward = useCallback(async (stepId: TutorialStepId) => {
+    if (!session?.user?.id) return;
+    setClaimingTutorialId(stepId);
+    try {
+      const res = await fetch("/api/yanmar/tutorial/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepId }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        tutorial?: unknown;
+        items?: unknown;
+        stats?: unknown;
+      };
+      if (res.status === 409 || data.error === "INVENTORY_FULL") {
+        setShowInventoryFullModal(true);
+        return;
+      }
+      if (!res.ok) return;
+      const next = parseYanmarTutorialState(data.tutorial);
+      tutorialStateRef.current = next;
+      setTutorialState(next);
+      if (Array.isArray(data.items)) {
+        setGearItems(data.items as typeof gearItems);
+      }
+      if (data.stats) {
+        publishEquipmentStatsRef.current(data.stats as never);
+      }
+    } finally {
+      setClaimingTutorialId(null);
+    }
+  }, [session?.user?.id]);
+
+  const handleTutorialGearAction = useCallback((action: TutorialGearAction) => {
+    const step = tutorialStepRef.current;
+    if (step?.gearAction === action) {
+      tutorialGearOpenedRef.current = true;
+    }
+  }, []);
 
   const handleSimTick = useCallback(() => {
     syncDigHud();
@@ -5436,6 +5775,10 @@ export function ExcavatorGameWrapper({
       dumpTruckPhase: dumpTruckStateRef.current.phase,
       haulTruckPhase: terrainRef.current.hillZone?.haulTruck.phase ?? "",
       breakerTipReady: fb.canStrike,
+      travelBlockedRaiseArm: fb.travelBlockedRaiseArm,
+      canDump: fb.canDump,
+      grappleOpen: auxiliaryRef.current.grappleOpen,
+      gearActionOpened: tutorialGearOpenedRef.current,
     });
 
     const wp = getTutorialWaypoint(step, phase) ?? null;
@@ -5453,6 +5796,26 @@ export function ExcavatorGameWrapper({
 
     if (done) {
       const finalLabel = getTutorialPhaseSuccessLabel(step, prevPhase);
+      const stepId = step.id;
+      const next = {
+        ...withCompletedStep(tutorialStateRef.current, stepId),
+        introDone: true,
+      };
+      tutorialStateRef.current = next;
+      setTutorialState(next);
+      if (session?.user?.id) {
+        void fetch("/api/yanmar/tutorial/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stepId }),
+        }).catch(() => undefined);
+      } else {
+        try {
+          window.localStorage.setItem("ykgame:yanmar:tutorial-intro", "1");
+        } catch {
+          /* ignore */
+        }
+      }
       showTutorialComplete(finalLabel, getTutorialPhaseCount(step));
       return;
     }
@@ -5470,13 +5833,10 @@ export function ExcavatorGameWrapper({
       return;
     }
 
-    // rockLoad처럼 안내만 바뀌는 경우(성공 연출 없이 상태 추적)
-    if (phase.phase !== prevPhase) {
-      const guide = getTutorialInstruction(step, phase);
-      if (guide !== tutorialGuideRef.current) {
-        tutorialGuideRef.current = guide;
-        setTutorialGuide(guide);
-      }
+    const guide = getTutorialInstruction(step, phase);
+    if (guide !== tutorialGuideRef.current) {
+      tutorialGuideRef.current = guide;
+      setTutorialGuide(guide);
     }
   }, [
     finalizeSportsMeetStageAdvance,
@@ -5489,6 +5849,7 @@ export function ExcavatorGameWrapper({
     showTutorialPhaseSuccess,
     syncDigHud,
     setHud,
+    session?.user?.id,
   ]);
 
   const handleProgress = useCallback(
@@ -6650,7 +7011,7 @@ export function ExcavatorGameWrapper({
   }, [config.duration, equipmentStats.maxLoadUnits, mode, onEnd]);
 
   useEffect(() => {
-    if (tutorialStep?.id !== "dig") return;
+    if (tutorialStep?.id !== "bucket") return;
     const sim = simRef.current;
     sim.bucketLoad = 0;
     tutorialDumpRef.current = 0;
@@ -6663,16 +7024,6 @@ export function ExcavatorGameWrapper({
       arm: sim.arm,
       bucket: sim.bucket,
     }));
-  }, [tutorialIndex, tutorialStep?.id]);
-
-  useEffect(() => {
-    if (tutorialStep?.id !== "dump") return;
-    const sim = simRef.current;
-    tutorialDumpRef.current = 0;
-    if (sim.bucketLoad < 0.25) {
-      sim.bucketLoad = 0.45;
-      setHud((h) => ({ ...h, bucketLoad: sim.bucketLoad }));
-    }
   }, [tutorialIndex, tutorialStep?.id]);
 
   useEffect(() => {
@@ -6816,6 +7167,22 @@ export function ExcavatorGameWrapper({
     mode !== "gameReady" &&
     (monumentClaimableQuestCount > 0 ||
       (monumentHudPhase === "active" && monumentMinimapStorageFull));
+  const playerLevelNow = getPlayerLevelProgress(totalXp).level;
+  const gearCraftUnlocked = isGearCraftUnlocked(playerLevelNow);
+  const questPanelUnlocked = isQuestPanelUnlocked(playerLevelNow);
+  const tutorialNotify =
+    getNewTutorialStepIds(playerLevelNow, tutorialState.seenNew).length > 0;
+  const tutorialGuideHud =
+    mode === "tutorial" && tutorialStep ? (
+      <TutorialGuideHud
+        step={tutorialStep}
+        phaseDisplay={tutorialPhaseDisplay}
+        flash={tutorialFlash}
+        guide={tutorialGuide}
+        showWaypoint={tutorialHasWaypoint}
+        goalDist={hud.goalDist}
+      />
+    ) : null;
 
   return (
     <div
@@ -6844,24 +7211,41 @@ export function ExcavatorGameWrapper({
           isLoggedIn={Boolean(session?.user?.id)}
           onClaimed={applyHourlyAdClaim}
         />
-        <TutorialSelectModal
-          open={showTutorialMenu}
+        <TutorialListPanel
+          open={
+            showTutorialMenu ||
+            (mode === "tutorial" && !tutorialState.introDone)
+          }
+          playerLevel={playerLevelNow}
+          tutorial={tutorialState}
           activeId={tutorialStep?.id ?? null}
+          claimingId={claimingTutorialId}
+          showSkip={mode === "tutorial"}
+          hideClose={!tutorialState.introDone && mode === "tutorial"}
+          onSelect={(index) => startTutorial(index)}
+          onClaim={(stepId) => {
+            void claimTutorialReward(stepId);
+          }}
+          onSkip={skipTutorialIntro}
           onClose={() => setShowTutorialMenu(false)}
-          onSelect={startTutorial}
-          onFreePlay={startFreePractice}
         />
         <InventoryFullModal
           open={showInventoryFullModal}
           onClose={() => setShowInventoryFullModal(false)}
           onOpenGear={() => {
             setShowInventoryFullModal(false);
+            if (!isGearCraftUnlocked(getPlayerLevelProgress(totalXp).level)) {
+              return;
+            }
             setShowShopPanel(false);
             setShowEquipmentUpgrade(true);
           }}
         />
         <GearPanel
-          open={showEquipmentUpgrade}
+          open={
+            showEquipmentUpgrade &&
+            (gearCraftUnlocked || Boolean(tutorialStep?.gearAction))
+          }
           onClose={() => setShowEquipmentUpgrade(false)}
           items={gearItems}
           currency={mode === "game" ? currency : previewStars}
@@ -6894,6 +7278,8 @@ export function ExcavatorGameWrapper({
           onSellMany={async (ids) => runGearSellMany(ids)}
           onSynthesize={(itemIds) => runGearSynthesize(itemIds)}
           onExpandInventory={() => void handleExpandInventory()}
+          tutorialGearAction={tutorialStep?.gearAction ?? null}
+          onTutorialGearAction={handleTutorialGearAction}
         />
         <PlayerProfileModal
           open={showProfileModal}
@@ -7095,7 +7481,7 @@ export function ExcavatorGameWrapper({
         ) : null}
 
         {mode !== "intro" && mode !== "gameReady" && mode !== "ride" ? (
-          <div className="absolute left-1 top-2 z-[90] flex max-w-[calc(100%-7rem)] flex-col items-start gap-1.5">
+          <div className="absolute left-1 top-2 z-[96] flex max-w-[calc(100%-7rem)] flex-col items-start gap-1.5">
             {!questsDisabled ? (
               <>
                 <div className="pointer-events-auto flex max-w-full flex-col items-start gap-1.5">
@@ -7106,13 +7492,16 @@ export function ExcavatorGameWrapper({
                         showQuestPanel ? " is-open" : ""
                       }`}
                       onPointerDown={activateOnPointerDown(() => {
+                        if (!questPanelUnlocked) return;
                         setShowShopPanel(false);
                         setShowEquipmentUpgrade(false);
                         setShowQuestPanel((open) => !open);
                       })}
                       aria-expanded={showQuestPanel}
                       aria-label={
-                        showQuestPanel
+                        !questPanelUnlocked
+                          ? `퀘스트 잠김, 레벨 ${PLAYER_UNLOCKS.QUESTS} 필요`
+                          : showQuestPanel
                           ? "퀘스트 닫기"
                           : questClaimableCount > 0
                             ? `퀘스트 열기, 미수령 보상 ${questClaimableCount}개`
@@ -7126,7 +7515,7 @@ export function ExcavatorGameWrapper({
                         draggable={false}
                       />
                       <span className="yanmar-quest-button-label">퀘스트</span>
-                      {questClaimableCount > 0 ? (
+                      {questPanelUnlocked && questClaimableCount > 0 ? (
                         <span
                           className="yanmar-quest-notify-badge is-icon"
                           aria-hidden
@@ -7134,6 +7523,10 @@ export function ExcavatorGameWrapper({
                           {questClaimableCount > 9 ? "9+" : questClaimableCount}
                         </span>
                       ) : null}
+                      <HudFeatureLock
+                        locked={!questPanelUnlocked}
+                        level={PLAYER_UNLOCKS.QUESTS}
+                      />
                     </button>
                     <button
                       type="button"
@@ -7141,6 +7534,7 @@ export function ExcavatorGameWrapper({
                         showEquipmentUpgrade ? " is-open" : ""
                       }`}
                       onPointerDown={activateOnPointerDown(() => {
+                        if (!gearCraftUnlocked) return;
                         setShowQuestPanel(false);
                         setShowShopPanel(false);
                         setShowProfileModal(false);
@@ -7148,7 +7542,11 @@ export function ExcavatorGameWrapper({
                       })}
                       aria-expanded={showEquipmentUpgrade}
                       aria-label={
-                        showEquipmentUpgrade ? "장비강화 닫기" : "장비강화 열기"
+                        !gearCraftUnlocked
+                          ? `장비 잠김, 레벨 ${PLAYER_UNLOCKS.GEAR_CRAFT} 필요`
+                          : showEquipmentUpgrade
+                            ? "장비강화 닫기"
+                            : "장비강화 열기"
                       }
                     >
                       <img
@@ -7158,6 +7556,10 @@ export function ExcavatorGameWrapper({
                         draggable={false}
                       />
                       <span className="yanmar-upgrade-hud-button-label">장비</span>
+                      <HudFeatureLock
+                        locked={!gearCraftUnlocked}
+                        level={PLAYER_UNLOCKS.GEAR_CRAFT}
+                      />
                     </button>
                     <button
                       type="button"
@@ -7399,6 +7801,7 @@ export function ExcavatorGameWrapper({
                       </button>
                     ) : null}
                   </div>
+                  {tutorialGuideHud}
                   {showMissionQuest ? (
                     <div className="w-[9rem]">
                       <MissionHudPanel
@@ -7412,7 +7815,7 @@ export function ExcavatorGameWrapper({
                   ) : null}
                 </div>
                 <QuestPanel
-                  open={showQuestPanel}
+                  open={showQuestPanel && questPanelUnlocked}
                   onClose={() => setShowQuestPanel(false)}
                   playerLevel={getPlayerLevelProgress(totalXp).level}
                   questState={questState}
@@ -7464,11 +7867,16 @@ export function ExcavatorGameWrapper({
                       showEquipmentUpgrade ? " is-open" : ""
                     }`}
                     onPointerDown={activateOnPointerDown(() => {
+                      if (!gearCraftUnlocked) return;
                       setShowEquipmentUpgrade((open) => !open);
                     })}
                     aria-expanded={showEquipmentUpgrade}
                     aria-label={
-                      showEquipmentUpgrade ? "장비강화 닫기" : "장비강화 열기"
+                      !gearCraftUnlocked
+                        ? `장비 잠김, 레벨 ${PLAYER_UNLOCKS.GEAR_CRAFT} 필요`
+                        : showEquipmentUpgrade
+                          ? "장비강화 닫기"
+                          : "장비강화 열기"
                     }
                   >
                     <img
@@ -7478,16 +7886,24 @@ export function ExcavatorGameWrapper({
                       draggable={false}
                     />
                     <span className="yanmar-upgrade-hud-button-label">장비</span>
+                    <HudFeatureLock
+                      locked={!gearCraftUnlocked}
+                      level={PLAYER_UNLOCKS.GEAR_CRAFT}
+                    />
                   </button>
                   {mode !== "sportsRanked" && mode !== "sportsPractice" ? (
                     <button
                       type="button"
-                      onPointerDown={activateOnPointerDown(() =>
-                        setShowTutorialMenu(true),
-                      )}
-                      className="h-[2.75rem] rounded-lg border border-white/20 bg-black/70 px-2.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
+                      onPointerDown={activateOnPointerDown(openTutorialList)}
+                      className="relative h-[2.75rem] rounded-lg border border-white/20 bg-black/70 px-2.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
                     >
                       튜토리얼
+                      {tutorialNotify ? (
+                        <span
+                          className="yanmar-quest-notify-badge is-dot"
+                          aria-hidden
+                        />
+                      ) : null}
                     </button>
                   ) : null}
                 {nearMonument &&
@@ -7706,6 +8122,7 @@ export function ExcavatorGameWrapper({
                     />
                   </div>
                 ) : null}
+                {tutorialGuideHud}
               </div>
             ) : null}
           </div>
@@ -7985,47 +8402,6 @@ export function ExcavatorGameWrapper({
             })()
           : null}
 
-        {mode === "tutorial" && tutorialStep && (
-          <div className="absolute left-2 top-[5.25rem] z-40 w-[min(42rem,calc(100%_-_1rem))] rounded-xl border border-amber-300/20 bg-black/75 p-2 text-white shadow-xl backdrop-blur-sm">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold text-amber-300">{tutorialStep.title}</p>
-              <p className="shrink-0 text-[9px] font-semibold tabular-nums text-white/55">
-                {tutorialPhaseDisplay.current}/{tutorialPhaseDisplay.total}
-              </p>
-            </div>
-            <p
-              className={`mt-0.5 text-[clamp(7px,2.35vw,10px)] leading-snug ${
-                tutorialFlash?.kind === "phase"
-                  ? "font-bold text-emerald-300"
-                  : tutorialFlash?.kind === "complete"
-                    ? "font-bold text-amber-200"
-                    : "text-white/85"
-              }`}
-            >
-              {tutorialFlash
-                ? `✓ ${tutorialFlash.message}`
-                : tutorialGuide || tutorialStep.instruction}
-            </p>
-            <button
-              type="button"
-              onClick={startFreePractice}
-              className="mx-auto mt-2 block rounded bg-white/10 px-2 py-0.5 text-[9px] font-medium hover:bg-white/20"
-            >
-              자유동작
-            </button>
-          </div>
-        )}
-
-        {mode === "tutorial" && tutorialStep && (
-          <div className="absolute right-2 z-20 rounded bg-black/40 px-1.5 py-0.5 text-[9px] text-white/70"
-            style={{
-              bottom: `calc(${((COCKPIT_LAYOUT.height / COCKPIT_LAYOUT.width) * 100).toFixed(1)}% + 2.75rem)`,
-            }}
-          >
-            선택 연습 {tutorialIndex + 1}/{TUTORIAL_STEPS.length}
-          </div>
-        )}
-
         {mode !== "intro" && (mode !== "gameReady" || showMinimap) && (
           <div className="absolute right-1.5 top-1.5 z-[90] flex items-start gap-1 pointer-events-auto">
             <ActiveShopBuffIcons
@@ -8152,7 +8528,7 @@ export function ExcavatorGameWrapper({
                   ))}
                   {digFeedback.crashCooldownEtaSec > 0 ? (
                     <li className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85">
-                      <span className="truncate">파쇄</span>
+                      <span className="truncate">{hudT("crash")}</span>
                       <span className="shrink-0 tabular-nums text-orange-200">
                         {formatDumpTruckReturnTime(
                           digFeedback.crashCooldownEtaSec,
@@ -8263,7 +8639,7 @@ export function ExcavatorGameWrapper({
         )}
 
         {mode === "tutorial" &&
-        tutorialStep?.id === "dump" &&
+        tutorialStep?.id === "bucket" &&
         digFeedback.truckPresent ? (
           <DumpHintPanel
             bucketLoad={hud.bucketLoad}
@@ -8276,12 +8652,6 @@ export function ExcavatorGameWrapper({
             show
           />
         ) : null}
-
-        {mode === "tutorial" && tutorialHasWaypoint && (
-          <div className="absolute left-2 top-[12.25rem] z-20 rounded-lg bg-sky-600/85 px-2 py-1 text-[10px] font-semibold text-white">
-            목표까지 {hud.goalDist}m
-          </div>
-        )}
 
         {mode !== "intro" &&
         (dumpScorePanel || couponDiscovery || gearDiscovery) &&
@@ -8355,19 +8725,6 @@ export function ExcavatorGameWrapper({
             ) : (
               attachmentWarning.message
             )}
-          </div>
-        ) : null}
-        {mode !== "intro" && levelUpToast ? (
-          <div
-            key={levelUpToast.key}
-            className="yanmar-level-up-toast"
-            role="status"
-            aria-live="polite"
-          >
-            <p className="yanmar-level-up-toast-title">레벨이 상승했습니다.</p>
-            <p className="yanmar-level-up-toast-level">
-              현재 레벨 <span>{levelUpToast.level}</span>
-            </p>
           </div>
         ) : null}
         <AttachmentUnlockOverlay
@@ -8473,6 +8830,14 @@ export function ExcavatorGameWrapper({
               breakerSfxEnabled: !soundSettings.breakerSfxEnabled,
             });
           }}
+          sfxDetails={soundSettings.sfxDetails}
+          onSfxDetailChange={(id, next) => {
+            updateSoundSettings((prev) => ({
+              ...prev,
+              sfxDetails: { ...prev.sfxDetails, [id]: next },
+              ...(id === "breaker" ? { breakerSfxEnabled: next.enabled } : {}),
+            }));
+          }}
           hornId={soundSettings.hornId}
           onHornIdChange={(hornId: HornId) => {
             updateSoundSettings({ hornId });
@@ -8481,6 +8846,8 @@ export function ExcavatorGameWrapper({
           }}
           onResetPosition={resetExcavatorPosition}
           onShowGuide={onShowGuide}
+          onShowTutorial={openTutorialList}
+          tutorialNotify={tutorialNotify}
           onShowRanking={onShowRanking}
           onSaveAndExit={onRequestExit}
           isAdmin={isAdmin}
@@ -8582,6 +8949,7 @@ export function ExcavatorGameWrapper({
                 (sportsMeetRun.phase !== "ready" &&
                   sportsMeetRun.phase !== "countdown")
               }
+              levelUpBurst={levelUpBurst}
             />
           </div>
         )}

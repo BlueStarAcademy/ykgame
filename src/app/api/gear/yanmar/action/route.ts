@@ -37,6 +37,8 @@ import { loadUserFinalStats } from "@/games/yanmar/gearService";
 import { asJson } from "@/games/yanmar/jsonCompat";
 import { cappedCurrencyIncrement } from "@/lib/currency";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
+import { isGearCraftUnlocked, PLAYER_UNLOCKS } from "@/lib/playerUnlocks";
+import { announceMasterEnhance10 } from "@/lib/chat/announcements";
 
 function toData(item: {
   slot: string;
@@ -107,6 +109,23 @@ export async function POST(req: Request) {
   try {
     const result = await prisma.$transaction(async (tx) => {
       await ensureYanmarGearMigration(tx, session.user.id);
+
+      if (
+        action === "enhance" ||
+        action === "dismantle" ||
+        action === "synthesize"
+      ) {
+        const craftUser = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { totalXp: true },
+        });
+        const playerLevel = getPlayerLevelProgress(
+          craftUser?.totalXp ?? 0,
+        ).level;
+        if (!isGearCraftUnlocked(playerLevel)) {
+          throw new Error(`LEVEL_REQUIRED:${PLAYER_UNLOCKS.GEAR_CRAFT}`);
+        }
+      }
 
       if (action === "expandInventory") {
         const user = await tx.user.findUnique({
@@ -522,6 +541,49 @@ export async function POST(req: Request) {
         stats: loaded.stats,
       };
     });
+
+    if (
+      action === "enhance" &&
+      result &&
+      typeof result === "object" &&
+      "success" in result &&
+      result.success === true &&
+      "item" in result &&
+      result.item &&
+      typeof result.item === "object" &&
+      "grade" in result.item &&
+      result.item.grade === "MASTER" &&
+      "before" in result &&
+      result.before &&
+      typeof result.before === "object" &&
+      "enhanceLevel" in result.before &&
+      result.before.enhanceLevel === 9 &&
+      "after" in result &&
+      result.after &&
+      typeof result.after === "object" &&
+      "enhanceLevel" in result.after &&
+      result.after.enhanceLevel === 10
+    ) {
+      const item = result.item as {
+        id: string;
+        nameSnapshot: string;
+        slot: string;
+        grade: string;
+        enhanceLevel: number;
+        mainOption: unknown;
+        subOptions: unknown;
+        masterOption: unknown;
+        durability?: number;
+        durabilityMax?: number;
+      };
+      void announceMasterEnhance10({
+        userId: session.user.id,
+        nickname: session.user.nickname,
+        item,
+      }).catch((error) => {
+        console.error("[chat] master enhance announce failed:", error);
+      });
+    }
 
     return NextResponse.json(result);
   } catch (e) {

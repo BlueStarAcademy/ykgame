@@ -1,6 +1,7 @@
 import type { CouponType, Prisma } from "@/generated/prisma/client";
 import { couponTypeLabel, isExchangeCoupon } from "@/lib/coupon";
 import { prisma } from "@/lib/prisma";
+import { announceCouponWinChat } from "@/lib/chat/announcements";
 import {
   clampTickerScrollSpeed,
   TICKER_SCROLL_SPEED_DEFAULT,
@@ -70,6 +71,15 @@ export async function publishTickerWinEvents(
   await db.tickerWinEvent.deleteMany({
     where: { createdAt: { lt: cutoff } },
   });
+
+  for (const event of events) {
+    void announceCouponWinChat({
+      nickname: event.nickname,
+      message: event.message,
+    }).catch((error) => {
+      console.error("[chat] coupon announce failed:", error);
+    });
+  }
 }
 
 export async function getTickerSettings(): Promise<TickerSettings> {

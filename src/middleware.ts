@@ -2,6 +2,11 @@ import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 import { resolveAuthSecret } from "@/lib/auth-secret";
 import { NextResponse } from "next/server";
+import {
+  defaultLocale,
+  LOCALE_COOKIE,
+  parseLocale,
+} from "@/i18n/config";
 
 const { auth } = NextAuth({
   ...authConfig,
@@ -19,12 +24,37 @@ function redirectWithPwa(req: { nextUrl: URL }, path: string) {
   return NextResponse.redirect(url);
 }
 
+function withLocaleCookie(
+  req: { cookies: { get: (name: string) => { value: string } | undefined } },
+  res: NextResponse,
+) {
+  if (!req.cookies.get(LOCALE_COOKIE)?.value) {
+    res.cookies.set(LOCALE_COOKIE, defaultLocale, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: "lax",
+    });
+  } else {
+    // Normalize invalid values
+    const current = req.cookies.get(LOCALE_COOKIE)?.value;
+    const locale = parseLocale(current);
+    if (current !== locale) {
+      res.cookies.set(LOCALE_COOKIE, locale, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax",
+      });
+    }
+  }
+  return res;
+}
+
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
   // API는 각 route에서 인증 처리 — /api/auth/session 등 JSON 응답 필요
   if (pathname.startsWith("/api/")) {
-    return NextResponse.next();
+    return withLocaleCookie(req, NextResponse.next());
   }
 
   const isLoggedIn = !!req.auth;
@@ -41,39 +71,45 @@ export default auth((req) => {
     if (callbackPath.startsWith("/") && !callbackPath.startsWith("//")) {
       loginUrl.searchParams.set("callbackUrl", callbackPath);
     }
-    return NextResponse.redirect(loginUrl);
+    return withLocaleCookie(req, NextResponse.redirect(loginUrl));
   }
 
   if (isLoggedIn && isAuthPage) {
     const user = req.auth?.user;
     if (!user?.nickname) {
-      return redirectWithPwa(req, "/nickname");
+      return withLocaleCookie(req, redirectWithPwa(req, "/nickname"));
     }
     const callback = req.nextUrl.searchParams.get("callbackUrl");
     const dest =
       callback && callback.startsWith("/") && !callback.startsWith("//")
         ? callback
         : "/home";
-    return redirectWithPwa(req, dest);
+    return withLocaleCookie(req, redirectWithPwa(req, dest));
   }
 
   if (isLoggedIn && req.auth?.user) {
     const user = req.auth.user;
 
     if (!user.nickname && pathname !== "/nickname") {
-      return redirectWithPwa(req, "/nickname");
+      return withLocaleCookie(req, redirectWithPwa(req, "/nickname"));
     }
 
     if (user.nickname && pathname === "/nickname") {
-      return NextResponse.redirect(new URL("/home", req.url));
+      return withLocaleCookie(
+        req,
+        NextResponse.redirect(new URL("/home", req.url)),
+      );
     }
 
     if (isAdmin && user.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/home", req.url));
+      return withLocaleCookie(
+        req,
+        NextResponse.redirect(new URL("/home", req.url)),
+      );
     }
   }
 
-  return NextResponse.next();
+  return withLocaleCookie(req, NextResponse.next());
 });
 
 export const config = {

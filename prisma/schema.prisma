@@ -95,6 +95,8 @@ model User {
   email                String                 @unique
   passwordHash         String
   nickname             String?                @unique
+  /** UI locale: ko | ja | en */
+  locale               String?
   /** Yanmar profile portrait — ChassisModelId string */
   profileAvatarId      String?
   role                 Role                   @default(USER)
@@ -137,6 +139,8 @@ model User {
   monumentStarsStored         Int       @default(0)
   monumentProdUpdatedAt       DateTime?
   monumentTutorialDone        Boolean   @default(false)
+  /** introDone, completed[], claimed[], seenNew[] — yanmar operator tutorial */
+  yanmarTutorial              Json?
   gachaTicketsStandard Int                    @default(0)
   gachaTicketsPremium  Int                    @default(0)
   /** KST day key (YYYY-MM-DD) for daily free gacha counters */
@@ -154,6 +158,7 @@ model User {
   sportsMeetAttemptsUsed      Int       @default(0)
   sportsMeetScores            YanmarSportsMeetScore[]
   sportsMeetRewardGrants      YanmarSportsMeetRewardGrant[]
+  chatMessages                ChatMessage[]
 }
 
 /** Weekly excavator sports-meet best clear time (lower is better). */
@@ -526,4 +531,32 @@ model TickerWinEvent {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+enum ChatMessageKind {
+  USER
+  SYSTEM
+}
+
+/** 채널 채팅 · 전역 시스템 이벤트 */
+model ChatMessage {
+  id            String          @id @default(cuid())
+  kind          ChatMessageKind @default(USER)
+  /** 1–100 for channel messages; null = broadcast to every channel */
+  channel       Int?
+  userId        String?
+  nickname      String?
+  body          String
+  /** Immutable gear snapshot for MASTER+10 inspect links */
+  gearSnapshot  Json?
+  hidden        Boolean         @default(false)
+  hiddenAt      DateTime?
+  hiddenByAdmin String?
+  createdAt     DateTime        @default(now())
+  user          User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([channel, createdAt])
+  @@index([createdAt])
+  @@index([hidden, createdAt])
+  @@index([userId, createdAt])
 }

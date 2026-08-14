@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
 import type { ExcavatorSimState } from "./ExcavatorScene";
@@ -10,13 +11,13 @@ import type { MonumentPhase } from "./monument/types";
 import type { WorldPickupsState } from "./worldPickups";
 
 const LEGEND = [
-  { label: "흙더미", tone: "dig" },
-  { label: "하역", tone: "dump" },
-  { label: "파쇄", tone: "crash" },
-  { label: "석재", tone: "hill" },
-  { label: "정비", tone: "repair" },
-  { label: "조형", tone: "monument" },
-  { label: "운동회", tone: "sports" },
+  { labelKey: "legend.dig", tone: "dig" },
+  { labelKey: "legend.dump", tone: "dump" },
+  { labelKey: "legend.crash", tone: "crash" },
+  { labelKey: "legend.hill", tone: "hill" },
+  { labelKey: "legend.repair", tone: "repair" },
+  { labelKey: "legend.monument", tone: "monument" },
+  { labelKey: "legend.sports", tone: "sports" },
 ] as const;
 
 function useExpandedMapSize(open: boolean) {
@@ -66,6 +67,7 @@ export function ExcavatorMapModal({
   monumentPhase?: MonumentPhase;
   sportsMeetUnlocked?: boolean;
 }) {
+  const t = useTranslations("yanmar.map");
   const mapSize = useExpandedMapSize(open);
   const legend = sportsMeetUnlocked
     ? LEGEND
@@ -87,21 +89,21 @@ export function ExcavatorMapModal({
                 <span className="yanmar-map-modal-compass-n">N</span>
               </span>
               <div className="min-w-0">
-                <p className="yanmar-map-modal-eyebrow">Site Survey</p>
-                <h2 className="yanmar-map-modal-title">현장 맵</h2>
+                <p className="yanmar-map-modal-eyebrow">{t("eyebrow")}</p>
+                <h2 className="yanmar-map-modal-title">{t("title")}</h2>
               </div>
             </div>
             <button
               type="button"
               onClick={onClose}
               className="yanmar-map-modal-close"
-              aria-label="맵 닫기"
+              aria-label={t("closeAriaLabel")}
             >
               ✕
             </button>
           </div>
           <p className="yanmar-map-modal-subtitle">
-            빨간 화살표가 현재 위치와 진행 방향입니다
+            {t("subtitle")}
           </p>
         </header>
 
@@ -126,14 +128,14 @@ export function ExcavatorMapModal({
             />
           </div>
 
-          <ul className="yanmar-map-modal-legend" aria-label="맵 범례">
+          <ul className="yanmar-map-modal-legend" aria-label={t("legendAriaLabel")}>
             {legend.map((item) => (
               <li
-                key={item.label}
+                key={item.labelKey}
                 className={`yanmar-map-modal-legend-item is-${item.tone}`}
               >
                 <span className="yanmar-map-modal-legend-dot" aria-hidden />
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </li>
             ))}
           </ul>

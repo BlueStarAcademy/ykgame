@@ -1,0 +1,1178 @@
+{
+  "common": {
+    "close": "閉じる",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "saving": "保存中...",
+    "loading": "読み込み中...",
+    "confirm": "確認",
+    "back": "戻る",
+    "next": "次へ",
+    "yes": "はい",
+    "no": "いいえ",
+    "error": "エラーが発生しました。",
+    "player": "プレイヤー",
+    "admin": "管理",
+    "stars": "スター",
+    "daysLeft": "残り{days}日",
+    "used": "使用済み",
+    "expired": "期限切れ"
+  },
+  "meta": {
+    "title": "YK建機 重機体験",
+    "description": "YK建機の重機をゲームで体験。ヤンマーショベル1人称シミュレーターと8ブランドのミニゲーム。",
+    "appleTitle": "YKゲーム"
+  },
+  "auth": {
+    "login": "ログイン",
+    "loggingIn": "ログイン中...",
+    "signup": "新規登録",
+    "logout": "ログアウト",
+    "loginId": "ID",
+    "password": "パスワード",
+    "loginIdPlaceholder": "IDを入力",
+    "passwordPlaceholder": "パスワードを入力",
+    "saveId": "IDを保存",
+    "autoLogin": "自動ログイン",
+    "noAccount": "アカウントをお持ちでない方は",
+    "brandTitle": "YK建機ブランド カジュアルゲーム",
+    "brandSubtitle": "ログインしてミニゲームを楽しもう",
+    "registeredNotice": "登録が完了しました。ログインしてください。",
+    "invalidCredentials": "IDまたはパスワードが正しくありません。",
+    "loginError": "ログイン中にエラーが発生しました。",
+    "conflictTitle": "別の端末でログイン中です。ログアウトして接続しますか？",
+    "connect": "接続",
+    "nicknameTitle": "ニックネーム設定",
+    "nicknameSubtitle": "ゲームに表示する名前を決めてください",
+    "nicknamePlaceholder": "ニックネーム（{min}〜{max}文字）",
+    "nicknameContinue": "はじめる",
+    "signupTitle": "新規登録",
+    "email": "メール",
+    "confirmPassword": "パスワード確認",
+    "createAccount": "アカウント作成",
+    "alreadyHaveAccount": "すでにアカウントをお持ちですか？",
+    "signupFailed": "登録に失敗しました。",
+    "signingUp": "登録中...",
+    "checkEmail": "重複確認",
+    "emailAvailable": "このメールアドレスは使用できます。",
+    "emailInUse": "このメールアドレスはすでに使用されています。",
+    "nicknameSetFailed": "ニックネームの設定に失敗しました。",
+    "nicknameRequirements": "韓国語基準で{min}〜{max}文字・重複不可",
+    "nicknameInitialHint": "韓国語基準で{min}〜{max}文字で入力してください。",
+    "nicknameMinHint": "ニックネームは{min}文字以上で入力してください。（現在{length}文字）",
+    "nicknameMaxHint": "ニックネームは{max}文字以下で入力してください。（現在{length}文字）",
+    "nicknameLength": "{length}/{max}文字",
+    "startGame": "ゲームを開始",
+    "loadingGameInfo": "情報を読み込み中",
+    "loginWithDifferentAccount": "別のIDでログイン"
+  },
+  "landing": {
+    "heroTitle": "重機体験ゾーン",
+    "gameExperience": "ゲーム体験",
+    "globalLineupEyebrow": "Global Lineup",
+    "globalLineupTitle": "グローバルブランドラインアップ",
+    "globalLineupDesc": "YK建機が輸入・販売する8ブランドの重機",
+    "howToPlayEyebrow": "How to Play",
+    "howToPlayTitle": "体験の流れ",
+    "companyTagline": "世界の銘品重機、最高の価値をお届けします",
+    "statYears": "年の実績",
+    "statBrands": "グローバルブランド",
+    "statCenters": "全国直営センター",
+    "statNetwork": "サービスネットワーク",
+    "step1Title": "紹介ページ",
+    "step1Desc": "ホーム追加またはゲーム体験から開始",
+    "step2Title": "ログイン",
+    "step2Desc": "QR・ボタンでログイン（ログイン済みならすぐ移動）",
+    "step3Title": "機材選択",
+    "step3Desc": "「ヤンマー！何してる？」ロビーで体験する機材を選びます",
+    "step4Title": "プレイ",
+    "step4Desc": "土砂・荷下ろし・ブレーカー・石材ミッションに挑戦して報酬を獲得",
+    "footer": "© YK建機 · 実感操作で体験する機材アーケード",
+    "footerPrompt": "ゲーム体験で機材に触れてみましょう",
+    "installing": "インストール中...",
+    "addToHome": "ホームに追加",
+    "iosInstallTitle": "iPhone / iPadへのインストール方法",
+    "iosInstallStep1": "Safari下部の共有ボタンをタップします",
+    "iosInstallStep2": "「ホーム画面に追加」を選択します",
+    "iosInstallStep3": "名前を確認して「追加」を押すとYKゲームのアイコンが作成されます",
+    "addToHomeTitle": "ホームに追加する方法",
+    "addToHomeDescription": "ブラウザメニューで「アプリをインストール」または「ホーム画面に追加」を選ぶと、YKゲームのアイコンがホーム画面に作成されます。",
+    "generatingQr": "QRを生成中..."
+  },
+  "shell": {
+    "menu": "メニュー",
+    "openMenu": "メニューを開く",
+    "closeMenu": "メニューを閉じる",
+    "mailbox": "郵便箱",
+    "inventory": "クーポン箱",
+    "ranking": "ランキング",
+    "settings": {
+      "title": "設定",
+      "language": "言語",
+      "loginId": "ID",
+      "nickname": "ニックネーム",
+      "nicknameHint": "ニックネーム変更にはスター{cost}個が必要です。重複不可。",
+      "nicknamePlaceholder": "ニックネーム（{min}〜{max}文字）",
+      "loading": "設定を読み込み中...",
+      "saveFailed": "設定の保存に失敗しました。",
+      "change": "変更"
+    },
+    "mailboxModal": {
+      "title": "郵便箱",
+      "loading": "郵便箱を読み込み中...",
+      "empty": "受信メールがありません。",
+      "unclaimed": "未受取",
+      "claim": "報酬受取",
+      "claiming": "受取中...",
+      "claimed": "受取済み",
+      "claimFailed": "報酬の受取に失敗しました。",
+      "starReward": "⭐ スター {amount}"
+    },
+    "inventoryModal": {
+      "title": "クーポン箱",
+      "loading": "読み込み中...",
+      "empty": "所持クーポンがありません。",
+      "select": "クーポンを選択してください",
+      "alreadyUsed": "すでに使用済みのクーポンです",
+      "expired": "有効期限が切れています",
+      "noBarcode": "バーコードを表示できません",
+      "expiresAt": "有効期限 {date}",
+      "exchange": "交換"
+    },
+    "coupons": {
+      "YK_PARTS_DISCOUNT": "YK建機パーツ割引券",
+      "EQUIPMENT_RENTAL_DISCOUNT": "重機レンタル割引券",
+      "FILTER_SET_EXCHANGE": "フィルターセット交換クーポン"
+    },
+    "chat": {
+      "title": "チャット",
+      "close": "閉じる",
+      "openAriaLabel": "チャットを開く",
+      "noticesAriaLabel": "お知らせ",
+      "noNotices": "お知らせはありません。",
+      "anonymous": "匿名",
+      "inspectGear": "装備を見る",
+      "allChannelsFull": "すべてのチャンネルが満員です。",
+      "channelFull": "選択したチャンネルは満員です。",
+      "unavailable": "チャットサーバーに接続できません。",
+      "joinFailed": "チャンネルへの入室に失敗しました。",
+      "cooldownError": "{seconds}秒後に再度チャットできます。",
+      "rejoinChannel": "チャンネルに再入室してください。",
+      "sendFailed": "メッセージの送信に失敗しました。",
+      "warning": "不適切な発言は制裁の対象となる場合があります。",
+      "channel": "チャンネル",
+      "channelOption": "チャンネル{channel}",
+      "noMessages": "まだチャットはありません。",
+      "emojiPickerAriaLabel": "絵文字を選択",
+      "inputAvailableAfter": "{seconds}秒後に入力できます",
+      "messagePlaceholder": "メッセージを入力",
+      "send": "送信"
+    },
+    "inquiry": {
+      "title": "お問い合わせ",
+      "close": "閉じる",
+      "confirm": "確認",
+      "ariaLabel": "お問い合わせ",
+      "writeTab": "お問い合わせ",
+      "mineTab": "自分のお問い合わせ",
+      "submitted": "お問い合わせを受け付けました。",
+      "submittedDescription": "運営チームが確認して対応します。自分のお問い合わせタブで回答を確認できます。",
+      "viewMyInquiries": "お問い合わせを見る",
+      "warning": "暴言・誹謗中傷や意図的な悪用のお問い合わせは制裁の対象となる場合があります。",
+      "titlePlaceholder": "件名",
+      "bodyPlaceholder": "お問い合わせ内容を入力してください",
+      "requiredFields": "件名と内容を入力してください。",
+      "submitting": "受付中...",
+      "submit": "お問い合わせを送信",
+      "submitFailed": "受付に失敗しました",
+      "listLoadFailed": "一覧の読み込みに失敗しました",
+      "backToList": "← 一覧",
+      "statusAnswered": "回答済み",
+      "statusPending": "お問い合わせ中",
+      "myInquiry": "自分のお問い合わせ",
+      "answer": "回答",
+      "noAnswer": "まだ回答は登録されていません。",
+      "loading": "読み込み中...",
+      "empty": "お問い合わせ履歴はありません。"
+    }
+  },
+  "games": {
+    "results": {
+      "rideTitle": "乗車体験終了",
+      "yanmarTitle": "運転結果",
+      "completedTitle": "ミッション完了！",
+      "timeOverTitle": "時間切れ",
+      "rideHome": "乗車ホームへ",
+      "exit": "終了",
+      "home": "ホームへ",
+      "stay": "続ける",
+      "retry": "再挑戦",
+      "saveFailed": "スコアを保存できませんでした。後でもう一度お試しください。",
+      "saving": "スコアを保存中...",
+      "rideExperience": "乗車体験",
+      "cumulativeScore": "累計スコア",
+      "practiceScore": "練習スコア",
+      "complete": "完了",
+      "playTime": "プレイ {seconds}秒",
+      "timeRemaining": "残り {seconds}秒",
+      "thisRunScore": "今回の運転 +{score}",
+      "seasonRank": "シーズン #{rank}",
+      "practiceNotRanked": "練習運転の結果はランキングに保存されません。",
+      "cumulativeTop10": "累計スコア Top 10",
+      "season": "シーズン",
+      "myRank": "自分の順位 {rank}",
+      "points": "{score}点",
+      "rankingLoading": "ランキングを読み込み中...",
+      "noRankingData": "ランキングデータがありません",
+      "starsEarned": "{stars}個のスターを獲得！",
+      "monthlyTop10": "今月の Top 10",
+      "viewAll": "すべて見る"
+    },
+    "ranking": {
+      "me": "自分",
+      "cumulativeScore": "累計スコア",
+      "pointUnit": "点",
+      "noRecords": "まだ記録がありません",
+      "firstPlayHint": "最初のプレイでシーズンランキングに名前を載せましょう。",
+      "myRank": "自分の順位",
+      "top10": "TOP 10",
+      "noTop10Records": "まだ TOP 10 の記録がありません。",
+      "previousSportsMeet": "先週の運動会",
+      "weeklySportsMeet": "週間ショベル運動会",
+      "seasonRanking": "シーズンランキング",
+      "seasonLabelRanking": "{season}ランキング",
+      "sportsMeetEyebrow": "運動会",
+      "seasonRankingEyebrow": "シーズンランキング",
+      "close": "閉じる",
+      "seasonEndsIn": "シーズン終了まで",
+      "seasonCumulative": "シーズン累計",
+      "viewPreviousWeek": "先週を見る",
+      "viewCurrentWeek": "今週を見る",
+      "liveTop10": "Top 10 · リアルタイム累計順位",
+      "seasonTop10": "Top 10 · シーズン累計スコア",
+      "loading": "読み込み中…",
+      "sportsMyRank": "自分の順位 {rank}位",
+      "reward": "報酬 {stars}★"
+    },
+    "immersive": {
+      "exit": "終了",
+      "points": "{score}点",
+      "fullscreen": "フルスクリーン"
+    }
+  },
+  "yanmar": {
+    "settings": {
+      "title": "設定",
+      "display": "画面",
+      "sound": "音",
+      "other": "その他",
+      "minimap": "ミニマップ",
+      "missionQuest": "ミッションクエスト",
+      "bgm": "BGM",
+      "sfx": "効果音",
+      "breakerSfx": "ブレーカー効果音",
+      "horn": "ホーン",
+      "resetPosition": "初期位置（挟まった時）",
+      "fullscreen": "フルスクリーン",
+      "mailbox": "郵便箱",
+      "inventory": "クーポン箱",
+      "guide": "遊び方",
+      "tutorial": "チュートリアル",
+      "ranking": "ランキング",
+      "saveAndExit": "保存して終了",
+      "logout": "ログアウト",
+      "admin": "管理",
+      "inquiry": "お問い合わせ",
+      "language": "言語"
+    },
+    "ads": {
+      "rewardHint": "報酬を見る",
+      "m15": {
+        "teaserTitle": "SV10・SV11 発売！",
+        "teaserSub": "タップして報酬を受け取る",
+        "panelEyebrow": "Yanmar New Model",
+        "panelTitle": "SV10・SV11 発売！",
+        "imageAlt": "ヤンマー SV10・SV11 ミニショベル発売",
+        "ariaLabel": "SV10・SV11 発売広告"
+      },
+      "m30": {
+        "teaserTitle": "パーツ事前注文！",
+        "teaserSub": "タップして報酬を受け取る",
+        "panelEyebrow": "Yanmar Parts Promo",
+        "panelTitle": "パーツ事前注文プロモーション",
+        "imageAlt": "ヤンマーパーツ事前注文 — ゴムトラック・ローラー・スプロケット・アイドラー",
+        "ariaLabel": "パーツ事前注文プロモーション広告"
+      },
+      "m45": {
+        "teaserTitle": "ジョンディア部品20%！",
+        "teaserSub": "タップして報酬を受け取る",
+        "panelEyebrow": "YK建機 × John Deere",
+        "panelTitle": "ジョンディア純正部品20%オフ",
+        "imageAlt": "YK建機 × ジョンディア — 純正部品20%オフプロモーション",
+        "ariaLabel": "ジョンディア純正部品20%オフ広告"
+      }
+    },
+    "hud": {
+      "engineOn": "始動 ON",
+      "engineOff": "始動 OFF",
+      "safety": "安全",
+      "rpm": "RPM",
+      "fuel": "燃料",
+      "score": "スコア",
+      "stars": "スター",
+      "dump": "荷下ろし",
+      "crash": "破砕",
+      "mission": "ミッション",
+      "practice": "練習",
+      "game": "ゲーム",
+      "pause": "一時停止",
+      "resume": "再開",
+      "exit": "終了"
+    },
+    "toasts": {
+      "inventoryFullTitle": "インベントリの空きがありません。",
+      "inventoryFullLead": "装備を分解・売却するかスロットを拡張してから、再度獲得できます。",
+      "manageGear": "装備管理",
+      "congratulations": "おめでとうございます！",
+      "couponFoundExchange": "{label}を発見しました！！",
+      "couponFoundDiscount": "{label} {pct}%オフクーポンを発見しました！！",
+      "inventoryFullShort": "インベントリ満杯！",
+      "gearAcquired": "装備ゲット！",
+      "mailedAsStars": "スター郵便に変換されました"
+    },
+    "unlocks": {
+      "gear": {
+        "ariaLabel": "レベル6 装備の分解・強化・合成解放案内",
+        "alt": "装備",
+        "dismantle": "分解",
+        "enhance": "強化",
+        "synthesize": "合成",
+        "title": "装備が解放されました",
+        "lead": "装備の分解・強化・合成ができます。チュートリアル一覧に案内が追加されます。",
+        "perk1Title": "分解",
+        "perk1Desc": "不要な装備から強化コアを入手します",
+        "perk2Title": "強化",
+        "perk2Desc": "強化コアで装着装備の性能を上げます",
+        "perk3Title": "合成",
+        "perk3Desc": "同ランク装備3個で次のランクを狙います"
+      },
+      "quests": {
+        "ariaLabel": "レベル7 クエスト解放案内",
+        "alt": "クエスト",
+        "title": "クエストが解放されました",
+        "lead": "デイリー・ウィークリークエストを確認し、貯まっていた報酬を受け取れます。",
+        "perk1Title": "クエストパネル",
+        "perk1Desc": "HUDのクエストボタンから一覧と報酬を開きます",
+        "perk2Title": "バックグラウンド進行",
+        "perk2Desc": "ロック中でも出席などは貯まり続けます"
+      },
+      "monument": {
+        "ariaLabel": "レベル20 YK造形物解放案内",
+        "title": "YK造形物が解放されました",
+        "lead": "マップ北側（ミニマップ12時）の造形物予定地へ移動します。基本ミッション3つを完了すると建設を始められます。",
+        "perk1Title": "ダンプトラックを送る",
+        "perk1Desc": "土の荷下ろし場からトラックを1回出発させてください",
+        "perk2Title": "破砕9個",
+        "perk2Desc": "ブレーカーで路面を破砕してください",
+        "perk3Title": "石トラックを送る",
+        "perk3Desc": "丘の荷下ろし場から石トラックを1回出発させてください",
+        "cta": "造形物へ移動"
+      },
+      "sportsMeet": {
+        "ariaLabel": "レベル25 ショベル運動会解放案内",
+        "title": "ショベル運動会が解放されました",
+        "lead": "ミニマップ左下のポータルから週間タイムアタックに挑戦しましょう。毎日挑戦権1回、練習モードは無制限です。月曜0時（KST）にコースが変わり、先週順位でスター郵便が支給されます。",
+        "perk1Title": "ランキング · 練習",
+        "perk1Desc": "挑戦権（1/1）でランキング、練習は記録未反映",
+        "perk2Title": "週間コース",
+        "perk2Desc": "5種パターンが月曜ごとに自動ローテーション",
+        "perk3Title": "週間報酬",
+        "perk3Desc": "1位3000★〜参加100★を郵便で支給",
+        "cta": "ポータルへ移動"
+      },
+      "attachment": {
+        "ariaLabel": "レベル{level} {attachment}および新規作業場解放案内",
+        "machineAlt": "ブレード装着のヤンマーショベルと{attachment}",
+        "breaker": "ブレーカー",
+        "grapple": "グラップル",
+        "zoneBreaker": "破砕作業場",
+        "zoneGrapple": "石材運搬作業場",
+        "title": "新しい作業が解放されました",
+        "lead": "{zone}と{attachment}装備が解禁されました。",
+        "equipTitle": "{attachment}装着",
+        "equipDesc": "機能メニューでアタッチメントを切り替えられます",
+        "zoneDesc": "専用作業エリアへ移動してミッションを遂行しましょう"
+      }
+    },
+    "gear": {
+      "title": "装備",
+      "enhance": "強化",
+      "inventory": "インベントリ",
+      "equip": "装備",
+      "unequip": "解除",
+      "success": "強化成功！",
+      "fail": "強化失敗",
+      "maxLevel": "最大強化",
+      "empty": "装備がありません",
+      "slots": {
+        "bucket": "バケット",
+        "breaker": "ブレーカー",
+        "grapple": "グラップル",
+        "track": "トラック",
+        "cabin": "キャビン",
+        "engine": "エンジン"
+      }
+    },
+    "cockpit": {
+      "bucket": "バケット",
+      "horn": "ホーン",
+      "safety": "安全レバー",
+      "throttle": "スロットル",
+      "blade": "ブレード",
+      "auto": "オート",
+      "function": "機能",
+      "boomSwing": "ブームスイング",
+      "travel": "走行",
+      "pedalBreaker": "ブレーカー",
+      "pedalGrapple": "グラップル"
+    },
+    "quest": {
+      "title": "クエスト",
+      "claim": "受取",
+      "claimed": "完了",
+      "progress": "進行",
+      "empty": "進行中のクエストはありません",
+      "defs": {
+        "repeat-soil-dump-10000": "土の荷下ろし {target}",
+        "repeat-asphalt-10": "破砕 {target}個",
+        "repeat-rock-dump-10": "石の荷下ろし {target}個",
+        "repeat-travel-10000": "走行距離 {target}m",
+        "daily-login": "ログインする",
+        "daily-horn": "ホーンを鳴らす {target}回",
+        "daily-soil-load": "土 {target} 積込む",
+        "daily-truck-depart": "トラック出発 {target}回",
+        "daily-travel-3000": "走行距離 {target}m",
+        "daily-asphalt-9": "破砕 {target}回",
+        "daily-rock-load-5": "石の積込成功 {target}回",
+        "daily-all-complete": "デイリークエストをすべて完了",
+        "daily-mission-clear-3": "ミッションクエスト {target}回完了"
+      }
+    },
+    "shop": {
+      "title": "ショップ",
+      "buy": "購入",
+      "buying": "購入中",
+      "extend": "延長",
+      "owned": "適用中",
+      "soldOut": "売切れ",
+      "duration1h": "持続時間 1時間",
+      "items": {
+        "cylinder-oil-arm": {
+          "name": "シリンダーオイル（アーム）",
+          "effect": "クリティカル確率 +25%"
+        },
+        "cylinder-oil-boom": {
+          "name": "シリンダーオイル（ブーム）",
+          "effect": "クリティカルスコア +50%"
+        },
+        "engine-fluorine-clean": {
+          "name": "エンジンフッ素除去",
+          "effect": "走行速度 +50%"
+        },
+        "rock-load-manual": {
+          "name": "石積込教本",
+          "effect": "密着感 +20%"
+        },
+        "truck-racer": {
+          "name": "トラックレーサー",
+          "effect": "トラック帰還時間 -60秒"
+        },
+        "ranker-will": {
+          "name": "ランカーの意志",
+          "effect": "スコア2倍確率 35%"
+        }
+      }
+    },
+    "workshop": {
+      "title": "???",
+      "upgrade": "???????",
+      "level": "Lv.{level}",
+      "close": "???????",
+      "rewards": "??",
+      "rewardsAwaiting": "????",
+      "unclaimedRewards": "??? ?? {count}?",
+      "tabs": {
+        "quest": "???",
+        "upgrade": "?????",
+        "shop": "??"
+      },
+      "questsTitle": "???????",
+      "questRewardNote": "????????????????????",
+      "oneUpgradeAtATime": "????????????????1??????",
+      "owned": "??",
+      "shopTitle": "???????",
+      "weeklyReset": "??????{limit}?????0?(KST)????",
+      "tags": {
+        "daily": "??",
+        "repeat": "??"
+      },
+      "claimed": "????",
+      "done": "??",
+      "levelRequirement": "???{level}???",
+      "instantComplete": "????",
+      "insufficient": "????",
+      "thisWeek": "?? {count}/{limit}",
+      "purchaseConfirmation": "????",
+      "purchasePrompt": "{item}????????",
+      "consume": "??",
+      "cancel": "??",
+      "purchase": "??",
+      "acquiredResult": "????",
+      "confirm": "??",
+      "upgradeConfirmation": "?????????",
+      "duration": "????",
+      "instantCompleteConfirmation": "???????",
+      "secondsPreview": "{from}? ? {to}?",
+      "capacityPreview": "{from} ? {to}??? {base}?",
+      "countPreview": "{from}? ? {to}???? {base}?",
+      "catalog": {
+        "workshops": {
+          "dump": {
+            "label": "???????",
+            "pointsLabel": "????????"
+          },
+          "crash": {
+            "label": "????????",
+            "pointsLabel": "?????????"
+          },
+          "hill": {
+            "label": "???????",
+            "pointsLabel": "??????????"
+          }
+        },
+        "upgrades": {
+          "truck_capacity": {
+            "label": "??????",
+            "description": "??????????????????"
+          },
+          "truck_cooldown": {
+            "label": "???????",
+            "description": "?????????????????"
+          },
+          "haul_capacity": {
+            "label": "????????",
+            "description": "??????????+1"
+          },
+          "haul_cooldown": {
+            "label": "?????????",
+            "description": "???????????????"
+          },
+          "breaker_power": {
+            "label": "????????",
+            "description": "?????????+10%"
+          },
+          "score_rank": {
+            "label": "??????",
+            "description": "???????+10%"
+          },
+          "xp_expert": {
+            "label": "?????",
+            "description": "???????+5%"
+          },
+          "lucky_drop": {
+            "label": "??????",
+            "description": "??????+1%p"
+          },
+          "rock_appraiser": {
+            "label": "????",
+            "description": "??????+1?"
+          }
+        },
+        "quests": {
+          "dump-daily-soil-8000": "?????? 8,000",
+          "dump-daily-truck-2": "????????? 2?",
+          "dump-repeat-soil-4000": "?????? 4,000",
+          "crash-daily-asphalt-9": "?? 9?",
+          "crash-daily-asphalt-18": "?? 18?",
+          "crash-repeat-asphalt-3": "?? 3?",
+          "hill-daily-rock-5": "?????? 5?",
+          "hill-daily-haul-1": "???????? 1?",
+          "hill-repeat-rock-2": "?????? 2?"
+        },
+        "shop": {
+          "ticket_standard": {
+            "label": "??????",
+            "description": "????1?5????????"
+          },
+          "ticket_premium": {
+            "label": "??????",
+            "description": "????1?3????????"
+          },
+          "enhance_core": {
+            "label": "????",
+            "description": "????1?10????????"
+          }
+        }
+      }
+    },
+    "repair": {
+      "title": "??",
+      "repair": "??",
+      "free": "??",
+      "durability": "???",
+      "close": "??????",
+      "exchangeAvailable": "????",
+      "expiringSoon": "????????",
+      "normal": "??",
+      "rewardRange": "??????",
+      "stars": "???",
+      "enhanceCore": "????",
+      "standardTicket": "??????",
+      "premiumTicket": "??????",
+      "gaugeLabel": "{fluid} {percent}%",
+      "exchangeRewards": "??????",
+      "exchange": "????",
+      "waiting": "???",
+      "cancel": "??",
+      "cycleHours": "???? {hours}??",
+      "items": "?",
+      "catalog": {
+        "pointKinds": {
+          "dump": "????????",
+          "crash": "?????????",
+          "hill": "??????????",
+          "monument": "??????????"
+        },
+        "fluids": {
+          "engineOil": {
+            "label": "???????",
+            "blurb": "??????????????????????",
+            "whyReplace": "???????????????????????????????"
+          },
+          "engineOilFilter": {
+            "label": "????????????",
+            "blurb": "?????????????????????????????",
+            "whyReplace": "????????????????????????????????"
+          },
+          "hydraulicOil": {
+            "label": "?????",
+            "blurb": "???????????????????????????",
+            "whyReplace": "???????????????????????????????"
+          },
+          "hydraulicFilter": {
+            "label": "???????",
+            "blurb": "???????????????????????",
+            "whyReplace": "??????????????????????????????"
+          },
+          "fuelFilter": {
+            "label": "???????",
+            "blurb": "???????????????????????",
+            "whyReplace": "???????????????????????????????"
+          },
+          "gearOil": {
+            "label": "?????",
+            "blurb": "???????????????????????",
+            "whyReplace": "???????????????????????????????"
+          }
+        },
+        "buffs": {
+          "engineOil": "?? +5%?45?",
+          "engineOilFilter": "?? +5%?1??",
+          "hydraulicOil": "?? +5%?1??30?",
+          "hydraulicFilter": "???? +8%?2??",
+          "fuelFilter": "???? +8%?4??",
+          "gearOil": "???? +8%?8??"
+        }
+      }
+    },
+    "monument": {
+      "title": "YK??????",
+      "upgrade": "?????",
+      "points": "??????????",
+      "close": "??????????",
+      "rewards": "??",
+      "rewardsAwaiting": "????",
+      "next": "??",
+      "minutes": "{value}?",
+      "seconds": "{value}?",
+      "storageFull": "???????",
+      "claim": "??",
+      "tabs": {
+        "quest": "???",
+        "upgrade": "?????",
+        "shop": "??"
+      },
+      "unclaimedRewards": "??? ?? {count}?",
+      "constructionMissions": "???????",
+      "constructionMissionNote": "???????????????????????",
+      "questsTitle": "??????????",
+      "questRewardNote": "???????????????????????",
+      "tags": {
+        "build": "??",
+        "daily": "??",
+        "repeat": "??"
+      },
+      "done": "??",
+      "claimed": "????",
+      "startConstruction": "?????60??",
+      "constructionInProgress": "???",
+      "constructionInProgressNote": "??????????????????????????",
+      "constructionComplete": "??????????",
+      "completeConstruction": "????",
+      "levelRequirement": "???{level}???",
+      "instantComplete": "????",
+      "insufficient": "????",
+      "weeklyReset": "??????{limit}?????0?(KST)????",
+      "thisWeek": "?? {count}/{limit}",
+      "purchaseConfirmation": "????",
+      "purchasePrompt": "{item}????????",
+      "consume": "??",
+      "cancel": "??",
+      "purchase": "??",
+      "acquiredResult": "????",
+      "confirm": "??",
+      "upgradeConfirmation": "?????????",
+      "duration": "????",
+      "catalog": {
+        "upgrades": {
+          "storage_cap": {
+            "label": "?????"
+          },
+          "prod_speed": {
+            "label": "????"
+          }
+        },
+        "questMetrics": {
+          "soilDump": "?????? {target}",
+          "dumpTruckDepart": "????????{target}???",
+          "asphaltBreak": "?? {target}?",
+          "haulTruckDepart": "??????{target}???",
+          "rockDump": "?????? {target}?",
+          "travel": "???? {target}m"
+        }
+      }
+    },
+    "controlsGuide": {
+      "title": "操作ガイド",
+      "heading": "部品別の操作機能",
+      "ariaLabel": "ヤンマー SV08-1 操作ガイド",
+      "imageAlt": "ヤンマー SV08-1 ショベル操作図 — ジョイスティック、走行レバー、ブーム・バケット・アーム",
+      "hint": "① 左ジョイスティック · ② 走行レバー · ⑤ 右ジョイスティック — ピンチで拡大",
+      "close": "閉じる"
+    },
+    "tutorial": {
+      "ariaLabel": "チュートリアル",
+      "title": "操作練習",
+      "close": "閉じる",
+      "new": "New",
+      "unlockLevel": "レベル{level}で解放",
+      "claimed": "受取済み",
+      "claiming": "受取中",
+      "claimReward": "報酬を受け取る",
+      "completionReward": "完了報酬",
+      "claim": "受取",
+      "skipToGame": "SKIP · ゲームへ",
+      "goalDistance": "目標まで {meters}m",
+      "steps": {
+        "travel": {
+          "title": "走行",
+          "instruction": "前進・後退・左レバー右旋回・右レバー左旋回をそれぞれ10m練習します"
+        },
+        "boom": {
+          "title": "ブーム",
+          "instruction": "ブームを最大まで上げてから最大まで下げる動作を3回繰り返します"
+        },
+        "arm": {
+          "title": "アーム",
+          "instruction": "アームを最大まで上げてから最大まで下げる動作を3回繰り返します"
+        },
+        "bucket": {
+          "title": "バケット",
+          "instruction": "土エリアで積込んだあとダンプトラックに荷下ろしします"
+        },
+        "breaker": {
+          "title": "ブレーカー",
+          "instruction": "アスファルトに垂直に当て、ペダル左側で破砕します"
+        },
+        "grapple": {
+          "title": "グラップル",
+          "instruction": "石を掴んで積込み、石トラックに荷下ろしします"
+        },
+        "gearDismantle": {
+          "title": "装備分解",
+          "instruction": "装備を分解すると強化コアを獲得します"
+        },
+        "gearEnhance": {
+          "title": "装備強化",
+          "instruction": "強化コアを使って装備を強化します"
+        },
+        "gearSynth": {
+          "title": "装備合成",
+          "instruction": "同じ等級の装備3個を合成します"
+        }
+      }
+    },
+    "gacha": {
+      "title": "獲得結果",
+      "synthesisTitle": "合成結果",
+      "skip": "スキップ",
+      "close": "閉じる",
+      "confirm": "確認",
+      "openingEquipment": "装備を開封中…",
+      "checkingEquipment": "装備を確認中…",
+      "highGrade": "HIGH GRADE"
+    },
+    "map": {
+      "eyebrow": "Site Survey",
+      "title": "現場マップ",
+      "closeAriaLabel": "マップを閉じる",
+      "subtitle": "赤い矢印は現在位置と進行方向を示します",
+      "legendAriaLabel": "マップの凡例",
+      "legend": {
+        "dig": "土砂",
+        "dump": "荷下ろし",
+        "crash": "破砕",
+        "hill": "石材",
+        "repair": "整備",
+        "monument": "モニュメント",
+        "sports": "運動会"
+      }
+    },
+    "sportsMeet": {
+      "title": "ショベル運動会",
+      "close": "閉じる",
+      "loading": "読み込み中…",
+      "error": "エラー",
+      "ticketLoadFailed": "チケット情報を読み込めませんでした。",
+      "thisWeekCourse": "今週のコース",
+      "rankRewards": "順位別報酬",
+      "rank": "{rank}位",
+      "rankOrLower": "{rank}位〜",
+      "rankRange": "{min}〜{max}位",
+      "weeklyResetNote": "月曜日0時にコースをリセット・先週の順位報酬を配布",
+      "thisWeekRankings": "今週のランキング",
+      "previousWeekRankings": "先週のランキング",
+      "rankedMode": "ランキングモード",
+      "practiceMode": "練習モード",
+      "rankingsAriaLabel": "ショベル運動会ランキング",
+      "myRank": "自分の順位 {rank}位",
+      "reward": "報酬 {stars}★",
+      "noPreviousWeekRecords": "先週の記録はありません",
+      "noThisWeekRecords": "今週の記録はありません",
+      "rankingsLoadFailed": "ランキングを読み込めませんでした。",
+      "noRecords": "記録がありません",
+      "rankHeader": "順位",
+      "nicknameHeader": "ニックネーム",
+      "timeHeader": "時間",
+      "courseProgress": "コース {current}/{total}",
+      "course": "コース",
+      "meet": "運動会",
+      "waitingToStart": "開始待機",
+      "start": "開始",
+      "exit": "終了",
+      "resultAriaLabel": "ショベル運動会結果",
+      "finish": "完走！",
+      "rankingRecorded": "ランキングに記録が反映されました",
+      "submittingRanking": "ランキングに送信中…",
+      "practiceNotRanked": "練習記録・ランキング対象外",
+      "segment": "区間",
+      "cumulative": "累計",
+      "retryPractice": "練習を再挑戦",
+      "viewThisWeekRankings": "今週のランキングを見る",
+      "returnToWorkshop": "作業場に戻る"
+    },
+    "chassis": {
+      "title": "車体",
+      "close": "閉じる",
+      "zoom": "拡大表示",
+      "zoomAriaLabel": "車体画像を拡大表示",
+      "closeZoom": "拡大表示を閉じる",
+      "class": {
+        "light": "軽量",
+        "medium": "中型",
+        "heavy": "大型"
+      },
+      "weight": "{weight}kg",
+      "defaultTrait": "標準支給・キャノピー",
+      "bonusPointsTitle": "配分可能なボーナスポイント",
+      "bonus": "ボーナス {points}",
+      "save": "保存",
+      "recommendedAllocation": "おすすめ配分",
+      "statsAriaLabel": "車体能力値",
+      "decreaseStat": "{stat}を減らす",
+      "increaseStat": "{stat}を増やす",
+      "stats": {
+        "strength": "力",
+        "agility": "敏捷",
+        "stamina": "持久力",
+        "endurance": "忍耐",
+        "balance": "安定",
+        "technique": "技術"
+      }
+    },
+    "catalog": {
+      "slots": {
+        "ARM": "アーム",
+        "BOOM": "ブーム",
+        "TRACK": "トラック",
+        "BUCKET": "バケット",
+        "BREAKER": "ブレーカー",
+        "GRAPPLE": "グラップル"
+      },
+      "grades": {
+        "NORMAL": "通常",
+        "ENHANCED": "強化",
+        "PRECISION": "精密",
+        "MASTER": "マスター"
+      },
+      "gradePrefix": {
+        "NORMAL": "普通の",
+        "ENHANCED": "改良された",
+        "PRECISION": "高性能",
+        "MASTER": "最上級"
+      },
+      "stats": {
+        "strength": "力",
+        "agility": "敏捷",
+        "stamina": "持久",
+        "endurance": "忍耐",
+        "balance": "安定",
+        "technique": "技術"
+      },
+      "gear": {
+        "ARM": {
+          "name": "アーム",
+          "desc": "作業半径と吊り上げ力"
+        },
+        "BOOM": {
+          "name": "ブーム",
+          "desc": "掘削深さとリーチ"
+        },
+        "TRACK": {
+          "name": "トラック",
+          "desc": "走行性能と安定性"
+        },
+        "BUCKET": {
+          "name": "バケット",
+          "desc": "掘削・積込用の基本バケット"
+        },
+        "BREAKER": {
+          "name": "ブレーカー",
+          "desc": "岩盤・コンクリート破砕用アタッチメント"
+        },
+        "GRAPPLE": {
+          "name": "グラップル",
+          "desc": "石材・がれき把持用グラップル"
+        }
+      }
+    },
+    "guide": {
+      "title": "遊び方",
+      "eyebrow": "Operator Guide",
+      "subtitle": "操作・作業・成長・報酬をひと目で",
+      "lead": "ヤンマーショベル体験の操作・作業・成長・報酬をまとめたヘルプです。",
+      "diagramAlt": "ヤンマーショベル操作図 — ジョイスティック、走行レバー、ブーム・バケット・アーム",
+      "diagramHint": "① 左ジョイスティック · ② 走行レバー · ⑤ 右ジョイスティック — ピンチで拡大",
+      "sections": {
+        "modes": {
+          "title": "モード",
+          "intro": "ホームからゲームモードにすぐ入れます。練習・チュートリアルで操作を覚えてからランキングに挑戦しましょう。",
+          "items": {
+            "game": {
+              "label": "ゲーム",
+              "desc": "スコア・スター・経験値・クーポンが反映され、シーズンランキングに記録されます。"
+            },
+            "practice": {
+              "label": "練習",
+              "desc": "マップの全作業エリアを開放して自由に練習します。ランキング・シーズン報酬には反映されません。"
+            },
+            "tutorial": {
+              "label": "チュートリアル",
+              "desc": "走行 → スイング → アーム → ブーム → バケット → 土山 → 荷下ろし → ブレーカ → 石の積込み → 石の荷下ろしの順で段階学習します。"
+            },
+            "ride": {
+              "label": "搭乗体験",
+              "desc": "操作だけを体験するモードです。スコアと報酬はありません。"
+            }
+          }
+        },
+        "controls": {
+          "title": "基本操作",
+          "items": {
+            "leftLever": {
+              "label": "左レバー",
+              "desc": "左右でスイング、前後でアームを操作します。"
+            },
+            "rightLever": {
+              "label": "右レバー",
+              "desc": "前後でブーム、左右でバケットを操作します。"
+            },
+            "travel": {
+              "label": "走行レバー",
+              "desc": "前進・後退・左右旋回します。"
+            },
+            "functionMenu": {
+              "label": "機能メニュー",
+              "desc": "アタッチメント切替、ドーザ、安全ロック、油圧高速、ブームスイング、スロットルなどを設定します。"
+            },
+            "pedals": {
+              "label": "ペダル・ホーン",
+              "desc": "ブレーカ打撃・グラップル開閉、ブームスイングペダル、ホーンを使います。"
+            },
+            "camera": {
+              "label": "カメラ・ミニマップ",
+              "desc": "視点の自由回転とミニマップで位置を確認します。オートポーズスロットで姿勢を保存・呼出せます。"
+            }
+          }
+        },
+        "attachments": {
+          "title": "アタッチメント・作業エリア",
+          "intro": "エリアに合ったアタッチメントを装着しないと作業できません。バケットに土が残っていると切替えできません。",
+          "items": {
+            "bucket": {
+              "label": "バケット・土山/荷下ろし",
+              "desc": "オレンジの土山エリアで土をすくい、ダンプトラックに荷下ろしします。"
+            },
+            "breaker": {
+              "label": "ブレーカ・破砕",
+              "desc": "破砕エリアで路面タイルを砕きます。壊れたタイルは一定時間後に再生します。"
+            },
+            "grapple": {
+              "label": "グラップル・石材",
+              "desc": "石を掴んで密着ゲージを満たしてから持ち上げ、運搬トラックに荷下ろしします。持ち上げ判定に失敗することがあります。"
+            }
+          }
+        },
+        "rewards": {
+          "title": "作業報酬",
+          "intro": "ゲームモードで作業するとスコア・スター・経験値を得られ、ごく低い確率でクーポンがドロップします。",
+          "items": {
+            "soilDump": {
+              "label": "土の荷下ろし",
+              "desc": "積載量単位ごとにスコアとスター(1〜3)を受け取ります。クリティカルでスコアが倍率上昇します。"
+            },
+            "crash": {
+              "label": "破砕",
+              "desc": "タイルごとにスコア・スター(5〜15)・経験値を受け取ります。"
+            },
+            "rockDump": {
+              "label": "石の荷下ろし",
+              "desc": "石1個の荷下ろしで高いスコア・スター(20〜30)・経験値を受け取ります。"
+            },
+            "stars": {
+              "label": "スター",
+              "desc": "装備強化・ガチャ・ショップなどに使う通貨です。保有上限はありません。"
+            },
+            "coupons": {
+              "label": "クーポン",
+              "desc": "YK部品割引券(10/15/20%)、装備レンタル割引券(10/20/30%)、フィルターセット交換クーポン。シーズン上限(各50/50/1)と有効期限(365日)があります。"
+            }
+          }
+        },
+        "unlocks": {
+          "title": "レベル・マップ解放",
+          "intro": "レベルが上がるとマップとクエストが広がります。",
+          "items": {
+            "tier1": {
+              "label": "1段階 (Lv.1〜)",
+              "desc": "土山・荷下ろしエリアを利用します。"
+            },
+            "tier2": {
+              "label": "2段階 (Lv.10〜)",
+              "desc": "ブレーカ・破砕エリアと関連クエストが解放されます。"
+            },
+            "tier3": {
+              "label": "3段階 (Lv.15〜)",
+              "desc": "グラップル・石材エリアと関連クエストが解放されます。"
+            },
+            "sportsMeet": {
+              "label": "ショベル運動会 (Lv.25〜)",
+              "desc": "ミニマップ左下のポータル。日次挑戦権1回のランキング・無制限練習。月曜0時(KST)にコース変更と先週順位のスター郵便。"
+            }
+          }
+        },
+        "quests": {
+          "title": "クエスト・ミッション",
+          "items": {
+            "daily": {
+              "label": "デイリークエスト",
+              "desc": "ログイン、ホーン、荷下ろし・破砕・走行など毎日更新される目標です。"
+            },
+            "repeat": {
+              "label": "リピートクエスト",
+              "desc": "受取後に再び進行できる長期目標です。"
+            },
+            "mission": {
+              "label": "デイリーミッション",
+              "desc": "1日3件、レベル帯に合った難易度で出題されます。クリアでスター・経験値・強化コア・ガチャ券などを受け取れます。"
+            }
+          }
+        },
+        "gear": {
+          "title": "装備・強化・車体",
+          "items": {
+            "gacha": {
+              "label": "ギア",
+              "desc": "アーム・ブーム・トラック・バケット・ブレーカ・グラップル装備をガチャで獲得します。等級と主/副オプションが性能を変えます。"
+            },
+            "enhance": {
+              "label": "強化",
+              "desc": "部位ごと+1〜+10強化。スターを消費し、段階が高いほど成功率が低く、失敗時にボーナスが溜まります。"
+            },
+            "chassis": {
+              "label": "車体",
+              "desc": "基本車体(ViO17-1)の能力値(力・敏捷・耐久・忍耐・安定・技術)を配分します。"
+            }
+          }
+        },
+        "workshop": {
+          "title": "作業場・ショップ",
+          "items": {
+            "facility": {
+              "label": "作業場",
+              "desc": "土山・破砕・石材の作業場でポイントを貯めてアップグレードし、チケット・コアなどを購入します。"
+            },
+            "shopBuff": {
+              "label": "ショップバフ",
+              "desc": "クリティカル・移動速度・グリップ・トラッククールダウン・スコア2倍確率など1時間バフを購入できます。"
+            }
+          }
+        },
+        "field": {
+          "title": "フィールド・整備",
+          "items": {
+            "fieldStar": {
+              "label": "フィールドスター",
+              "desc": "マップに浮かぶスターを拾うと50〜200スターを得ます。毎正時に1個出現します。"
+            },
+            "speedBuff": {
+              "label": "速度バフ",
+              "desc": "フィールド速度アイテムを拾うと約30秒間移動速度が2倍になります。約3分ごとに出現し、時間あたり最大10回。"
+            },
+            "repairTent": {
+              "label": "整備テント",
+              "desc": "各消耗品は時間が経つと期限切れになります。期限切れ・間近で赤いアイコンが出て、タッチで内容を確認できます。整備所で説明・残り時間・報酬範囲を確認してから無料で交換してください。交換時の報酬は範囲内で一度に抽選・支給されます。期限切れを放置すると能力値ペナルティが適用されます。"
+            }
+          }
+        },
+        "season": {
+          "title": "シーズン・その他",
+          "items": {
+            "ranking": {
+              "label": "シーズンランキング",
+              "desc": "四半期(KST)シーズンスコアで順位を競います。設定・メニューのランキング情報で確認できます。"
+            },
+            "mailbox": {
+              "label": "郵便箱・クーポン箱",
+              "desc": "郵便で配布された報酬を受け取り、クーポン箱で所持クーポンを確認します。"
+            },
+            "saveExit": {
+              "label": "保存して終了",
+              "desc": "設定からゲームを保存して終了すると進行状況が保管されます。"
+            }
+          }
+        }
+      }
+    }
+  }
+}

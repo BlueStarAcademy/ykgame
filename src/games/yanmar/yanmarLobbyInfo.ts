@@ -1,212 +1,58 @@
-export type YanmarGuideItem = {
-  label: string;
-  desc: string;
+export type YanmarGuideItemId = string;
+
+export type YanmarGuideSectionDef = {
+  id: string;
+  itemIds: readonly string[];
+  hasIntro?: boolean;
 };
 
-export type YanmarGuideSection = {
-  title: string;
-  intro?: string;
-  items: readonly YanmarGuideItem[];
-};
-
-/** 설정 메뉴 「게임방법」 도움말 — 현재 게임 시스템 전체 요약 */
-export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSection[] = [
+/**
+ * Stable ids for 「게임방법」 help content.
+ * Display copy lives in messages under yanmar.guide.sections.{id}
+ */
+export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSectionDef[] = [
   {
-    title: "모드",
-    intro: "홈에서 바로 게임 모드로 진입할 수 있습니다. 연습·튜토리얼로 조작을 익힌 뒤 랭킹에 도전하세요.",
-    items: [
-      {
-        label: "게임",
-        desc: "점수·스타·경험치·쿠폰이 반영되며 시즌 랭킹에 기록됩니다.",
-      },
-      {
-        label: "연습",
-        desc: "맵의 모든 작업 구역을 열어 자유 연습합니다. 랭킹·시즌 보상에는 반영되지 않습니다.",
-      },
-      {
-        label: "튜토리얼",
-        desc: "주행 → 스윙 → 암 → 붐 → 버켓 → 흙더미 → 하역 → 브레이커 → 돌 적재 → 돌 하역 순으로 단계별 학습합니다.",
-      },
-      {
-        label: "탑승 체험",
-        desc: "조작만 체험하는 모드입니다. 점수와 보상은 없습니다.",
-      },
-    ],
+    id: "modes",
+    hasIntro: true,
+    itemIds: ["game", "practice", "tutorial", "ride"],
   },
   {
-    title: "기본 조작",
-    items: [
-      {
-        label: "좌측 레버",
-        desc: "좌우로 스윙, 앞뒤로 암을 조작합니다.",
-      },
-      {
-        label: "우측 레버",
-        desc: "앞뒤로 붐, 좌우로 버켓을 조작합니다.",
-      },
-      {
-        label: "주행 레버",
-        desc: "전진·후진·좌우 선회합니다.",
-      },
-      {
-        label: "기능 메뉴",
-        desc: "부착물 교체, 도저, 안전 잠금, 유압 고속, 붐 스윙, 스로틀 등을 설정합니다.",
-      },
-      {
-        label: "페달 · 경적",
-        desc: "브레이커 타격·집게 개폐, 붐 스윙 페달, 경적을 사용합니다.",
-      },
-      {
-        label: "카메라 · 미니맵",
-        desc: "시점 자유 회전과 미니맵으로 위치를 확인합니다. 자동 포즈 슬롯으로 자세를 저장·불러올 수 있습니다.",
-      },
-    ],
+    id: "controls",
+    itemIds: ["leftLever", "rightLever", "travel", "functionMenu", "pedals", "camera"],
   },
   {
-    title: "부착물 · 작업 구역",
-    intro: "구역에 맞는 부착물을 장착해야 작업할 수 있습니다. 버켓에 흙이 남아 있으면 부착물을 바꿀 수 없습니다.",
-    items: [
-      {
-        label: "버켓 · 흙더미/하역",
-        desc: "주황 흙더미 구역에서 흙을 담고, 덤프 트럭에 하역합니다.",
-      },
-      {
-        label: "브레이커 · 파쇄",
-        desc: "파쇄 구역에서 노면 타일을 깨뜨립니다. 깨진 타일은 일정 시간 후 재생됩니다.",
-      },
-      {
-        label: "집게 · 석재",
-        desc: "돌을 집어 밀착감을 채운 뒤 들어 올리고, 운반 트럭에 하역합니다. 들기 판정에 실패할 수 있습니다.",
-      },
-    ],
+    id: "attachments",
+    hasIntro: true,
+    itemIds: ["bucket", "breaker", "grapple"],
   },
   {
-    title: "작업 보상",
-    intro: "게임 모드에서 작업하면 점수·스타·경험치를 얻고, 매우 낮은 확률로 쿠폰이 드롭됩니다.",
-    items: [
-      {
-        label: "흙 하역",
-        desc: "적재량 단위마다 점수와 스타(1~3)를 받습니다. 크리티컬이 나면 점수가 배율로 오릅니다.",
-      },
-      {
-        label: "파쇄",
-        desc: "타일당 점수·스타(5~15)·경험치를 받습니다.",
-      },
-      {
-        label: "돌 하역",
-        desc: "돌 1개 하역 시 높은 점수·스타(20~30)·경험치를 받습니다.",
-      },
-      {
-        label: "스타",
-        desc: "장비 강화·가챠·상점 등에 쓰는 재화입니다. 보유 한도는 없습니다.",
-      },
-      {
-        label: "쿠폰",
-        desc: "YK 부품 할인권(10/15/20%), 장비 대여 할인권(10/20/30%), 필터 세트 교환 쿠폰. 시즌 한도(각각 50/50/1)와 유효기간(365일)이 있습니다.",
-      },
-    ],
+    id: "rewards",
+    hasIntro: true,
+    itemIds: ["soilDump", "crash", "rockDump", "stars", "coupons"],
   },
   {
-    title: "레벨 · 맵 해금",
-    intro: "레벨이 오르면 맵과 퀘스트가 넓어집니다.",
-    items: [
-      {
-        label: "1단계 (Lv.1~)",
-        desc: "흙더미·하역 구역을 이용합니다.",
-      },
-      {
-        label: "2단계 (Lv.10~)",
-        desc: "브레이커·파쇄 구역과 관련 퀘스트가 해금됩니다.",
-      },
-      {
-        label: "3단계 (Lv.15~)",
-        desc: "집게·석재 구역과 관련 퀘스트가 해금됩니다.",
-      },
-      {
-        label: "굴착기 운동회 (Lv.25~)",
-        desc: "미니맵 좌측 하단 포탈. 일일 도전권 1회 랭킹·무제한 연습. 월요일 0시(KST) 코스 변경 및 지난주 순위 스타 우편.",
-      },
-    ],
+    id: "unlocks",
+    hasIntro: true,
+    itemIds: ["tier1", "tier2", "tier3", "sportsMeet"],
   },
   {
-    title: "퀘스트 · 미션",
-    items: [
-      {
-        label: "일일 퀘스트",
-        desc: "로그인, 경적, 하역·파쇄·주행 등 매일 갱신되는 목표입니다.",
-      },
-      {
-        label: "반복 퀘스트",
-        desc: "수령 후 다시 진행할 수 있는 장기 목표입니다.",
-      },
-      {
-        label: "일일 미션",
-        desc: "하루 3개, 레벨대에 맞는 난이도로 출제됩니다. 클리어 시 스타·경험치·강화 코어·가챠권 등을 받습니다.",
-      },
-    ],
+    id: "quests",
+    itemIds: ["daily", "repeat", "mission"],
   },
   {
-    title: "장비 · 강화 · 차체",
-    items: [
-      {
-        label: "기어",
-        desc: "암·붐·트랙·버켓·브레이커·집게 장비를 가챠로 획득합니다. 등급과 주/부 옵션이 성능을 바꿉니다.",
-      },
-      {
-        label: "강화",
-        desc: "부위별 +1~+10 강화. 스타를 소모하며 단계가 높을수록 성공률이 낮고, 실패 시 보너스가 쌓입니다.",
-      },
-      {
-        label: "차체",
-        desc: "기본 차체(ViO17-1) 능력치(힘·민첩·지구력·인내·안정·기술)를 배분합니다.",
-      },
-    ],
+    id: "gear",
+    itemIds: ["gacha", "enhance", "chassis"],
   },
   {
-    title: "작업장 · 상점",
-    items: [
-      {
-        label: "작업장",
-        desc: "흙더미·파쇄·석재 작업장에서 포인트를 모아 업그레이드하고, 티켓·코어 등을 구매합니다.",
-      },
-      {
-        label: "상점 버프",
-        desc: "크리티컬·이동속도·그립·트럭 쿨다운·점수 2배 확률 등 1시간 버프를 구매할 수 있습니다.",
-      },
-    ],
+    id: "workshop",
+    itemIds: ["facility", "shopBuff"],
   },
   {
-    title: "필드 · 정비",
-    items: [
-      {
-        label: "필드 스타",
-        desc: "맵에 떠 있는 스타를 주우면 50~200 스타를 얻습니다. 매 정시에 1개씩 등장합니다.",
-      },
-      {
-        label: "속도 버프",
-        desc: "필드 속도 아이템을 주우면 약 30초간 이동속도가 2배가 됩니다. 약 3분마다 등장하며 시간당 최대 10회.",
-      },
-      {
-        label: "정비 텐트",
-        desc: "각 소모품은 시간이 지나면 만료됩니다. 만료·임박 시 붉은 아이콘이 뜨고 터치하면 내용을 볼 수 있습니다. 정비소에서 설명·남은 시간·보상 범위를 확인한 뒤 무료로 교환하세요. 교환 시 보상은 범위 안에서 한 번에 뽑혀 지급됩니다. 만료를 방치하면 능력치 페널티가 적용됩니다.",
-      },
-    ],
+    id: "field",
+    itemIds: ["fieldStar", "speedBuff", "repairTent"],
   },
   {
-    title: "시즌 · 기타",
-    items: [
-      {
-        label: "시즌 랭킹",
-        desc: "분기(KST) 시즌 점수로 순위를 겨룹니다. 설정·메뉴의 랭킹정보에서 확인할 수 있습니다.",
-      },
-      {
-        label: "우편함 · 쿠폰함",
-        desc: "우편으로 지급된 보상을 받고, 쿠폰함에서 보유 쿠폰을 확인합니다.",
-      },
-      {
-        label: "저장 후 종료",
-        desc: "설정에서 게임 저장 후 종료하면 진행 상황이 보관됩니다.",
-      },
-    ],
+    id: "season",
+    itemIds: ["ranking", "mailbox", "saveExit"],
   },
 ] as const;

@@ -5,6 +5,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import {
   isMetaDailyQuest,
@@ -102,6 +103,7 @@ export function QuestPanel({
   onClaimMission,
   onClaimRepeat,
 }: QuestPanelProps) {
+  const t = useTranslations("yanmar.quest");
   const [tab, setTab] = useState<QuestTab>("daily");
   const [resetCountdown, setResetCountdown] = useState(() =>
     formatQuestResetCountdown(getMsUntilNextQuestReset()),
@@ -131,13 +133,13 @@ export function QuestPanel({
       return {
         def,
         target,
-        title: def.title(target),
+        title: t(`defs.${def.id}`, { target }),
         progress: progress?.progress ?? 0,
         completed: progress?.completed ?? false,
         claimed: progress?.claimed ?? false,
       };
     });
-  }, [playerLevel, questState]);
+  }, [playerLevel, questState, t]);
 
   const repeatRows = useMemo(() => {
     if (!questState) return [];
@@ -146,12 +148,13 @@ export function QuestPanel({
       const progress = (questState.repeat ?? []).find((item) => item.id === def.id);
       return {
         def,
+        title: t(`defs.${def.id}`, { target: def.target }),
         progress: progress?.progress ?? 0,
         completed: progress?.completed ?? false,
         claimCount: progress?.claimCount ?? 0,
       };
     });
-  }, [playerLevel, questState]);
+  }, [playerLevel, questState, t]);
 
   const currentMission = questState ? getCurrentMission(questState) : null;
   const missionsDone = questState?.missionsCleared ?? 0;
@@ -184,7 +187,7 @@ export function QuestPanel({
           </span>
           <div className="yanmar-quest-modal-titles">
             <p className="yanmar-quest-modal-eyebrow">YANMAR FIELD LOG</p>
-            <h2>퀘스트</h2>
+            <h2>{t("title")}</h2>
           </div>
           <div className="yanmar-quest-modal-head-meta">
             {totalClaimable > 0 ? (
@@ -420,12 +423,12 @@ export function QuestPanel({
 
           {questState && tab === "repeat" ? (
             <ul className="yanmar-quest-list">
-              {repeatRows.map(({ def, progress, completed, claimCount }) => {
+              {repeatRows.map(({ def, title, progress, completed, claimCount }) => {
                 const claiming = claimingId === `repeat:${def.id}`;
                 return (
                   <QuestCard
                     key={def.id}
-                    title={def.title}
+                    title={title}
                     reward={def.reward}
                     meta={
                       claimCount > 0 ? `오늘 ${claimCount}회 수령` : undefined

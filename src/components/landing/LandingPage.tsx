@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { YkGeongiLogo } from "@/components/brand/YkGeongiLogo";
 import { GAMES } from "@/lib/games";
 import { COMPANY, EXPERIENCE_STEPS } from "@/lib/landing-content";
@@ -13,6 +16,20 @@ interface LandingPageProps {
 }
 
 export function LandingPage({ gameHref }: LandingPageProps) {
+  const t = useTranslations("landing");
+  const stats = [
+    t("statYears"),
+    t("statBrands"),
+    t("statCenters"),
+    t("statNetwork"),
+  ];
+  const steps = [
+    { title: t("step1Title"), desc: t("step1Desc") },
+    { title: t("step2Title"), desc: t("step2Desc") },
+    { title: t("step3Title"), desc: t("step3Desc") },
+    { title: t("step4Title"), desc: t("step4Desc") },
+  ];
+
   return (
     <main className="landing-page relative flex h-[100dvh] flex-col overflow-hidden text-gray-900">
       <LandingPromoPopup />
@@ -28,11 +45,11 @@ export function LandingPage({ gameHref }: LandingPageProps) {
               className="landing-logo h-9 w-auto max-w-[9.5rem] object-contain object-left"
             />
             <h1 className="text-lg font-bold leading-tight tracking-tight text-gray-900">
-              중장비 체험존
+              {t("heroTitle")}
             </h1>
           </div>
           <p className="mt-1 max-w-xs text-[10px] leading-relaxed text-gray-400">
-            {COMPANY.tagline}
+            {t("companyTagline")}
           </p>
         </header>
 
@@ -45,7 +62,7 @@ export function LandingPage({ gameHref }: LandingPageProps) {
               experienceMode="game"
               className="landing-cta landing-cta-game flex min-w-0 flex-1 items-center justify-center rounded-xl px-3 py-2.5 text-xs font-bold text-white shadow-md"
             >
-              게임 체험
+              {t("gameExperience")}
             </PwaExperienceButton>
           </div>
         </div>
@@ -53,11 +70,11 @@ export function LandingPage({ gameHref }: LandingPageProps) {
 
       <div className="landing-scroll relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-4 pb-10">
         <section className="landing-stats mb-7 mt-1 grid grid-cols-4 divide-x divide-gray-100">
-          {COMPANY.stats.map((s) => (
+          {COMPANY.stats.map((s, index) => (
             <div key={s.label} className="px-1 py-1 text-center">
               <p className="text-base font-semibold tracking-tight text-gray-900">{s.value}</p>
               <p className="mt-0.5 text-[9px] font-medium uppercase tracking-wide text-gray-400">
-                {s.label}
+                {stats[index]}
               </p>
             </div>
           ))}
@@ -66,13 +83,13 @@ export function LandingPage({ gameHref }: LandingPageProps) {
         <section className="mb-8">
           <div className="landing-section-head mb-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-red-500">
-              Global Lineup
+              {t("globalLineupEyebrow")}
             </p>
             <h2 className="mt-1 text-base font-semibold tracking-tight text-gray-900">
-              글로벌 브랜드 라인업
+              {t("globalLineupTitle")}
             </h2>
             <p className="mt-1 text-[11px] leading-relaxed text-gray-400">
-              YK건기가 수입·판매하는 8개 브랜드 중장비
+              {t("globalLineupDesc")}
             </p>
           </div>
           <div className="landing-equipment-grid">
@@ -85,19 +102,21 @@ export function LandingPage({ gameHref }: LandingPageProps) {
         <section className="mb-8">
           <div className="landing-section-head mb-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-red-500">
-              How to Play
+              {t("howToPlayEyebrow")}
             </p>
             <h2 className="mt-1 text-base font-semibold tracking-tight text-gray-900">
-              체험 방법
+              {t("howToPlayTitle")}
             </h2>
           </div>
           <div className="space-y-2">
-            {EXPERIENCE_STEPS.map((item) => (
+            {EXPERIENCE_STEPS.map((item, index) => (
               <div key={item.step} className="landing-step flex items-center gap-3">
                 <span className="landing-step-num">{item.step}</span>
                 <div className="min-w-0 flex-1 border-b border-gray-50 pb-3">
-                  <p className="text-sm font-medium text-gray-900">{item.title}</p>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400">{item.desc}</p>
+                  <p className="text-sm font-medium text-gray-900">{steps[index].title}</p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400">
+                    {steps[index].desc}
+                  </p>
                 </div>
               </div>
             ))}
@@ -107,7 +126,7 @@ export function LandingPage({ gameHref }: LandingPageProps) {
         <footer className="landing-footer pt-5 text-center">
           <p className="text-[11px] font-medium tracking-wide text-gray-500">{COMPANY.name}</p>
           <p className="mt-1 text-[10px] text-gray-300">
-            게임 체험으로 장비를 만나보세요
+            {t("footerPrompt")}
           </p>
           <Link
             href={COMPANY.homepage}

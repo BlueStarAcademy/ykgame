@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { clientLogout } from "@/lib/client-logout";
+import { LocalizedImage } from "@/components/i18n/LocalizedImage";
 import { SiteLegendLegalFooter } from "@/components/auth/SiteLegendLegalFooter";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { useSiteLegendLoginBgm } from "@/components/auth/useSiteLegendLoginBgm";
@@ -21,6 +23,7 @@ export function SiteLegendHomeScreen({
   onStartGame,
   isEnteringGame = false,
 }: SiteLegendHomeScreenProps) {
+  const t = useTranslations("auth");
   const [panel, setPanel] = useState<HomePanel>("home");
 
   useSiteLegendLoginBgm(!isEnteringGame);
@@ -82,9 +85,9 @@ export function SiteLegendHomeScreen({
 
       <div className="site-legend-auth-frame">
         <div className="site-legend-auth-title-wrap">
-          <img
+          <LocalizedImage
             src="/images/site-legend/title.png"
-            alt="현장전설 SITE LEGEND"
+            alt="SITE LEGEND"
             className="site-legend-auth-title"
             draggable={false}
           />
@@ -100,11 +103,12 @@ export function SiteLegendHomeScreen({
             {isEnteringGame ? (
               <div className="site-legend-entry-loading" role="status" aria-live="polite">
                 <div className="site-legend-entry-loading-spinner" aria-hidden />
-                <p className="site-legend-entry-loading-text">정보 불러오는 중</p>
+                <p className="site-legend-entry-loading-text">{t("loadingGameInfo")}</p>
               </div>
             ) : (
               <SiteLegendActionButtons
-                primaryLabel="게임 시작"
+                primaryLabel={t("startGame")}
+                primaryType="start"
                 onPrimary={onStartGame}
                 secondary={{
                   type: "logout",
@@ -112,7 +116,7 @@ export function SiteLegendHomeScreen({
                     void clientLogout();
                   },
                 }}
-                switchAccountLabel="다른 아이디로 로그인"
+                switchAccountLabel={t("loginWithDifferentAccount")}
                 onSwitchAccount={() => setPanel("login")}
               />
             )}

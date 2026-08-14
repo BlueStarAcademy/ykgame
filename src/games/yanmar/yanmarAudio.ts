@@ -3,6 +3,8 @@ import {
   volumeToGain,
   type HornId,
   type SoundSettings,
+  type SfxDetailId,
+  type SfxDetailSettings,
 } from "./soundSettings";
 import {
   getSoundSettings,
@@ -160,6 +162,7 @@ class YanmarAudioController {
   private unlocked = false;
   private sfxEnabled = true;
   private breakerSfxEnabled = true;
+  private sfxDetails: SfxDetailSettings = getSoundSettings().sfxDetails;
   /** False until store hydrates — avoids playing before Off is applied. */
   private bgmEnabled = false;
   private bgmVolume = 28;
@@ -268,12 +271,14 @@ class YanmarAudioController {
     const prevBreakerSfxEnabled = this.breakerSfxEnabled;
     const prevBgmVolume = this.bgmVolume;
     const prevSfxVolume = this.sfxVolume;
+    const prevSfxDetails = this.sfxDetails;
 
     this.bgmEnabled = settings.bgmEnabled;
     this.bgmVolume = settings.bgmVolume;
     this.sfxEnabled = settings.sfxEnabled;
     this.sfxVolume = settings.sfxVolume;
     this.breakerSfxEnabled = settings.breakerSfxEnabled;
+    this.sfxDetails = settings.sfxDetails;
     this.hornId = settings.hornId;
 
     const bgmEnableChanged = prevBgmEnabled !== this.bgmEnabled;
@@ -282,15 +287,17 @@ class YanmarAudioController {
       prevBreakerSfxEnabled !== this.breakerSfxEnabled;
     const bgmVolumeChanged = prevBgmVolume !== this.bgmVolume;
     const sfxVolumeChanged = prevSfxVolume !== this.sfxVolume;
+    const sfxDetailsChanged =
+      JSON.stringify(prevSfxDetails) !== JSON.stringify(this.sfxDetails);
 
     // Volume-only changes must never restart loops — just retarget gain.
-    if (sfxVolumeChanged || sfxEnableChanged) {
+    if (sfxVolumeChanged || sfxEnableChanged || sfxDetailsChanged) {
       this.applyBreakerGain();
       this.applyTravelGain();
       this.applyHornVolumes();
       this.applyLiveHtmlSfxVolumes();
     }
-    if (sfxEnableChanged) {
+    if (sfxEnableChanged || sfxDetailsChanged) {
       this.syncBreakerPlayback();
       this.syncTravelPlayback();
     }
@@ -392,7 +399,11 @@ class YanmarAudioController {
   }
 
   private canPlayBreaker() {
-    return this.sfxEnabled && this.breakerSfxEnabled;
+    return (
+      this.sfxEnabled &&
+      this.breakerSfxEnabled &&
+      this.sfxDetails.breaker.enabled
+    );
   }
 
   private syncBreakerPlayback() {
@@ -406,7 +417,18 @@ class YanmarAudioController {
   }
 
   private canPlayTravel() {
-    return this.sfxEnabled && this.active;
+    return this.sfxEnabled && this.active && this.sfxDetails.travel.enabled;
+  }
+
+  private canPlayEffect(id: SfxDetailId) {
+    return this.sfxEnabled && this.sfxDetails[id].enabled;
+  }
+
+  private effectGain(id: SfxDetailId) {
+    return (
+      volumeToGain(this.sfxVolume) *
+      volumeToGain(this.sfxDetails[id].volume)
+    );
   }
 
   private syncTravelPlayback() {
@@ -426,19 +448,19 @@ class YanmarAudioController {
   private applyBreakerGain() {
     if (this.breakerGain) {
       this.breakerGain.gain.value =
-        BREAKER_BASE_GAIN * volumeToGain(this.sfxVolume);
+        BREAKER_BASE_GAIN * this.effectGain("breaker");
     }
   }
 
   private applyTravelGain() {
     if (!this.travelGain || !this.audioCtx || !this.travelWanted) return;
-    const peak = TRAVEL_BASE_GAIN * volumeToGain(this.sfxVolume);
+    const peak = TRAVEL_BASE_GAIN * this.effectGain("travel");
     this.travelGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
     this.travelGain.gain.setValueAtTime(peak, this.audioCtx.currentTime);
   }
 
   private applyHornVolumes() {
-    const volume = HORN_BASE_VOLUME * volumeToGain(this.sfxVolume);
+    const volume = HORN_BASE_VOLUME * this.effectGain("horn");
     for (const audio of this.hornCache.values()) {
       audio.volume = volume;
     }
@@ -446,31 +468,34 @@ class YanmarAudioController {
 
   /** Retarget volume on any HTML one-shot/loop that may already be audible. */
   private applyLiveHtmlSfxVolumes() {
-    const g = volumeToGain(this.sfxVolume);
-    const setVol = (audio: HTMLAudioElement | null | undefined, base: number) => {
+    const setVol = (
+      audio: HTMLAudioElement | null | undefined,
+      base: number,
+      id: SfxDetailId,
+    ) => {
       if (!audio) return;
-      audio.volume = Math.max(0, Math.min(1, base * g));
+      audio.volume = Math.max(0, Math.min(1, base * this.effectGain(id)));
     };
-    setVol(this.engineStartAudio, ENGINE_START_BASE_VOLUME);
-    setVol(this.engineOffAudio, ENGINE_OFF_BASE_VOLUME);
-    setVol(this.serviceEnterAudio, SERVICE_ENTER_BASE_VOLUME);
-    setVol(this.monumentEnterAudio, MONUMENT_ENTER_BASE_VOLUME);
-    setVol(this.starAcquireAudio, STAR_ACQUIRE_BASE_VOLUME);
-    setVol(this.buffAcquireAudio, BUFF_ACQUIRE_BASE_VOLUME);
-    setVol(this.sportsCountdownAudio, SPORTS_COUNTDOWN_BASE_VOLUME);
-    setVol(this.rouletteSpinAudio, SPIN_WHOOSH_BASE_VOLUME);
-    setVol(this.attachmentUnlockAudio, ATTACHMENT_UNLOCK_BASE_VOLUME);
+    setVol(this.engineStartAudio, ENGINE_START_BASE_VOLUME, "engine");
+    setVol(this.engineOffAudio, ENGINE_OFF_BASE_VOLUME, "engine");
+    setVol(this.serviceEnterAudio, SERVICE_ENTER_BASE_VOLUME, "service");
+    setVol(this.monumentEnterAudio, MONUMENT_ENTER_BASE_VOLUME, "monument");
+    setVol(this.starAcquireAudio, STAR_ACQUIRE_BASE_VOLUME, "star");
+    setVol(this.buffAcquireAudio, BUFF_ACQUIRE_BASE_VOLUME, "buff");
+    setVol(this.sportsCountdownAudio, SPORTS_COUNTDOWN_BASE_VOLUME, "sports");
+    setVol(this.rouletteSpinAudio, SPIN_WHOOSH_BASE_VOLUME, "roulette");
+    setVol(this.attachmentUnlockAudio, ATTACHMENT_UNLOCK_BASE_VOLUME, "attachment");
     for (const audio of this.uiClickPool) {
-      setVol(audio, UI_CLICK_BASE_VOLUME);
+      setVol(audio, UI_CLICK_BASE_VOLUME, "ui");
     }
     for (const audio of this.itemAcquirePool) {
-      setVol(audio, ITEM_ACQUIRE_BASE_VOLUME);
+      setVol(audio, ITEM_ACQUIRE_BASE_VOLUME, "item");
     }
     for (const audio of this.masterItemAcquirePool) {
-      setVol(audio, MASTER_ITEM_ACQUIRE_BASE_VOLUME);
+      setVol(audio, MASTER_ITEM_ACQUIRE_BASE_VOLUME, "masterItem");
     }
     for (const audio of this.enhanceSfxCache.values()) {
-      setVol(audio, ENHANCE_SFX_BASE_VOLUME);
+      setVol(audio, ENHANCE_SFX_BASE_VOLUME, "enhance");
     }
     this.applyHornVolumes();
   }
@@ -619,7 +644,7 @@ class YanmarAudioController {
 
   playHorn(hornId: HornId = this.hornId) {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("horn")) return;
     let audio = this.hornCache.get(hornId);
     if (!audio) {
       audio = new Audio(HORN_SRC[hornId]);
@@ -628,13 +653,13 @@ class YanmarAudioController {
     }
     this.playHtmlAudio(
       audio,
-      HORN_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      HORN_BASE_VOLUME * this.effectGain("horn"),
     );
   }
 
   playEnhanceResult(success: boolean) {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("enhance")) return;
     const key = success ? "success" : "fail";
     let audio = this.enhanceSfxCache.get(key);
     if (!audio) {
@@ -644,13 +669,13 @@ class YanmarAudioController {
     }
     this.playHtmlAudio(
       audio,
-      ENHANCE_SFX_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      ENHANCE_SFX_BASE_VOLUME * this.effectGain("enhance"),
     );
   }
 
   playUiClick() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("ui")) return;
     this.ensureStoreSubscription();
     let audio = this.uiClickPool[this.uiClickPoolIndex];
     if (!audio) {
@@ -661,14 +686,14 @@ class YanmarAudioController {
     this.uiClickPoolIndex = (this.uiClickPoolIndex + 1) % UI_CLICK_POOL_SIZE;
     this.playHtmlAudio(
       audio,
-      UI_CLICK_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      UI_CLICK_BASE_VOLUME * this.effectGain("ui"),
     );
   }
 
   /** One-shot when the cockpit engine start button switches On. */
   playEngineStart() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("engine")) return;
     this.ensureStoreSubscription();
     if (!this.engineStartAudio) {
       this.engineStartAudio = new Audio(ENGINE_START_SRC);
@@ -676,14 +701,14 @@ class YanmarAudioController {
     }
     this.playHtmlAudio(
       this.engineStartAudio,
-      ENGINE_START_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      ENGINE_START_BASE_VOLUME * this.effectGain("engine"),
     );
   }
 
   /** One-shot when the cockpit engine start button switches Off. */
   playEngineOff() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("engine")) return;
     this.ensureStoreSubscription();
     if (!this.engineOffAudio) {
       this.engineOffAudio = new Audio(ENGINE_OFF_SRC);
@@ -691,14 +716,14 @@ class YanmarAudioController {
     }
     this.playHtmlAudio(
       this.engineOffAudio,
-      ENGINE_OFF_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      ENGINE_OFF_BASE_VOLUME * this.effectGain("engine"),
     );
   }
 
   /** One-shot when the excavator enters the repair tent zone. */
   playServiceEnter() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("service")) return;
     this.ensureStoreSubscription();
     if (!this.serviceEnterAudio) {
       this.serviceEnterAudio = new Audio(SERVICE_ENTER_SRC);
@@ -706,14 +731,14 @@ class YanmarAudioController {
     }
     this.playHtmlAudio(
       this.serviceEnterAudio,
-      SERVICE_ENTER_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      SERVICE_ENTER_BASE_VOLUME * this.effectGain("service"),
     );
   }
 
   /** One-shot when the excavator enters the monument / sculpture zone. */
   playMonumentEnter() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("monument")) return;
     this.ensureStoreSubscription();
     if (!this.monumentEnterAudio) {
       this.monumentEnterAudio = new Audio(MONUMENT_ENTER_SRC);
@@ -721,14 +746,14 @@ class YanmarAudioController {
     }
     this.playHtmlAudio(
       this.monumentEnterAudio,
-      MONUMENT_ENTER_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      MONUMENT_ENTER_BASE_VOLUME * this.effectGain("monument"),
     );
   }
 
   /** One-shot when stars are gained (street pickup or ad reward). */
   playStarAcquire() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("star")) return;
     this.ensureStoreSubscription();
     if (!this.starAcquireAudio) {
       this.starAcquireAudio = new Audio(STAR_ACQUIRE_SRC);
@@ -736,14 +761,14 @@ class YanmarAudioController {
     }
     this.playHtmlAudio(
       this.starAcquireAudio,
-      STAR_ACQUIRE_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      STAR_ACQUIRE_BASE_VOLUME * this.effectGain("star"),
     );
   }
 
   /** One-shot when a timed buff is gained (street speed or shop). */
   playBuffAcquire() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("buff")) return;
     this.ensureStoreSubscription();
     if (!this.buffAcquireAudio) {
       this.buffAcquireAudio = new Audio(BUFF_ACQUIRE_SRC);
@@ -751,14 +776,14 @@ class YanmarAudioController {
     }
     this.playHtmlAudio(
       this.buffAcquireAudio,
-      BUFF_ACQUIRE_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      BUFF_ACQUIRE_BASE_VOLUME * this.effectGain("buff"),
     );
   }
 
   /** One-shot when gear/equipment is acquired (drop or gacha). */
   playItemAcquire() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("item")) return;
     this.ensureStoreSubscription();
     let audio = this.itemAcquirePool[this.itemAcquirePoolIndex];
     if (!audio) {
@@ -770,14 +795,14 @@ class YanmarAudioController {
       (this.itemAcquirePoolIndex + 1) % ITEM_ACQUIRE_POOL_SIZE;
     this.playHtmlAudio(
       audio,
-      ITEM_ACQUIRE_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      ITEM_ACQUIRE_BASE_VOLUME * this.effectGain("item"),
     );
   }
 
   /** One-shot when MASTER-grade gear is acquired. */
   playMasterItemAcquire() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("masterItem")) return;
     this.ensureStoreSubscription();
     let audio = this.masterItemAcquirePool[this.masterItemAcquirePoolIndex];
     if (!audio) {
@@ -789,14 +814,14 @@ class YanmarAudioController {
       (this.masterItemAcquirePoolIndex + 1) % ITEM_ACQUIRE_POOL_SIZE;
     this.playHtmlAudio(
       audio,
-      MASTER_ITEM_ACQUIRE_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      MASTER_ITEM_ACQUIRE_BASE_VOLUME * this.effectGain("masterItem"),
     );
   }
 
   /** Full 5s sports-meet start countdown (played once when Start is pressed). */
   playSportsCountdown() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("sports")) return;
     this.ensureStoreSubscription();
     if (!this.sportsCountdownAudio) {
       this.sportsCountdownAudio = new Audio(SPORTS_COUNTDOWN_SRC);
@@ -804,7 +829,7 @@ class YanmarAudioController {
     }
     this.playHtmlAudio(
       this.sportsCountdownAudio,
-      SPORTS_COUNTDOWN_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      SPORTS_COUNTDOWN_BASE_VOLUME * this.effectGain("sports"),
     );
   }
 
@@ -823,7 +848,7 @@ class YanmarAudioController {
   /** Loop while a reward roulette reel is spinning. */
   playRouletteSpin() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("roulette")) return;
     this.ensureStoreSubscription();
     if (!this.rouletteSpinAudio) {
       this.rouletteSpinAudio = new Audio(SPIN_WHOOSH_SRC);
@@ -833,7 +858,7 @@ class YanmarAudioController {
     audio.loop = true;
     this.playHtmlAudio(
       audio,
-      SPIN_WHOOSH_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      SPIN_WHOOSH_BASE_VOLUME * this.effectGain("roulette"),
     );
   }
 
@@ -853,7 +878,7 @@ class YanmarAudioController {
   /** One-shot when breaker/grapple unlock popup appears (Lv.10 / Lv.15). */
   playAttachmentUnlock() {
     if (typeof window === "undefined") return;
-    if (!this.sfxEnabled) return;
+    if (!this.canPlayEffect("attachment")) return;
     this.ensureStoreSubscription();
     if (!this.attachmentUnlockAudio) {
       this.attachmentUnlockAudio = new Audio(ATTACHMENT_UNLOCK_SRC);
@@ -861,7 +886,7 @@ class YanmarAudioController {
     }
     this.playHtmlAudio(
       this.attachmentUnlockAudio,
-      ATTACHMENT_UNLOCK_BASE_VOLUME * volumeToGain(this.sfxVolume),
+      ATTACHMENT_UNLOCK_BASE_VOLUME * this.effectGain("attachment"),
     );
   }
 
@@ -898,7 +923,7 @@ class YanmarAudioController {
         this.travelFadeToken += 1;
         const peak = Math.max(
           0.0001,
-          TRAVEL_BASE_GAIN * volumeToGain(this.sfxVolume),
+          TRAVEL_BASE_GAIN * this.effectGain("travel"),
         );
         const now = this.audioCtx.currentTime;
         const current = Math.max(0.0001, this.travelGain.gain.value);
@@ -983,7 +1008,7 @@ class YanmarAudioController {
     if (this.breakerSource) return;
 
     const gain = ctx.createGain();
-    gain.gain.value = BREAKER_BASE_GAIN * volumeToGain(this.sfxVolume);
+    gain.gain.value = BREAKER_BASE_GAIN * this.effectGain("breaker");
     gain.connect(ctx.destination);
 
     const source = ctx.createBufferSource();
@@ -1086,7 +1111,7 @@ class YanmarAudioController {
     const gain = ctx.createGain();
     const peak = Math.max(
       0.0001,
-      TRAVEL_BASE_GAIN * volumeToGain(this.sfxVolume),
+      TRAVEL_BASE_GAIN * this.effectGain("travel"),
     );
     const now = ctx.currentTime;
     gain.gain.setValueAtTime(0.0001, now);

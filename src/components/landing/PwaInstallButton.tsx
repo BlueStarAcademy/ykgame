@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { isStandalonePwa } from "@/lib/fullscreen";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -20,6 +21,7 @@ function isIosDevice(): boolean {
 }
 
 export function PwaInstallButton() {
+  const t = useTranslations("landing");
   const [state, setState] = useState<InstallState>("loading");
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
     null,
@@ -96,7 +98,7 @@ export function PwaInstallButton() {
     return null;
   }
 
-  const label = installing ? "설치 중..." : "홈 추가";
+  const label = installing ? t("installing") : t("addToHome");
 
   return (
     <div className="relative min-w-0 flex-1">
@@ -122,20 +124,17 @@ export function PwaInstallButton() {
       {showIosGuide && state === "ios" && (
         <div className="landing-install-guide absolute left-0 right-0 z-20 mt-2 w-[calc(200%+0.5rem)] rounded-xl border border-gray-200 bg-white/95 px-3 py-2.5 text-left shadow-sm">
           <p className="text-[11px] font-semibold text-gray-800">
-            iPhone / iPad 설치 방법
+            {t("iosInstallTitle")}
           </p>
           <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[10px] leading-relaxed text-gray-500">
             <li>
-              Safari 하단 <strong className="text-gray-700">공유</strong> 버튼을
-              탭합니다
+              {t("iosInstallStep1")}
             </li>
             <li>
-              <strong className="text-gray-700">홈 화면에 추가</strong>를
-              선택합니다
+              {t("iosInstallStep2")}
             </li>
             <li>
-              이름 확인 후 <strong className="text-gray-700">추가</strong>를
-              누르면 YK게임 아이콘이 생성됩니다
+              {t("iosInstallStep3")}
             </li>
           </ol>
         </div>
@@ -144,13 +143,10 @@ export function PwaInstallButton() {
       {showIosGuide && state === "unavailable" && (
         <div className="landing-install-guide absolute left-0 right-0 z-20 mt-2 w-[calc(200%+0.5rem)] rounded-xl border border-gray-200 bg-white/95 px-3 py-2.5 text-left shadow-sm">
           <p className="text-[11px] font-semibold text-gray-800">
-            홈 추가 방법
+            {t("addToHomeTitle")}
           </p>
           <p className="mt-1.5 text-[10px] leading-relaxed text-gray-500">
-            브라우저 메뉴에서{" "}
-            <strong className="text-gray-700">앱 설치</strong> 또는{" "}
-            <strong className="text-gray-700">홈 화면에 추가</strong>를
-            선택하면 YK게임 아이콘이 홈 화면에 생성됩니다.
+            {t("addToHomeDescription")}
           </p>
         </div>
       )}

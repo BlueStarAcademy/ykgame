@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { LocalizedImage } from "@/components/i18n/LocalizedImage";
 import { SiteLegendLegalFooter } from "@/components/auth/SiteLegendLegalFooter";
 import { useSiteLegendLoginBgm } from "@/components/auth/useSiteLegendLoginBgm";
 import { SiteLegendActionButtons } from "@/components/home/SiteLegendActionButtons";
@@ -10,6 +12,7 @@ import { clientLogout } from "@/lib/client-logout";
 type AuthPanel = "splash" | "login";
 
 export function SiteLegendAuthScreen() {
+  const t = useTranslations("auth");
   const [panel, setPanel] = useState<AuthPanel>("splash");
   useSiteLegendLoginBgm(true);
 
@@ -63,9 +66,9 @@ export function SiteLegendAuthScreen() {
 
       <div className="site-legend-auth-frame">
         <div className="site-legend-auth-title-wrap">
-          <img
+          <LocalizedImage
             src="/images/site-legend/title.png"
-            alt="현장전설 SITE LEGEND"
+            alt="SITE LEGEND"
             className="site-legend-auth-title"
             draggable={false}
           />
@@ -79,7 +82,8 @@ export function SiteLegendAuthScreen() {
             aria-hidden={panel !== "splash"}
           >
             <SiteLegendActionButtons
-              primaryLabel="로그인"
+              primaryType="login"
+              primaryLabel={t("login")}
               onPrimary={() => setPanel("login")}
               secondary={{
                 type: "logout",

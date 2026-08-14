@@ -74,6 +74,14 @@ export function SiteLegendTitleSettings({
             breakerSfxEnabled: !soundSettings.breakerSfxEnabled,
           });
         }}
+        sfxDetails={soundSettings.sfxDetails}
+        onSfxDetailChange={(id, next) => {
+          updateSoundSettings((prev) => ({
+            ...prev,
+            sfxDetails: { ...prev.sfxDetails, [id]: next },
+            ...(id === "breaker" ? { breakerSfxEnabled: next.enabled } : {}),
+          }));
+        }}
         hornId={soundSettings.hornId}
         onHornIdChange={(hornId: HornId) => {
           updateSoundSettings({ hornId });

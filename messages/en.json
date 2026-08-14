@@ -1,0 +1,1178 @@
+{
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving...",
+    "loading": "Loading...",
+    "confirm": "OK",
+    "back": "Back",
+    "next": "Next",
+    "yes": "Yes",
+    "no": "No",
+    "error": "Something went wrong.",
+    "player": "Player",
+    "admin": "Admin",
+    "stars": "Stars",
+    "daysLeft": "{days}d left",
+    "used": "Used",
+    "expired": "Expired"
+  },
+  "meta": {
+    "title": "YK Geongi Heavy Equipment Experience",
+    "description": "Experience YK Geongi heavy equipment as games. Yanmar excavator first-person simulator and 8 brand mini-games.",
+    "appleTitle": "YK Game"
+  },
+  "auth": {
+    "login": "Log in",
+    "loggingIn": "Logging in...",
+    "signup": "Sign up",
+    "logout": "Log out",
+    "loginId": "ID",
+    "password": "Password",
+    "loginIdPlaceholder": "Enter ID",
+    "passwordPlaceholder": "Enter password",
+    "saveId": "Remember ID",
+    "autoLogin": "Auto login",
+    "noAccount": "Don't have an account?",
+    "brandTitle": "YK Geongi Brand Casual Games",
+    "brandSubtitle": "Log in to play the mini-games",
+    "registeredNotice": "Registration complete. Please log in.",
+    "invalidCredentials": "Incorrect ID or password.",
+    "loginError": "An error occurred while logging in.",
+    "conflictTitle": "This account is already signed in. Sign out the other session and continue?",
+    "connect": "Continue",
+    "nicknameTitle": "Set nickname",
+    "nicknameSubtitle": "Choose the name shown in-game",
+    "nicknamePlaceholder": "Nickname ({min}–{max} chars)",
+    "nicknameContinue": "Get started",
+    "signupTitle": "Sign up",
+    "email": "Email",
+    "confirmPassword": "Confirm password",
+    "createAccount": "Create account",
+    "alreadyHaveAccount": "Already have an account?",
+    "signupFailed": "Sign-up failed.",
+    "signingUp": "Signing up...",
+    "checkEmail": "Check availability",
+    "emailAvailable": "This email is available.",
+    "emailInUse": "This email is already in use.",
+    "nicknameSetFailed": "Failed to set nickname.",
+    "nicknameRequirements": "{min}–{max} Korean characters · must be unique",
+    "nicknameInitialHint": "Enter {min}–{max} Korean characters.",
+    "nicknameMinHint": "Nickname must be at least {min} characters. (Currently {length})",
+    "nicknameMaxHint": "Nickname must be at most {max} characters. (Currently {length})",
+    "nicknameLength": "{length}/{max} characters",
+    "startGame": "Start game",
+    "loadingGameInfo": "Loading information",
+    "loginWithDifferentAccount": "Log in with another ID"
+  },
+  "landing": {
+    "heroTitle": "Heavy Equipment Experience Zone",
+    "gameExperience": "Play games",
+    "globalLineupEyebrow": "Global Lineup",
+    "globalLineupTitle": "Global brand lineup",
+    "globalLineupDesc": "Eight heavy-equipment brands imported and sold by YK Geongi",
+    "howToPlayEyebrow": "How to Play",
+    "howToPlayTitle": "How to experience",
+    "companyTagline": "World-class heavy equipment. Delivering the highest value.",
+    "statYears": "Years in business",
+    "statBrands": "Global brands",
+    "statCenters": "Nationwide centers",
+    "statNetwork": "Service network",
+    "step1Title": "Intro page",
+    "step1Desc": "Add to Home or start with Play games",
+    "step2Title": "Log in",
+    "step2Desc": "Log in via QR or button (skip if already signed in)",
+    "step3Title": "Choose equipment",
+    "step3Desc": "Open the Yanmar lobby and pick equipment to try",
+    "step4Title": "Play",
+    "step4Desc": "Take on dirt, dump, breaker, and stone missions for rewards",
+    "footer": "© YK Geongi · Heavy equipment arcade with realistic controls",
+    "footerPrompt": "Discover equipment through game experiences",
+    "installing": "Installing...",
+    "addToHome": "Add to Home",
+    "iosInstallTitle": "How to install on iPhone / iPad",
+    "iosInstallStep1": "Tap the Share button at the bottom of Safari",
+    "iosInstallStep2": "Choose Add to Home Screen",
+    "iosInstallStep3": "Confirm the name, then tap Add to create the YK Game icon",
+    "addToHomeTitle": "How to add to Home",
+    "addToHomeDescription": "Choose Install app or Add to Home Screen from the browser menu to add the YK Game icon to your home screen.",
+    "generatingQr": "Generating QR..."
+  },
+  "shell": {
+    "menu": "Menu",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "mailbox": "Mailbox",
+    "inventory": "Coupons",
+    "ranking": "Rankings",
+    "settings": {
+      "title": "Settings",
+      "language": "Language",
+      "loginId": "ID",
+      "nickname": "Nickname",
+      "nicknameHint": "Changing nickname costs {cost} stars. Must be unique.",
+      "nicknamePlaceholder": "Nickname ({min}–{max} chars)",
+      "loading": "Loading settings...",
+      "saveFailed": "Failed to save settings.",
+      "change": "Change"
+    },
+    "mailboxModal": {
+      "title": "Mailbox",
+      "loading": "Loading mailbox...",
+      "empty": "No mail yet.",
+      "unclaimed": "Unclaimed",
+      "claim": "Claim reward",
+      "claiming": "Claiming...",
+      "claimed": "Claimed",
+      "claimFailed": "Failed to claim reward.",
+      "starReward": "⭐ {amount} stars"
+    },
+    "inventoryModal": {
+      "title": "Coupons",
+      "loading": "Loading...",
+      "empty": "No coupons yet.",
+      "select": "Select a coupon",
+      "alreadyUsed": "This coupon was already used",
+      "expired": "This coupon has expired",
+      "noBarcode": "Unable to show barcode",
+      "expiresAt": "Expires {date}",
+      "exchange": "Exchange"
+    },
+    "coupons": {
+      "YK_PARTS_DISCOUNT": "YK Geongi parts discount",
+      "EQUIPMENT_RENTAL_DISCOUNT": "Equipment rental discount",
+      "FILTER_SET_EXCHANGE": "Filter set exchange coupon"
+    },
+    "chat": {
+      "title": "Chat",
+      "close": "Close",
+      "openAriaLabel": "Open chat",
+      "noticesAriaLabel": "Notices",
+      "noNotices": "No notices.",
+      "anonymous": "Anonymous",
+      "inspectGear": "Inspect gear",
+      "allChannelsFull": "All channels are full.",
+      "channelFull": "The selected channel is full.",
+      "unavailable": "Unable to connect to the chat server.",
+      "joinFailed": "Failed to join the channel.",
+      "cooldownError": "You can chat again in {seconds} seconds.",
+      "rejoinChannel": "Please rejoin the channel.",
+      "sendFailed": "Failed to send the message.",
+      "warning": "Inappropriate messages may result in penalties.",
+      "channel": "Channel",
+      "channelOption": "Channel {channel}",
+      "noMessages": "No chat messages yet.",
+      "emojiPickerAriaLabel": "Choose emoji",
+      "inputAvailableAfter": "Available in {seconds} seconds",
+      "messagePlaceholder": "Enter a message",
+      "send": "Send"
+    },
+    "inquiry": {
+      "title": "Support",
+      "close": "Close",
+      "confirm": "OK",
+      "ariaLabel": "Support",
+      "writeTab": "Contact support",
+      "mineTab": "My inquiries",
+      "submitted": "Your inquiry has been submitted.",
+      "submittedDescription": "The support team will review it. You can check the answer in My inquiries.",
+      "viewMyInquiries": "View my inquiries",
+      "warning": "Abusive language or intentional misuse of inquiries may result in penalties.",
+      "titlePlaceholder": "Title",
+      "bodyPlaceholder": "Describe your inquiry",
+      "requiredFields": "Enter a title and message.",
+      "submitting": "Submitting...",
+      "submit": "Submit inquiry",
+      "submitFailed": "Failed to submit the inquiry",
+      "listLoadFailed": "Failed to load inquiries",
+      "backToList": "← List",
+      "statusAnswered": "Answered",
+      "statusPending": "Pending",
+      "myInquiry": "My inquiry",
+      "answer": "Answer",
+      "noAnswer": "No answer has been posted yet.",
+      "loading": "Loading...",
+      "empty": "No inquiry history yet."
+    }
+  },
+  "games": {
+    "results": {
+      "rideTitle": "Ride Experience Complete",
+      "yanmarTitle": "Operation Results",
+      "completedTitle": "Mission Complete!",
+      "timeOverTitle": "Time's Up",
+      "rideHome": "Ride Home",
+      "exit": "Exit",
+      "home": "Home",
+      "stay": "Stay",
+      "retry": "Retry",
+      "saveFailed": "Unable to save your score. Please try again later.",
+      "saving": "Saving score...",
+      "rideExperience": "Ride Experience",
+      "cumulativeScore": "Cumulative Score",
+      "practiceScore": "Practice Score",
+      "complete": "Complete",
+      "playTime": "Played {seconds}s",
+      "timeRemaining": "{seconds}s remaining",
+      "thisRunScore": "This run +{score}",
+      "seasonRank": "Season #{rank}",
+      "practiceNotRanked": "Practice results are not saved to the rankings.",
+      "cumulativeTop10": "Cumulative Score Top 10",
+      "season": "Season",
+      "myRank": "My rank {rank}",
+      "points": "{score} pts",
+      "rankingLoading": "Loading rankings...",
+      "noRankingData": "No ranking data",
+      "starsEarned": "Earned {stars} stars!",
+      "monthlyTop10": "This Month's Top 10",
+      "viewAll": "View all"
+    },
+    "ranking": {
+      "me": "Me",
+      "cumulativeScore": "Cumulative Score",
+      "pointUnit": "pts",
+      "noRecords": "No records yet",
+      "firstPlayHint": "Play for the first time to put your name on the season rankings.",
+      "myRank": "My Rank",
+      "top10": "TOP 10",
+      "noTop10Records": "No TOP 10 records yet.",
+      "previousSportsMeet": "Last Week's Sports Meet",
+      "weeklySportsMeet": "Weekly Excavator Sports Meet",
+      "seasonRanking": "Season Rankings",
+      "seasonLabelRanking": "{season} Rankings",
+      "sportsMeetEyebrow": "Sports Meet",
+      "seasonRankingEyebrow": "Season Rankings",
+      "close": "Close",
+      "seasonEndsIn": "Until season ends",
+      "seasonCumulative": "Season Total",
+      "viewPreviousWeek": "View last week",
+      "viewCurrentWeek": "View this week",
+      "liveTop10": "Top 10 · Live cumulative rankings",
+      "seasonTop10": "Top 10 · Season cumulative score",
+      "loading": "Loading…",
+      "sportsMyRank": "My rank: {rank}",
+      "reward": "Reward {stars}★"
+    },
+    "immersive": {
+      "exit": "Exit",
+      "points": "{score} pts",
+      "fullscreen": "Fullscreen"
+    }
+  },
+  "yanmar": {
+    "settings": {
+      "title": "Settings",
+      "display": "Display",
+      "sound": "Sound",
+      "other": "Other",
+      "minimap": "Minimap",
+      "missionQuest": "Mission quest",
+      "bgm": "BGM",
+      "sfx": "SFX",
+      "breakerSfx": "Breaker SFX",
+      "horn": "Horn",
+      "resetPosition": "Reset position (unstuck)",
+      "fullscreen": "Fullscreen",
+      "mailbox": "Mailbox",
+      "inventory": "Coupons",
+      "guide": "How to play",
+      "tutorial": "Tutorial",
+      "ranking": "Rankings",
+      "saveAndExit": "Save & exit",
+      "logout": "Log out",
+      "admin": "Admin",
+      "inquiry": "Support",
+      "language": "Language"
+    },
+    "ads": {
+      "rewardHint": "View reward",
+      "m15": {
+        "teaserTitle": "SV10·SV11 launch!",
+        "teaserSub": "Tap for a reward",
+        "panelEyebrow": "Yanmar New Model",
+        "panelTitle": "SV10·SV11 launch!",
+        "imageAlt": "Yanmar SV10·SV11 mini excavator launch",
+        "ariaLabel": "SV10·SV11 launch ad"
+      },
+      "m30": {
+        "teaserTitle": "Parts pre-order!",
+        "teaserSub": "Tap for a reward",
+        "panelEyebrow": "Yanmar Parts Promo",
+        "panelTitle": "Parts pre-order promo",
+        "imageAlt": "Yanmar parts pre-order — rubber tracks, rollers, sprockets, idlers",
+        "ariaLabel": "Parts pre-order promo ad"
+      },
+      "m45": {
+        "teaserTitle": "John Deere parts 20%!",
+        "teaserSub": "Tap for a reward",
+        "panelEyebrow": "YK Geongi × John Deere",
+        "panelTitle": "John Deere genuine parts 20% off",
+        "imageAlt": "YK Geongi × John Deere — 20% off genuine parts promo",
+        "ariaLabel": "John Deere genuine parts 20% off ad"
+      }
+    },
+    "hud": {
+      "engineOn": "Engine ON",
+      "engineOff": "Engine OFF",
+      "safety": "Safety",
+      "rpm": "RPM",
+      "fuel": "Fuel",
+      "score": "Score",
+      "stars": "Stars",
+      "dump": "Dump",
+      "crash": "Break",
+      "mission": "Mission",
+      "practice": "Practice",
+      "game": "Game",
+      "pause": "Pause",
+      "resume": "Resume",
+      "exit": "Exit"
+    },
+    "toasts": {
+      "inventoryFullTitle": "Not enough inventory space.",
+      "inventoryFullLead": "Dismantle or sell gear, or expand slots, then try again.",
+      "manageGear": "Manage gear",
+      "congratulations": "Congratulations!",
+      "couponFoundExchange": "You found {label}!!",
+      "couponFoundDiscount": "You found a {pct}% off {label} coupon!!",
+      "inventoryFullShort": "Inventory full!",
+      "gearAcquired": "Gear acquired!",
+      "mailedAsStars": "Converted to star mail"
+    },
+    "unlocks": {
+      "gear": {
+        "ariaLabel": "Level 6 gear dismantle, enhance, and synthesis unlock",
+        "alt": "Gear",
+        "dismantle": "Dismantle",
+        "enhance": "Enhance",
+        "synthesize": "Synthesize",
+        "title": "Gear is now unlocked",
+        "lead": "You can dismantle, enhance, and synthesize gear. Guidance has been added to the tutorial list.",
+        "perk1Title": "Dismantle",
+        "perk1Desc": "Get enhance cores from gear you don't need",
+        "perk2Title": "Enhance",
+        "perk2Desc": "Use enhance cores to boost equipped gear",
+        "perk3Title": "Synthesize",
+        "perk3Desc": "Combine 3 same-grade pieces for a chance at the next grade"
+      },
+      "quests": {
+        "ariaLabel": "Level 7 quest unlock",
+        "alt": "Quests",
+        "title": "Quests are now unlocked",
+        "lead": "Check daily and weekly quests and claim rewards that have stacked up.",
+        "perk1Title": "Quest panel",
+        "perk1Desc": "Open the list and rewards from the HUD quest button",
+        "perk2Title": "Background progress",
+        "perk2Desc": "Attendance and more keep stacking while locked"
+      },
+      "monument": {
+        "ariaLabel": "Level 20 YK monument unlock",
+        "title": "YK Monument is now unlocked",
+        "lead": "Head to the monument site at the north of the map (12 o'clock on the minimap). Complete 3 basic missions to start construction.",
+        "perk1Title": "Send a dump truck",
+        "perk1Desc": "Dispatch a truck once from the dirt dump zone",
+        "perk2Title": "Break 9 surfaces",
+        "perk2Desc": "Use the breaker to crush asphalt",
+        "perk3Title": "Send a stone truck",
+        "perk3Desc": "Dispatch a stone truck once from the hill dump zone",
+        "cta": "Go to monument"
+      },
+      "sportsMeet": {
+        "ariaLabel": "Level 25 excavator sports meet unlock",
+        "title": "Excavator Sports Meet is now unlocked",
+        "lead": "Challenge the weekly time attack from the portal at the bottom-left of the minimap. 1 ranked attempt per day, practice unlimited. Courses rotate at Monday 0:00 (KST) and last week's rank pays star mail.",
+        "perk1Title": "Ranked · Practice",
+        "perk1Desc": "Ranked with ticket (1/1); practice is unranked",
+        "perk2Title": "Weekly course",
+        "perk2Desc": "5 patterns rotate automatically every Monday",
+        "perk3Title": "Weekly rewards",
+        "perk3Desc": "1st place 3000★ ~ participation 100★ via mail",
+        "cta": "Go to portal"
+      },
+      "attachment": {
+        "ariaLabel": "Level {level} {attachment} and new worksite unlock",
+        "machineAlt": "Yanmar excavator with blade and {attachment}",
+        "breaker": "Breaker",
+        "grapple": "Grapple",
+        "zoneBreaker": "Breaking worksite",
+        "zoneGrapple": "Stone haul worksite",
+        "title": "A new job is unlocked",
+        "lead": "{zone} and {attachment} gear are unlocked.",
+        "equipTitle": "Equip {attachment}",
+        "equipDesc": "Swap attachments from the function menu",
+        "zoneDesc": "Move to the dedicated work zone and complete missions"
+      }
+    },
+    "gear": {
+      "title": "Gear",
+      "enhance": "Enhance",
+      "inventory": "Inventory",
+      "equip": "Equip",
+      "unequip": "Unequip",
+      "success": "Enhance success!",
+      "fail": "Enhance failed",
+      "maxLevel": "Max enhance",
+      "empty": "No gear yet",
+      "slots": {
+        "bucket": "Bucket",
+        "breaker": "Breaker",
+        "grapple": "Grapple",
+        "track": "Track",
+        "cabin": "Cabin",
+        "engine": "Engine"
+      }
+    },
+    "cockpit": {
+      "bucket": "Bucket",
+      "horn": "Horn",
+      "safety": "Safety lever",
+      "throttle": "Throttle",
+      "blade": "Blade",
+      "auto": "Auto",
+      "function": "Function",
+      "boomSwing": "Boom swing",
+      "travel": "Travel",
+      "pedalBreaker": "Breaker",
+      "pedalGrapple": "Grapple"
+    },
+    "quest": {
+      "title": "Quests",
+      "claim": "Claim",
+      "claimed": "Done",
+      "progress": "Progress",
+      "empty": "No active quests",
+      "defs": {
+        "repeat-soil-dump-10000": "Dump soil {target}",
+        "repeat-asphalt-10": "Break asphalt ×{target}",
+        "repeat-rock-dump-10": "Dump rocks ×{target}",
+        "repeat-travel-10000": "Travel {target}m",
+        "daily-login": "Log in",
+        "daily-horn": "Sound the horn ×{target}",
+        "daily-soil-load": "Load soil {target}",
+        "daily-truck-depart": "Truck departures ×{target}",
+        "daily-travel-3000": "Travel {target}m",
+        "daily-asphalt-9": "Break asphalt ×{target}",
+        "daily-rock-load-5": "Load rocks successfully ×{target}",
+        "daily-all-complete": "Complete all daily quests",
+        "daily-mission-clear-3": "Clear mission quests ×{target}"
+      }
+    },
+    "shop": {
+      "title": "Shop",
+      "buy": "Buy",
+      "buying": "Buying...",
+      "extend": "Extend",
+      "owned": "Active",
+      "soldOut": "Sold out",
+      "duration1h": "Duration 1 hour",
+      "items": {
+        "cylinder-oil-arm": {
+          "name": "Cylinder oil (arm)",
+          "effect": "Critical chance +25%"
+        },
+        "cylinder-oil-boom": {
+          "name": "Cylinder oil (boom)",
+          "effect": "Critical score +50%"
+        },
+        "engine-fluorine-clean": {
+          "name": "Engine fluorine clean",
+          "effect": "Travel speed +50%"
+        },
+        "rock-load-manual": {
+          "name": "Rock load manual",
+          "effect": "Grip +20%"
+        },
+        "truck-racer": {
+          "name": "Truck racer",
+          "effect": "Truck return time -60s"
+        },
+        "ranker-will": {
+          "name": "Ranker's will",
+          "effect": "2× score chance 35%"
+        }
+      }
+    },
+    "workshop": {
+      "title": "Workshop",
+      "upgrade": "Upgrade",
+      "level": "Lv.{level}",
+      "close": "Close workshop",
+      "rewards": "Rewards",
+      "rewardsAwaiting": "Awaiting claim",
+      "unclaimedRewards": "??? ?? {count}?",
+      "tabs": {
+        "quest": "???",
+        "upgrade": "?????",
+        "shop": "??"
+      },
+      "questsTitle": "Workshop quests",
+      "questRewardNote": "Completed quests award workshop points.",
+      "oneUpgradeAtATime": "Only one upgrade can run at a time.",
+      "owned": "Owned",
+      "shopTitle": "Workshop shop",
+      "weeklyReset": "{limit} per item weekly ? resets Monday 00:00 KST",
+      "tags": {
+        "daily": "??",
+        "repeat": "??"
+      },
+      "claimed": "Claimed",
+      "done": "Complete",
+      "levelRequirement": "Level {level} required",
+      "instantComplete": "Complete now",
+      "insufficient": " (insufficient)",
+      "thisWeek": "This week {count}/{limit}",
+      "purchaseConfirmation": "Confirm purchase",
+      "purchasePrompt": "Buy {item}?",
+      "consume": "Cost",
+      "cancel": "??",
+      "purchase": "Buy",
+      "acquiredResult": "Acquired",
+      "confirm": "OK",
+      "upgradeConfirmation": "Confirm upgrade",
+      "duration": "Duration",
+      "instantCompleteConfirmation": "Confirm instant completion",
+      "secondsPreview": "{from}s ? {to}s",
+      "capacityPreview": "{from} ? {to} (base {base})",
+      "countPreview": "{from} ? {to} (base {base})",
+      "catalog": {
+        "workshops": {
+          "dump": {
+            "label": "Soil unloading yard",
+            "pointsLabel": "Unloading points"
+          },
+          "crash": {
+            "label": "Breaker workshop",
+            "pointsLabel": "Breaker points"
+          },
+          "hill": {
+            "label": "Stone unloading yard",
+            "pointsLabel": "Stone unloading points"
+          }
+        },
+        "upgrades": {
+          "truck_capacity": {
+            "label": "Dump capacity",
+            "description": "Increase maximum dump-truck unload capacity"
+          },
+          "truck_cooldown": {
+            "label": "Dump return time",
+            "description": "Reduce dump-truck return cooldown"
+          },
+          "haul_capacity": {
+            "label": "Stone truck capacity",
+            "description": "Increase stone truck capacity by 1"
+          },
+          "haul_cooldown": {
+            "label": "Stone truck return time",
+            "description": "Reduce stone-truck return cooldown"
+          },
+          "breaker_power": {
+            "label": "Breaker power",
+            "description": "Breaker damage +10%"
+          },
+          "score_rank": {
+            "label": "Work ranker",
+            "description": "Work-completion score +10%"
+          },
+          "xp_expert": {
+            "label": "Work expert",
+            "description": "Work-completion XP +5%"
+          },
+          "lucky_drop": {
+            "label": "Lucky worker",
+            "description": "Gear drop chance +1%p"
+          },
+          "rock_appraiser": {
+            "label": "Rock appraiser",
+            "description": "One extra rock in the stone area"
+          }
+        },
+        "quests": {
+          "dump-daily-soil-8000": "Unload 8,000 soil",
+          "dump-daily-truck-2": "Send dump truck twice",
+          "dump-repeat-soil-4000": "Unload 4,000 soil",
+          "crash-daily-asphalt-9": "Break 9 asphalt pieces",
+          "crash-daily-asphalt-18": "Break 18 asphalt pieces",
+          "crash-repeat-asphalt-3": "Break 3 asphalt pieces",
+          "hill-daily-rock-5": "Unload 5 rocks",
+          "hill-daily-haul-1": "Send haul truck once",
+          "hill-repeat-rock-2": "Unload 2 rocks"
+        },
+        "shop": {
+          "ticket_standard": {
+            "label": "Standard draw ticket",
+            "description": "Get 1?5 at random on purchase"
+          },
+          "ticket_premium": {
+            "label": "Premium draw ticket",
+            "description": "Get 1?3 at random on purchase"
+          },
+          "enhance_core": {
+            "label": "Enhancement core",
+            "description": "Get 1?10 at random on purchase"
+          }
+        }
+      }
+    },
+    "repair": {
+      "title": "Maintenance",
+      "repair": "??",
+      "free": "??",
+      "durability": "???",
+      "close": "Close maintenance",
+      "exchangeAvailable": "Ready to exchange",
+      "expiringSoon": "Expiring soon",
+      "normal": "Normal",
+      "rewardRange": "Exchange reward range",
+      "stars": "Stars",
+      "enhanceCore": "Enhancement core",
+      "standardTicket": "Standard draw ticket",
+      "premiumTicket": "Premium draw ticket",
+      "gaugeLabel": "{fluid} {percent}%",
+      "exchangeRewards": "Exchange rewards",
+      "exchange": "Exchange",
+      "waiting": "Waiting",
+      "cancel": "??",
+      "cycleHours": "Exchange cycle: {hours} hours",
+      "items": " items",
+      "catalog": {
+        "pointKinds": {
+          "dump": "Unloading points",
+          "crash": "Breaker points",
+          "hill": "Stone unloading points",
+          "monument": "Monument points"
+        },
+        "fluids": {
+          "engineOil": {
+            "label": "Engine oil",
+            "blurb": "Lubricant that reduces engine friction and cools heat.",
+            "whyReplace": "As it ages, viscosity breaks down, reducing power and fuel efficiency while increasing overheating risk."
+          },
+          "engineOilFilter": {
+            "label": "Engine oil filter",
+            "blurb": "Filters metal particles and impurities from engine oil.",
+            "whyReplace": "A clog worsens circulation, accelerating engine wear and slowing response."
+          },
+          "hydraulicOil": {
+            "label": "Hydraulic oil",
+            "blurb": "Working fluid for the hydraulics that move the boom, arm, and bucket.",
+            "whyReplace": "Degradation loses pressure, slowing work and weakening breaker force."
+          },
+          "hydraulicFilter": {
+            "label": "Hydraulic filter",
+            "blurb": "Blocks contaminants in hydraulic oil to protect valves and pumps.",
+            "whyReplace": "A clog destabilizes the hydraulic circuit and affects precise control and power."
+          },
+          "fuelFilter": {
+            "label": "Fuel filter",
+            "blurb": "Filters water and debris from fuel before it reaches the engine.",
+            "whyReplace": "A clog makes fuel delivery uneven and dulls travel and work response."
+          },
+          "gearOil": {
+            "label": "Gear oil",
+            "blurb": "Protects travel and swing gearboxes from friction and impact.",
+            "whyReplace": "Low or degraded oil increases gear wear, making travel and swing heavy and noisy."
+          }
+        },
+        "buffs": {
+          "engineOil": "Agility +5% ? 45 min",
+          "engineOilFilter": "Agility +5% ? 1 hour",
+          "hydraulicOil": "Agility +5% ? 1 hr 30 min",
+          "hydraulicFilter": "Strength & endurance +8% ? 2 hours",
+          "fuelFilter": "Strength & endurance +8% ? 4 hours",
+          "gearOil": "Strength & endurance +8% ? 8 hours"
+        }
+      }
+    },
+    "monument": {
+      "title": "YK Monument",
+      "upgrade": "?????",
+      "points": "Monument points",
+      "close": "Close monument",
+      "rewards": "Rewards",
+      "rewardsAwaiting": "Awaiting claim",
+      "next": "Next",
+      "minutes": "{value}m",
+      "seconds": "{value}s",
+      "storageFull": "Storage full",
+      "claim": "Claim",
+      "tabs": {
+        "quest": "???",
+        "upgrade": "?????",
+        "shop": "??"
+      },
+      "unclaimedRewards": "??? ?? {count}?",
+      "constructionMissions": "Construction missions",
+      "constructionMissionNote": "Complete the basic missions to start construction.",
+      "questsTitle": "Monument quests",
+      "questRewardNote": "Completed quests award monument points.",
+      "tags": {
+        "build": "??",
+        "daily": "??",
+        "repeat": "??"
+      },
+      "done": "Complete",
+      "claimed": "Claimed",
+      "startConstruction": "Start construction (60 min)",
+      "constructionInProgress": "Construction in progress",
+      "constructionInProgressNote": "When time is up, approach it and select Complete construction.",
+      "constructionComplete": "Construction complete!",
+      "completeConstruction": "Complete construction",
+      "levelRequirement": "Level {level} required",
+      "instantComplete": "Complete now",
+      "insufficient": " (insufficient)",
+      "weeklyReset": "{limit} per item weekly ? resets Monday 00:00 KST",
+      "thisWeek": "This week {count}/{limit}",
+      "purchaseConfirmation": "Confirm purchase",
+      "purchasePrompt": "Buy {item}?",
+      "consume": "Cost",
+      "cancel": "??",
+      "purchase": "Buy",
+      "acquiredResult": "Acquired",
+      "confirm": "OK",
+      "upgradeConfirmation": "Confirm upgrade",
+      "duration": "Duration",
+      "catalog": {
+        "upgrades": {
+          "storage_cap": {
+            "label": "Storage capacity"
+          },
+          "prod_speed": {
+            "label": "Production speed"
+          }
+        },
+        "questMetrics": {
+          "soilDump": "Unload {target} soil",
+          "dumpTruckDepart": "Send dump truck {target} time(s)",
+          "asphaltBreak": "Break {target} asphalt pieces",
+          "haulTruckDepart": "Send stone truck {target} time(s)",
+          "rockDump": "Unload {target} rocks",
+          "travel": "Travel {target}m"
+        }
+      }
+    },
+    "controlsGuide": {
+      "title": "Controls guide",
+      "heading": "Controls by part",
+      "ariaLabel": "Yanmar SV08-1 controls guide",
+      "imageAlt": "Yanmar SV08-1 excavator controls diagram — joysticks, travel levers, boom/bucket/arm",
+      "hint": "① Left joystick · ② Travel levers · ⑤ Right joystick — pinch to zoom",
+      "close": "Close"
+    },
+    "tutorial": {
+      "ariaLabel": "Tutorial",
+      "title": "Controls practice",
+      "close": "Close",
+      "new": "New",
+      "unlockLevel": "Unlocks at level {level}",
+      "claimed": "Claimed",
+      "claiming": "Claiming",
+      "claimReward": "Claim reward",
+      "completionReward": "Completion reward",
+      "claim": "Claim",
+      "skipToGame": "SKIP · Go to game",
+      "goalDistance": "{meters}m to goal",
+      "steps": {
+        "travel": {
+          "title": "Travel",
+          "instruction": "Practice forward, reverse, left-lever right turn, and right-lever left turn for 10m each"
+        },
+        "boom": {
+          "title": "Boom",
+          "instruction": "Raise the boom to max, then lower to max, three times"
+        },
+        "arm": {
+          "title": "Arm",
+          "instruction": "Raise the arm to max, then lower to max, three times"
+        },
+        "bucket": {
+          "title": "Bucket",
+          "instruction": "Load soil in the dirt zone, then dump it into the dump truck"
+        },
+        "breaker": {
+          "title": "Breaker",
+          "instruction": "Place the breaker vertically on asphalt and break with the left pedal"
+        },
+        "grapple": {
+          "title": "Grapple",
+          "instruction": "Pick up a rock, load it, then dump it into the rock truck"
+        },
+        "gearDismantle": {
+          "title": "Dismantle gear",
+          "instruction": "Dismantling gear grants enhance cores"
+        },
+        "gearEnhance": {
+          "title": "Enhance gear",
+          "instruction": "Use enhance cores to upgrade your gear"
+        },
+        "gearSynth": {
+          "title": "Synthesize gear",
+          "instruction": "Synthesize three gear pieces of the same grade"
+        }
+      }
+    },
+    "gacha": {
+      "title": "Acquired items",
+      "synthesisTitle": "Synthesis result",
+      "skip": "Skip",
+      "close": "Close",
+      "confirm": "OK",
+      "openingEquipment": "Opening equipment…",
+      "checkingEquipment": "Checking equipment…",
+      "highGrade": "HIGH GRADE"
+    },
+    "map": {
+      "eyebrow": "Site Survey",
+      "title": "Site map",
+      "closeAriaLabel": "Close map",
+      "subtitle": "The red arrow shows your current position and direction.",
+      "legendAriaLabel": "Map legend",
+      "legend": {
+        "dig": "Soil pile",
+        "dump": "Dumping",
+        "crash": "Breaking",
+        "hill": "Stone",
+        "repair": "Maintenance",
+        "monument": "Monument",
+        "sports": "Sports meet"
+      }
+    },
+    "sportsMeet": {
+      "title": "Excavator Sports Meet",
+      "close": "Close",
+      "loading": "Loading…",
+      "error": "Error",
+      "ticketLoadFailed": "Unable to load ticket information.",
+      "thisWeekCourse": "This Week's Course",
+      "rankRewards": "Rank Rewards",
+      "rank": "Rank {rank}",
+      "rankOrLower": "Rank {rank} or lower",
+      "rankRange": "Ranks {min}–{max}",
+      "weeklyResetNote": "Course resets Monday at 00:00 · Last week's rank rewards are granted",
+      "thisWeekRankings": "This Week's Rankings",
+      "previousWeekRankings": "Last Week's Rankings",
+      "rankedMode": "Ranked Mode",
+      "practiceMode": "Practice Mode",
+      "rankingsAriaLabel": "Excavator Sports Meet rankings",
+      "myRank": "My rank: {rank}",
+      "reward": "Reward {stars}★",
+      "noPreviousWeekRecords": "No records from last week",
+      "noThisWeekRecords": "No records this week",
+      "rankingsLoadFailed": "Unable to load rankings.",
+      "noRecords": "No records",
+      "rankHeader": "Rank",
+      "nicknameHeader": "Nickname",
+      "timeHeader": "Time",
+      "courseProgress": "Course {current}/{total}",
+      "course": "Course",
+      "meet": "Sports Meet",
+      "waitingToStart": "Waiting to start",
+      "start": "Start",
+      "exit": "Exit",
+      "resultAriaLabel": "Excavator Sports Meet results",
+      "finish": "Finished!",
+      "rankingRecorded": "Your ranking record has been updated",
+      "submittingRanking": "Submitting ranking…",
+      "practiceNotRanked": "Practice record · not ranked",
+      "segment": "Segment",
+      "cumulative": "Cumulative",
+      "retryPractice": "Retry Practice",
+      "viewThisWeekRankings": "View This Week's Rankings",
+      "returnToWorkshop": "Return to Workshop"
+    },
+    "chassis": {
+      "title": "Chassis",
+      "close": "Close",
+      "zoom": "Zoom",
+      "zoomAriaLabel": "Zoom chassis image",
+      "closeZoom": "Close zoomed image",
+      "class": {
+        "light": "Light",
+        "medium": "Medium",
+        "heavy": "Heavy"
+      },
+      "weight": "{weight} kg",
+      "defaultTrait": "Standard issue · canopy",
+      "bonusPointsTitle": "Available bonus points",
+      "bonus": "Bonus {points}",
+      "save": "Save",
+      "recommendedAllocation": "Recommended",
+      "statsAriaLabel": "Chassis stats",
+      "decreaseStat": "Decrease {stat}",
+      "increaseStat": "Increase {stat}",
+      "stats": {
+        "strength": "Strength",
+        "agility": "Agility",
+        "stamina": "Stamina",
+        "endurance": "Endurance",
+        "balance": "Balance",
+        "technique": "Technique"
+      }
+    },
+    "catalog": {
+      "slots": {
+        "ARM": "Arm",
+        "BOOM": "Boom",
+        "TRACK": "Track",
+        "BUCKET": "Bucket",
+        "BREAKER": "Breaker",
+        "GRAPPLE": "Grapple"
+      },
+      "grades": {
+        "NORMAL": "Normal",
+        "ENHANCED": "Enhanced",
+        "PRECISION": "Precision",
+        "MASTER": "Master"
+      },
+      "gradePrefix": {
+        "NORMAL": "Common",
+        "ENHANCED": "Improved",
+        "PRECISION": "High-performance",
+        "MASTER": "Top-tier"
+      },
+      "stats": {
+        "strength": "Strength",
+        "agility": "Agility",
+        "stamina": "Stamina",
+        "endurance": "Endurance",
+        "balance": "Balance",
+        "technique": "Technique"
+      },
+      "gear": {
+        "ARM": {
+          "name": "Arm",
+          "desc": "Working radius and lifting power"
+        },
+        "BOOM": {
+          "name": "Boom",
+          "desc": "Digging depth and reach"
+        },
+        "TRACK": {
+          "name": "Track",
+          "desc": "Travel performance and stability"
+        },
+        "BUCKET": {
+          "name": "Bucket",
+          "desc": "Standard bucket for digging and loading"
+        },
+        "BREAKER": {
+          "name": "Breaker",
+          "desc": "Attachment for rock and concrete breaking"
+        },
+        "GRAPPLE": {
+          "name": "Grapple",
+          "desc": "Grapple for stone and debris"
+        }
+      }
+    },
+    "guide": {
+      "title": "How to play",
+      "eyebrow": "Operator Guide",
+      "subtitle": "Controls, work, growth, and rewards at a glance",
+      "lead": "A quick overview of controls, work, growth, and rewards in the Yanmar excavator experience.",
+      "diagramAlt": "Yanmar excavator controls diagram — joysticks, travel levers, boom/bucket/arm",
+      "diagramHint": "① Left joystick · ② Travel levers · ⑤ Right joystick — pinch to zoom",
+      "sections": {
+        "modes": {
+          "title": "Modes",
+          "intro": "Enter Game mode from Home. Learn the controls in Practice or Tutorial, then climb the rankings.",
+          "items": {
+            "game": {
+              "label": "Game",
+              "desc": "Score, stars, XP, and coupons count, and results are recorded in season rankings."
+            },
+            "practice": {
+              "label": "Practice",
+              "desc": "Opens every work zone on the map for free practice. Does not count toward rankings or season rewards."
+            },
+            "tutorial": {
+              "label": "Tutorial",
+              "desc": "Learn step by step: travel → swing → arm → boom → bucket → soil pile → dump → breaker → rock load → rock dump."
+            },
+            "ride": {
+              "label": "Ride experience",
+              "desc": "Controls-only mode. No score or rewards."
+            }
+          }
+        },
+        "controls": {
+          "title": "Basic controls",
+          "items": {
+            "leftLever": {
+              "label": "Left lever",
+              "desc": "Swing left/right; move the arm forward/back."
+            },
+            "rightLever": {
+              "label": "Right lever",
+              "desc": "Boom forward/back; bucket left/right."
+            },
+            "travel": {
+              "label": "Travel levers",
+              "desc": "Forward, reverse, and turn left/right."
+            },
+            "functionMenu": {
+              "label": "Function menu",
+              "desc": "Swap attachments, dozer, safety lock, hydraulic high speed, boom swing, throttle, and more."
+            },
+            "pedals": {
+              "label": "Pedals & horn",
+              "desc": "Breaker hits, grapple open/close, boom-swing pedal, and horn."
+            },
+            "camera": {
+              "label": "Camera & minimap",
+              "desc": "Free-look and minimap for position. Auto-pose slots save and load machine posture."
+            }
+          }
+        },
+        "attachments": {
+          "title": "Attachments & work zones",
+          "intro": "Equip the matching attachment for each zone. You cannot swap attachments while soil remains in the bucket.",
+          "items": {
+            "bucket": {
+              "label": "Bucket · soil / dump",
+              "desc": "Load soil in the orange pile zone and dump it into dump trucks."
+            },
+            "breaker": {
+              "label": "Breaker · crushing",
+              "desc": "Break road tiles in the crushing zone. Broken tiles respawn after a while."
+            },
+            "grapple": {
+              "label": "Grapple · stone",
+              "desc": "Grip a rock, fill the grip meter, lift it, and unload onto haul trucks. Lift checks can fail."
+            }
+          }
+        },
+        "rewards": {
+          "title": "Work rewards",
+          "intro": "Working in Game mode earns score, stars, and XP, with a very low chance of coupon drops.",
+          "items": {
+            "soilDump": {
+              "label": "Soil dump",
+              "desc": "Earn score and stars (1–3) per load unit. Critical hits multiply score."
+            },
+            "crash": {
+              "label": "Crushing",
+              "desc": "Earn score, stars (5–15), and XP per tile."
+            },
+            "rockDump": {
+              "label": "Rock dump",
+              "desc": "Unloading one rock grants high score, stars (20–30), and XP."
+            },
+            "stars": {
+              "label": "Stars",
+              "desc": "Currency for gear enhance, gacha, shop, and more. No hold limit."
+            },
+            "coupons": {
+              "label": "Coupons",
+              "desc": "YK parts discounts (10/15/20%), equipment rental discounts (10/20/30%), and filter-set exchange coupons. Season caps (50/50/1) and 365-day expiry apply."
+            }
+          }
+        },
+        "unlocks": {
+          "title": "Level & map unlocks",
+          "intro": "Higher levels open more of the map and quests.",
+          "items": {
+            "tier1": {
+              "label": "Tier 1 (Lv.1+)",
+              "desc": "Use the soil pile and dump zones."
+            },
+            "tier2": {
+              "label": "Tier 2 (Lv.10+)",
+              "desc": "Unlocks breaker/crushing zones and related quests."
+            },
+            "tier3": {
+              "label": "Tier 3 (Lv.15+)",
+              "desc": "Unlocks grapple/stone zones and related quests."
+            },
+            "sportsMeet": {
+              "label": "Excavator Sports Meet (Lv.25+)",
+              "desc": "Portal at the lower-left of the minimap. One ranked ticket per day, unlimited practice. Course rotates Monday 00:00 (KST) with last week’s rank star mail."
+            }
+          }
+        },
+        "quests": {
+          "title": "Quests & missions",
+          "items": {
+            "daily": {
+              "label": "Daily quests",
+              "desc": "Goals that refresh daily: login, horn, dump, crushing, travel, and more."
+            },
+            "repeat": {
+              "label": "Repeat quests",
+              "desc": "Long-term goals you can progress again after claiming."
+            },
+            "mission": {
+              "label": "Daily missions",
+              "desc": "Three per day, scaled to your level. Clears grant stars, XP, enhance cores, gacha tickets, and more."
+            }
+          }
+        },
+        "gear": {
+          "title": "Gear, enhance & chassis",
+          "items": {
+            "gacha": {
+              "label": "Gear",
+              "desc": "Obtain arm, boom, track, bucket, breaker, and grapple gear from gacha. Rarity and main/sub options change performance."
+            },
+            "enhance": {
+              "label": "Enhance",
+              "desc": "Enhance each part +1 to +10. Costs stars; higher tiers are harder, and failures build a bonus."
+            },
+            "chassis": {
+              "label": "Chassis",
+              "desc": "Allocate base chassis (ViO17-1) stats: power, agility, stamina, grit, stability, and skill."
+            }
+          }
+        },
+        "workshop": {
+          "title": "Workshop & shop",
+          "items": {
+            "facility": {
+              "label": "Workshop",
+              "desc": "Earn points at soil, crushing, and stone workshops to upgrade and buy tickets, cores, and more."
+            },
+            "shopBuff": {
+              "label": "Shop buffs",
+              "desc": "Buy 1-hour buffs such as critical, move speed, grip, truck cooldown, and double-score chance."
+            }
+          }
+        },
+        "field": {
+          "title": "Field & maintenance",
+          "items": {
+            "fieldStar": {
+              "label": "Field stars",
+              "desc": "Pick up floating map stars for 50–200 stars. One appears every hour on the hour."
+            },
+            "speedBuff": {
+              "label": "Speed buff",
+              "desc": "Field speed pickups double move speed for about 30 seconds. Spawns about every 3 minutes, up to 10 per hour."
+            },
+            "repairTent": {
+              "label": "Repair tent",
+              "desc": "Consumables expire over time. When expired or nearly expired, a red icon appears—tap to inspect. At the repair shop, check the description, time left, and reward range, then exchange for free. Rewards are drawn once within the stated range. Leaving them expired applies a stat penalty."
+            }
+          }
+        },
+        "season": {
+          "title": "Season & more",
+          "items": {
+            "ranking": {
+              "label": "Season ranking",
+              "desc": "Compete on quarterly (KST) season score. Check Ranking info in Settings/menu."
+            },
+            "mailbox": {
+              "label": "Mailbox & coupon box",
+              "desc": "Claim mailed rewards and view held coupons in the coupon box."
+            },
+            "saveExit": {
+              "label": "Save & exit",
+              "desc": "Saving and exiting from Settings keeps your progress."
+            }
+          }
+        }
+      }
+    }
+  }
+}
