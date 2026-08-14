@@ -177,10 +177,6 @@ export function WorkshopPanel({
     }
   }, [open, workshopId]);
 
-  useEffect(() => {
-    if (!pending) setConfirmInstant(null);
-  }, [pending]);
-
   const def = workshopId ? WORKSHOP_DEFS[workshopId] : null;
   const points = workshopId && panelState ? panelState.points[workshopId] : 0;
   const levels =
@@ -193,6 +189,10 @@ export function WorkshopPanel({
       : undefined;
   const playerLevel = getPlayerLevelProgress(panelState?.totalXp ?? 0).level;
   const currency = panelState?.currency ?? 0;
+
+  useEffect(() => {
+    if (!pending) setConfirmInstant(null);
+  }, [pending]);
 
   useEffect(() => {
     if (!open || !pending || !onInstantUpgrade || busy) return;
