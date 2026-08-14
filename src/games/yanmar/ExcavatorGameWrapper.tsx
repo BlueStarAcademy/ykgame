@@ -36,7 +36,7 @@ import {
   hasManualControlInput,
 } from "./controls";
 import { CockpitOverlay } from "./CockpitOverlay";
-import { resolveAttachmentTipClearance } from "./attachmentGround";
+import { prepareAttachmentSwapClearance } from "./attachmentGround";
 import {
   ExcavatorScene,
   createInitialSim,
@@ -1521,7 +1521,7 @@ export function ExcavatorGameWrapper({
       simRef.current.attachmentType === "breaker" ||
       simRef.current.attachmentType === "grapple"
     ) {
-      resolveAttachmentTipClearance(
+      prepareAttachmentSwapClearance(
         simRef.current,
         terrainRef.current,
         auxiliaryRef.current.boomSwing,
@@ -2185,16 +2185,14 @@ export function ExcavatorGameWrapper({
       }
       simRef.current.attachmentType = next;
       simRef.current.carriedBoulderId = null;
-      // Breaker/grapple tips are longer than the bucket — lift clear so the
-      // ground constraint does not freeze hydraulics/travel on swap.
-      if (next === "breaker" || next === "grapple") {
-        resolveAttachmentTipClearance(
-          simRef.current,
-          terrainRef.current,
-          auxiliaryRef.current.boomSwing,
-          auxiliaryRef.current.grappleOpen,
-        );
-      }
+      // Breaker can pierce the boom when the arm is fully curled — unfold first.
+      // Breaker/grapple tips are also longer than the bucket — lift clear of ground.
+      prepareAttachmentSwapClearance(
+        simRef.current,
+        terrainRef.current,
+        auxiliaryRef.current.boomSwing,
+        auxiliaryRef.current.grappleOpen,
+      );
       setAttachmentType(next);
       if (attachmentWarningTimerRef.current != null) {
         window.clearTimeout(attachmentWarningTimerRef.current);
@@ -2497,6 +2495,12 @@ export function ExcavatorGameWrapper({
           } else {
             sim.attachmentType = "grapple";
           }
+          prepareAttachmentSwapClearance(
+            sim,
+            terrainRef.current,
+            auxiliaryRef.current.boomSwing,
+            auxiliaryRef.current.grappleOpen,
+          );
           setAttachmentType(sim.attachmentType);
           if (stage === "dig") {
             resetDumpTruckState(dumpTruckStateRef.current);
@@ -2638,6 +2642,12 @@ export function ExcavatorGameWrapper({
         if (stage === "drive" || stage === "dig") sim.attachmentType = "bucket";
         else if (stage === "crash") sim.attachmentType = "breaker";
         else sim.attachmentType = "grapple";
+        prepareAttachmentSwapClearance(
+          sim,
+          terrainRef.current,
+          auxiliaryRef.current.boomSwing,
+          auxiliaryRef.current.grappleOpen,
+        );
         setAttachmentType(sim.attachmentType);
       }
 
@@ -5098,17 +5108,12 @@ export function ExcavatorGameWrapper({
     if (step?.startAttachment) {
       simRef.current.attachmentType = step.startAttachment;
       simRef.current.carriedBoulderId = null;
-      if (
-        step.startAttachment === "breaker" ||
-        step.startAttachment === "grapple"
-      ) {
-        resolveAttachmentTipClearance(
-          simRef.current,
-          terrainRef.current,
-          auxiliaryRef.current.boomSwing,
-          auxiliaryRef.current.grappleOpen,
-        );
-      }
+      prepareAttachmentSwapClearance(
+        simRef.current,
+        terrainRef.current,
+        auxiliaryRef.current.boomSwing,
+        auxiliaryRef.current.grappleOpen,
+      );
       setAttachmentType(step.startAttachment);
     }
 

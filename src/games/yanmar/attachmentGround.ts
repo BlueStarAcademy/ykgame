@@ -1,4 +1,5 @@
 import { JOINT_LIMITS } from "./controls";
+import { resolveBreakerBoomClearance } from "./breakerBoomClearance";
 import {
   getBreakerTipWorld,
   getBucketBodyContactWorld,
@@ -233,4 +234,23 @@ export function resolveAttachmentTipClearance(
     measureAttachmentClearance(sim, terrain, boomSwing, grappleOpen).clearance >=
     targetClearance
   );
+}
+
+/**
+ * Pose fix when mounting breaker/grapple:
+ * - breaker: unfold arm so the chisel does not pierce the boom
+ * - then lift clear of the ground for the longer tip
+ */
+export function prepareAttachmentSwapClearance(
+  sim: ExcavatorSimState,
+  terrain: TerrainData,
+  boomSwing: number,
+  grappleOpen = 1,
+): void {
+  if (sim.attachmentType === "breaker") {
+    resolveBreakerBoomClearance(sim);
+  }
+  if (sim.attachmentType === "breaker" || sim.attachmentType === "grapple") {
+    resolveAttachmentTipClearance(sim, terrain, boomSwing, grappleOpen);
+  }
 }
