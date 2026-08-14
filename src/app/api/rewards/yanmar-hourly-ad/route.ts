@@ -8,10 +8,10 @@ import {
   runReplayableRewardEvent,
 } from "@/lib/yanmar-rewards";
 import {
+  getActiveHourlyAd,
   getHourlyAdHourBucket,
-  isHourlyAdClaimOpen,
   makeHourlyAdEventId,
-  parseHourlyAdEventBucket,
+  parseHourlyAdEventId,
   rollHourlyAdReward,
   type HourlyAdReward,
 } from "@/games/yanmar/hourlyAdReward";
@@ -120,19 +120,25 @@ export async function POST(request: Request) {
   } | null;
 
   const eventId = parseRewardEventId(body?.eventId);
-  const bucket = eventId ? parseHourlyAdEventBucket(eventId) : null;
+  const parsed = eventId ? parseHourlyAdEventId(eventId) : null;
+  const active = getActiveHourlyAd();
   const currentBucket = getHourlyAdHourBucket();
 
-  if (!eventId || bucket === null) {
+  if (!eventId || parsed === null) {
     return NextResponse.json({ error: "Invalid eventId" }, { status: 400 });
   }
-  if (bucket !== currentBucket || !isHourlyAdClaimOpen()) {
+  if (
+    !active ||
+    parsed.hourBucket !== currentBucket ||
+    parsed.hourBucket !== active.hourBucket ||
+    parsed.slotId !== active.slot.id
+  ) {
     return NextResponse.json(
       { error: "Hour window expired", expired: true },
       { status: 400 },
     );
   }
-  if (eventId !== makeHourlyAdEventId(bucket)) {
+  if (eventId !== makeHourlyAdEventId(parsed.hourBucket, parsed.slotId)) {
     return NextResponse.json({ error: "Invalid eventId" }, { status: 400 });
   }
 

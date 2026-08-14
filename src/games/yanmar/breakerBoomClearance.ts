@@ -1,4 +1,4 @@
-import { JOINT_LIMITS } from "./controls";
+import { FACTORY_JOINT_LIMITS } from "./workEquipment/workEquipmentStructure";
 import { YANMAR_MACHINE_RIG } from "./machineVisualTheme";
 import type { ExcavatorSimState } from "./types";
 
@@ -8,6 +8,9 @@ const {
   armRotationScale: ARM_SCALE,
   bucketRotationScale: BUCKET_SCALE,
   breakerRotationZ: BREAKER_ROT,
+  breakerVisualScale: BREAKER_SCALE,
+  breakerArmPinLocalX: ARM_PIN_X,
+  breakerArmPinLocalY: ARM_PIN_Y,
   breakerTipLocalX: TIP_LX,
   breakerTipLocalY: TIP_LY,
 } = YANMAR_MACHINE_RIG;
@@ -100,7 +103,13 @@ export function breakerHitsBoom(sim: ExcavatorSimState): boolean {
   const { a, b } = boomSegmentEndpoints(sim.boom);
   const need = BOOM_HIT_RADIUS + CLEARANCE_MARGIN;
   for (const [lx, ly] of BREAKER_HIT_LOCALS) {
-    const p = breakerPointPlanar(sim.boom, sim.arm, sim.bucket, lx, ly);
+    const p = breakerPointPlanar(
+      sim.boom,
+      sim.arm,
+      sim.bucket,
+      (lx - ARM_PIN_X) * BREAKER_SCALE,
+      (ly - ARM_PIN_Y) * BREAKER_SCALE,
+    );
     if (distPointToSegment(p.x, p.y, a.x, a.y, b.x, b.y) < need) {
       return true;
     }
@@ -115,8 +124,8 @@ export function breakerHitsBoom(sim: ExcavatorSimState): boolean {
 export function resolveBreakerBoomClearance(sim: ExcavatorSimState): boolean {
   if (!breakerHitsBoom(sim)) return true;
 
-  const armMax = JOINT_LIMITS.arm.max;
-  const bucketMax = JOINT_LIMITS.bucket.max;
+  const armMax = FACTORY_JOINT_LIMITS.arm.max;
+  const bucketMax = FACTORY_JOINT_LIMITS.bucket.max;
   const startArm = sim.arm;
   const startBucket = sim.bucket;
 
@@ -153,4 +162,66 @@ export function resolveBreakerBoomClearance(sim: ExcavatorSimState): boolean {
   sim.arm = armMax;
   sim.bucket = Math.max(sim.bucket, startBucket);
   return !breakerHitsBoom(sim);
+}
+
+type JointSnapshot = { boom: number; arm: number; bucket: number };
+
+/**
+ * Runtime stop: while breaker is mounted, do not let the arm (or boom/bucket
+ * moves that tuck the chisel in) push through the boom. Prefer clamping arm
+ * fold; unfold only as far as needed to clear.
+ */
+export function enforceBreakerBoomClearance(
+  sim: ExcavatorSimState,
+  previous: JointSnapshot,
+  vel?: { arm: number } | null,
+): void {
+  if (sim.attachmentType !== "breaker") return;
+  if (!breakerHitsBoom(sim)) return;
+
+  const armMax = FACTORY_JOINT_LIMITS.arm.max;
+  const foldedArm = sim.arm;
+  const boomNow = sim.boom;
+  const bucketNow = sim.bucket;
+
+  // Keep the newly applied boom/bucket; see if the previous arm still clears.
+  sim.arm = previous.arm;
+  if (!breakerHitsBoom(sim) && previous.arm > foldedArm + 1e-5) {
+    // Arm fold caused the hit — stop at the last safe angle.
+    let lo = foldedArm;
+    let hi = previous.arm;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) * 0.5;
+      sim.arm = mid;
+      if (breakerHitsBoom(sim)) lo = mid;
+      else hi = mid;
+    }
+    sim.arm = hi;
+    if (vel && vel.arm < 0) vel.arm = 0;
+    return;
+  }
+
+  // Boom/bucket tucked the tip in, or we were already past the limit — unfold.
+  sim.boom = boomNow;
+  sim.bucket = bucketNow;
+  sim.arm = foldedArm;
+  if (foldedArm < armMax - 1e-4) {
+    let lo = foldedArm;
+    let hi = armMax;
+    for (let i = 0; i < 28; i++) {
+      const mid = (lo + hi) * 0.5;
+      sim.arm = mid;
+      if (breakerHitsBoom(sim)) lo = mid;
+      else hi = mid;
+    }
+    sim.arm = hi;
+  } else {
+    sim.arm = armMax;
+  }
+
+  if (breakerHitsBoom(sim)) {
+    // Last resort matches swap resolver (nudge bucket open).
+    resolveBreakerBoomClearance(sim);
+  }
+  if (vel && vel.arm < 0) vel.arm = 0;
 }

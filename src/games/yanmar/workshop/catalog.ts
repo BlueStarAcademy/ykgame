@@ -15,7 +15,7 @@ export const WORKSHOP_SHOP_ITEMS: readonly WorkshopShopItemDef[] = [
   {
     id: "ticket_standard",
     label: "일반 뽑기권",
-    description: "일반 뽑기 1회에 사용",
+    description: "구매 시 1~5개 랜덤 획득",
     cost: WORKSHOP_SHOP_PRICES.ticket_standard,
     weeklyLimit: WORKSHOP_SHOP_WEEKLY_LIMIT,
     icon: "/images/yanmar/2d/gacha-ticket-standard.svg",
@@ -23,7 +23,7 @@ export const WORKSHOP_SHOP_ITEMS: readonly WorkshopShopItemDef[] = [
   {
     id: "ticket_premium",
     label: "고급 뽑기권",
-    description: "고급 뽑기 1회에 사용",
+    description: "구매 시 1~3개 랜덤 획득",
     cost: WORKSHOP_SHOP_PRICES.ticket_premium,
     weeklyLimit: WORKSHOP_SHOP_WEEKLY_LIMIT,
     icon: "/images/yanmar/2d/gacha-ticket-premium.svg",
@@ -31,7 +31,7 @@ export const WORKSHOP_SHOP_ITEMS: readonly WorkshopShopItemDef[] = [
   {
     id: "enhance_core",
     label: "강화코어",
-    description: "장비 강화에 사용",
+    description: "구매 시 1~10개 랜덤 획득",
     cost: WORKSHOP_SHOP_PRICES.enhance_core,
     weeklyLimit: WORKSHOP_SHOP_WEEKLY_LIMIT,
     icon: "/images/yanmar/2d/enhance-core.svg",

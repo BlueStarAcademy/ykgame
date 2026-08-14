@@ -9,6 +9,9 @@ import { REPAIR_TENT } from "./gearCatalog";
 import { SITE_LAYOUT } from "./siteLayout";
 import type { MonumentPhase } from "./monument/types";
 import type { WorldPickupsState } from "./worldPickups";
+import { getGraphicsProfile } from "./graphicsQuality";
+
+const MINIMAP_GFX = getGraphicsProfile();
 
 interface ExcavatorMinimapProps {
   simRef: React.RefObject<ExcavatorSimState>;
@@ -65,7 +68,10 @@ function setupHiDpiCanvas(canvas: HTMLCanvasElement, displaySize: number) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const dpr = Math.min(
+    window.devicePixelRatio || 1,
+    MINIMAP_GFX.minimapMaxDpr,
+  );
   const bufW = Math.round(displaySize * dpr);
   const bufH = Math.round(displaySize * dpr);
   // Assigning width/height resets the context (including transform).
@@ -84,7 +90,10 @@ function ensureMinimapHiDpi(
   ctx: CanvasRenderingContext2D,
   displaySize: number,
 ): CanvasRenderingContext2D {
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const dpr = Math.min(
+    window.devicePixelRatio || 1,
+    MINIMAP_GFX.minimapMaxDpr,
+  );
   const bufW = Math.round(displaySize * dpr);
   const bufH = Math.round(displaySize * dpr);
   if (canvas.width !== bufW || canvas.height !== bufH) {
@@ -192,14 +201,18 @@ export function ExcavatorMinimap({
     let raf = 0;
     let ctx = setupHiDpiCanvas(canvas, size)?.ctx ?? null;
     if (!ctx) return;
+    let lastDraw = 0;
+    const minFrameMs = 1000 / Math.max(1, MINIMAP_GFX.minimapFps);
 
-    const draw = () => {
+    const draw = (now: number) => {
+      raf = requestAnimationFrame(draw);
+      if (now - lastDraw < minFrameMs) return;
+      lastDraw = now;
       ctx = ensureMinimapHiDpi(canvas, ctx!, size);
       const context = ctx;
       const sim = simRef.current;
       const terrain = terrainRef.current;
       if (!sim || !terrain) {
-        raf = requestAnimationFrame(draw);
         return;
       }
       const wp =
@@ -533,7 +546,7 @@ export function ExcavatorMinimap({
       context.fill();
       context.restore();
 
-      raf = requestAnimationFrame(draw);
+      // next frame scheduled at top of draw()
     };
 
     const onResize = () => {

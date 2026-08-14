@@ -9,26 +9,26 @@ import {
   HOURLY_AD_SLOT_DECAY_MS,
   HOURLY_AD_WATCH_SEC,
   formatMmSs,
-  getHourlyAdBannerRemainingMs,
-  getHourlyAdHourBucket,
+  getActiveHourlyAd,
   makeHourlyAdEventId,
   markHourlyAdClaimedLocally,
   rollHourlyAdReward,
   saveHourlyAdGrantLocally,
   wasHourlyAdClaimedLocally,
   type HourlyAdClaimResult,
+  type HourlyAdCreative,
   type HourlyAdReward,
+  type HourlyAdSlotId,
 } from "./hourlyAdReward";
 import { yanmarAudio } from "./yanmarAudio";
 
-const AD_IMAGE = "/images/yanmar/ads/sv10-sv11-launch.png";
 const REEL_LOOPS = 18;
 const ITEM_HEIGHT = 4.6; /* rem — keep in sync with CSS .slotItem */
 
 const REWARD_PREVIEW_ITEMS = [
   {
     key: "stars",
-    range: "100~300",
+    range: "75~225",
     icons: ["/images/star-currency.svg"],
   },
   {
@@ -38,12 +38,12 @@ const REWARD_PREVIEW_ITEMS = [
   },
   {
     key: "gachaStandard",
-    range: "5개",
+    range: "4개",
     icons: ["/images/yanmar/2d/gacha-ticket-standard.svg"],
   },
   {
     key: "points",
-    range: "100~300",
+    range: "75~225",
     icons: [
       "/images/yanmar/2d/workshop-coin-dump.svg",
       "/images/yanmar/2d/workshop-coin-crash.svg",
@@ -96,6 +96,9 @@ export function HourlyAdBanner({
   const [mounted, setMounted] = useState(false);
   const [bannerSec, setBannerSec] = useState(0);
   const [claimed, setClaimed] = useState(false);
+  const [activeSlotId, setActiveSlotId] = useState<HourlyAdSlotId | null>(null);
+  const [activeHourBucket, setActiveHourBucket] = useState<number | null>(null);
+  const [creative, setCreative] = useState<HourlyAdCreative | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [watchLeft, setWatchLeft] = useState(HOURLY_AD_WATCH_SEC);
   const [reward, setReward] = useState<HourlyAdReward | null>(null);
@@ -111,6 +114,8 @@ export function HourlyAdBanner({
   const stopRequestedRef = useRef(false);
   /** True once server/local grant is finalized (independent of 확인). */
   const grantFinalizedRef = useRef(false);
+  const activeSlotIdRef = useRef<HourlyAdSlotId | null>(null);
+  const activeHourBucketRef = useRef<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -120,11 +125,26 @@ export function HourlyAdBanner({
     if (!enabled || !mounted) return;
 
     const tick = () => {
-      const now = Date.now();
-      const bucket = getHourlyAdHourBucket(now);
-      setClaimed(wasHourlyAdClaimedLocally(bucket));
-      const remainMs = getHourlyAdBannerRemainingMs(now);
-      setBannerSec(remainMs > 0 ? remainMs / 1000 : 0);
+      const active = getActiveHourlyAd();
+      if (!active) {
+        setBannerSec(0);
+        setActiveSlotId(null);
+        setActiveHourBucket(null);
+        setCreative(null);
+        activeSlotIdRef.current = null;
+        activeHourBucketRef.current = null;
+        setClaimed(false);
+        return;
+      }
+
+      const { hourBucket, slot, remainingMs } = active;
+      activeSlotIdRef.current = slot.id;
+      activeHourBucketRef.current = hourBucket;
+      setActiveSlotId(slot.id);
+      setActiveHourBucket(hourBucket);
+      setCreative(slot.creative);
+      setClaimed(wasHourlyAdClaimedLocally(hourBucket, slot.id));
+      setBannerSec(remainingMs / 1000);
     };
 
     tick();
@@ -137,6 +157,7 @@ export function HourlyAdBanner({
     mounted &&
     !claimed &&
     bannerSec > 0 &&
+    creative !== null &&
     phase === "idle";
 
   const adOpen = phase === "ad" || phase === "claiming";
@@ -179,7 +200,10 @@ export function HourlyAdBanner({
   useEffect(() => {
     const persistClaimed = () => {
       if (!grantFinalizedRef.current) return;
-      markHourlyAdClaimedLocally(getHourlyAdHourBucket());
+      const slotId = activeSlotIdRef.current;
+      const hourBucket = activeHourBucketRef.current;
+      if (!slotId || hourBucket === null) return;
+      markHourlyAdClaimedLocally(hourBucket, slotId);
     };
     window.addEventListener("pagehide", persistClaimed);
     document.addEventListener("visibilitychange", persistClaimed);
@@ -190,7 +214,7 @@ export function HourlyAdBanner({
   }, []);
 
   function openAd() {
-    if (claimed || bannerSec <= 0) return;
+    if (claimed || bannerSec <= 0 || !creative) return;
     setClaimError(null);
     setConfirmClose(false);
     setPhase("ad");
@@ -207,8 +231,9 @@ export function HourlyAdBanner({
 
   function confirmCloseAd() {
     if (phase === "claiming") return;
-    const bucket = getHourlyAdHourBucket();
-    markHourlyAdClaimedLocally(bucket);
+    if (activeHourBucket !== null && activeSlotId) {
+      markHourlyAdClaimedLocally(activeHourBucket, activeSlotId);
+    }
     setClaimed(true);
     setConfirmClose(false);
     setPhase("idle");
@@ -284,11 +309,13 @@ export function HourlyAdBanner({
 
   async function claimReward() {
     if (phase !== "ad" || watchLeft > 0) return;
+    if (activeHourBucket === null || !activeSlotId) return;
     setPhase("claiming");
     setClaimError(null);
 
-    const bucket = getHourlyAdHourBucket();
-    const eventId = makeHourlyAdEventId(bucket);
+    const bucket = activeHourBucket;
+    const slotId = activeSlotId;
+    const eventId = makeHourlyAdEventId(bucket, slotId);
 
     try {
       let result: HourlyAdClaimResult;
@@ -319,7 +346,7 @@ export function HourlyAdBanner({
       }
 
       // Grant is final as soon as the API/local roll succeeds — 확인 is UI only.
-      saveHourlyAdGrantLocally(bucket, result);
+      saveHourlyAdGrantLocally(bucket, slotId, result);
       grantFinalizedRef.current = true;
       setClaimed(true);
       setReward(result.reward);
@@ -346,22 +373,22 @@ export function HourlyAdBanner({
 
   return (
     <>
-      {showTeaser ? (
+      {showTeaser && creative ? (
         <button
           type="button"
           className={styles.teaser}
           onClick={openAd}
-          aria-label="SV10·SV11 출시 광고 보상 보기"
+          aria-label={`${creative.ariaLabel} 보상 보기`}
         >
           <span className={styles.teaserShine} aria-hidden />
           <div className={styles.teaserMedia}>
             <span className={styles.teaserBadge}>NEW</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={AD_IMAGE} alt="" draggable={false} />
+            <img src={creative.image} alt="" draggable={false} />
           </div>
           <div className={styles.teaserBody}>
-            <div className={styles.teaserTitle}>SV10·SV11 출시!</div>
-            <div className={styles.teaserSub}>탭하고 보상 받기</div>
+            <div className={styles.teaserTitle}>{creative.teaserTitle}</div>
+            <div className={styles.teaserSub}>{creative.teaserSub}</div>
             <div className={styles.teaserTimer}>
               <span className={styles.teaserTimerLabel}>남은 시간</span>
               <span>{formatMmSs(bannerSec)}</span>
@@ -370,7 +397,7 @@ export function HourlyAdBanner({
         </button>
       ) : null}
 
-      {adOpen
+      {adOpen && creative
         ? createPortal(
             <div className={styles.backdrop} onClick={requestCloseAd}>
               <div
@@ -378,12 +405,14 @@ export function HourlyAdBanner({
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
-                aria-label="SV10·SV11 출시 광고"
+                aria-label={creative.ariaLabel}
               >
                 <div className={styles.panelHeader}>
                   <div>
-                    <div className={styles.panelEyebrow}>Yanmar New Model</div>
-                    <h2 className={styles.panelTitle}>SV10·SV11 출시!</h2>
+                    <div className={styles.panelEyebrow}>
+                      {creative.panelEyebrow}
+                    </div>
+                    <h2 className={styles.panelTitle}>{creative.panelTitle}</h2>
                   </div>
                   <button
                     type="button"
@@ -398,10 +427,7 @@ export function HourlyAdBanner({
                 <div className={styles.panelBody}>
                   <div className={styles.adFrame}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={AD_IMAGE}
-                      alt="얀마 SV10·SV11 미니굴착기 출시"
-                    />
+                    <img src={creative.image} alt={creative.imageAlt} />
                   </div>
                   {watchLeft > 0 ? (
                     <p className={styles.adHint}>{watchLeft}초 후 보상 획득</p>

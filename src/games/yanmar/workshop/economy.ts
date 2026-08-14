@@ -14,6 +14,20 @@ export const WORKSHOP_SHOP_PRICES = {
   enhance_core: 200,
 } as const;
 
+/** Inclusive random grant ranges on shop purchase. */
+export const WORKSHOP_SHOP_GRANT_RANGES = {
+  ticket_standard: { min: 1, max: 5 },
+  ticket_premium: { min: 1, max: 3 },
+  enhance_core: { min: 1, max: 10 },
+} as const;
+
+export function rollWorkshopShopGrantAmount(
+  itemId: keyof typeof WORKSHOP_SHOP_GRANT_RANGES,
+): number {
+  const range = WORKSHOP_SHOP_GRANT_RANGES[itemId];
+  return range.min + Math.floor(Math.random() * (range.max - range.min + 1));
+}
+
 /** KST Monday date key `YYYY-MM-DD` for the week containing `now`. */
 export function getWorkshopWeekKey(now = new Date()): string {
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);

@@ -5,6 +5,7 @@ import {
   WORKSHOP_SHOP_ITEMS,
   getWorkshopWeekKey,
   isWorkshopId,
+  rollWorkshopShopGrantAmount,
   workshopPointsField,
   type WorkshopShopItemId,
 } from "@/games/yanmar/workshop";
@@ -73,12 +74,13 @@ export async function POST(request: Request) {
       if (!user) throw new Error("USER_NOT_FOUND");
       if (user[field] < item.cost) throw new Error("INSUFFICIENT_POINTS");
 
+      const grantedAmount = rollWorkshopShopGrantAmount(itemId);
       const grantData =
         itemId === "ticket_standard"
-          ? { gachaTicketsStandard: { increment: 1 } }
+          ? { gachaTicketsStandard: { increment: grantedAmount } }
           : itemId === "ticket_premium"
-            ? { gachaTicketsPremium: { increment: 1 } }
-            : { enhanceCores: { increment: 1 } };
+            ? { gachaTicketsPremium: { increment: grantedAmount } }
+            : { enhanceCores: { increment: grantedAmount } };
 
       const refreshed = await tx.user.update({
         where: { id: session.user.id },
@@ -119,6 +121,7 @@ export async function POST(request: Request) {
         workshopId,
         itemId,
         cost: item.cost,
+        grantedAmount,
         weekKey,
         weeklyCount: updatedPurchase.count,
         weeklyRemaining: Math.max(0, item.weeklyLimit - updatedPurchase.count),

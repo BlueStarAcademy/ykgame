@@ -17,6 +17,7 @@ import {
   filterInput,
 } from "./controls";
 import type { AutoPoseState } from "./types";
+import { enforceBreakerBoomClearance } from "./breakerBoomClearance";
 import {
   digAt,
   consumeDigZoneUnits,
@@ -904,6 +905,9 @@ export function tickExcavatorSim(params: SimTickParams) {
         getArmCollisionSamples,
       );
     }
+    // Breaker mounted: stop arm fold (and tuck-in from boom/bucket) before
+    // the chisel pierces the boom stick.
+    enforceBreakerBoomClearance(sim, subBefore, vel);
   }
   if (constrainExcavatorToMap(sim, terrain)) {
     vel.travel = 0;

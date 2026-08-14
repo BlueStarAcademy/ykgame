@@ -18,6 +18,7 @@ import {
   YANMAR_PAINT_MATERIAL,
   YANMAR_PAINT_RED,
 } from "./machineVisualTheme";
+import { getGraphicsProfile } from "./graphicsQuality";
 import {
   getChassisVisualProfile,
   type ChassisVisualProfile,
@@ -27,6 +28,8 @@ import {
   type SprocketStyle,
 } from "./chassisVisualConfig";
 import type { ChassisModelId } from "./chassisCatalog";
+
+const PAINT_GFX = getGraphicsProfile();
 
 /**
  * Undercarriage / swing-bearing center in body local +X.
@@ -43,21 +46,28 @@ const SWING_HOUSE_FLOOR_LOCAL_Y =
   SWING_DECK_TOP_Y + SWING_KINGPOST_H + 0.03 - SWING_HOUSE_LIFT_Y;
 const TRACK_PAD_COUNT = 34;
 const RUBBER_TREAD_COUNT = 48;
-const TRACK_STRAIGHT_HALF = 0.86;
+/** Side-view track extents — front a bit longer than rear. */
+const TRACK_FRONT = 1.7;
+const TRACK_REAR = 1.5;
 const TRACK_LOOP_RADIUS = 0.38;
-const TRACK_STRAIGHT_LENGTH = TRACK_STRAIGHT_HALF * 2;
+const TRACK_STRAIGHT_LENGTH = TRACK_FRONT + TRACK_REAR;
 const TRACK_ARC_LENGTH = Math.PI * TRACK_LOOP_RADIUS;
 const TRACK_LOOP_LENGTH = TRACK_STRAIGHT_LENGTH * 2 + TRACK_ARC_LENGTH * 2;
+const TRACK_CARCASS_LEN = TRACK_FRONT + TRACK_REAR + TRACK_LOOP_RADIUS * 2;
+const TRACK_CARCASS_H = TRACK_LOOP_RADIUS * 2 + 0.06;
+/** Shift carcass so the longer front doesn't leave an empty rear gap. */
+const TRACK_CARCASS_CENTER_X = (TRACK_FRONT - TRACK_REAR) * 0.5;
 const TRACK_WHEEL_DARK = "#14191d";
 const TRACK_WHEEL_HUB = "#30373c";
 const TRACK_WHEEL_STEEL = "#4a545c";
+const TRACK_GROUP_Y = 0.24;
 
 function getTrackLoopPose(distance: number) {
   let cursor = THREE.MathUtils.euclideanModulo(distance, TRACK_LOOP_LENGTH);
 
   if (cursor < TRACK_STRAIGHT_LENGTH) {
     return {
-      x: -TRACK_STRAIGHT_HALF + cursor,
+      x: -TRACK_REAR + cursor,
       y: -TRACK_LOOP_RADIUS,
       angle: 0,
     };
@@ -67,7 +77,7 @@ function getTrackLoopPose(distance: number) {
   if (cursor < TRACK_ARC_LENGTH) {
     const theta = -Math.PI / 2 + cursor / TRACK_LOOP_RADIUS;
     return {
-      x: TRACK_STRAIGHT_HALF + Math.cos(theta) * TRACK_LOOP_RADIUS,
+      x: TRACK_FRONT + Math.cos(theta) * TRACK_LOOP_RADIUS,
       y: Math.sin(theta) * TRACK_LOOP_RADIUS,
       angle: theta + Math.PI / 2,
     };
@@ -76,7 +86,7 @@ function getTrackLoopPose(distance: number) {
 
   if (cursor < TRACK_STRAIGHT_LENGTH) {
     return {
-      x: TRACK_STRAIGHT_HALF - cursor,
+      x: TRACK_FRONT - cursor,
       y: TRACK_LOOP_RADIUS,
       angle: Math.PI,
     };
@@ -85,18 +95,19 @@ function getTrackLoopPose(distance: number) {
 
   const theta = Math.PI / 2 + cursor / TRACK_LOOP_RADIUS;
   return {
-    x: -TRACK_STRAIGHT_HALF + Math.cos(theta) * TRACK_LOOP_RADIUS,
+    x: -TRACK_REAR + Math.cos(theta) * TRACK_LOOP_RADIUS,
     y: Math.sin(theta) * TRACK_LOOP_RADIUS,
     angle: theta + Math.PI / 2,
   };
 }
 
 function rollerPositions(count: number): number[] {
-  if (count <= 1) return [0];
-  const span = TRACK_STRAIGHT_HALF * 1.55;
+  if (count <= 1) return [TRACK_CARCASS_CENTER_X];
+  const start = -TRACK_REAR * 0.78;
+  const end = TRACK_FRONT * 0.78;
   return Array.from({ length: count }, (_, i) => {
     const t = i / (count - 1);
-    return -span / 2 + t * span;
+    return start + t * (end - start);
   });
 }
 
@@ -114,7 +125,7 @@ function TrackIdler({
   return (
     <group
       ref={wheelRef}
-      position={[TRACK_STRAIGHT_HALF, 0.01, side * 0.28]}
+      position={[TRACK_FRONT, 0.01, side * 0.28]}
     >
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[radius, radius, 0.18, 32]} />
@@ -159,7 +170,7 @@ function TrackSprocket({
   return (
     <group
       ref={wheelRef}
-      position={[-TRACK_STRAIGHT_HALF, 0.01, side * 0.28]}
+      position={[-TRACK_REAR, 0.01, side * 0.28]}
     >
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[radius, radius, isMini ? 0.14 : 0.18, 28]} />
@@ -315,9 +326,10 @@ function RubberTrack({
     <group position={[0, 0.18, side * 0.72]}>
       {/* Continuous rubber belt carcass */}
       <RoundedBox
-        args={[2.42, 0.82, 0.6]}
-        radius={0.36}
+        args={[TRACK_CARCASS_LEN, TRACK_CARCASS_H, 0.6]}
+        radius={TRACK_LOOP_RADIUS * 0.95}
         smoothness={12}
+        position={[TRACK_CARCASS_CENTER_X, 0, 0]}
         castShadow
       >
         <meshStandardMaterial
@@ -330,10 +342,10 @@ function RubberTrack({
       {[-0.27, 0.27].map((zLocal) => (
         <RoundedBox
           key={`bead-${zLocal}`}
-          args={[2.34, 0.12, 0.1]}
+          args={[TRACK_CARCASS_LEN - 0.08, 0.12, 0.1]}
           radius={0.05}
           smoothness={6}
-          position={[0, 0.08, side * zLocal]}
+          position={[TRACK_CARCASS_CENTER_X, 0.08, side * zLocal]}
           castShadow
         >
           <meshStandardMaterial
@@ -344,10 +356,10 @@ function RubberTrack({
         </RoundedBox>
       ))}
       <RoundedBox
-        args={[1.65, 0.26, 0.48]}
+        args={[TRACK_STRAIGHT_LENGTH * 0.95, 0.26, 0.48]}
         radius={0.08}
         smoothness={6}
-        position={[0, 0.06, 0]}
+        position={[TRACK_CARCASS_CENTER_X, 0.06, 0]}
         castShadow
       >
         <meshStandardMaterial color={COLOR.frameLight} {...MATERIAL.frame} />
@@ -511,18 +523,19 @@ function SteelTrack({
   return (
     <group position={[0, 0.18, side * 0.72]}>
       <RoundedBox
-        args={[2.36, 0.7, 0.52]}
+        args={[TRACK_CARCASS_LEN - 0.06, TRACK_CARCASS_H - 0.12, 0.52]}
         radius={0.22}
         smoothness={8}
+        position={[TRACK_CARCASS_CENTER_X, 0, 0]}
         castShadow
       >
         <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
       </RoundedBox>
       <RoundedBox
-        args={[1.8, 0.32, 0.58]}
+        args={[TRACK_STRAIGHT_LENGTH * 1.05, 0.32, 0.58]}
         radius={0.1}
         smoothness={6}
-        position={[0, 0.02, 0]}
+        position={[TRACK_CARCASS_CENTER_X, 0.02, 0]}
         castShadow
       >
         <meshStandardMaterial color={COLOR.frameLight} {...MATERIAL.frame} />
@@ -611,16 +624,20 @@ function ChassisTrack({
 function UndercarriageAssembly({
   trackWidth,
   scale = 1,
+  bodyScale = 1,
 }: {
   trackWidth: number;
   scale?: number;
+  bodyScale?: number;
 }) {
   // Match PremiumExcavatorBody track group scales (non-uniform).
   const trackScaleX = 0.58 * trackWidth;
   const trackScaleZ = 0.82 * trackWidth;
+  // Keep carbody width inside the track bay; grow length/height with bodyScale.
+  // Deck top stays fixed so the kingpost / house / boom pivot still line up.
   const bodyW = getCarbodyWidth(trackWidth);
-  const bodyL = 2.28 * trackScaleX;
-  const bodyH = 0.46;
+  const bodyL = 2.28 * trackScaleX * bodyScale;
+  const bodyH = 0.46 * bodyScale;
   const deckTopY = SWING_DECK_TOP_Y;
   const bodyCenterY = deckTopY - bodyH * 0.5 + 0.02;
   // Tall enough kingpost that light (scale≈0.9) machines still read a clear cylinder.
@@ -787,8 +804,24 @@ function PaintMaterial({
   color?: string;
   dark?: boolean;
 }) {
+  if (PAINT_GFX.quality === "performance") {
+    return (
+      <meshStandardMaterial
+        color={color}
+        roughness={YANMAR_PAINT_MATERIAL.roughness}
+        metalness={YANMAR_PAINT_MATERIAL.metalness}
+      />
+    );
+  }
   return (
-    <meshPhysicalMaterial color={color} {...YANMAR_PAINT_MATERIAL} />
+    <meshPhysicalMaterial
+      color={color}
+      roughness={YANMAR_PAINT_MATERIAL.roughness}
+      metalness={YANMAR_PAINT_MATERIAL.metalness}
+      clearcoat={PAINT_GFX.paintClearcoat}
+      clearcoatRoughness={YANMAR_PAINT_MATERIAL.clearcoatRoughness}
+      envMapIntensity={PAINT_GFX.paintEnvMapIntensity}
+    />
   );
 }
 
@@ -875,10 +908,6 @@ function CanopyCab({ variant = "twoPost" }: { variant?: CanopyVariant }) {
       >
         <meshStandardMaterial color="#1a1f24" {...MATERIAL.frame} />
       </RoundedBox>
-      <mesh position={[0.05, -0.02, -0.52]}>
-        <boxGeometry args={[0.95, 1.28, 0.022]} />
-        <GlassMaterial />
-      </mesh>
     </group>
   );
 }
@@ -1503,12 +1532,13 @@ export function PremiumExcavatorBody({
   const trackScaleZ = 0.82 * visual.trackWidth;
   const bodyXZ = 0.58 * (0.94 + visual.bodyBulk * 0.06);
   const bodyZ = 0.82 * (0.94 + visual.bodyBulk * 0.06);
+  const bodyScale = visual.bodyScale;
 
   return (
     <group scale={[visual.scale, visual.scale, visual.scale]}>
       {/* Fixed undercarriage — track center = swing pivot (X=0) */}
       <group scale={[trackScaleX, 1, trackScaleZ]}>
-        <group position={[SWING_PIVOT_X, 0.24, 0]}>
+        <group position={[SWING_PIVOT_X, TRACK_GROUP_Y, 0]}>
           {([-1, 1] as const).map((side) => (
             <ChassisTrack
               key={side}
@@ -1524,6 +1554,7 @@ export function PremiumExcavatorBody({
       <UndercarriageAssembly
         trackWidth={visual.trackWidth}
         scale={visual.scale}
+        bodyScale={bodyScale}
       />
 
       {/* House yaws about undercarriage center, raised clear of tracks */}
@@ -1531,56 +1562,67 @@ export function PremiumExcavatorBody({
         ref={upperBodyRef}
         position={[SWING_PIVOT_X, SWING_HOUSE_LIFT_Y, 0]}
       >
-        <group scale={[bodyXZ, 1, bodyZ]}>
-          {/* House floor sitting on the bearing upper race */}
-          <RoundedBox
-            args={[0.95, 0.1, 0.88]}
-            radius={0.045}
-            smoothness={6}
-            position={[0, SWING_HOUSE_FLOOR_LOCAL_Y, 0]}
-            castShadow
+        {/* Scale house about the floor so kingpost / boom pivot stay put */}
+        <group position={[0, SWING_HOUSE_FLOOR_LOCAL_Y, 0]}>
+          <group
+            scale={[
+              bodyXZ * bodyScale,
+              bodyScale,
+              bodyZ * bodyScale,
+            ]}
           >
-            <meshStandardMaterial color={COLOR.frameLight} {...MATERIAL.frame} />
-          </RoundedBox>
-          <mesh position={[0, SWING_HOUSE_FLOOR_LOCAL_Y - 0.04, 0]}>
-            <cylinderGeometry args={[0.3, 0.32, 0.045, 36]} />
-            <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
-          </mesh>
-
-          <UpperHood visual={visual} />
-
-          <Counterweight bulk={visual.bodyBulk} rearMark={rearYkPlate ?? ykLogo} />
-          <OperatorStation />
-          <CabAssembly visual={visual} />
-
-          {([-1, 1] as const).map((side) => (
-            <group
-              key={`work-light-${side}`}
-              position={[
-                (visual.cabStyle === "open" ? -0.55 : -0.47) + HOUSE_FROM_LEGACY,
-                visual.cabStyle === "open"
-                  ? 1.82
-                  : visual.cabStyle === "enclosed"
-                    ? 2.68
-                    : 2.54,
-                side * 0.43,
-              ]}
-            >
-              <RoundedBox args={[0.24, 0.14, 0.16]} radius={0.035} smoothness={4}>
-                <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
+            <group position={[0, -SWING_HOUSE_FLOOR_LOCAL_Y, 0]}>
+              {/* House floor sitting on the bearing upper race */}
+              <RoundedBox
+                args={[0.95, 0.1, 0.88]}
+                radius={0.045}
+                smoothness={6}
+                position={[0, SWING_HOUSE_FLOOR_LOCAL_Y, 0]}
+                castShadow
+              >
+                <meshStandardMaterial color={COLOR.frameLight} {...MATERIAL.frame} />
               </RoundedBox>
-              <mesh position={[0.02, 0, side * 0.085]}>
-                <boxGeometry args={[0.15, 0.08, 0.02]} />
-                <meshStandardMaterial
-                  color={COLOR.lamp}
-                  emissive="#ffe4a3"
-                  emissiveIntensity={0.72}
-                  roughness={0.12}
-                  metalness={0.08}
-                />
+              <mesh position={[0, SWING_HOUSE_FLOOR_LOCAL_Y - 0.04, 0]}>
+                <cylinderGeometry args={[0.3, 0.32, 0.045, 36]} />
+                <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
               </mesh>
+
+              <UpperHood visual={visual} />
+
+              <Counterweight bulk={visual.bodyBulk} rearMark={rearYkPlate ?? ykLogo} />
+              <OperatorStation />
+              <CabAssembly visual={visual} />
+
+              {([-1, 1] as const).map((side) => (
+                <group
+                  key={`work-light-${side}`}
+                  position={[
+                    (visual.cabStyle === "open" ? -0.55 : -0.47) + HOUSE_FROM_LEGACY,
+                    visual.cabStyle === "open"
+                      ? 1.82
+                      : visual.cabStyle === "enclosed"
+                        ? 2.68
+                        : 2.54,
+                    side * 0.43,
+                  ]}
+                >
+                  <RoundedBox args={[0.24, 0.14, 0.16]} radius={0.035} smoothness={4}>
+                    <meshStandardMaterial color={COLOR.frame} {...MATERIAL.frame} />
+                  </RoundedBox>
+                  <mesh position={[0.02, 0, side * 0.085]}>
+                    <boxGeometry args={[0.15, 0.08, 0.02]} />
+                    <meshStandardMaterial
+                      color={COLOR.lamp}
+                      emissive="#ffe4a3"
+                      emissiveIntensity={0.72}
+                      roughness={0.12}
+                      metalness={0.08}
+                    />
+                  </mesh>
+                </group>
+              ))}
             </group>
-          ))}
+          </group>
         </group>
       </group>
     </group>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
+import { StarAmount } from "@/components/StarAmount";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import {
   MONUMENT_BUILD_QUESTS,
@@ -59,7 +60,9 @@ interface MonumentPanelProps {
   onClaimRepeatQuest?: (questId: string, points: number) => void | Promise<void>;
   onUpgrade: (upgradeKey: MonumentUpgradeKey) => void | Promise<void>;
   onInstantUpgrade?: () => void | Promise<void>;
-  onShopPurchase: (itemId: WorkshopShopItemId) => void | Promise<void>;
+  onShopPurchase: (
+    itemId: WorkshopShopItemId,
+  ) => Promise<{ itemId: WorkshopShopItemId; grantedAmount: number } | null>;
   onStartConstruction?: () => void | Promise<void>;
   onClaimConstruction?: () => void | Promise<void>;
   onClaimStars?: () => void | Promise<void>;
@@ -116,6 +119,18 @@ export function MonumentPanel({
     cost: number;
     durationMs: number;
   } | null>(null);
+  const [confirmShop, setConfirmShop] = useState<{
+    itemId: WorkshopShopItemId;
+    label: string;
+    icon: string;
+    cost: number;
+  } | null>(null);
+  const [shopResult, setShopResult] = useState<{
+    itemId: WorkshopShopItemId;
+    label: string;
+    icon: string;
+    amount: number;
+  } | null>(null);
   const autoSettleKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -125,7 +140,11 @@ export function MonumentPanel({
   }, [open]);
 
   useEffect(() => {
-    if (!open) setConfirmUpgrade(null);
+    if (!open) {
+      setConfirmUpgrade(null);
+      setConfirmShop(null);
+      setShopResult(null);
+    }
   }, [open]);
 
   useEffect(() => {
@@ -215,7 +234,7 @@ export function MonumentPanel({
       nested
       panelClassName="!max-w-[min(96vw,26rem)] !overflow-hidden landscape:!max-h-[min(94dvh,32rem)]"
     >
-      <div className="yanmar-workshop-panel flex h-[min(88dvh,36rem)] w-full flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md landscape:h-[min(92dvh,26rem)]">
+      <div className="yanmar-workshop-panel relative flex h-[min(88dvh,36rem)] w-full flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md landscape:h-[min(92dvh,26rem)]">
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <h2 className="min-w-0 flex-1 truncate text-lg font-black tracking-tight">
             YK 조형물
@@ -626,12 +645,15 @@ export function MonumentPanel({
                             className="inline-flex items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
                             onClick={() => void onInstantUpgrade()}
                           >
-                            {timerReady
-                              ? "완료"
-                              : `즉시완료 ★${instantCost.toLocaleString()}`}
-                            {!timerReady && currency < instantCost
-                              ? " (부족)"
-                              : ""}
+                            {timerReady ? (
+                              "완료"
+                            ) : (
+                              <>
+                                즉시완료{" "}
+                                <StarAmount value={instantCost} size={12} />
+                                {currency < instantCost ? " (부족)" : ""}
+                              </>
+                            )}
                           </button>
                         ) : (
                           <button
@@ -729,7 +751,12 @@ export function MonumentPanel({
                         disabled={busy || !canBuy}
                         className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
                         onClick={() =>
-                          void onShopPurchase(item.id as WorkshopShopItemId)
+                          setConfirmShop({
+                            itemId: item.id as WorkshopShopItemId,
+                            label: item.label,
+                            icon: item.icon,
+                            cost: item.cost,
+                          })
                         }
                       >
                         <PointsAmount value={item.cost} size={14} />
@@ -741,6 +768,92 @@ export function MonumentPanel({
             </div>
           ) : null}
         </div>
+
+        {confirmShop ? (
+          <div
+            className="yanmar-repair-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="yanmar-monument-shop-confirm-title"
+          >
+            <div className="yanmar-repair-confirm-card">
+              <h3 id="yanmar-monument-shop-confirm-title">구매 확인</h3>
+              <p className="yanmar-repair-confirm-item">
+                {confirmShop.label}을(를) 구매하시겠습니까?
+              </p>
+              <ul className="yanmar-repair-confirm-facts">
+                <li className="yanmar-repair-confirm-cost">
+                  소모 <PointsAmount value={confirmShop.cost} size={14} />
+                </li>
+              </ul>
+              <div className="yanmar-repair-confirm-actions">
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-cancel"
+                  disabled={busy}
+                  onClick={() => setConfirmShop(null)}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-ok"
+                  disabled={busy}
+                  onClick={() => {
+                    const pending = confirmShop;
+                    setConfirmShop(null);
+                    void (async () => {
+                      const result = await onShopPurchase(pending.itemId);
+                      if (!result) return;
+                      setShopResult({
+                        itemId: result.itemId,
+                        label: pending.label,
+                        icon: pending.icon,
+                        amount: result.grantedAmount,
+                      });
+                    })();
+                  }}
+                >
+                  구매
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {shopResult ? (
+          <div
+            className="yanmar-repair-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="yanmar-monument-shop-result-title"
+          >
+            <div className="yanmar-repair-confirm-card is-result">
+              <h3 id="yanmar-monument-shop-result-title">획득 결과</h3>
+              <div className="flex flex-col items-center gap-2 py-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={shopResult.icon}
+                  alt=""
+                  className="h-16 w-16 object-contain"
+                  draggable={false}
+                />
+                <p className="yanmar-repair-confirm-item">
+                  {shopResult.label} ×{shopResult.amount}
+                </p>
+              </div>
+              <div className="yanmar-repair-confirm-actions">
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-ok"
+                  onClick={() => setShopResult(null)}
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {confirmUpgrade ? (
           <div

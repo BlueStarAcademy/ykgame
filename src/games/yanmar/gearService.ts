@@ -15,10 +15,10 @@ import {
 import { createGearItem, pickGrade, pickSlot, canonicalizeMainOption, canonicalizeSubOptions } from "./gearGenerate";
 import type { MasterOptionInst } from "./gearGenerate";
 import { calculateFinalYanmarStats, type EquippedGearInput } from "./gearStats";
-import type { ChassisModelId } from "./chassisCatalog";
 import {
-  mergeOwnedWithFullCatalog,
+  DEFAULT_CHASSIS_ID,
   parseOwnedChassisIds,
+  type ChassisModelId,
 } from "./chassisCatalog";
 import type { MainOptionInst } from "./gearGenerate";
 import { asJson } from "./jsonCompat";
@@ -151,7 +151,26 @@ export async function loadUserFinalStats(
     repairBuff = repair.buffKind as "SMALL" | "LARGE";
   }
 
-  const chassisId = (loadout?.activeChassisId ?? "ViO17_1") as ChassisModelId;
+  // Chassis switching is disabled — always ViO17-1.
+  const chassisId = DEFAULT_CHASSIS_ID;
+  const ownedChassisIds: ChassisModelId[] = [DEFAULT_CHASSIS_ID];
+  if (loadout) {
+    const owned = parseOwnedChassisIds(loadout.ownedChassisIds);
+    const needsSync =
+      loadout.activeChassisId !== DEFAULT_CHASSIS_ID ||
+      owned.length !== 1 ||
+      owned[0] !== DEFAULT_CHASSIS_ID;
+    if (needsSync) {
+      await tx.userChassisLoadout.update({
+        where: { userId_gameId: { userId, gameId } },
+        data: {
+          activeChassisId: DEFAULT_CHASSIS_ID,
+          ownedChassisIds: asJson(ownedChassisIds),
+        },
+      });
+    }
+  }
+
   const abilityAlloc = parseAbilityAlloc(loadout?.abilityAlloc);
   const playerLevel = getPlayerLevelProgress(user?.totalXp ?? 0).level;
   const equipped = toEquippedInputs(items);
@@ -165,23 +184,6 @@ export async function loadUserFinalStats(
     abilityAlloc,
     workshopLevels,
   });
-
-  // TEST unlock: ensure every catalog chassis is owned so players can equip freely.
-  let ownedChassisIds = parseOwnedChassisIds(loadout?.ownedChassisIds);
-  const mergedOwned = mergeOwnedWithFullCatalog(ownedChassisIds);
-  if (
-    loadout &&
-    (mergedOwned.length !== ownedChassisIds.length ||
-      mergedOwned.some((id) => !ownedChassisIds.includes(id)))
-  ) {
-    await tx.userChassisLoadout.update({
-      where: { userId_gameId: { userId, gameId } },
-      data: { ownedChassisIds: asJson(mergedOwned) },
-    });
-    ownedChassisIds = mergedOwned;
-  } else {
-    ownedChassisIds = mergedOwned;
-  }
 
   return {
     stats,

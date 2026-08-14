@@ -94,7 +94,7 @@ import { GachaResultModal } from "./GachaResultModal";
 import { HourlyAdBanner } from "./HourlyAdBanner";
 import {
   getHourlyAdHourBucket,
-  loadHourlyAdGrantLocally,
+  loadLatestHourlyAdGrantLocally,
   type HourlyAdClaimResult,
 } from "./hourlyAdReward";
 import type { GachaFreeStatus } from "./gachaFree";
@@ -501,6 +501,8 @@ const FREE_LOOK_PITCH_MAX = 0.42;
 const FREE_LOOK_TRAVEL_THRESHOLD = 0.08;
 const FREE_LOOK_DISTANCE_MIN = 0.4;
 const FREE_LOOK_DISTANCE_MAX = 2.5;
+/** Mouse-wheel zoom: larger = faster. Multiplies distance each notch. */
+const FREE_LOOK_WHEEL_ZOOM = 0.00135;
 const FREE_LOOK_VEL_MAX = 5.5;
 const FREE_LOOK_VEL_SMOOTH = 0.35;
 
@@ -2006,6 +2008,24 @@ export function ExcavatorGameWrapper({
     [syncFreeLookDragFromPointers],
   );
 
+  // React may attach wheel as passive; use a non-passive listener so we can
+  // preventDefault and stop the page from scrolling while zooming.
+  useEffect(() => {
+    const surface = freeLookSurfaceRef.current;
+    if (!surface) return;
+    const onWheel = (event: WheelEvent) => {
+      if (isFreeLookTraveling()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const look = lookOffsetRef.current;
+      const next =
+        look.targetDistance * Math.exp(event.deltaY * FREE_LOOK_WHEEL_ZOOM);
+      look.targetDistance = clampFreeLookDistance(next);
+    };
+    surface.addEventListener("wheel", onWheel, { passive: false });
+    return () => surface.removeEventListener("wheel", onWheel);
+  }, [clampFreeLookDistance, isFreeLookTraveling, mode]);
+
   const modeRef = useRef<GameMode>(mode);
   const sessionRoleRef = useRef(session?.user?.role);
   sessionRoleRef.current = session?.user?.role;
@@ -2835,7 +2855,7 @@ export function ExcavatorGameWrapper({
   // from the persisted grant + server state so the reward stays received.
   useEffect(() => {
     if (mode !== "game" || sessionStatus === "loading") return;
-    const grant = loadHourlyAdGrantLocally(getHourlyAdHourBucket());
+    const grant = loadLatestHourlyAdGrantLocally(getHourlyAdHourBucket());
     if (!grant) return;
 
     if (typeof grant.currency === "number") {
@@ -4121,7 +4141,7 @@ export function ExcavatorGameWrapper({
           body: JSON.stringify({ itemId }),
         });
         const data = await res.json();
-        if (!res.ok) return;
+        if (!res.ok) return null;
         if (typeof data.points === "number") {
           setMonumentPanelState((prev) =>
             prev ? { ...prev, points: data.points } : prev,
@@ -4137,6 +4157,9 @@ export function ExcavatorGameWrapper({
           setEnhanceCores(data.enhanceCores);
         }
         await loadMonumentState();
+        const grantedAmount =
+          typeof data.grantedAmount === "number" ? data.grantedAmount : 1;
+        return { itemId, grantedAmount };
       } finally {
         setMonumentBusy(false);
       }
@@ -4204,7 +4227,7 @@ export function ExcavatorGameWrapper({
   const handleWorkshopShopPurchase = useCallback(
     async (itemId: WorkshopShopItemId) => {
       const workshopId = activeWorkshopId;
-      if (!workshopId) return;
+      if (!workshopId) return null;
       setWorkshopBusy(true);
       try {
         const res = await fetch("/api/workshop/yanmar/shop/purchase", {
@@ -4213,7 +4236,7 @@ export function ExcavatorGameWrapper({
           body: JSON.stringify({ workshopId, itemId }),
         });
         const data = await res.json();
-        if (!res.ok) return;
+        if (!res.ok) return null;
         setWorkshopPanelState((prev) => {
           if (!prev) return prev;
           const shopPurchases = {
@@ -4241,6 +4264,9 @@ export function ExcavatorGameWrapper({
         if (typeof data.enhanceCores === "number") {
           setEnhanceCores(data.enhanceCores);
         }
+        const grantedAmount =
+          typeof data.grantedAmount === "number" ? data.grantedAmount : 1;
+        return { itemId, grantedAmount };
       } finally {
         setWorkshopBusy(false);
       }
@@ -6916,7 +6942,7 @@ export function ExcavatorGameWrapper({
           onClaimQuest={(questId) => void handleWorkshopClaim(questId)}
           onUpgrade={(key) => void handleWorkshopUpgrade(key)}
           onInstantUpgrade={() => void handleWorkshopInstantUpgrade()}
-          onShopPurchase={(itemId) => void handleWorkshopShopPurchase(itemId)}
+          onShopPurchase={handleWorkshopShopPurchase}
         />
         <MonumentPanel
           open={showMonumentPanel}
@@ -6932,7 +6958,7 @@ export function ExcavatorGameWrapper({
           }
           onUpgrade={(key) => void handleMonumentUpgrade(key)}
           onInstantUpgrade={() => void handleMonumentInstantUpgrade()}
-          onShopPurchase={(itemId) => void handleMonumentShopPurchase(itemId)}
+          onShopPurchase={handleMonumentShopPurchase}
           onStartConstruction={() => void handleMonumentStartConstruction()}
           onClaimConstruction={() => void handleMonumentClaimConstruction()}
           onClaimStars={() => void handleMonumentClaimStars()}

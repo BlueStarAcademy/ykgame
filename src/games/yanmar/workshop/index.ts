@@ -18,6 +18,8 @@ export {
   ROCK_APPRAISER_COSTS,
   WORKSHOP_SHOP_WEEKLY_LIMIT,
   WORKSHOP_SHOP_PRICES,
+  WORKSHOP_SHOP_GRANT_RANGES,
+  rollWorkshopShopGrantAmount,
   getWorkshopWeekKey,
   getWorkshopUpgradeCost,
   getWorkshopUpgradeMaxLevel,

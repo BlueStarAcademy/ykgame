@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getWorkshopWeekKey } from "@/games/yanmar/workshop";
+import {
+  getWorkshopWeekKey,
+  rollWorkshopShopGrantAmount,
+  type WorkshopShopItemId,
+} from "@/games/yanmar/workshop";
 import {
   MONUMENT_SHOP_ITEMS,
   syncMonumentPhase,
@@ -55,12 +59,15 @@ export async function POST(request: Request) {
       const count = purchase?.count ?? 0;
       if (count >= item.weeklyLimit) throw new Error("WEEKLY_LIMIT");
 
+      const grantedAmount = rollWorkshopShopGrantAmount(
+        item.id as WorkshopShopItemId,
+      );
       const inventoryUpdate =
         item.id === "ticket_standard"
-          ? { gachaTicketsStandard: { increment: 1 } }
+          ? { gachaTicketsStandard: { increment: grantedAmount } }
           : item.id === "ticket_premium"
-            ? { gachaTicketsPremium: { increment: 1 } }
-            : { enhanceCores: { increment: 1 } };
+            ? { gachaTicketsPremium: { increment: grantedAmount } }
+            : { enhanceCores: { increment: grantedAmount } };
 
       await tx.user.update({
         where: { id: session.user.id },
@@ -102,6 +109,7 @@ export async function POST(request: Request) {
         gachaTicketsStandard: refreshed?.gachaTicketsStandard ?? 0,
         gachaTicketsPremium: refreshed?.gachaTicketsPremium ?? 0,
         enhanceCores: refreshed?.enhanceCores ?? 0,
+        grantedAmount,
         remaining: Math.max(0, item.weeklyLimit - (count + 1)),
       };
     });

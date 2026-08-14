@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
+import { StarAmount } from "@/components/StarAmount";
 import { getPlayerLevelProgress } from "@/lib/playerLevel";
 import {
   WORKSHOP_DEFS,
@@ -62,7 +63,9 @@ interface WorkshopPanelProps {
   onClaimQuest: (questId: string) => void | Promise<void>;
   onUpgrade: (upgradeKey: WorkshopUpgradeKey) => void | Promise<void>;
   onInstantUpgrade?: () => void | Promise<void>;
-  onShopPurchase: (itemId: WorkshopShopItemId) => void | Promise<void>;
+  onShopPurchase: (
+    itemId: WorkshopShopItemId,
+  ) => Promise<{ itemId: WorkshopShopItemId; grantedAmount: number } | null>;
 }
 
 function WorkshopPointsAmount({
@@ -162,6 +165,18 @@ export function WorkshopPanel({
     toLevel: number;
     stars: number;
   } | null>(null);
+  const [confirmShop, setConfirmShop] = useState<{
+    itemId: WorkshopShopItemId;
+    label: string;
+    icon: string;
+    cost: number;
+  } | null>(null);
+  const [shopResult, setShopResult] = useState<{
+    itemId: WorkshopShopItemId;
+    label: string;
+    icon: string;
+    amount: number;
+  } | null>(null);
   const autoSettleKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -174,6 +189,8 @@ export function WorkshopPanel({
     if (!open) {
       setConfirmUpgrade(null);
       setConfirmInstant(null);
+      setConfirmShop(null);
+      setShopResult(null);
     }
   }, [open, workshopId]);
 
@@ -236,7 +253,7 @@ export function WorkshopPanel({
       nested
       panelClassName="!max-w-[min(96vw,26rem)] !overflow-hidden landscape:!max-h-[min(94dvh,32rem)]"
     >
-      <div className="yanmar-workshop-panel flex h-[min(88dvh,36rem)] w-full flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md landscape:h-[min(92dvh,26rem)]">
+      <div className="yanmar-workshop-panel relative flex h-[min(88dvh,36rem)] w-full flex-col overflow-hidden rounded-2xl border border-stone-400/40 bg-[#1c2430]/96 text-stone-100 shadow-2xl backdrop-blur-md landscape:h-[min(92dvh,26rem)]">
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <h2 className="min-w-0 flex-1 truncate text-lg font-black tracking-tight">
             {def.label}
@@ -441,12 +458,15 @@ export function WorkshopPanel({
                               });
                             }}
                           >
-                            {timerReady
-                              ? "완료"
-                              : `즉시완료 ★${instantCost.toLocaleString()}`}
-                            {!timerReady && currency < instantCost
-                              ? " (부족)"
-                              : ""}
+                            {timerReady ? (
+                              "완료"
+                            ) : (
+                              <>
+                                즉시완료{" "}
+                                <StarAmount value={instantCost} size={12} />
+                                {currency < instantCost ? " (부족)" : ""}
+                              </>
+                            )}
                           </button>
                         ) : (
                           <button
@@ -550,7 +570,14 @@ export function WorkshopPanel({
                         type="button"
                         disabled={busy || !canBuy}
                         className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-black text-white disabled:opacity-40"
-                        onClick={() => void onShopPurchase(item.id)}
+                        onClick={() =>
+                          setConfirmShop({
+                            itemId: item.id,
+                            label: item.label,
+                            icon: item.icon,
+                            cost: item.cost,
+                          })
+                        }
                       >
                         <WorkshopPointsAmount
                           icon={coin}
@@ -565,6 +592,97 @@ export function WorkshopPanel({
             </div>
           ) : null}
         </div>
+
+        {confirmShop ? (
+          <div
+            className="yanmar-repair-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="yanmar-workshop-shop-confirm-title"
+          >
+            <div className="yanmar-repair-confirm-card">
+              <h3 id="yanmar-workshop-shop-confirm-title">구매 확인</h3>
+              <p className="yanmar-repair-confirm-item">
+                {confirmShop.label}을(를) 구매하시겠습니까?
+              </p>
+              <ul className="yanmar-repair-confirm-facts">
+                <li className="yanmar-repair-confirm-cost">
+                  소모{" "}
+                  <WorkshopPointsAmount
+                    icon={coin}
+                    value={confirmShop.cost}
+                    size={14}
+                  />
+                </li>
+              </ul>
+              <div className="yanmar-repair-confirm-actions">
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-cancel"
+                  disabled={busy}
+                  onClick={() => setConfirmShop(null)}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-ok"
+                  disabled={busy}
+                  onClick={() => {
+                    const pending = confirmShop;
+                    setConfirmShop(null);
+                    void (async () => {
+                      const result = await onShopPurchase(pending.itemId);
+                      if (!result) return;
+                      setShopResult({
+                        itemId: result.itemId,
+                        label: pending.label,
+                        icon: pending.icon,
+                        amount: result.grantedAmount,
+                      });
+                    })();
+                  }}
+                >
+                  구매
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {shopResult ? (
+          <div
+            className="yanmar-repair-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="yanmar-workshop-shop-result-title"
+          >
+            <div className="yanmar-repair-confirm-card is-result">
+              <h3 id="yanmar-workshop-shop-result-title">획득 결과</h3>
+              <div className="flex flex-col items-center gap-2 py-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={shopResult.icon}
+                  alt=""
+                  className="h-16 w-16 object-contain"
+                  draggable={false}
+                />
+                <p className="yanmar-repair-confirm-item">
+                  {shopResult.label} ×{shopResult.amount}
+                </p>
+              </div>
+              <div className="yanmar-repair-confirm-actions">
+                <button
+                  type="button"
+                  className="yanmar-repair-confirm-ok"
+                  onClick={() => setShopResult(null)}
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {confirmUpgrade ? (
           <div
@@ -633,7 +751,7 @@ export function WorkshopPanel({
               </p>
               <ul className="yanmar-repair-confirm-facts">
                 <li className="yanmar-repair-confirm-cost">
-                  소모 ★{confirmInstant.stars.toLocaleString()}
+                  소모 <StarAmount value={confirmInstant.stars} size={14} />
                 </li>
               </ul>
               <div className="yanmar-repair-confirm-actions">

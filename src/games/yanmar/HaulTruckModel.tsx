@@ -233,7 +233,7 @@ export function HaulTruckModel({
         <meshStandardMaterial color={COLORS.frame} {...MATERIALS.frame} />
       </RoundedBox>
       <RoundedBox args={[6.55, 0.92, 3.12]} radius={0.2} position={[0, 1.52, 0]} castShadow>
-        <meshStandardMaterial color={COLORS.paintRedDark} {...MATERIALS.paintedDark} />
+        <meshStandardMaterial color={COLORS.truckBedDark} {...MATERIALS.paintedDark} />
       </RoundedBox>
 
       {/* Deep quarry bed with reinforced floor, side rails and ribs. */}
@@ -249,7 +249,7 @@ export function HaulTruckModel({
             {[-1.55, -0.78, 0, 0.78, 1.55].map((x) => (
               <mesh key={x} position={[x, 0, side * 0.11]} rotation={[0, 0, -0.12]}>
                 <boxGeometry args={[0.11, 1.28, 0.12]} />
-                <meshStandardMaterial color={COLORS.paintHighlight} {...MATERIALS.painted} />
+                <meshStandardMaterial color={COLORS.truckBedBright} {...MATERIALS.painted} />
               </mesh>
             ))}
             {ykMark ? (

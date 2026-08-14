@@ -158,7 +158,7 @@ export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSection[] = [
       },
       {
         label: "차체",
-        desc: "차체를 구매·탑승하고 능력치(힘·민첩·지구력·인내·안정·기술)를 배분합니다.",
+        desc: "기본 차체(ViO17-1) 능력치(힘·민첩·지구력·인내·안정·기술)를 배분합니다.",
       },
     ],
   },

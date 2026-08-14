@@ -8,16 +8,89 @@ function randomInt(min: number, max: number) {
 }
 
 const MINUTE_MS = 60_000;
-/** Banner opens at KST :30 every hour (e.g. 12:30–13:00). */
-export const HOURLY_AD_WINDOW_OFFSET_MS = 30 * MINUTE_MS;
-/** Banner stays visible for 30 minutes after the :30 open. */
-export const HOURLY_AD_BANNER_MS = 30 * MINUTE_MS;
+/** Each hourly ad teaser stays visible for 15 minutes. */
+export const HOURLY_AD_BANNER_MS = 15 * MINUTE_MS;
 /** Ad watch gate before claim is enabled. */
 export const HOURLY_AD_WATCH_SEC = 10;
 /** Slot reel decelerates to a stop over this duration when not interrupted. */
 export const HOURLY_AD_SLOT_DECAY_MS = 5_800;
 
 export const HOURLY_AD_EVENT_PREFIX = "hourly-ad:";
+
+export type HourlyAdSlotId = "m15" | "m30" | "m45";
+
+export type HourlyAdCreative = {
+  image: string;
+  teaserTitle: string;
+  teaserSub: string;
+  panelEyebrow: string;
+  panelTitle: string;
+  imageAlt: string;
+  ariaLabel: string;
+  /** False until creative art is supplied (slot stays closed). */
+  ready: boolean;
+};
+
+export type HourlyAdSlot = {
+  id: HourlyAdSlotId;
+  /** Minutes after KST hour start when the teaser opens. */
+  offsetMin: number;
+  creative: HourlyAdCreative;
+};
+
+/**
+ * Three staggered ads per KST hour:
+ * :15 existing launch creative, :30 parts pre-order, :45 next upload.
+ */
+export const HOURLY_AD_SLOTS: readonly HourlyAdSlot[] = [
+  {
+    id: "m15",
+    offsetMin: 15,
+    creative: {
+      image: "/images/yanmar/ads/sv10-sv11-launch.png",
+      teaserTitle: "SV10·SV11 출시!",
+      teaserSub: "탭하고 보상 받기",
+      panelEyebrow: "Yanmar New Model",
+      panelTitle: "SV10·SV11 출시!",
+      imageAlt: "얀마 SV10·SV11 미니굴착기 출시",
+      ariaLabel: "SV10·SV11 출시 광고",
+      ready: true,
+    },
+  },
+  {
+    id: "m30",
+    offsetMin: 30,
+    creative: {
+      image: "/images/yanmar/ads/parts-preorder.png",
+      teaserTitle: "부품 사전 주문!",
+      teaserSub: "탭하고 보상 받기",
+      panelEyebrow: "Yanmar Parts Promo",
+      panelTitle: "부품 사전 주문 프로모션",
+      imageAlt: "얀마 부품 사전 주문 프로모션 — 고무트랙·롤러·스프로켓·아이들러",
+      ariaLabel: "부품 사전 주문 프로모션 광고",
+      ready: true,
+    },
+  },
+  {
+    id: "m45",
+    offsetMin: 45,
+    creative: {
+      image: "/images/yanmar/ads/hourly-ad-45.png",
+      teaserTitle: "존디어 부품 20%!",
+      teaserSub: "탭하고 보상 받기",
+      panelEyebrow: "YK건기 × John Deere",
+      panelTitle: "존디어 순정 부품 20% 인하",
+      imageAlt:
+        "YK건기 × 존디어 — 존디어 모든 순정 부품 20% 인하 프로모션",
+      ariaLabel: "존디어 순정 부품 20% 인하 광고",
+      ready: true,
+    },
+  },
+] as const;
+
+const SLOT_BY_ID = Object.fromEntries(
+  HOURLY_AD_SLOTS.map((slot) => [slot.id, slot]),
+) as Record<HourlyAdSlotId, HourlyAdSlot>;
 
 export type HourlyAdRewardKind =
   | "stars"
@@ -45,14 +118,15 @@ export type HourlyAdRewardPoolEntry = {
   max?: number;
 };
 
+/** Reward pool scaled to ~75% of the previous hourly-ad amounts. */
 export const HOURLY_AD_REWARD_POOL: readonly HourlyAdRewardPoolEntry[] = [
   {
     kind: "stars",
     label: "스타",
     icon: "/images/star-currency.svg",
     fixedAmount: null,
-    min: 100,
-    max: 300,
+    min: 75,
+    max: 225,
   },
   {
     kind: "gachaPremium",
@@ -64,39 +138,39 @@ export const HOURLY_AD_REWARD_POOL: readonly HourlyAdRewardPoolEntry[] = [
     kind: "gachaStandard",
     label: "일반 뽑기권",
     icon: "/images/yanmar/2d/gacha-ticket-standard.svg",
-    fixedAmount: 5,
+    fixedAmount: 4,
   },
   {
     kind: "dumpPoints",
     label: "흙 하역장 포인트",
     icon: "/images/yanmar/2d/workshop-coin-dump.svg",
     fixedAmount: null,
-    min: 100,
-    max: 300,
+    min: 75,
+    max: 225,
   },
   {
     kind: "crashPoints",
     label: "파쇄 작업장 포인트",
     icon: "/images/yanmar/2d/workshop-coin-crash.svg",
     fixedAmount: null,
-    min: 100,
-    max: 300,
+    min: 75,
+    max: 225,
   },
   {
     kind: "hillPoints",
     label: "돌 하역장 포인트",
     icon: "/images/yanmar/2d/workshop-coin-hill.svg",
     fixedAmount: null,
-    min: 100,
-    max: 300,
+    min: 75,
+    max: 225,
   },
   {
     kind: "monumentPoints",
     label: "조형물 포인트",
     icon: "/images/yanmar/2d/workshop-coin-monument.svg",
     fixedAmount: null,
-    min: 100,
-    max: 300,
+    min: 75,
+    max: 225,
   },
 ] as const;
 
@@ -111,37 +185,81 @@ export function getHourlyAdHourStartMs(hourBucket: number) {
   return getWorldPickupHourStartMs(hourBucket);
 }
 
-/** KST wall-clock :30 of the given hour bucket (UTC epoch ms). */
-export function getHourlyAdWindowStartMs(hourBucket: number) {
-  return getHourlyAdHourStartMs(hourBucket) + HOURLY_AD_WINDOW_OFFSET_MS;
+export function isHourlyAdSlotId(value: string): value is HourlyAdSlotId {
+  return value === "m15" || value === "m30" || value === "m45";
 }
 
-export function makeHourlyAdEventId(hourBucket: number) {
-  return `${HOURLY_AD_EVENT_PREFIX}${hourBucket}`;
+export function getHourlyAdSlot(slotId: HourlyAdSlotId) {
+  return SLOT_BY_ID[slotId];
 }
 
-export function parseHourlyAdEventBucket(eventId: string): number | null {
+/** KST wall-clock open time for a slot inside the given hour bucket. */
+export function getHourlyAdSlotWindowStartMs(
+  hourBucket: number,
+  slotId: HourlyAdSlotId,
+) {
+  const slot = getHourlyAdSlot(slotId);
+  return getHourlyAdHourStartMs(hourBucket) + slot.offsetMin * MINUTE_MS;
+}
+
+export type ActiveHourlyAd = {
+  hourBucket: number;
+  slot: HourlyAdSlot;
+  remainingMs: number;
+};
+
+/** Active ready slot for `now`, or null outside all windows. */
+export function getActiveHourlyAd(now = Date.now()): ActiveHourlyAd | null {
+  const hourBucket = getHourlyAdHourBucket(now);
+  for (const slot of HOURLY_AD_SLOTS) {
+    if (!slot.creative.ready) continue;
+    const start = getHourlyAdSlotWindowStartMs(hourBucket, slot.id);
+    const elapsed = now - start;
+    if (elapsed < 0 || elapsed >= HOURLY_AD_BANNER_MS) continue;
+    return {
+      hourBucket,
+      slot,
+      remainingMs: HOURLY_AD_BANNER_MS - elapsed,
+    };
+  }
+  return null;
+}
+
+export function makeHourlyAdEventId(
+  hourBucket: number,
+  slotId: HourlyAdSlotId,
+) {
+  return `${HOURLY_AD_EVENT_PREFIX}${hourBucket}:${slotId}`;
+}
+
+export function parseHourlyAdEventId(eventId: string): {
+  hourBucket: number;
+  slotId: HourlyAdSlotId;
+} | null {
   if (!eventId.startsWith(HOURLY_AD_EVENT_PREFIX)) return null;
   const raw = eventId.slice(HOURLY_AD_EVENT_PREFIX.length);
-  const bucket = Number(raw);
-  return Number.isInteger(bucket) && bucket > 0 ? bucket : null;
+  const [bucketRaw, slotRaw] = raw.split(":");
+  const hourBucket = Number(bucketRaw);
+  if (!Number.isInteger(hourBucket) || hourBucket <= 0) return null;
+  if (!slotRaw || !isHourlyAdSlotId(slotRaw)) return null;
+  return { hourBucket, slotId: slotRaw };
 }
 
-/** Remaining ms until the teaser banner expires (0 if outside :30–:00 KST). */
+/** @deprecated Prefer parseHourlyAdEventId — kept for older callers. */
+export function parseHourlyAdEventBucket(eventId: string): number | null {
+  return parseHourlyAdEventId(eventId)?.hourBucket ?? null;
+}
+
+/** Remaining ms until the active teaser expires (0 if none). */
 export function getHourlyAdBannerRemainingMs(now = Date.now()) {
-  const bucket = getHourlyAdHourBucket(now);
-  const start = getHourlyAdWindowStartMs(bucket);
-  const elapsed = now - start;
-  if (elapsed < 0 || elapsed >= HOURLY_AD_BANNER_MS) return 0;
-  return HOURLY_AD_BANNER_MS - elapsed;
+  return getActiveHourlyAd(now)?.remainingMs ?? 0;
 }
 
 /**
- * Claim is allowed while the banner window is open (KST :30–:00).
- * Rejects requests before :30 or after the hour rolls over.
+ * Claim is allowed while a ready slot window is open.
  */
 export function isHourlyAdClaimOpen(now = Date.now()) {
-  return getHourlyAdBannerRemainingMs(now) > 0;
+  return getActiveHourlyAd(now) !== null;
 }
 
 export function formatMmSs(totalSec: number) {
@@ -151,22 +269,36 @@ export function formatMmSs(totalSec: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-/** True if reward was claimed or the ad was dismissed this hour. */
-export function wasHourlyAdClaimedLocally(hourBucket: number) {
+function storageKey(prefix: string, hourBucket: number, slotId: HourlyAdSlotId) {
+  return `${prefix}${hourBucket}:${slotId}`;
+}
+
+/** True if reward was claimed or the ad was dismissed for this slot. */
+export function wasHourlyAdClaimedLocally(
+  hourBucket: number,
+  slotId: HourlyAdSlotId,
+) {
   try {
     return (
-      window.localStorage.getItem(`${CLAIMED_STORAGE_PREFIX}${hourBucket}`) ===
-      "1"
+      window.localStorage.getItem(
+        storageKey(CLAIMED_STORAGE_PREFIX, hourBucket, slotId),
+      ) === "1"
     );
   } catch {
     return false;
   }
 }
 
-/** Hide the teaser for this hour (after claim or dismiss-without-reward). */
-export function markHourlyAdClaimedLocally(hourBucket: number) {
+/** Hide the teaser for this slot (after claim or dismiss-without-reward). */
+export function markHourlyAdClaimedLocally(
+  hourBucket: number,
+  slotId: HourlyAdSlotId,
+) {
   try {
-    window.localStorage.setItem(`${CLAIMED_STORAGE_PREFIX}${hourBucket}`, "1");
+    window.localStorage.setItem(
+      storageKey(CLAIMED_STORAGE_PREFIX, hourBucket, slotId),
+      "1",
+    );
   } catch {
     /* ignore quota / private mode */
   }
@@ -178,12 +310,13 @@ export function markHourlyAdClaimedLocally(hourBucket: number) {
  */
 export function saveHourlyAdGrantLocally(
   hourBucket: number,
+  slotId: HourlyAdSlotId,
   result: HourlyAdClaimResult,
 ) {
-  markHourlyAdClaimedLocally(hourBucket);
+  markHourlyAdClaimedLocally(hourBucket, slotId);
   try {
     window.localStorage.setItem(
-      `${GRANT_STORAGE_PREFIX}${hourBucket}`,
+      storageKey(GRANT_STORAGE_PREFIX, hourBucket, slotId),
       JSON.stringify({
         eventId: result.eventId,
         reward: result.reward,
@@ -204,13 +337,16 @@ export function saveHourlyAdGrantLocally(
 
 export function loadHourlyAdGrantLocally(
   hourBucket: number,
+  slotId: HourlyAdSlotId,
 ): HourlyAdClaimResult | null {
   try {
     const raw = window.localStorage.getItem(
-      `${GRANT_STORAGE_PREFIX}${hourBucket}`,
+      storageKey(GRANT_STORAGE_PREFIX, hourBucket, slotId),
     );
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as HourlyAdClaimResult;
+    const parsed = JSON.parse(raw) as HourlyAdClaimResult & {
+      savedAtMs?: number;
+    };
     if (!parsed?.reward?.kind || typeof parsed.reward.amount !== "number") {
       return null;
     }
@@ -220,6 +356,23 @@ export function loadHourlyAdGrantLocally(
   }
 }
 
+/** Most recent persisted grant among this hour's slots (for wallet restore). */
+export function loadLatestHourlyAdGrantLocally(
+  hourBucket: number,
+): HourlyAdClaimResult | null {
+  let latest: (HourlyAdClaimResult & { savedAtMs?: number }) | null = null;
+  for (const slot of HOURLY_AD_SLOTS) {
+    const grant = loadHourlyAdGrantLocally(hourBucket, slot.id) as
+      | (HourlyAdClaimResult & { savedAtMs?: number })
+      | null;
+    if (!grant) continue;
+    if (!latest || (grant.savedAtMs ?? 0) > (latest.savedAtMs ?? 0)) {
+      latest = grant;
+    }
+  }
+  return latest;
+}
+
 export function rollHourlyAdReward(): HourlyAdReward {
   const entry =
     HOURLY_AD_REWARD_POOL[
@@ -227,7 +380,7 @@ export function rollHourlyAdReward(): HourlyAdReward {
     ]!;
   const amount =
     entry.fixedAmount ??
-    randomInt(entry.min ?? 100, entry.max ?? 300);
+    randomInt(entry.min ?? 75, entry.max ?? 225);
   return {
     kind: entry.kind,
     amount,

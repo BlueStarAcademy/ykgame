@@ -2,7 +2,6 @@ import type { ExcavatorSimState } from "./ExcavatorScene";
 import { getGrappleThumbBucketLocals } from "./grappleArmClearance";
 import { YANMAR_MACHINE_RIG } from "./machineVisualTheme";
 import { WE } from "./workEquipment/workEquipmentStructure";
-
 const {
   boomLength: BOOM_LEN,
   armLength: ARM_LEN,
@@ -124,8 +123,13 @@ export const MIN_BREAKER_GROUND_ANGLE_DEG = 70;
 /** 시각 모델의 실제 정 끝점과 동일한 브레이커 접촉점. */
 export function getBreakerTipWorld(sim: ExcavatorSimState, boomSwing = 0): BucketTip {
   const rotation = YANMAR_MACHINE_RIG.breakerRotationZ;
-  const localX = YANMAR_MACHINE_RIG.breakerTipLocalX;
-  const localY = YANMAR_MACHINE_RIG.breakerTipLocalY;
+  const scale = YANMAR_MACHINE_RIG.breakerVisualScale;
+  const localX =
+    (YANMAR_MACHINE_RIG.breakerTipLocalX - YANMAR_MACHINE_RIG.breakerArmPinLocalX) *
+    scale;
+  const localY =
+    (YANMAR_MACHINE_RIG.breakerTipLocalY - YANMAR_MACHINE_RIG.breakerArmPinLocalY) *
+    scale;
   const rotatedX = Math.cos(rotation) * localX - Math.sin(rotation) * localY;
   const rotatedY = Math.sin(rotation) * localX + Math.cos(rotation) * localY;
   return bucketPointWorld(sim, boomSwing, rotatedX, rotatedY);

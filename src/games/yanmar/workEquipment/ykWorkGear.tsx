@@ -21,11 +21,13 @@ import {
   YANMAR_PAINT_MATERIAL,
   YANMAR_PAINT_RED,
 } from "../machineVisualTheme";
+import { getGraphicsProfile } from "../graphicsQuality";
 
 /** Match house paint exactly (same hex + physical material). */
 const RED = YANMAR_PAINT_RED;
 const CHROME = YANMAR_MACHINE_COLORS.chrome;
 const BARREL = YANMAR_MACHINE_COLORS.frame;
+const PAINT_GFX = getGraphicsProfile();
 
 /** Solid section — slightly stout, with a dark silhouette rim. */
 const BOOM_H = 0.34;
@@ -36,8 +38,24 @@ const ARM_D = 0.26;
 const RIM = 0.02;
 
 function Paint(_props?: { dark?: boolean }) {
+  if (PAINT_GFX.quality === "performance") {
+    return (
+      <meshStandardMaterial
+        color={RED}
+        roughness={YANMAR_PAINT_MATERIAL.roughness}
+        metalness={YANMAR_PAINT_MATERIAL.metalness}
+      />
+    );
+  }
   return (
-    <meshPhysicalMaterial color={RED} {...YANMAR_PAINT_MATERIAL} />
+    <meshPhysicalMaterial
+      color={RED}
+      roughness={YANMAR_PAINT_MATERIAL.roughness}
+      metalness={YANMAR_PAINT_MATERIAL.metalness}
+      clearcoat={PAINT_GFX.paintClearcoat}
+      clearcoatRoughness={YANMAR_PAINT_MATERIAL.clearcoatRoughness}
+      envMapIntensity={PAINT_GFX.paintEnvMapIntensity}
+    />
   );
 }
 

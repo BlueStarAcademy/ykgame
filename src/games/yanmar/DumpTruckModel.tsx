@@ -101,7 +101,7 @@ function DumpBed({ sideMark }: { sideMark: THREE.Texture | null }) {
           </mesh>
           <mesh position={[0, 0.72, side * 0.04]}>
             <boxGeometry args={[5.52, 0.19, 0.23]} />
-            <meshStandardMaterial color={COLOR.paintRedBright} {...MATERIAL.painted} />
+            <meshStandardMaterial color={COLOR.truckBedBright} {...MATERIAL.painted} />
           </mesh>
           <mesh position={[0, -0.7, side * 0.04]}>
             <boxGeometry args={[5.4, 0.17, 0.23]} />
@@ -111,11 +111,11 @@ function DumpBed({ sideMark }: { sideMark: THREE.Texture | null }) {
             <group key={`rib-${x}`} position={[x, 0, side * 0.1]}>
               <mesh rotation={[0, 0, -0.08]}>
                 <boxGeometry args={[0.14, 1.28, 0.15]} />
-                <meshStandardMaterial color={COLOR.paintRedDark} {...MATERIAL.paintedDark} />
+                <meshStandardMaterial color={COLOR.truckBedDark} {...MATERIAL.paintedDark} />
               </mesh>
               <mesh position={[0, 0.18, side * 0.085]}>
                 <boxGeometry args={[0.055, 0.78, 0.06]} />
-                <meshStandardMaterial color={COLOR.paintHighlight} {...MATERIAL.painted} />
+                <meshStandardMaterial color={COLOR.truckBedBright} {...MATERIAL.painted} />
               </mesh>
             </group>
           ))}
@@ -142,14 +142,14 @@ function DumpBed({ sideMark }: { sideMark: THREE.Texture | null }) {
         <group key={`tail-panel-${x}`} position={[x, 0, 0]}>
           <mesh castShadow>
             <boxGeometry args={[0.2, 1.44, 3.04]} />
-            <meshStandardMaterial color={COLOR.paintRedDark} {...MATERIAL.paintedDark} />
+            <meshStandardMaterial color={COLOR.truckBedDark} {...MATERIAL.paintedDark} />
           </mesh>
           {[-1.08, -0.36, 0.36, 1.08].map((z) => (
             <mesh key={z} position={[x > 0 ? 0.12 : -0.12, 0.48, z]}>
               <boxGeometry args={[0.055, 0.24, 0.4]} />
               <meshStandardMaterial
-                color={x > 0 ? COLOR.warning : COLOR.paintRedBright}
-                emissive={x > 0 ? "#ff8c1a" : "#7a0909"}
+                color={x > 0 ? COLOR.warning : COLOR.truckBedBright}
+                emissive={x > 0 ? "#ff8c1a" : "#1a2026"}
                 emissiveIntensity={0.24}
                 roughness={0.2}
                 metalness={0.15}

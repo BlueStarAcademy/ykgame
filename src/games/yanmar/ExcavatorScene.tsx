@@ -3,10 +3,11 @@
 /* eslint-disable react-hooks/refs */
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Billboard, ContactShadows, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 import { YK_GEONGI_LOGO } from "@/lib/brand-assets";
+import { getGraphicsProfile } from "./graphicsQuality";
 import type { AuxiliaryControlState, ExcavatorControlState, ControlMask, HydraulicVelocity } from "./controls";
 import { DEFAULT_BOOM_SWING } from "./controls";
 import { ExcavatorBucket } from "./ExcavatorBucket";
@@ -1740,10 +1741,11 @@ function ExcavatorArm({
     const bucketRotation = s.bucket * YANMAR_MACHINE_RIG.bucketRotationScale;
     if (bucketRef.current) bucketRef.current.rotation.z = bucketRotation;
 
-    // Boom/arm work gear (cylinders + joint cover) stays for every attachment,
-    // including breaker — only the tip tool mesh swaps.
+    // Boom/arm work gear stays for every attachment. The tip curl cylinder is
+    // bucket/grapple H-link only — breaker mounts on the yellow wing pins.
+    const showTipCylinder = s.attachmentType !== "breaker";
     if (bucketCylinderGearRef.current) {
-      bucketCylinderGearRef.current.visible = true;
+      bucketCylinderGearRef.current.visible = showTipCylinder;
     }
     poseWorkEquipmentCylinders({
       boomJoint: s.boom,
@@ -1752,7 +1754,7 @@ function ExcavatorArm({
       boomCylinder: boomCylinderRef.current,
       armCylinder: armCylinderRef.current,
       bucketCylinder: bucketCylinderRef.current,
-      showBucketCylinder: true,
+      showBucketCylinder: showTipCylinder,
       boomLen,
       armLen,
     });
@@ -3825,6 +3827,20 @@ function AuxiliarySceneEffects({
 }
 
 /**
+ * R3F may re-apply deprecated PCFSoftShadowMap on Canvas configure (parent
+ * re-renders). Convert before the shadow pass so Three does not warn every frame.
+ */
+function LockPcfShadowMap() {
+  const gl = useThree((s) => s.gl);
+  useFrame(() => {
+    if (gl.shadowMap.type === THREE.PCFSoftShadowMap) {
+      gl.shadowMap.type = THREE.PCFShadowMap;
+    }
+  }, -1);
+  return null;
+}
+
+/**
  * Mounts only after Canvas Suspense resolves (all useLoader textures ready).
  * Waits two rendered frames so the first paint is on screen before reveal.
  */
@@ -3846,8 +3862,11 @@ function SceneReadySignal({ onReady }: { onReady?: () => void }) {
 function SceneContent(props: ExcavatorSceneProps) {
   const terrainRevision = props.terrainRevision ?? 0;
   const sportsArena = Boolean(props.sportsArenaActive);
+  const gfx = useMemo(() => getGraphicsProfile(), []);
+  const shadowExtent = gfx.shadowCameraExtent;
   return (
     <>
+      <LockPcfShadowMap />
       <color attach="background" args={[sportsArena ? "#f0b56a" : "#8ec6e8"]} />
       <fog
         attach="fog"
@@ -3865,13 +3884,13 @@ function SceneContent(props: ExcavatorSceneProps) {
         position={sportsArena ? [54, 48, -28] : [-42, 58, -54]}
         intensity={sportsArena ? 2.85 : 3.15}
         color={sportsArena ? "#ffd39a" : "#fff0c9"}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-left={-125}
-        shadow-camera-right={125}
-        shadow-camera-top={125}
-        shadow-camera-bottom={-125}
+        castShadow={gfx.shadows !== false}
+        shadow-mapSize-width={gfx.shadowMapSize}
+        shadow-mapSize-height={gfx.shadowMapSize}
+        shadow-camera-left={-shadowExtent}
+        shadow-camera-right={shadowExtent}
+        shadow-camera-top={shadowExtent}
+        shadow-camera-bottom={-shadowExtent}
         shadow-camera-near={1}
         shadow-camera-far={220}
         shadow-bias={-0.00022}
@@ -3953,15 +3972,17 @@ function SceneContent(props: ExcavatorSceneProps) {
           terrainRef={props.terrainRef}
         />
       ) : null}
-      <ContactShadows
-        position={[48, 0.12, 48]}
-        scale={205}
-        opacity={sportsArena ? 0.3 : 0.24}
-        blur={2.8}
-        far={38}
-        resolution={512}
-        frames={1}
-      />
+      {gfx.contactShadows ? (
+        <ContactShadows
+          position={[48, 0.12, 48]}
+          scale={205}
+          opacity={sportsArena ? 0.3 : 0.24}
+          blur={2.8}
+          far={38}
+          resolution={gfx.contactShadowResolution}
+          frames={1}
+        />
+      ) : null}
       <WorksiteSetDressing
         dumpTruckStateRef={props.dumpTruckStateRef}
         equipmentStatsRef={props.equipmentStatsRef}
@@ -4022,21 +4043,30 @@ function SceneContent(props: ExcavatorSceneProps) {
   );
 }
 
+/** R3F `shadows={true}` still maps to deprecated PCFSoftShadowMap — lock PCF. */
+const CANVAS_SHADOWS = {
+  enabled: true,
+  type: THREE.PCFShadowMap,
+} as const;
+
 export function ExcavatorScene(props: ExcavatorSceneProps) {
   const [glRecoveryKey, setGlRecoveryKey] = useState(0);
   const recoveringRef = useRef(false);
+  const gfx = useMemo(() => getGraphicsProfile(), []);
+  const canvasShadows =
+    gfx.shadows === false ? false : CANVAS_SHADOWS;
 
   return (
     <Canvas
       key={glRecoveryKey}
-      shadows="percentage"
+      shadows={canvasShadows}
       gl={{
-        antialias: true,
+        antialias: gfx.antialias,
         powerPreference: "high-performance",
         alpha: false,
         stencil: false,
       }}
-      dpr={[1, 1.5]}
+      dpr={gfx.dpr}
       camera={{ fov: 58, near: 0.1, far: 420 }}
       style={{ width: "100%", height: "100%", background: "#8ec6e8" }}
       onCreated={({ gl }) => {
@@ -4044,6 +4074,8 @@ export function ExcavatorScene(props: ExcavatorSceneProps) {
         gl.toneMappingExposure = 1.08;
         gl.outputColorSpace = THREE.SRGBColorSpace;
         gl.setClearColor("#8ec6e8", 1);
+        // R3F re-configures on parent re-renders; keep type off the soft path.
+        gl.shadowMap.type = THREE.PCFShadowMap;
 
         const canvas = gl.domElement;
         const onContextLost = (event: Event) => {

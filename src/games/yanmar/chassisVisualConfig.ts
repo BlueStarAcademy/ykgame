@@ -13,6 +13,11 @@ export interface ChassisVisualProfile {
   id: ChassisModelId;
   /** Uniform visual scale relative to the default ViO17 body */
   scale: number;
+  /**
+   * House + undercarriage carbody scale (tracks/wheels excluded).
+   * Default body is ~1.25 so the painted chassis reads larger than the track set.
+   */
+  bodyScale: number;
   cabStyle: ChassisCabStyle;
   rollbarVariant?: RollbarVariant;
   canopyVariant?: CanopyVariant;
@@ -58,6 +63,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   SV08_1C: {
     id: "SV08_1C",
     scale: 0.9,
+    bodyScale: 1,
     cabStyle: "open",
     bodyBulk: 0.9,
     trackWidth: 0.92,
@@ -68,6 +74,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   SV10: {
     id: "SV10",
     scale: 0.92,
+    bodyScale: 1,
     cabStyle: "open",
     bodyBulk: 0.93,
     trackWidth: 0.94,
@@ -78,6 +85,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   SV11: {
     id: "SV11",
     scale: 0.94,
+    bodyScale: 1,
     cabStyle: "rollbar",
     rollbarVariant: "single",
     bodyBulk: 0.95,
@@ -89,6 +97,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   ViO12_2A: {
     id: "ViO12_2A",
     scale: 0.96,
+    bodyScale: 1,
     cabStyle: "rollbar",
     rollbarVariant: "arch",
     bodyBulk: 0.97,
@@ -100,6 +109,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   ViO17_1: {
     id: "ViO17_1",
     scale: 1,
+    bodyScale: 1.25,
     cabStyle: "canopy",
     canopyVariant: "twoPost",
     bodyBulk: 1,
@@ -111,6 +121,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   ViO20_6: {
     id: "ViO20_6",
     scale: 1.03,
+    bodyScale: 1,
     cabStyle: "canopy",
     canopyVariant: "twoPost",
     bodyBulk: 1.04,
@@ -122,6 +133,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   ViO23_6: {
     id: "ViO23_6",
     scale: 1.05,
+    bodyScale: 1,
     cabStyle: "canopy",
     canopyVariant: "twoPost",
     bodyBulk: 1.06,
@@ -133,6 +145,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   ViO25_6A: {
     id: "ViO25_6A",
     scale: 1.07,
+    bodyScale: 1,
     cabStyle: "canopy",
     canopyVariant: "fourPost",
     bodyBulk: 1.08,
@@ -144,6 +157,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   ViO35_74: {
     id: "ViO35_74",
     scale: 1.1,
+    bodyScale: 1,
     cabStyle: "canopy",
     canopyVariant: "fourPost",
     bodyBulk: 1.12,
@@ -155,6 +169,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   ViO35_7A_CJR: {
     id: "ViO35_7A_CJR",
     scale: 1.1,
+    bodyScale: 1,
     cabStyle: "enclosed",
     bodyBulk: 1.14,
     trackWidth: 1.08,
@@ -165,6 +180,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   ViO55_6A: {
     id: "ViO55_6A",
     scale: 1.14,
+    bodyScale: 1,
     cabStyle: "enclosed",
     bodyBulk: 1.2,
     trackWidth: 1.12,
@@ -175,6 +191,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   ViO80_7: {
     id: "ViO80_7",
     scale: 1.17,
+    bodyScale: 1,
     cabStyle: "enclosed",
     bodyBulk: 1.26,
     trackWidth: 1.16,
@@ -185,6 +202,7 @@ const PROFILES: Record<ChassisModelId, ChassisVisualProfile> = {
   SV100_7: {
     id: "SV100_7",
     scale: 1.2,
+    bodyScale: 1,
     cabStyle: "enclosed",
     bodyBulk: 1.32,
     trackWidth: 1.2,

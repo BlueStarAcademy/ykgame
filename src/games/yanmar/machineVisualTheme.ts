@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 export const YANMAR_MACHINE_RIG = {
   boomLength: 3,
-  armLength: 2.5,
+  armLength: 2.35,
   bucketLength: 1.2,
   boomPivotY: 1.68,
   /**
@@ -29,6 +29,15 @@ export const YANMAR_MACHINE_RIG = {
   armRotationScale: 1,
   bucketRotationScale: 1.02,
   breakerRotationZ: -0.08,
+  /** Uniform visual scale of the breaker body (~20% under full model). */
+  breakerVisualScale: 0.8,
+  /**
+   * Yellow-wing arm pin in unscaled breaker-model local.
+   * Body is shifted so this point sits on the attachment origin.
+   */
+  breakerArmPinLocalX: -0.006,
+  breakerArmPinLocalY: 0.497,
+  /** Tip in unscaled breaker-model local; world tip uses (tip − armPin) × scale. */
   breakerTipLocalX: -2.18,
   breakerTipLocalY: -0.15,
   /**
@@ -84,7 +93,8 @@ export function getDozerBladeReach(scale = 1, trackWidth = 1): number {
   const s = Math.max(0.85, scale);
   const tw = Math.max(0.85, trackWidth);
   // Track front ≈ (straight half + loop radius) * trackScaleX * visual.scale
-  const trackFront = 0.72 * tw * s;
+  // Matches ExcavatorModel TRACK_FRONT(1.7) + TRACK_LOOP_RADIUS(0.38), trackScaleX 0.58
+  const trackFront = 1.206 * tw * s;
   const overhang = YANMAR_MACHINE_RIG.dozerBladeReach - 0.72;
   return trackFront + overhang * s;
 }
@@ -128,8 +138,10 @@ export const YANMAR_MACHINE_COLORS = {
   interior: "#242b32",
   warning: "#ffb629",
   lamp: "#fff6da",
-  truckBed: YANMAR_PAINT_RED,
-  truckBedDark: YANMAR_PAINT_RED,
+  /** Dump / haul truck bed — charcoal steel, not machine red. */
+  truckBed: "#3d4650",
+  truckBedDark: "#2a3138",
+  truckBedBright: "#525c66",
 } as const;
 
 /** Shared painted-metal look for house + work equipment. */

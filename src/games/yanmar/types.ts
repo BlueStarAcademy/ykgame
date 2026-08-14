@@ -4,7 +4,7 @@ export type CameraMode = 1 | 2 | 3;
 export interface CameraLookOffset {
   yaw: number;
   pitch: number;
-  /** Orbit distance scale (1 = default). Pinch/zoom adjusts this. */
+  /** Orbit distance scale (1 = default). Pinch / mouse-wheel zoom adjusts this. */
   distance: number;
   /** Pointer/inertia targets — camera eases toward these each frame. */
   targetYaw: number;
