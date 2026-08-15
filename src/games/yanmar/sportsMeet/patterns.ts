@@ -24,8 +24,9 @@ export type SportsMeetZoneLayout = {
 
 /**
  * Linear sports-meet course:
- * drive → dig → drive → crash → drive → hill → drive(finish sprint) → flood.
+ * drive → dig → drive → crash → drive → hill → drive → flood → drive(finish).
  * `drivePaths` has one polyline per drive stage (in order).
+ * The last drive path is a short finish sprint after flood.
  */
 export type SportsMeetPattern = {
   id: SportsMeetPatternId;
@@ -54,6 +55,7 @@ export const SPORTS_MEET_LINEAR_STAGE_ORDER = [
   "hill",
   "drive",
   "flood",
+  "drive",
 ] as const satisfies readonly SportsMeetStageKind[];
 
 function joinDrivePaths(
@@ -135,8 +137,9 @@ const LINEAR_DRIVE_3: SitePoint[] = [
 ];
 
 /**
- * hill → midfield loop → NE FINISH gate (stars guide the line like other legs).
+ * hill → midfield loop → NE flood approach (stars guide the line like other legs).
  * Keep clear of walls (~8u) and avoid scribbling on the north rim.
+ * Finish sprint after flood is a separate short path outside the flood radius.
  */
 const LINEAR_DRIVE_4: SitePoint[] = [
   [-12, 116],
@@ -151,11 +154,18 @@ const LINEAR_DRIVE_4: SitePoint[] = [
   [84, 124],
 ];
 
+/** After flood: 5m straight finish outside flood radius (center [84,118], r=22). */
+const LINEAR_DRIVE_FINISH: SitePoint[] = [
+  [84, 88],
+  [84, 83],
+];
+
 const LINEAR_PATHS = [
   LINEAR_DRIVE_1,
   LINEAR_DRIVE_2,
   LINEAR_DRIVE_3,
   LINEAR_DRIVE_4,
+  LINEAR_DRIVE_FINISH,
 ] as const;
 
 /** Wider arcs — same zones, bigger amplitude. */
@@ -217,6 +227,10 @@ const WIDE_DRIVE_4: SitePoint[] = [
   [110, 112],
   [86, 126],
 ];
+const WIDE_DRIVE_FINISH: SitePoint[] = [
+  [84, 88],
+  [84, 83],
+];
 
 /** Tighter wiggles — denser switchbacks on a slightly inward corridor. */
 const TIGHT_DRIVE_1: SitePoint[] = [
@@ -276,6 +290,10 @@ const TIGHT_DRIVE_4: SitePoint[] = [
   [110, 86],
   [98, 108],
   [74, 118],
+];
+const TIGHT_DRIVE_FINISH: SitePoint[] = [
+  [84, 88],
+  [84, 83],
 ];
 
 const MIRROR_ZONES: SportsMeetZoneLayout = {
@@ -341,6 +359,11 @@ const MIRROR_DRIVE_4: SitePoint[] = [
   [-20, 122],
   [-4, 128],
 ];
+/** After flood (mirror center [72,114]): 5m finish south of the zone. */
+const MIRROR_DRIVE_FINISH: SitePoint[] = [
+  [72, 84],
+  [72, 79],
+];
 
 function makePattern(
   id: SportsMeetPatternId,
@@ -366,28 +389,28 @@ export const SPORTS_MEET_PATTERNS: readonly SportsMeetPattern[] = [
     1,
     "linear_wide",
     "직선 와이드",
-    [WIDE_DRIVE_1, WIDE_DRIVE_2, WIDE_DRIVE_3, WIDE_DRIVE_4],
+    [WIDE_DRIVE_1, WIDE_DRIVE_2, WIDE_DRIVE_3, WIDE_DRIVE_4, WIDE_DRIVE_FINISH],
     LINEAR_ZONES,
   ),
   makePattern(
     2,
     "linear_tight",
     "직선 타이트",
-    [TIGHT_DRIVE_1, TIGHT_DRIVE_2, TIGHT_DRIVE_3, TIGHT_DRIVE_4],
+    [TIGHT_DRIVE_1, TIGHT_DRIVE_2, TIGHT_DRIVE_3, TIGHT_DRIVE_4, TIGHT_DRIVE_FINISH],
     LINEAR_ZONES,
   ),
   makePattern(
     3,
     "linear_sweep",
     "직선 스윕",
-    [LINEAR_DRIVE_1, WIDE_DRIVE_2, TIGHT_DRIVE_3, LINEAR_DRIVE_4],
+    [LINEAR_DRIVE_1, WIDE_DRIVE_2, TIGHT_DRIVE_3, LINEAR_DRIVE_4, LINEAR_DRIVE_FINISH],
     LINEAR_ZONES,
   ),
   makePattern(
     4,
     "linear_mirror",
     "직선 미러",
-    [MIRROR_DRIVE_1, MIRROR_DRIVE_2, MIRROR_DRIVE_3, MIRROR_DRIVE_4],
+    [MIRROR_DRIVE_1, MIRROR_DRIVE_2, MIRROR_DRIVE_3, MIRROR_DRIVE_4, MIRROR_DRIVE_FINISH],
     MIRROR_ZONES,
   ),
 ] as const;
@@ -448,6 +471,8 @@ export function sportsMeetDriveStarQuota(
   stageIndex: number,
 ) {
   if (stageOrder[stageIndex] !== "drive") return 0;
+  // Finish sprint: gate only — no stars on the short 5m leg.
+  if (isSportsMeetFinishDriveStage(stageOrder, stageIndex)) return 0;
   return mission.drive.starCount;
 }
 
@@ -498,6 +523,7 @@ export function getSportsMeetTrackSegments(
   const p1 = pattern.drivePaths[1];
   const p2 = pattern.drivePaths[2];
   const p3 = pattern.drivePaths[3];
+  const p4 = pattern.drivePaths[4];
 
   if (p0) {
     pushPath(p0);
@@ -525,6 +551,12 @@ export function getSportsMeetTrackSegments(
     pushPath(p3);
     const end = p3[p3.length - 1];
     if (end) segs.push({ from: end, to: flood });
+  }
+  // Finish sprint sits outside the flood pad — connect from flood rim, not through it.
+  if (p4) {
+    const start = p4[0];
+    if (start) segs.push({ from: flood, to: start });
+    pushPath(p4);
   }
 
   return segs;

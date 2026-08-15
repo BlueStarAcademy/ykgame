@@ -96,8 +96,12 @@ import {
   getBucketScraperContactWorld,
   getBucketSoilRetention,
   getBucketTipWorld,
+  DOZER_BLADE_GROUND_TRAVEL_MULT,
+  DOZER_BLADE_ON_GROUND_CLEARANCE,
   getDozerBladeContactWorld,
   getMaxDozerBladeFromGround,
+  isDozerBladeOnGround,
+  measureDozerBladeGroundContact,
   MIN_BREAKER_GROUND_ANGLE_DEG,
   type DigFeedback,
 } from "./bucket";
@@ -144,6 +148,7 @@ import {
   type WorldPickup,
   type WorldPickupsState,
 } from "./worldPickups";
+import { SPORTS_MEET_SPEED_BUFF_MULT } from "./sportsMeet/coursePickups";
 import { constrainSportsMeetStartPaddock } from "./sportsMeet/startPaddock";
 import {
   isSportsMeetWorkAllowed,
@@ -377,6 +382,11 @@ export interface SimTickParams {
   sportsMeetStartPaddock?: import("./sportsMeet/startPaddock").SportsMeetStartPaddock | null;
   /** Current sports-meet stage — gates dig/dump/crash/hill work. */
   sportsMeetStage?: SportsMeetStageKind | null;
+  /**
+   * Sports-meet course speed buff expiry (wall-clock ms).
+   * Separate from arcade world pickups — sports mode does not pass worldPickups.
+   */
+  sportsMeetSpeedBuffUntilMs?: number;
 }
 
 function clampControl(value: number, min = -1, max = 1) {
@@ -904,15 +914,56 @@ export function tickExcavatorSim(params: SimTickParams) {
   const nowMs = Date.now();
   const worldBuffActive =
     !!params.worldPickups && isWorldSpeedBuffActive(params.worldPickups, nowMs);
+  const sportsCourseBuffActive =
+    isSportsMode &&
+    (params.sportsMeetSpeedBuffUntilMs ?? 0) > nowMs;
+  const speedBuffMult = sportsCourseBuffActive
+    ? SPORTS_MEET_SPEED_BUFF_MULT
+    : worldBuffActive
+      ? SPEED_BUFF_MULT
+      : 1;
   const sportsDriveMult =
     isSportsMode && sportsStage === "drive"
       ? Math.max(1, stats.sportsMeetDriveSpeedMult ?? 1)
       : 1;
+  // 블레이드를 땅에 대고 있으면 이동속도 50% 감소.
+  let bladeGroundTravelMult = 1;
+  {
+    const bladeAmount = Math.max(0, Math.min(1, auxiliary?.blade ?? 0));
+    if (bladeAmount > 0.01) {
+      const bladeProbe = getDozerBladeContactWorld(sim, bladeAmount, dozerBladeReach);
+      const bladeOnAsphalt = !!getCrashTileAt(
+        terrain,
+        bladeProbe.x,
+        bladeProbe.z,
+      )?.active;
+      const bladeGroundY = bladeOnAsphalt
+        ? sampleCrashContactHeight(terrain, bladeProbe.x, bladeProbe.z)
+        : sampleHeight(terrain, bladeProbe.x, bladeProbe.z);
+      const bladeClearanceLimit = bladeOnAsphalt
+        ? 0.02
+        : isInDigZone(bladeProbe.x, bladeProbe.z, terrain)
+          ? -0.28
+          : 0.02;
+      if (
+        isDozerBladeOnGround(
+          sim,
+          bladeAmount,
+          bladeGroundY,
+          bladeClearanceLimit,
+          dozerBladeReach,
+        )
+      ) {
+        bladeGroundTravelMult = DOZER_BLADE_GROUND_TRAVEL_MULT;
+      }
+    }
+  }
   const travelSpeedScale =
     stats.travelSpeedMultiplier *
     rpmScale *
-    (worldBuffActive ? SPEED_BUFF_MULT : 1) *
-    sportsDriveMult;
+    speedBuffMult *
+    sportsDriveMult *
+    bladeGroundTravelMult;
   const workSpeedScale = (stats.workSpeedMultiplier ?? 1) * rpmScale;
   /** 상부 선회: RPM 상대 배율 × 민첩. RPM1=현재×민첩, RPM2=2×(게임) / 1.15×(탑승). */
   const swingSpeedScale =
@@ -2614,12 +2665,17 @@ export function tickExcavatorSim(params: SimTickParams) {
     : isInDigZone(bladeGroundProbe.x, bladeGroundProbe.z, terrain)
       ? -0.28
       : 0.02;
-  const effectiveBlade = Math.min(
+  const {
+    effectiveBlade,
+    contact: bladeContact,
+    clearance: bladeClearance,
+  } = measureDozerBladeGroundContact(
+    sim,
     bladeAmount,
-    getMaxDozerBladeFromGround(sim, bladeGroundY, bladeClearanceLimit, dozerBladeReach),
+    bladeGroundY,
+    bladeClearanceLimit,
+    dozerBladeReach,
   );
-  const bladeContact = getDozerBladeContactWorld(sim, effectiveBlade, dozerBladeReach);
-  const bladeClearance = bladeContact.y - bladeGroundY;
   const forwardTravel = Math.max(0, vel.travel);
   const bladeInSoilField = isInDigZone(bladeContact.x, bladeContact.z, terrain);
   const floodZone = terrain.floodZone;
@@ -2647,12 +2703,12 @@ export function tickExcavatorSim(params: SimTickParams) {
   }
   const bladeScraping =
     effectiveBlade > 0.55 &&
-    bladeClearance < 0.12 &&
+    bladeClearance < DOZER_BLADE_ON_GROUND_CLEARANCE &&
     forwardTravel > 0.35 &&
     bladeInSoilField;
   const bladeFloodPush =
     effectiveBlade > 0.55 &&
-    bladeClearance < 0.12 &&
+    bladeClearance < DOZER_BLADE_ON_GROUND_CLEARANCE &&
     forwardTravel > 0.35 &&
     bladeInFloodField &&
     floodStraightPush &&

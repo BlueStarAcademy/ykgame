@@ -260,6 +260,50 @@ export function getMaxDozerBladeFromGround(
   return Math.max(0, Math.min(1, dropNeeded / YANMAR_MACHINE_RIG.dozerBladeDrop));
 }
 
+/** 블레이드 하단이 이 간격(m) 이하면 접지로 본다. */
+export const DOZER_BLADE_ON_GROUND_CLEARANCE = 0.12;
+
+/** 블레이드 접지 주행 시 이동속도 배수. */
+export const DOZER_BLADE_GROUND_TRAVEL_MULT = 0.5;
+
+/** 지면 클램프 반영 후 블레이드 접촉점·여유 높이. */
+export function measureDozerBladeGroundContact(
+  sim: ExcavatorSimState,
+  blade: number,
+  groundY: number,
+  clearanceLimit = 0.02,
+  reach: number = YANMAR_MACHINE_RIG.dozerBladeReach,
+): { effectiveBlade: number; contact: BucketTip; clearance: number } {
+  const bladeAmount = Math.max(0, Math.min(1, blade));
+  const effectiveBlade = Math.min(
+    bladeAmount,
+    getMaxDozerBladeFromGround(sim, groundY, clearanceLimit, reach),
+  );
+  const contact = getDozerBladeContactWorld(sim, effectiveBlade, reach);
+  return {
+    effectiveBlade,
+    contact,
+    clearance: contact.y - groundY,
+  };
+}
+
+export function isDozerBladeOnGround(
+  sim: ExcavatorSimState,
+  blade: number,
+  groundY: number,
+  clearanceLimit = 0.02,
+  reach: number = YANMAR_MACHINE_RIG.dozerBladeReach,
+): boolean {
+  const { clearance } = measureDozerBladeGroundContact(
+    sim,
+    blade,
+    groundY,
+    clearanceLimit,
+    reach,
+  );
+  return clearance < DOZER_BLADE_ON_GROUND_CLEARANCE;
+}
+
 export interface DigFeedback {
   inDigZone: boolean;
   inDumpZone: boolean;

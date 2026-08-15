@@ -71,9 +71,10 @@ export function beginSportsMeetRun(
   );
   state.runId = runId;
   state = rebuildDriveStars(state, pattern, heightAt);
-  // One speed booster waits at the front of each drive leg.
+  // One speed booster waits at the front of each drive leg (not the finish sprint).
+  const approachPaths = pattern.drivePaths.slice(0, -1);
   state.speedBuffs = buildSpeedBuffPickups(
-    pattern.drivePaths,
+    approachPaths.length > 0 ? approachPaths : pattern.drivePaths,
     heightAt,
   );
   return state;
@@ -347,19 +348,36 @@ export function noteSportsRockDump(
   return next;
 }
 
-/** Update sports flood HUD after each trash chunk reaches the incinerator. */
+/** Sports flood stage: one 500-unit deposit into the incinerator clears immediately. */
+export const SPORTS_MEET_FLOOD_INCINERATOR_CAPACITY = 500;
+
+/** Update sports flood HUD; clear the stage as soon as capacity is reached. */
 export function noteSportsFloodIncineratorFill(
   state: SportsMeetRunState,
   units: number,
+  now = Date.now(),
+  capacity = SPORTS_MEET_FLOOD_INCINERATOR_CAPACITY,
 ): SportsMeetRunState {
   if (state.phase !== "racing") return state;
   if (state.stageOrder[state.stageIndex] !== "flood") return state;
   const nextUnits = Math.max(0, Math.floor(units));
-  if (nextUnits === state.floodIncineratorUnits) return state;
-  return { ...state, floodIncineratorUnits: nextUnits };
+  if (nextUnits === state.floodIncineratorUnits && nextUnits < capacity) {
+    return state;
+  }
+  let next: SportsMeetRunState = {
+    ...state,
+    floodIncineratorUnits: nextUnits,
+  };
+  if (nextUnits >= capacity) {
+    next = advanceStage(next, "flood", now);
+  }
+  return next;
 }
 
-/** The flood stage completes only after the filled incinerator is left behind. */
+/**
+ * @deprecated Sports flood now clears on incinerator fill.
+ * Kept for burn FX callbacks on the main map / older hooks.
+ */
 export function noteSportsFloodBurnStarted(
   state: SportsMeetRunState,
   now = Date.now(),
@@ -367,6 +385,7 @@ export function noteSportsFloodBurnStarted(
   if (state.phase !== "racing") return state;
   if (state.stageOrder[state.stageIndex] !== "flood") return state;
   if (state.floodBurnStarted) return state;
+  // If fill already advanced the stage, ignore burn-start clear.
   return advanceStage({ ...state, floodBurnStarted: true }, "flood", now);
 }
 

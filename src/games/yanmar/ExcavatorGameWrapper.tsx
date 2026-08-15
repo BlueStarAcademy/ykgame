@@ -83,6 +83,8 @@ import {
   createHydraulicVelocity,
   createAutoPoseState,
   startAutoArmPose,
+  BLADE_LOWERED,
+  BLADE_RAISED,
   type HydraulicVelocity,
 } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
@@ -365,7 +367,6 @@ import {
   noteSportsAsphaltBreak,
   noteSportsDumpDepart,
   noteSportsDumpFill,
-  noteSportsFloodBurnStarted,
   noteSportsFloodIncineratorFill,
   noteSportsRockDump,
   prepareSportsMeetStageContent,
@@ -3048,6 +3049,10 @@ export function ExcavatorGameWrapper({
           stage,
           prepared.stageIndex,
         );
+        const finishDrive = isSportsMeetFinishDriveStage(
+          prepared.stageOrder,
+          prepared.stageIndex,
+        );
         const sim = simRef.current;
         if (sim) {
           sim.posX = spawn.x;
@@ -3070,13 +3075,18 @@ export function ExcavatorGameWrapper({
           if (stage === "dig") {
             resetDumpTruckState(dumpTruckStateRef.current);
           }
+          // Flood: start with blade on ground. Finish sprint: raise blade for full speed.
+          if (stage === "flood" || finishDrive) {
+            const blade = stage === "flood" ? BLADE_LOWERED : BLADE_RAISED;
+            auxiliaryRef.current = { ...auxiliaryRef.current, blade };
+            setAuxiliary((prev) =>
+              prev.blade === blade ? prev : { ...prev, blade },
+            );
+          }
         }
         showAttachmentWarning(
-          isSportsMeetFinishDriveStage(
-            prepared.stageOrder,
-            prepared.stageIndex,
-          )
-            ? "골인 주행 시작! 별을 따라 FINISH로!"
+          finishDrive
+            ? "골인 주행 시작! FINISH로 직진!"
             : `${STAGE_LABEL_KO[stage]} 코스 시작!`,
         );
       }
@@ -7660,13 +7670,14 @@ export function ExcavatorGameWrapper({
       modeRef.current === "sportsRanked" ||
       modeRef.current === "sportsPractice";
     if (!isSports || !sportsMeetRunRef.current) return;
-    const next = noteSportsFloodIncineratorFill(
-      sportsMeetRunRef.current,
-      units,
-    );
+    const before = sportsMeetRunRef.current;
+    let next = noteSportsFloodIncineratorFill(before, units, Date.now());
+    if (next.stageIndex !== before.stageIndex) {
+      next = finalizeSportsMeetStageAdvance(before, next);
+    }
     sportsMeetRunRef.current = next;
     setSportsMeetRun(next);
-  }, []);
+  }, [finalizeSportsMeetStageAdvance]);
 
   const handleFloodBurnStarted = useCallback(
     (eventId: string, burnedUnits: number) => {
@@ -7674,19 +7685,14 @@ export function ExcavatorGameWrapper({
         modeRef.current === "sportsRanked" ||
         modeRef.current === "sportsPractice";
       if (isSports) {
-        if (!sportsMeetRunRef.current) return;
-        const before = sportsMeetRunRef.current;
-        let next = noteSportsFloodBurnStarted(before, Date.now());
-        next = finalizeSportsMeetStageAdvance(before, next);
-        sportsMeetRunRef.current = next;
-        setSportsMeetRun(next);
+        // Sports flood clears on incinerator fill; burn FX is ignored for stage advance.
         return;
       }
       pushQuestProgress("trashBurn", burnedUnits);
       pushQuestProgress("trashBurnComplete", 1);
       void claimSpecialReward("flood-burn", eventId);
     },
-    [claimSpecialReward, finalizeSportsMeetStageAdvance, pushQuestProgress],
+    [claimSpecialReward, pushQuestProgress],
   );
 
   const handleFloodBurnComplete = useCallback(
@@ -8980,7 +8986,13 @@ export function ExcavatorGameWrapper({
                         if (stage === "crash") {
                           return `파쇄 ${sportsMeetRun.asphaltBroken}/${sportsMeetRun.mission.crash.asphaltTileCount}`;
                         }
-                        return `돌 ${sportsMeetRun.rocksDumped}/${sportsMeetRun.mission.hill.successfulDumpsRequired}`;
+                        if (stage === "hill") {
+                          return `돌 ${sportsMeetRun.rocksDumped}/${sportsMeetRun.mission.hill.successfulDumpsRequired}`;
+                        }
+                        if (stage === "flood") {
+                          return `소각 ${sportsMeetRun.floodIncineratorUnits}/500`;
+                        }
+                        return "";
                       })()}
                       elapsedMs={sportsMeetElapsedMs(sportsMeetRun)}
                       raceStartedAtMs={sportsMeetRun.raceStartedAtMs}
@@ -9354,7 +9366,9 @@ export function ExcavatorGameWrapper({
               worldPickupsRef={
                 mode === "game" && session?.user?.id
                   ? worldPickupsRef
-                  : undefined
+                  : mode === "sportsRanked" || mode === "sportsPractice"
+                    ? worldPickupsRef
+                    : undefined
               }
               worldPickupRevision={worldPickupRevision}
               alignWithMinimap={mode !== "gameReady"}

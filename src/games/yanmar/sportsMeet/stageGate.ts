@@ -16,8 +16,8 @@ export function getSportsMeetAllowedAttachment(
     case "hill":
       return "grapple";
     case "flood":
-      // This stage requires both the dozer blade and grapple.
-      return null;
+      // Blade + grapple: start on grapple (blade is lowered separately).
+      return "grapple";
   }
 }
 

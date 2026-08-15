@@ -2483,6 +2483,7 @@ function SimLoop({
       onWorldPickup,
       sportsMeetStartPaddock,
       sportsMeetStage,
+      sportsMeetSpeedBuffUntilMs: sportsRun?.speedBuffUntilMs ?? 0,
     });
 
     const dust = runtimeRef.current.digDust;

@@ -253,9 +253,9 @@ export function applySportsMeetTerrain(
     terrain.hillZone.dropX = hillX + 10;
     terrain.hillZone.dropZ = hillZ + 2;
   }
-  // Two 500-unit collection/grapple loops fill the 1_000 incinerator; leaving
-  // the filled incinerator starts burn and clears the sports flood stage.
-  const floodZone = createFloodRecoveryZone(floodX, floodZ, 1_000);
+  // One 500-unit collection/grapple deposit fills the sports incinerator and
+  // clears the flood stage immediately (no leave-to-burn wait).
+  const floodZone = createFloodRecoveryZone(floodX, floodZ, 500);
   floodZone.incineratorX = floodX + 14;
   floodZone.incineratorZ = floodZ;
   floodZone.incineratorYaw = Math.atan2(
