@@ -188,3 +188,12 @@ export function isGearCraftUnlocked(playerLevel: number) {
 export function isQuestPanelUnlocked(playerLevel: number) {
   return playerLevel >= PLAYER_UNLOCKS.QUESTS;
 }
+
+/** Dozer blade lever — unlocks with flood recovery (Lv.23). */
+export function isBladeUnlocked(
+  playerLevel: number,
+  opts?: { unlockAll?: boolean },
+): boolean {
+  if (opts?.unlockAll) return true;
+  return playerLevel >= PLAYER_UNLOCKS.FLOOD_RECOVERY;
+}

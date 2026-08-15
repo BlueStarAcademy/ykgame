@@ -5298,11 +5298,11 @@ body {
 
 .yanmar-engine-start-mark {
   position: absolute;
-  top: 28%;
+  top: 50%;
   left: 50%;
-  width: 34%;
-  height: 34%;
-  transform: translateX(-50%);
+  width: 38%;
+  height: 38%;
+  transform: translate(-50%, -50%);
 }
 
 .yanmar-engine-start-power {
@@ -5340,14 +5340,22 @@ body {
 .yanmar-engine-start-caption {
   position: absolute;
   left: 50%;
-  bottom: 12%;
+  top: calc(100% + 0.12rem);
+  z-index: 2;
   transform: translateX(-50%);
+  width: max-content;
+  max-width: none;
+  padding: 0.08rem 0.28rem;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.62);
   font-size: 0.42rem;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   line-height: 1;
-  color: rgba(203, 213, 225, 0.82);
+  white-space: nowrap;
+  color: rgba(203, 213, 225, 0.9);
   text-shadow: 0 0.06rem 0.1rem rgba(0, 0, 0, 0.65);
+  pointer-events: none;
 }
 
 .yanmar-engine-start-button.is-on .yanmar-engine-start-caption {
@@ -5356,7 +5364,7 @@ body {
 
 .yanmar-layout-portrait .yanmar-engine-start-caption {
   font-size: 0.4rem;
-  bottom: 11%;
+  top: calc(100% + 0.1rem);
 }
 
 .yanmar-function-menu-item {
@@ -6813,6 +6821,31 @@ body {
 
 .yanmar-blade-lever-embedded.is-disabled {
   opacity: 0.45;
+}
+
+.yanmar-blade-lever-embedded.is-locked,
+.yanmar-blade-lever-visual.is-locked {
+  filter: grayscale(0.7);
+  opacity: 0.55;
+}
+
+.yanmar-blade-lever-lock {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, 0.54);
+  background: rgba(2, 6, 23, 0.9);
+  padding: 0.16rem 0.34rem;
+  color: #f8fafc;
+  font-size: 0.52rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 0.12rem 0.28rem rgba(0, 0, 0, 0.58);
+  pointer-events: none;
 }
 
 .yanmar-blade-lever-visual-embedded .yanmar-visual-lever-travel {

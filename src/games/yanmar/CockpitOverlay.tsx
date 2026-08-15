@@ -36,6 +36,8 @@ import {
 import {
   getAttachmentRequiredLevel,
   isAttachmentUnlocked,
+  isBladeUnlocked,
+  PLAYER_UNLOCKS,
 } from "@/lib/playerUnlocks";
 import type { HornId } from "./soundSettings";
 import { yanmarAudio } from "./yanmarAudio";
@@ -1352,6 +1354,8 @@ function SafetyLever({
 function BladeLever({
   value,
   enabled,
+  levelLocked = false,
+  requiredLevel = PLAYER_UNLOCKS.FLOOD_RECOVERY,
   showTouchZone,
   layout,
   isPortrait,
@@ -1361,6 +1365,9 @@ function BladeLever({
 }: {
   value: number;
   enabled: boolean;
+  /** True when player level has not unlocked the blade yet. */
+  levelLocked?: boolean;
+  requiredLevel?: number;
   showTouchZone: boolean;
   layout: CockpitLayout;
   isPortrait: boolean;
@@ -1377,6 +1384,7 @@ function BladeLever({
   const lastFrameTimeRef = useRef<number | null>(null);
   const [stick, setStick] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const canOperate = enabled && !levelLocked;
 
   useEffect(() => {
     valueRef.current = value;
@@ -1433,8 +1441,8 @@ function BladeLever({
   useEffect(() => () => stopRate(), [stopRate]);
 
   useEffect(() => {
-    if (!enabled) stopRate();
-  }, [enabled, stopRate]);
+    if (!canOperate) stopRate();
+  }, [canOperate, stopRate]);
 
   const updateFromEvent = useCallback(
     (clientY: number) => {
@@ -1471,7 +1479,7 @@ function BladeLever({
   const pointer = usePointerRelease(onRelease);
 
   const handleStart = (e: React.PointerEvent) => {
-    if (!enabled) {
+    if (!canOperate) {
       if (onInactivePress) {
         e.preventDefault();
         onInactivePress();
@@ -1497,14 +1505,16 @@ function BladeLever({
   const visualValue = dragging
     ? stick
     : Math.max(-1, Math.min(1, value * 2 - 1));
-  const acceptsInactivePress = !enabled && Boolean(onInactivePress);
+  const acceptsInactivePress = !canOperate && Boolean(onInactivePress);
+  const ariaLabel = levelLocked
+    ? `블레이드 레버 잠김, 레벨 ${requiredLevel} 필요`
+    : "블레이드 레버";
+  const lockedClass = levelLocked ? " is-locked" : !canOperate ? " is-disabled" : "";
 
   if (embedded) {
     return (
       <div
-        className={`yanmar-blade-lever-embedded relative h-full w-full touch-none ${
-          !enabled ? "is-disabled" : ""
-        }`}
+        className={`yanmar-blade-lever-embedded relative h-full w-full touch-none${lockedClass}`}
         onContextMenu={(e) => e.preventDefault()}
       >
         <div className="yanmar-blade-lever-visual yanmar-blade-lever-visual-embedded pointer-events-none" aria-hidden>
@@ -1517,10 +1527,15 @@ function BladeLever({
           />
           <span className="yanmar-blade-lever-label">{cockpit("blade")}</span>
         </div>
+        {levelLocked ? (
+          <span className="yanmar-blade-lever-lock" aria-hidden>
+            Lv.{requiredLevel}
+          </span>
+        ) : null}
         <div
           ref={zoneRef}
           className={`yanmar-blade-lever absolute inset-0 z-50 touch-none rounded-xl ${
-            !enabled && !acceptsInactivePress ? "pointer-events-none is-disabled" : ""
+            !canOperate && !acceptsInactivePress ? "pointer-events-none is-disabled" : ""
           }`}
           style={{ WebkitTouchCallout: "none" }}
           onPointerDown={handleStart}
@@ -1531,7 +1546,7 @@ function BladeLever({
             pointer.finish();
           }}
           onContextMenu={(e) => e.preventDefault()}
-          aria-label="블레이드 레버"
+          aria-label={ariaLabel}
         >
           {showTouchZone ? (
             <>
@@ -1548,9 +1563,7 @@ function BladeLever({
   return (
     <>
       <div
-        className={`yanmar-blade-lever-visual pointer-events-none absolute z-30 ${
-          !enabled ? "is-disabled" : ""
-        }`}
+        className={`yanmar-blade-lever-visual pointer-events-none absolute z-30${lockedClass}`}
         style={{
           left: `${blade.cx * 100}%`,
           top: TRAVEL_BASELINE,
@@ -1566,11 +1579,16 @@ function BladeLever({
           variant="travel"
         />
         <span className="yanmar-blade-lever-label">{cockpit("blade")}</span>
+        {levelLocked ? (
+          <span className="yanmar-blade-lever-lock" aria-hidden>
+            Lv.{requiredLevel}
+          </span>
+        ) : null}
       </div>
       <div
         ref={zoneRef}
         className={`yanmar-blade-lever absolute z-50 touch-none rounded-xl ${
-          !enabled && !acceptsInactivePress ? "pointer-events-none is-disabled" : ""
+          !canOperate && !acceptsInactivePress ? "pointer-events-none is-disabled" : ""
         } ${isPortrait ? "yanmar-blade-lever-portrait" : ""}`}
         style={{
           left: `${blade.cx * 100}%`,
@@ -1588,7 +1606,7 @@ function BladeLever({
           pointer.finish();
         }}
         onContextMenu={(e) => e.preventDefault()}
-        aria-label="블레이드 레버"
+        aria-label={ariaLabel}
       >
         {showTouchZone ? (
           <>
@@ -2024,6 +2042,9 @@ function FunctionMenu({
   const buttonSize = getAuxMenuButtonSize(isPortrait);
   const gap = "0.42rem";
   const bladeHeight = `calc(${buttonSize} * 2 + ${gap})`;
+  const bladeUnlocked = isBladeUnlocked(playerLevel, {
+    unlockAll: unlockAllAttachments,
+  });
 
   return (
     <div
@@ -2133,6 +2154,8 @@ function FunctionMenu({
           <BladeLever
             value={auxiliary.blade}
             enabled={auxiliary.engineOn && !auxiliary.safetyLocked}
+            levelLocked={!bladeUnlocked}
+            requiredLevel={PLAYER_UNLOCKS.FLOOD_RECOVERY}
             showTouchZone={showTouchZones}
             layout={layout}
             isPortrait={isPortrait}
@@ -2219,9 +2242,9 @@ function EngineStartButton({
         <span className="yanmar-engine-start-mark">
           <span className="yanmar-engine-start-power" />
         </span>
-        <span className="yanmar-engine-start-caption">
-          {engineOn ? hud("engineOn") : hud("engineOff")}
-        </span>
+      </span>
+      <span className="yanmar-engine-start-caption">
+        {engineOn ? hud("engineOn") : hud("engineOff")}
       </span>
       {showTouchZones ? (
         <span className="pointer-events-none absolute inset-[-6%] rounded-full border border-emerald-200/65 bg-transparent" />
@@ -2710,6 +2733,9 @@ export function CockpitOverlay({
   }, [onAttachmentWarning]);
   const engineOffPress =
     !auxiliary.engineOn ? notifyEngineOff : undefined;
+  const bladeUnlocked = isBladeUnlocked(playerLevel, {
+    unlockAll: unlockAllAttachments,
+  });
 
   const setControlPointerDrag = useCallback((pointerId: number, active: boolean) => {
     if (active) {
@@ -2748,6 +2774,12 @@ export function CockpitOverlay({
     attachmentPedalCanOperate,
     onAuxiliaryChange,
   ]);
+
+  useEffect(() => {
+    if (bladeUnlocked) return;
+    if (auxiliary.blade <= BLADE_RAISED) return;
+    onAuxiliaryChange((current) => ({ ...current, blade: BLADE_RAISED }));
+  }, [auxiliary.blade, bladeUnlocked, onAuxiliaryChange]);
 
   return (
     <CockpitTranslationContext.Provider value={{ cockpit, hud }}>

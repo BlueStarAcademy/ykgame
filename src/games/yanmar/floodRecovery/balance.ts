@@ -1,7 +1,8 @@
 import type { ChassisBaseStats } from "../chassisCatalog";
+import { PLAYER_UNLOCKS } from "@/lib/playerUnlocks";
 
 /** Player level required to unlock flood recovery content. */
-export const FLOOD_RECOVERY_UNLOCK_LEVEL = 23;
+export const FLOOD_RECOVERY_UNLOCK_LEVEL = PLAYER_UNLOCKS.FLOOD_RECOVERY;
 
 /** Default incinerator fill target before burn (before capacity upgrades). */
 export const FLOOD_INCINERATOR_BASE_CAPACITY = 3000;
