@@ -24,6 +24,9 @@
     "assets:site-legend-titles": "node scripts/gen-site-legend-titles.mjs",
     "assets:hourly-ads-locale": "node scripts/gen-hourly-ad-locales.mjs",
     "i18n:smoke": "node scripts/i18n-smoke.mjs",
+    "check:encoding": "node scripts/check-encoding.mjs",
+    "check:i18n-keys": "node scripts/check-i18n-keys.mjs",
+    "check:text": "npm run check:encoding && npm run check:i18n-keys && npm run i18n:smoke",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs"
   },
   "prisma": {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { clientLogout } from "@/lib/client-logout";
+import { LanguagePicker } from "@/components/i18n/LanguagePicker";
 import { LocalizedImage } from "@/components/i18n/LocalizedImage";
 import { SiteLegendLegalFooter } from "@/components/auth/SiteLegendLegalFooter";
 import { LoginForm } from "@/components/auth/LoginForm";
@@ -24,6 +25,7 @@ export function SiteLegendHomeScreen({
   isEnteringGame = false,
 }: SiteLegendHomeScreenProps) {
   const t = useTranslations("auth");
+  const legalT = useTranslations("siteLegendLegal");
   const [panel, setPanel] = useState<HomePanel>("home");
 
   useSiteLegendLoginBgm(!isEnteringGame);
@@ -37,6 +39,7 @@ export function SiteLegendHomeScreen({
     <div
       className={`site-legend-auth site-legend-home ${panel === "login" ? "is-login-panel" : ""}`}
     >
+      {!isEnteringGame ? <LanguagePicker variant="splash" /> : null}
       <div
         className="site-legend-auth-bg"
         aria-hidden
@@ -86,8 +89,8 @@ export function SiteLegendHomeScreen({
       <div className="site-legend-auth-frame">
         <div className="site-legend-auth-title-wrap">
           <LocalizedImage
-            src="/images/site-legend/title.png"
-            alt="SITE LEGEND"
+            src="/images/site-legend/title.png?v=14"
+            alt={legalT("titleAlt")}
             className="site-legend-auth-title"
             draggable={false}
           />

@@ -6,7 +6,12 @@ import {
 } from "./missionBalance";
 import { weekIndexFromWeekKey, getSportsMeetWeekKey } from "./weekKey";
 
-export type SportsMeetStageKind = "drive" | "dig" | "crash" | "hill";
+export type SportsMeetStageKind =
+  | "drive"
+  | "dig"
+  | "crash"
+  | "hill"
+  | "flood";
 
 export type SportsMeetPatternId = 0 | 1 | 2 | 3 | 4;
 
@@ -14,11 +19,12 @@ export type SportsMeetZoneLayout = {
   dig: SitePoint;
   crash: SitePoint;
   hill: SitePoint;
+  flood: SitePoint;
 };
 
 /**
  * Linear sports-meet course:
- * drive → dig → drive → crash → drive → hill → drive(finish sprint).
+ * drive → dig → drive → crash → drive → hill → drive(finish sprint) → flood.
  * `drivePaths` has one polyline per drive stage (in order).
  */
 export type SportsMeetPattern = {
@@ -47,6 +53,7 @@ export const SPORTS_MEET_LINEAR_STAGE_ORDER = [
   "drive",
   "hill",
   "drive",
+  "flood",
 ] as const satisfies readonly SportsMeetStageKind[];
 
 function joinDrivePaths(
@@ -72,6 +79,7 @@ const LINEAR_ZONES: SportsMeetZoneLayout = {
   dig: [18, 2],
   crash: [120, 36],
   hill: [-8, 118],
+  flood: [84, 118],
 };
 
 /** SW paddock with switchbacks into dig. */
@@ -274,6 +282,7 @@ const MIRROR_ZONES: SportsMeetZoneLayout = {
   dig: [18, 2],
   crash: [112, 52],
   hill: [20, 124],
+  flood: [72, 114],
 };
 
 /** Mirror: crash sits NE, route fills SE then NW. */
@@ -484,6 +493,7 @@ export function getSportsMeetTrackSegments(
   const dig = pattern.zones.dig;
   const crash = pattern.zones.crash;
   const hill = pattern.zones.hill;
+  const flood = pattern.zones.flood;
   const p0 = pattern.drivePaths[0];
   const p1 = pattern.drivePaths[1];
   const p2 = pattern.drivePaths[2];
@@ -513,6 +523,8 @@ export function getSportsMeetTrackSegments(
     const start = p3[0];
     if (start) segs.push({ from: hill, to: start });
     pushPath(p3);
+    const end = p3[p3.length - 1];
+    if (end) segs.push({ from: end, to: flood });
   }
 
   return segs;
@@ -523,6 +535,7 @@ export const STAGE_LABEL_KO: Record<SportsMeetStageKind, string> = {
   dig: "흙 하역",
   crash: "아스팔트",
   hill: "돌 하역",
+  flood: "수해복구",
 };
 
 export function formatStageOrderKo(

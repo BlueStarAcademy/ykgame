@@ -2,6 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   CHAT_HISTORY_LIMIT,
+  chatRetentionCutoff,
   clampChatBody,
   isValidChatChannel,
 } from "@/lib/chat-constants";
@@ -77,13 +78,15 @@ export async function listChatHistory(options: {
     afterCreatedAt = anchor?.createdAt ?? null;
   }
 
+  const cutoff = chatRetentionCutoff();
   const rows = await prisma.chatMessage.findMany({
     where: {
       hidden: false,
+      createdAt: {
+        gte: cutoff,
+        ...(afterCreatedAt ? { gt: afterCreatedAt } : {}),
+      },
       OR: [{ channel: options.channel }, { channel: null }],
-      ...(afterCreatedAt
-        ? { createdAt: { gt: afterCreatedAt } }
-        : {}),
     },
     orderBy: { createdAt: afterCreatedAt ? "asc" : "desc" },
     take: limit,
@@ -91,6 +94,14 @@ export async function listChatHistory(options: {
 
   const ordered = afterCreatedAt ? rows : rows.reverse();
   return ordered.map(toWire);
+}
+
+/** Delete messages past the retention window (oldest first). Best-effort. */
+export async function pruneExpiredChatMessages(): Promise<number> {
+  const result = await prisma.chatMessage.deleteMany({
+    where: { createdAt: { lt: chatRetentionCutoff() } },
+  });
+  return result.count;
 }
 
 export async function createUserChatMessage(options: {
@@ -197,6 +208,11 @@ export async function getChatBootstrap(options: {
   memberCount: number | null;
   capacity: number;
 }> {
+  // Opportunistic cleanup so week-old messages disappear without a cron.
+  void pruneExpiredChatMessages().catch(() => {
+    /* ignore prune failures */
+  });
+
   const [notices, messages, memberCount] = await Promise.all([
     listActiveChatNotices(),
     listChatHistory({ channel: options.channel }),

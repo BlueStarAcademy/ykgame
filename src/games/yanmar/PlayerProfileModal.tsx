@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { StarAmount } from "@/components/StarAmount";
 import { XpProgressBar } from "@/components/ui/XpProgressBar";
@@ -9,17 +9,14 @@ import {
   NICKNAME_CHANGE_COST_STARS,
   NICKNAME_MAX_LENGTH,
   NICKNAME_MIN_LENGTH,
+  PROFILE_AVATAR_IDS,
   nicknameCharLength,
   profileAvatarSrc,
   resolveProfileAvatarId,
   validateNickname,
 } from "@/lib/profile";
 import { ChassisGallery } from "./ChassisPanel";
-import {
-  CHASSIS_CATALOG,
-  type ChassisModelId,
-} from "./chassisCatalog";
-import { chassisModelThumbSrc } from "./gearArt";
+import type { ChassisModelId } from "./chassisCatalog";
 import type { AbilityAlloc } from "./abilityAlloc";
 
 interface PlayerProfileModalProps {
@@ -47,29 +44,34 @@ interface PlayerProfileModalProps {
 
 function ProfileAvatar({
   avatarId,
-  fallbackChassisId,
+  nickname,
   size = 48,
 }: {
   avatarId: string | null;
-  fallbackChassisId?: string;
+  nickname: string;
   size?: number;
 }) {
-  const src = profileAvatarSrc(avatarId, fallbackChassisId);
+  const src = profileAvatarSrc(avatarId);
+  const initial = nickname.trim().charAt(0) || "?";
   return (
-    <div
+    <span
       className="yanmar-profile-avatar"
       style={{ width: size, height: size }}
       aria-hidden
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        key={src}
-        src={src}
-        alt=""
-        className="yanmar-profile-avatar-img"
-        draggable={false}
-      />
-    </div>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={src}
+          src={src}
+          alt=""
+          className="yanmar-profile-avatar-img"
+          draggable={false}
+        />
+      ) : (
+        <span className="yanmar-profile-avatar-initial">{initial}</span>
+      )}
+    </span>
   );
 }
 
@@ -92,41 +94,25 @@ function PencilIcon() {
   );
 }
 
-function ProfileEditModal({
+function ProfileAvatarModal({
   open,
   onClose,
   nickname,
-  stars,
   profileAvatarId,
-  activeChassisId,
   onProfileUpdated,
 }: {
   open: boolean;
   onClose: () => void;
   nickname: string;
-  stars: number;
   profileAvatarId: string | null;
-  activeChassisId: string;
   onProfileUpdated: PlayerProfileModalProps["onProfileUpdated"];
 }) {
-  const resolvedAvatar = resolveProfileAvatarId(profileAvatarId, activeChassisId);
-  const [draftAvatarId, setDraftAvatarId] =
-    useState<ChassisModelId>(resolvedAvatar);
-  const [draftNickname, setDraftNickname] = useState(nickname);
+  const resolvedAvatar = resolveProfileAvatarId(profileAvatarId);
+  const [draftAvatarId, setDraftAvatarId] = useState(resolvedAvatar);
   const [savingAvatar, setSavingAvatar] = useState(false);
-  const [savingNickname, setSavingNickname] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!open) return;
-    setDraftAvatarId(resolveProfileAvatarId(profileAvatarId, activeChassisId));
-    setDraftNickname(nickname);
-    setError("");
-  }, [open, profileAvatarId, activeChassisId, nickname]);
-
   const avatarDirty = draftAvatarId !== resolvedAvatar;
-  const nicknameDirty = draftNickname.trim() !== nickname.trim();
-  const canAffordNickname = stars >= NICKNAME_CHANGE_COST_STARS;
 
   async function saveAvatar() {
     if (!avatarDirty) return;
@@ -155,59 +141,30 @@ function ProfileEditModal({
     }
   }
 
-  async function saveNickname() {
-    const next = draftNickname.trim();
-    if (!nicknameDirty) return;
-    const parsed = validateNickname(next);
-    if (!parsed.ok) {
-      setError(parsed.message);
-      return;
-    }
-    if (!canAffordNickname) {
-      setError(`닉네임 변경에는 스타 ${NICKNAME_CHANGE_COST_STARS}개가 필요합니다.`);
-      return;
-    }
-    setError("");
-    setSavingNickname(true);
-    try {
-      const res = await fetch("/api/user/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname: parsed.nickname }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "닉네임 변경에 실패했습니다.");
-        return;
-      }
-      await onProfileUpdated({
-        nickname: data.nickname ?? parsed.nickname,
-        profileAvatarId: data.profileAvatarId ?? profileAvatarId,
-        currency: data.currency,
-      });
-    } catch {
-      setError("닉네임 변경에 실패했습니다.");
-    } finally {
-      setSavingNickname(false);
-    }
-  }
-
   return (
     <AppModalOverlay
       open={open}
       onClose={onClose}
       nested
-      panelClassName="!max-w-[min(94vw,28rem)] !h-[min(88dvh,40rem)] !max-h-[min(88dvh,40rem)] !overflow-hidden !p-0"
+      panelClassName="!max-w-[min(94vw,28rem)] !overflow-hidden !p-0"
     >
-      <div className="yanmar-profile-edit-modal">
+      <div className="yanmar-profile-edit-modal yanmar-profile-avatar-modal">
         <div className="yanmar-profile-edit-header">
-          <h3>프로필 편집</h3>
+          <h3>프로필 이미지</h3>
           <button type="button" onClick={onClose} aria-label="닫기">
             ×
           </button>
         </div>
 
         <div className="yanmar-profile-edit-body">
+          <div className="yanmar-profile-avatar-preview">
+            <span>미리보기</span>
+            <ProfileAvatar
+              avatarId={draftAvatarId}
+              nickname={nickname}
+              size={118}
+            />
+          </div>
           <section className="yanmar-profile-edit-pane yanmar-profile-edit-pane--avatar">
             <div className="yanmar-profile-edit-section-head">
               <h4>프로필 이미지</h4>
@@ -223,83 +180,150 @@ function ProfileEditModal({
             <div
               className="yanmar-profile-avatar-scroll"
               role="listbox"
-              aria-label="차량 디자인"
+              aria-label="프로필 이미지"
             >
               <div className="yanmar-profile-avatar-grid">
-                {CHASSIS_CATALOG.map((chassis) => {
-                  const selected = draftAvatarId === chassis.id;
+                {PROFILE_AVATAR_IDS.map((avatarId) => {
+                  const selected = draftAvatarId === avatarId;
+                  const label =
+                    avatarId === "initial"
+                      ? "기본 프로필"
+                      : `얀마 ${Number(avatarId.slice(-2))}`;
                   return (
                     <button
-                      key={chassis.id}
+                      key={avatarId}
                       type="button"
                       role="option"
                       aria-selected={selected}
-                      aria-label={chassis.label}
-                      title={chassis.label}
+                      aria-label={label}
+                      title={label}
                       className={`yanmar-profile-avatar-option${
                         selected ? " is-selected" : ""
                       }`}
-                      onClick={() => setDraftAvatarId(chassis.id)}
+                      onClick={() => setDraftAvatarId(avatarId)}
                     >
                       <span className="yanmar-profile-avatar-frame" aria-hidden>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          key={chassisModelThumbSrc(chassis.id)}
-                          src={chassisModelThumbSrc(chassis.id)}
-                          alt=""
-                          draggable={false}
+                        <ProfileAvatar
+                          avatarId={avatarId}
+                          nickname={nickname}
+                          size={72}
                         />
                       </span>
-                      <span className="yanmar-profile-avatar-label">
-                        {chassis.label}
-                      </span>
+                      <span className="yanmar-profile-avatar-label">{label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
           </section>
+          {error ? <p className="yanmar-profile-edit-error">{error}</p> : null}
+        </div>
+      </div>
+    </AppModalOverlay>
+  );
+}
 
-          <section className="yanmar-profile-edit-pane yanmar-profile-edit-pane--nickname">
-            <h4>닉네임 변경</h4>
-            <input
-              type="text"
-              value={draftNickname}
-              onChange={(e) => setDraftNickname(e.target.value)}
-              className="yanmar-profile-edit-nickname"
-              placeholder={`닉네임 (${NICKNAME_MIN_LENGTH}~${NICKNAME_MAX_LENGTH}글자)`}
-              minLength={NICKNAME_MIN_LENGTH}
-              maxLength={NICKNAME_MAX_LENGTH}
-              aria-label="닉네임"
-            />
-            <button
-              type="button"
-              className="yanmar-profile-edit-nickname-btn"
-              disabled={
-                !nicknameDirty ||
-                savingNickname ||
-                nicknameCharLength(draftNickname.trim()) < NICKNAME_MIN_LENGTH
-              }
-              onClick={() => void saveNickname()}
-            >
-              {savingNickname ? (
-                "변경 중..."
-              ) : (
-                <>
-                  <span>변경</span>
-                  <StarAmount
-                    value={NICKNAME_CHANGE_COST_STARS}
-                    size={13}
-                    valueClassName="text-[12px] font-black tabular-nums text-amber-100"
-                  />
-                </>
-              )}
-            </button>
-            {!canAffordNickname && nicknameDirty ? (
-              <p className="yanmar-profile-edit-hint">스타가 부족합니다.</p>
-            ) : null}
-            {error ? <p className="yanmar-profile-edit-error">{error}</p> : null}
-          </section>
+function NicknameModal({
+  open,
+  onClose,
+  nickname,
+  stars,
+  profileAvatarId,
+  onProfileUpdated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  nickname: string;
+  stars: number;
+  profileAvatarId: string | null;
+  onProfileUpdated: PlayerProfileModalProps["onProfileUpdated"];
+}) {
+  const [draftNickname, setDraftNickname] = useState(nickname);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const nicknameDirty = draftNickname.trim() !== nickname.trim();
+  const canAffordNickname = stars >= NICKNAME_CHANGE_COST_STARS;
+
+  async function saveNickname() {
+    const parsed = validateNickname(draftNickname.trim());
+    if (!parsed.ok) return setError(parsed.message);
+    if (!nicknameDirty) return;
+    if (!canAffordNickname) {
+      return setError(
+        `닉네임 변경에는 스타 ${NICKNAME_CHANGE_COST_STARS}개가 필요합니다.`,
+      );
+    }
+
+    setError("");
+    setSaving(true);
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname: parsed.nickname }),
+      });
+      const data = await res.json();
+      if (!res.ok) return setError(data.error ?? "닉네임 변경에 실패했습니다.");
+      await onProfileUpdated({
+        nickname: data.nickname ?? parsed.nickname,
+        profileAvatarId: data.profileAvatarId ?? profileAvatarId,
+        currency: data.currency,
+      });
+      onClose();
+    } catch {
+      setError("닉네임 변경에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <AppModalOverlay
+      open={open}
+      onClose={onClose}
+      nested
+      panelClassName="!max-w-[min(94vw,25rem)] !overflow-hidden !p-0"
+    >
+      <div className="yanmar-profile-edit-modal yanmar-nickname-modal">
+        <div className="yanmar-profile-edit-header">
+          <h3>닉네임 변경</h3>
+          <button type="button" onClick={onClose} aria-label="닫기">×</button>
+        </div>
+        <div className="yanmar-profile-edit-pane yanmar-nickname-modal-body">
+          <p className="yanmar-nickname-cost">
+            1회 변경 비용 <StarAmount value={NICKNAME_CHANGE_COST_STARS} size={15} valueClassName="text-sm font-black text-amber-100" />
+          </p>
+          <input
+            type="text"
+            value={draftNickname}
+            onChange={(event) => setDraftNickname(event.target.value)}
+            className="yanmar-profile-edit-nickname"
+            placeholder={`닉네임 (${NICKNAME_MIN_LENGTH}~${NICKNAME_MAX_LENGTH}글자)`}
+            minLength={NICKNAME_MIN_LENGTH}
+            maxLength={NICKNAME_MAX_LENGTH}
+            aria-label="닉네임"
+          />
+          <button
+            type="button"
+            className="yanmar-profile-edit-nickname-btn"
+            disabled={!nicknameDirty || saving || nicknameCharLength(draftNickname.trim()) < NICKNAME_MIN_LENGTH}
+            onClick={() => void saveNickname()}
+          >
+            {saving ? (
+              "변경 중..."
+            ) : (
+              <>
+                <StarAmount
+                  value={NICKNAME_CHANGE_COST_STARS}
+                  size={14}
+                  valueClassName="text-[13px] font-black tabular-nums text-amber-50"
+                />
+                <span>변경</span>
+              </>
+            )}
+          </button>
+          {!canAffordNickname && nicknameDirty ? <p className="yanmar-profile-edit-hint">스타가 부족합니다.</p> : null}
+          {error ? <p className="yanmar-profile-edit-error">{error}</p> : null}
         </div>
       </div>
     </AppModalOverlay>
@@ -324,22 +348,19 @@ export function PlayerProfileModal({
   onAbilityAllocChange,
   onProfileUpdated,
 }: PlayerProfileModalProps) {
-  const [editOpen, setEditOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) setEditOpen(false);
-  }, [open]);
-
-  const avatarFallback = useMemo(
-    () => String(activeChassisId),
-    [activeChassisId],
-  );
+  const [avatarEditOpen, setAvatarEditOpen] = useState(false);
+  const [nicknameEditOpen, setNicknameEditOpen] = useState(false);
+  const handleClose = () => {
+    setAvatarEditOpen(false);
+    setNicknameEditOpen(false);
+    onClose();
+  };
 
   return (
     <>
       <AppModalOverlay
         open={open}
-        onClose={onClose}
+        onClose={handleClose}
         panelClassName="!max-w-[min(96vw,42rem)] !max-h-[min(94dvh,44rem)] !overflow-hidden !p-0 landscape:!max-h-[min(96dvh,36rem)]"
       >
         <div className="yanmar-profile-modal">
@@ -353,7 +374,7 @@ export function PlayerProfileModal({
                   valueClassName="text-[12px] font-black tabular-nums text-amber-100"
                 />
               </span>
-              <button type="button" onClick={onClose} aria-label="닫기">
+              <button type="button" onClick={handleClose} aria-label="닫기">
                 ×
               </button>
             </div>
@@ -364,14 +385,14 @@ export function PlayerProfileModal({
               <div className="yanmar-profile-avatar-wrap">
                 <ProfileAvatar
                   avatarId={profileAvatarId}
-                  fallbackChassisId={avatarFallback}
+                  nickname={nickname}
                   size={56}
                 />
                 <button
                   type="button"
                   className="yanmar-profile-edit-pencil"
-                  onClick={() => setEditOpen(true)}
-                  aria-label="프로필 편집"
+                  onClick={() => setAvatarEditOpen(true)}
+                  aria-label="프로필 이미지 변경"
                 >
                   <PencilIcon />
                 </button>
@@ -380,6 +401,14 @@ export function PlayerProfileModal({
                 <p className="yanmar-profile-level-row">
                   <span className="yanmar-profile-level">Lv.{xpProgress.level}</span>
                   <span className="yanmar-profile-name">{nickname}</span>
+                  <button
+                    type="button"
+                    className="yanmar-profile-edit-pencil yanmar-profile-nickname-pencil"
+                    onClick={() => setNicknameEditOpen(true)}
+                    aria-label="닉네임 변경"
+                  >
+                    <PencilIcon />
+                  </button>
                 </p>
                 <XpProgressBar
                   progress={xpProgress}
@@ -407,13 +436,21 @@ export function PlayerProfileModal({
         </div>
       </AppModalOverlay>
 
-      <ProfileEditModal
-        open={editOpen}
-        onClose={() => setEditOpen(false)}
+      <ProfileAvatarModal
+        key={`avatar-${avatarEditOpen}-${profileAvatarId}`}
+        open={avatarEditOpen}
+        onClose={() => setAvatarEditOpen(false)}
+        nickname={nickname}
+        profileAvatarId={profileAvatarId}
+        onProfileUpdated={onProfileUpdated}
+      />
+      <NicknameModal
+        key={`nickname-${nicknameEditOpen}-${nickname}`}
+        open={nicknameEditOpen}
+        onClose={() => setNicknameEditOpen(false)}
         nickname={nickname}
         stars={stars}
         profileAvatarId={profileAvatarId}
-        activeChassisId={avatarFallback}
         onProfileUpdated={onProfileUpdated}
       />
     </>

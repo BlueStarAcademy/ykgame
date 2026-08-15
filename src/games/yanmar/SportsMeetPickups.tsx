@@ -4,16 +4,8 @@ import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { StarMesh } from "./StarMesh";
+import { BoosterMesh } from "./WorldPickupMeshes";
 import type { SportsMeetRunState } from "./sportsMeet/types";
-
-const SHARED_BUFF_GEO = new THREE.BoxGeometry(0.7, 0.7, 0.7);
-const SHARED_BUFF_MAT = new THREE.MeshStandardMaterial({
-  color: "#38bdf8",
-  emissive: "#0ea5e9",
-  emissiveIntensity: 0.5,
-  metalness: 0.3,
-  roughness: 0.3,
-});
 
 export function SportsMeetPickups({
   runRef,
@@ -82,14 +74,14 @@ export function SportsMeetPickups({
         </group>
       ))}
       {buffs.map((b) => (
-        <mesh
+        <group
           key={b.id}
           position={[b.x, b.y, b.z]}
           userData={{ baseY: b.y, pickupId: b.id, kind: "buff" }}
-          geometry={SHARED_BUFF_GEO}
-          material={SHARED_BUFF_MAT}
           visible={!b.collected}
-        />
+        >
+          <BoosterMesh />
+        </group>
       ))}
     </group>
   );

@@ -18,10 +18,15 @@ export const SITE_LAYOUT = {
   /** West of monument on minimap (lower world X) so labels/zones don't overlap. */
   hill: [6, 104] as SitePoint,
   /**
-   * Minimap top-left = world NE. East of monument, north of crash —
-   * flood debris field center.
+   * Minimap top-left = world NE. Kept inward of the north/east edge
+   * safety mesh (max − 7) so the zone paint ring stays clear.
    */
-  flood: [120, 125] as SitePoint,
+  flood: [116, 118] as SitePoint,
+  /**
+   * NE corner approach, inset from the green north mesh / east barriers
+   * (tier-3 max ≈ 144, panels at ≈ 137). Hopper faces the debris field.
+   */
+  floodIncinerator: [129, 130] as SitePoint,
   /** North edge (minimap 12 o'clock) — Yanmar pylon monument */
   monument: [48, 132] as SitePoint,
   /** Minimap bottom-left (world SE) — excavator sports meet portal */

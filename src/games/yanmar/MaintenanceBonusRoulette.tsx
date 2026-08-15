@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   MAINTENANCE_FLUIDS,
   bonusTableForFluid,
   maintenancePackageHighlight,
-  pointKindLabel,
   type MaintenanceBonusOutcome,
   type MaintenanceFluidId,
   type MaintenanceGrantedPayout,
@@ -67,9 +67,10 @@ function highlightToReelItem(
   bonus: MaintenanceBonusOutcome | Parameters<
     typeof maintenancePackageHighlight
   >[1],
+  t: ReturnType<typeof useTranslations>,
 ): ReelItem {
   const pointKind = MAINTENANCE_FLUIDS[fluidId].pointKind;
-  const highlight = maintenancePackageHighlight(fluidId, bonus);
+  const highlight = maintenancePackageHighlight(fluidId, bonus, t);
   return {
     key: highlight.key,
     label: highlight.label,
@@ -77,11 +78,15 @@ function highlightToReelItem(
   };
 }
 
-function buildReel(fluidId: MaintenanceFluidId, winner: MaintenanceBonusOutcome) {
+function buildReel(
+  fluidId: MaintenanceFluidId,
+  winner: MaintenanceBonusOutcome,
+  t: ReturnType<typeof useTranslations>,
+) {
   const base = bonusTableForFluid(fluidId).map((entry) =>
-    highlightToReelItem(fluidId, entry.outcome),
+    highlightToReelItem(fluidId, entry.outcome, t),
   );
-  const winnerItem = highlightToReelItem(fluidId, winner);
+  const winnerItem = highlightToReelItem(fluidId, winner, t);
   const winnerIndexInPool = Math.max(
     0,
     base.findIndex((item) => item.key === winnerItem.key),
@@ -97,13 +102,16 @@ function buildReel(fluidId: MaintenanceFluidId, winner: MaintenanceBonusOutcome)
   return { items, stopIndex, winnerItem };
 }
 
-function grantChips(granted: MaintenanceGrantedPayout): GrantChip[] {
+function grantChips(
+  granted: MaintenanceGrantedPayout,
+  t: ReturnType<typeof useTranslations>,
+): GrantChip[] {
   const chips: GrantChip[] = [];
   if (granted.stars > 0) {
     chips.push({
       key: "stars",
       src: STAR_ICON,
-      label: "스타",
+      label: t("repair.stars"),
       amountLabel: `+${granted.stars.toLocaleString()}`,
     });
   }
@@ -111,7 +119,7 @@ function grantChips(granted: MaintenanceGrantedPayout): GrantChip[] {
     chips.push({
       key: "points",
       src: POINT_ICONS[granted.pointKind],
-      label: pointKindLabel(granted.pointKind),
+      label: t(`repair.catalog.pointKinds.${granted.pointKind}`),
       amountLabel: `+${granted.workshopPoints.toLocaleString()}`,
     });
   }
@@ -119,7 +127,7 @@ function grantChips(granted: MaintenanceGrantedPayout): GrantChip[] {
     chips.push({
       key: "cores",
       src: CORE_ICON,
-      label: "강화코어",
+      label: t("repair.enhanceCore"),
       amountLabel: `+${granted.enhanceCores.toLocaleString()}`,
     });
   }
@@ -127,16 +135,20 @@ function grantChips(granted: MaintenanceGrantedPayout): GrantChip[] {
     chips.push({
       key: "ticket-std",
       src: TICKET_STANDARD_ICON,
-      label: "일반 뽑기권",
-      amountLabel: `${granted.gachaTicketsStandard}개`,
+      label: t("repair.standardTicket"),
+      amountLabel: t("maintenanceRoulette.count", {
+        count: granted.gachaTicketsStandard,
+      }),
     });
   }
   if (granted.gachaTicketsPremium > 0) {
     chips.push({
       key: "ticket-prem",
       src: TICKET_PREMIUM_ICON,
-      label: "고급 뽑기권",
-      amountLabel: `${granted.gachaTicketsPremium}개`,
+      label: t("repair.premiumTicket"),
+      amountLabel: t("maintenanceRoulette.count", {
+        count: granted.gachaTicketsPremium,
+      }),
     });
   }
   if (granted.xpGarnish > 0) {
@@ -163,6 +175,7 @@ export function MaintenanceBonusRoulette({
   buffLabel: string;
   onDone: () => void;
 }) {
+  const t = useTranslations("yanmar");
   const [phase, setPhase] = useState<Phase>("spinning");
   const [reelItems, setReelItems] = useState<ReelItem[]>([]);
   const [reelOffsetRem, setReelOffsetRem] = useState(0);
@@ -183,7 +196,7 @@ export function MaintenanceBonusRoulette({
     if (startedRef.current) return;
     startedRef.current = true;
 
-    const { items, stopIndex } = buildReel(fluidId, bonus);
+    const { items, stopIndex } = buildReel(fluidId, bonus, t);
     setReelItems(items);
     setReelOffsetRem(0);
     spinningRef.current = true;
@@ -237,21 +250,23 @@ export function MaintenanceBonusRoulette({
     };
 
     spinRafRef.current = requestAnimationFrame(frame);
-  }, [fluidId, bonus, granted.stars]);
+  }, [fluidId, bonus, granted.stars, t]);
 
   function requestStopSpin() {
     if (phase !== "spinning") return;
     stopRequestedRef.current = true;
   }
 
-  const chips = grantChips(granted);
+  const chips = grantChips(granted, t);
 
   return (
     <div className={styles.backdrop} role="dialog" aria-modal="true">
       <div className={styles.panel} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <h3 className={styles.title}>
-            {phase === "reveal" ? "교환 보상 획득!" : "보상 뽑기"}
+            {phase === "reveal"
+              ? t("maintenanceRoulette.rewardAcquired")
+              : t("maintenanceRoulette.drawingReward")}
           </h3>
         </div>
         <div className={styles.body}>
@@ -281,7 +296,7 @@ export function MaintenanceBonusRoulette({
             </div>
           ) : (
             <div className={styles.slotResult}>
-              <div className={styles.grantGrid} aria-label="획득한 전체 보상">
+              <div className={styles.grantGrid} aria-label={t("maintenanceRoulette.allRewards")}>
                 {chips.map((chip) => (
                   <span
                     key={chip.key}
@@ -316,7 +331,7 @@ export function MaintenanceBonusRoulette({
               className={styles.btnGold}
               onClick={requestStopSpin}
             >
-              멈춤
+              {t("maintenanceRoulette.stop")}
             </button>
           ) : (
             <button
@@ -324,7 +339,7 @@ export function MaintenanceBonusRoulette({
               className={styles.btnPrimary}
               onClick={onDone}
             >
-              확인
+              {t("maintenanceRoulette.confirm")}
             </button>
           )}
         </div>

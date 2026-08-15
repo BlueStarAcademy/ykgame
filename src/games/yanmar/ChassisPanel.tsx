@@ -76,7 +76,6 @@ export function ChassisGallery({
 
   const thumbSrc = chassisModelThumbSrc(selected.id);
   const statLabel = (key: MainOptionKey) => t(`stats.${key}`);
-  const classLabel = t(`class.${selected.chassisClass.toLowerCase()}`);
   const weightLabel = t("weight", {
     weight: selected.weightKg.toLocaleString(),
   });
@@ -85,6 +84,10 @@ export function ChassisGallery({
     <div className="yanmar-chassis-gallery">
       <div className="yanmar-chassis-showcase">
         <div className="yanmar-chassis-showcase-visual is-active">
+          <div className="yanmar-chassis-showcase-stage" aria-hidden>
+            <span className="yanmar-chassis-showcase-glow" />
+            <span className="yanmar-chassis-showcase-floor" />
+          </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             key={thumbSrc}
@@ -93,6 +96,7 @@ export function ChassisGallery({
             className="yanmar-chassis-showcase-img"
             draggable={false}
           />
+          <span className="yanmar-chassis-weight-pill">{weightLabel}</span>
           <button
             type="button"
             className="yanmar-chassis-zoom-btn"
@@ -103,14 +107,8 @@ export function ChassisGallery({
         </div>
 
         <div className="yanmar-chassis-showcase-meta">
-          <h4 className="yanmar-chassis-showcase-name">{selected.label}</h4>
-          <div className="yanmar-chassis-showcase-info">
-            <span className="yanmar-chassis-class-pill">
-              {classLabel}
-            </span>
-            <span className="yanmar-chassis-weight-pill">
-              {weightLabel}
-            </span>
+          <div className="yanmar-chassis-showcase-title-row">
+            <h4 className="yanmar-chassis-showcase-name">{selected.label}</h4>
           </div>
           <p className="yanmar-chassis-trait">{t("defaultTrait")}</p>
           {allocEnabled ? (
@@ -160,7 +158,7 @@ export function ChassisGallery({
         >
           {MAIN_OPTION_KEYS.map((key) => {
             const base = selected.stats[key];
-            const alloc = allocEnabled ? (draft[key] ?? 0) : 0;
+            const alloc = draft[key] ?? 0;
             const preview = base + alloc;
             return (
               <li key={key}>
@@ -222,9 +220,7 @@ export function ChassisGallery({
               draggable={false}
             />
             <p className="yanmar-chassis-art-preview-name">{selected.label}</p>
-            <p className="yanmar-chassis-art-preview-meta">
-              {classLabel} · {weightLabel}
-            </p>
+            <p className="yanmar-chassis-art-preview-meta">{weightLabel}</p>
             <button
               type="button"
               className="yanmar-chassis-art-preview-close"

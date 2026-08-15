@@ -56,9 +56,11 @@ import {
   dumpTruckLocalToWorld,
   hillBoulderVisualScale,
   pushFloodDebrisToCollection,
+  advanceFloodDebrisBladePush,
   beginFloodTrashCarry,
   depositFloodTrashToIncinerator,
   dropFloodCarriedTrash,
+  failFloodTrashCarry,
   tryStartFloodBurn,
   advanceFloodBurn,
   isInsideFloodCollectionPad,
@@ -171,6 +173,57 @@ import {
   grappleOpenEnoughToGrab,
 } from "./grappleArmClearance";
 import { yanmarAudio } from "./yanmarAudio";
+
+const FLOOD_TRASH_GRIP_PROFILE = {
+  size: 0.52,
+  roundness: 0.58,
+  comOffsetX: 0.18,
+  comOffsetZ: -0.14,
+} as const;
+
+/**
+ * A load of collected trash deliberately uses the identical HillBoulder shape
+ * profile consumed by `computeComAlignFactor` and `computeGrappleAdhesion`.
+ * That keeps pressure, grip adhesion, and success probability calculation
+ * exactly on the same path as stone loading.
+ */
+function floodTrashGripTarget(
+  zone: NonNullable<TerrainData["floodZone"]>,
+  trashId: string,
+): HillBoulder {
+  return {
+    id: trashId,
+    x: zone.collectionX,
+    z: zone.collectionZ,
+    active: true,
+    delivered: false,
+    extracted: false,
+    ...FLOOD_TRASH_GRIP_PROFILE,
+  };
+}
+
+/**
+ * Flood trash grab must target the central collection pile — not the whole
+ * painted pad (`collectionRadius` ≈ 5.5). Reuses the hill rock ground-pose
+ * envelope so HUD "집게가능" and the actual pickup share one radius.
+ */
+function isFloodTrashGrabPose(
+  zone: NonNullable<TerrainData["floodZone"]>,
+  clamp: { x: number; y: number; z: number },
+  terrain: TerrainData,
+  jawSamples: ReadonlyArray<{ x: number; y: number; z: number }>,
+): boolean {
+  const target = floodTrashGripTarget(
+    zone,
+    zone.carriedTrashId ?? `${zone.id}-collection-load`,
+  );
+  return isGrappleGroundPickupPose(
+    clamp,
+    target,
+    sampleHeight(terrain, clamp.x, clamp.z),
+    jawSamples,
+  );
+}
 
 export interface DumpSoilVisual {
   active: boolean;
@@ -294,6 +347,10 @@ export interface SimTickParams {
   onFloodCollectFilled?: (eventId: string, amount: number) => void;
   /** Flood: grapple pickup. awardCycleReward is true once per cycle. */
   onFloodTrashGrapple?: (eventId: string, awardCycleReward: boolean) => void;
+  /** Flood: one trash chunk was deposited in the incinerator. */
+  onFloodIncineratorFilled?: (units: number) => void;
+  /** Flood: player left the filled incinerator and the burn began. */
+  onFloodBurnStarted?: () => void;
   /** Flood: incinerator burn completed. */
   onFloodBurnComplete?: (eventId: string, burnedUnits: number) => void;
   onAttachmentWarning: (message: string) => void;
@@ -688,6 +745,43 @@ function constrainExcavatorToDumpTruck(
   return true;
 }
 
+/** Open hopper outer shell radius; the boom may load above it, but tracks cannot overlap it. */
+const FLOOD_INCINERATOR_BODY_RADIUS = 3.7;
+
+function constrainExcavatorFromFloodIncinerator(
+  sim: ExcavatorSimState,
+  previous: { x: number; z: number; heading: number; swing: number },
+  terrain: TerrainData,
+  excavatorRadius: number,
+) {
+  const zone = terrain.floodZone;
+  if (!zone || (!zone.active && zone.phase !== "readyToBurn" && zone.phase !== "burning")) {
+    return false;
+  }
+  const minimumDistance = FLOOD_INCINERATOR_BODY_RADIUS + excavatorRadius;
+  const dx = sim.posX - zone.incineratorX;
+  const dz = sim.posZ - zone.incineratorZ;
+  if (dx * dx + dz * dz >= minimumDistance * minimumDistance) return false;
+
+  const previousDx = previous.x - zone.incineratorX;
+  const previousDz = previous.z - zone.incineratorZ;
+  if (previousDx * previousDx + previousDz * previousDz >= minimumDistance * minimumDistance) {
+    sim.posX = previous.x;
+    sim.posZ = previous.z;
+    sim.heading = previous.heading;
+    sim.swing = previous.swing;
+    return true;
+  }
+
+  const distance = Math.hypot(dx, dz);
+  const fallbackHeading = Math.atan2(Math.sin(sim.heading), Math.cos(sim.heading));
+  const normalX = distance > 1e-4 ? dx / distance : Math.sin(fallbackHeading);
+  const normalZ = distance > 1e-4 ? dz / distance : Math.cos(fallbackHeading);
+  sim.posX = zone.incineratorX + normalX * minimumDistance;
+  sim.posZ = zone.incineratorZ + normalZ * minimumDistance;
+  return true;
+}
+
 export function tickExcavatorSim(params: SimTickParams) {
   const {
     dt,
@@ -696,7 +790,6 @@ export function tickExcavatorSim(params: SimTickParams) {
     terrain,
     score,
     mode,
-    stats,
     allowed,
     auxiliary,
     autoPose,
@@ -712,6 +805,8 @@ export function tickExcavatorSim(params: SimTickParams) {
     onFloodDebrisPushed,
     onFloodCollectFilled,
     onFloodTrashGrapple,
+    onFloodIncineratorFilled,
+    onFloodBurnStarted,
     onFloodBurnComplete,
     onAttachmentWarning,
     onDumpTruckFull,
@@ -721,6 +816,21 @@ export function tickExcavatorSim(params: SimTickParams) {
     dozerBladeReach = YANMAR_MACHINE_RIG.dozerBladeReach,
     excavatorCollisionRadius = EXCAVATOR_COLLISION_RADIUS,
   } = params;
+
+  const isSportsMode =
+    mode === "sportsRanked" || mode === "sportsPractice";
+  const sportsStage = params.sportsMeetStage ?? null;
+  const digFillMult =
+    isSportsMode && sportsStage === "dig"
+      ? Math.max(1, params.stats.sportsMeetDigFillMult ?? 1)
+      : 1;
+  const stats =
+    digFillMult === 1
+      ? params.stats
+      : {
+          ...params.stats,
+          maxLoadUnits: Math.round(params.stats.maxLoadUnits * digFillMult),
+        };
 
   const systemsFrozen = endedRef?.current === true;
   if (!systemsFrozen) {
@@ -792,10 +902,15 @@ export function tickExcavatorSim(params: SimTickParams) {
   const nowMs = Date.now();
   const worldBuffActive =
     !!params.worldPickups && isWorldSpeedBuffActive(params.worldPickups, nowMs);
+  const sportsDriveMult =
+    isSportsMode && sportsStage === "drive"
+      ? Math.max(1, stats.sportsMeetDriveSpeedMult ?? 1)
+      : 1;
   const travelSpeedScale =
     stats.travelSpeedMultiplier *
     rpmScale *
-    (worldBuffActive ? SPEED_BUFF_MULT : 1);
+    (worldBuffActive ? SPEED_BUFF_MULT : 1) *
+    sportsDriveMult;
   const workSpeedScale = (stats.workSpeedMultiplier ?? 1) * rpmScale;
   /** 상부 선회: RPM 상대 배율 × 민첩. RPM1=현재×민첩, RPM2=2×(게임) / 1.15×(탑승). */
   const swingSpeedScale =
@@ -1081,6 +1196,19 @@ export function tickExcavatorSim(params: SimTickParams) {
       constrainSportsMeetStartPaddock(sim, params.sportsMeetStartPaddock);
     }
   }
+  if (
+    constrainExcavatorFromFloodIncinerator(
+      sim,
+      beforeTravel,
+      terrain,
+      excavatorCollisionRadius,
+    )
+  ) {
+    vel.travel = 0;
+    vel.trackTurn = 0;
+    vel.trackLeft = 0;
+    vel.trackRight = 0;
+  }
 
   let bucketContact = measureAttachmentClearance(sim, terrain, boomSwing, grappleOpen);
   let { clearance } = bucketContact;
@@ -1254,7 +1382,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     // 버켓 관통·암 충돌·컬 한도까지. 말면/암에 닿으면 자동으로 조금 닫힘.
     auxiliary.grappleOpen = clampGrappleOpenAgainstArm(sim, auxiliary.grappleOpen);
 
-    // 운반 중: 돌 크기만큼 덜 접힌 채 멈춤 — 그 상태에서 닫기 유지 시 압력 상승.
+    // 운반 중: 돌/쓰레기 크기만큼 덜 접힌 채 멈춤 — 그 상태에서 닫기 유지 시 압력 상승.
     if (sim.carriedBoulderId && terrain.hillZone) {
       const carriedRock = terrain.hillZone.boulders.find(
         (item) => item.id === sim.carriedBoulderId,
@@ -1264,6 +1392,15 @@ export function tickExcavatorSim(params: SimTickParams) {
         if (auxiliary.grappleOpen < restOpen) {
           auxiliary.grappleOpen = restOpen;
         }
+      }
+    } else if (sim.carriedTrashId && terrain.floodZone) {
+      const trashGripTarget = floodTrashGripTarget(
+        terrain.floodZone,
+        sim.carriedTrashId,
+      );
+      const restOpen = grappleClampOpenForRock(trashGripTarget);
+      if (auxiliary.grappleOpen < restOpen) {
+        auxiliary.grappleOpen = restOpen;
       }
     }
   }
@@ -1345,9 +1482,6 @@ export function tickExcavatorSim(params: SimTickParams) {
     }
   };
 
-  const isSportsMode =
-    mode === "sportsRanked" || mode === "sportsPractice";
-  const sportsStage = params.sportsMeetStage ?? null;
   const sportsWorkAllowed = (work: SportsMeetWorkKind) =>
     !isSportsMode || isSportsMeetWorkAllowed(sportsStage, work);
   const warnSportsWorkBlocked = (work: SportsMeetWorkKind) => {
@@ -1391,6 +1525,12 @@ export function tickExcavatorSim(params: SimTickParams) {
           if (every3 > 1 && runtime.breakerHitCount % 3 === 0) {
             hitDamage = Math.round(hitDamage * every3);
           }
+          if (isSportsMode && sportsStage === "crash") {
+            const crashHitMult = Math.max(1, stats.sportsMeetCrashHitMult ?? 1);
+            if (crashHitMult !== 1) {
+              hitDamage = Math.round(hitDamage * crashHitMult);
+            }
+          }
           const result = damageCrashTile(terrain, tile.id, hitDamage);
           // Hold-to-hammer: rapid ticks while the foot pedal stays down.
           runtime.attachmentActionCooldown = 0.11;
@@ -1418,6 +1558,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       : 0;
   const angleReady = grappleBucketAngleReady(sim.bucket);
   const hillForGrapple = terrain.hillZone;
+  const floodForGrapple = terrain.floodZone;
   const wrappableRock =
     sim.attachmentType === "grapple" &&
     hillForGrapple?.active &&
@@ -1599,7 +1740,11 @@ export function tickExcavatorSim(params: SimTickParams) {
         g.clearanceAtLock =
           grappleClamp.y - sampleHeight(terrain, grappleClamp.x, grappleClamp.z);
       }
-    } else if (!sim.carriedBoulderId && !runtime.grappleGrip.liftResult) {
+    } else if (
+      !sim.carriedBoulderId &&
+      !sim.carriedTrashId &&
+      !runtime.grappleGrip.liftResult
+    ) {
       if (runtime.grappleGrip.contactElapsed > 0 && !runtime.grappleGrip.liftChecked) {
         resetGrappleGrip(runtime.grappleGrip);
       }
@@ -1677,6 +1822,39 @@ export function tickExcavatorSim(params: SimTickParams) {
         }
       }
     }
+    if (
+      sim.attachmentType === "grapple" &&
+      sim.carriedTrashId &&
+      floodForGrapple &&
+      grip.locked &&
+      !grip.liftChecked &&
+      liftedEnough
+    ) {
+      const success = mode === "tutorial" ? true : Math.random() < grip.adhesion01;
+      grip.liftChecked = true;
+      grip.liftResult = success ? "success" : "fail";
+      grip.liftResultTick += 1;
+      if (success) {
+        const eventId = sim.carriedTrashId;
+        const awardCycleReward = !floodForGrapple.rewardedGrapple;
+        if (awardCycleReward) floodForGrapple.rewardedGrapple = true;
+        onFloodTrashGrapple?.(eventId, awardCycleReward);
+        onAttachmentWarning("적재 성공");
+      } else {
+        // A dropped trash load scatters and must be collected again.
+        failFloodTrashCarry(terrain);
+        sim.carriedTrashId = null;
+        runtime.digDust.active = true;
+        runtime.digDust.x = grappleClamp.x;
+        runtime.digDust.y = grappleClamp.y;
+        runtime.digDust.z = grappleClamp.z;
+        const failTick = grip.liftResultTick;
+        resetGrappleGrip(grip);
+        grip.liftResult = "fail";
+        grip.liftResultTick = failTick;
+        onAttachmentWarning("적재 실패 — 집결 쓰레기가 흩어졌습니다.");
+      }
+    }
   }
 
   // 집어서 돌 작업 반경(트럭 포함 outer) 밖으로 나가면 반출 처리.
@@ -1689,38 +1867,42 @@ export function tickExcavatorSim(params: SimTickParams) {
     }
   }
 
-  // Flood recovery trash grapple: collection pad → incinerator.
-  const floodForGrapple = terrain.floodZone;
+  // Flood recovery trash grapple: collection pile → incinerator.
   if (
     sim.attachmentType === "grapple" &&
     floodForGrapple &&
     (floodForGrapple.phase === "active" ||
       floodForGrapple.phase === "readyToBurn") &&
-    !sim.carriedBoulderId &&
-    runtime.attachmentActionCooldown <= 0
+    !sim.carriedBoulderId
   ) {
+    // Sim/zone carry ids must stay paired. A leftover zone lock after a failed
+    // lift or session restore blocks beginFloodTrashCarry while HUD still
+    // shows 집게가능 (which only checks sim.carriedTrashId).
+    if (!sim.carriedTrashId && floodForGrapple.carriedTrashId) {
+      floodForGrapple.carriedTrashId = null;
+    }
     const floodClosing = grapplePedal > 0;
     const floodOpening = grapplePedal < 0;
-    const nearPad = isInsideFloodCollectionPad(
+    const nearCollectionLoad = isFloodTrashGrabPose(
       floodForGrapple,
-      grappleClamp.x,
-      grappleClamp.z,
+      grappleClamp,
+      terrain,
+      grappleJawSamples,
     );
     const nearIncinerator = isInsideFloodIncinerator(
       floodForGrapple,
       grappleClamp.x,
       grappleClamp.z,
     );
-    const tipNearGround =
-      grappleClamp.y - sampleHeight(terrain, grappleClamp.x, grappleClamp.z) <
-      0.85;
 
     if (
+      runtime.attachmentActionCooldown <= 0 &&
       !sim.carriedTrashId &&
+      floodForGrapple.active &&
       floodForGrapple.phase === "active" &&
       floodClosing &&
-      nearPad &&
-      tipNearGround &&
+      runtime.grappleGrabArmed &&
+      nearCollectionLoad &&
       floodForGrapple.collectedUnits >= FLOOD_COLLECTION_THRESHOLD
     ) {
       if (!angleReady) {
@@ -1730,15 +1912,52 @@ export function tickExcavatorSim(params: SimTickParams) {
         const carried = beginFloodTrashCarry(terrain);
         if (carried) {
           sim.carriedTrashId = carried.trashId;
+          runtime.grappleGrabArmed = false;
+          resetGrappleGrip(runtime.grappleGrip);
+          // Trash is less uniform than a boulder, so its grip chance still
+          // depends on the player's hold pressure and bucket angle.
+          const trashGripTarget = floodTrashGripTarget(
+            floodForGrapple,
+            carried.trashId,
+          );
+          runtime.grappleGrip.comFactor = computeComAlignFactor(
+            trashGripTarget,
+            grappleClamp.x,
+            grappleClamp.z,
+          );
+          const initial = computeGrappleAdhesion({
+            rock: trashGripTarget,
+            contactElapsed: 0,
+            bucketAngle: sim.bucket,
+            comFactor: runtime.grappleGrip.comFactor,
+            adhesionBonus: stats.gripAdhesionBonus,
+          });
+          runtime.grappleGrip.adhesion01 = initial.adhesion01;
+          runtime.grappleGrip.pressure01 = initial.pressure01;
+          // Match rock grab: keep jaws from fully shutting on the load.
+          if (auxiliary) {
+            auxiliary.grappleOpen = Math.max(
+              auxiliary.grappleOpen,
+              grappleClampOpenForRock(trashGripTarget),
+            );
+          }
           runtime.attachmentActionCooldown = 0.25;
-          const awardCycleReward = !floodForGrapple.rewardedGrapple;
-          if (awardCycleReward) floodForGrapple.rewardedGrapple = true;
-          onFloodTrashGrapple?.(carried.trashId, awardCycleReward);
         }
       }
-    } else if (sim.carriedTrashId && floodOpening && nearIncinerator) {
-      depositFloodTrashToIncinerator(terrain);
+    } else if (
+      runtime.attachmentActionCooldown <= 0 &&
+      sim.carriedTrashId &&
+      runtime.grappleGrip.liftChecked &&
+      runtime.grappleGrip.liftResult === "success" &&
+      floodOpening &&
+      nearIncinerator
+    ) {
+      const deposited = depositFloodTrashToIncinerator(terrain);
+      if (deposited) {
+        onFloodIncineratorFilled?.(floodForGrapple.incineratorUnits);
+      }
       sim.carriedTrashId = null;
+      resetGrappleGrip(runtime.grappleGrip);
       runtime.attachmentActionCooldown = 0.3;
     } else if (
       sim.carriedTrashId &&
@@ -1746,12 +1965,60 @@ export function tickExcavatorSim(params: SimTickParams) {
     ) {
       dropFloodCarriedTrash(terrain);
       sim.carriedTrashId = null;
+      resetGrappleGrip(runtime.grappleGrip);
+    }
+
+    // Pressure / adhesion must keep updating even during attachment cooldown
+    // (same timing as boulder clamping — not gated on grab/deposit cooldown).
+    if (sim.carriedTrashId && !runtime.grappleGrip.liftChecked) {
+      const g = runtime.grappleGrip;
+      if (floodClosing && !g.locked) {
+        const trashGripTarget = floodTrashGripTarget(
+          floodForGrapple,
+          sim.carriedTrashId,
+        );
+        g.contactElapsed += dt;
+        if (
+          Math.hypot(
+            grappleClamp.x - trashGripTarget.x,
+            grappleClamp.z - trashGripTarget.z,
+          ) <=
+          hillBoulderWrapRadius(trashGripTarget) * 1.8
+        ) {
+          g.comFactor = computeComAlignFactor(
+            trashGripTarget,
+            grappleClamp.x,
+            grappleClamp.z,
+          );
+        }
+        const next = computeGrappleAdhesion({
+          rock: trashGripTarget,
+          contactElapsed: g.contactElapsed,
+          bucketAngle: sim.bucket,
+          comFactor: g.comFactor,
+          adhesionBonus: stats.gripAdhesionBonus,
+        });
+        g.adhesion01 = next.adhesion01;
+        g.pressure01 = next.pressure01;
+        if (g.pressure01 >= 1) {
+          g.locked = true;
+          g.clearanceAtLock =
+            grappleClamp.y -
+            sampleHeight(terrain, grappleClamp.x, grappleClamp.z);
+        }
+      } else if (!floodClosing && !floodOpening && !g.locked) {
+        g.locked = true;
+        g.clearanceAtLock =
+          grappleClamp.y -
+          sampleHeight(terrain, grappleClamp.x, grappleClamp.z);
+      }
     }
   }
 
   if (sim.attachmentType !== "grapple" && sim.carriedTrashId) {
     dropFloodCarriedTrash(terrain);
     sim.carriedTrashId = null;
+    resetGrappleGrip(runtime.grappleGrip);
   }
 
   const isInDumpTruckRearBox = (wx: number, wz: number) => {
@@ -1950,29 +2217,53 @@ export function tickExcavatorSim(params: SimTickParams) {
   const grappleReadyToCloseGrab =
     grappleOpenEnoughToGrab(sim, grappleOpenForHud) ||
     runtime.grappleGrabArmed;
+  const floodGrabLoadReady =
+    sim.attachmentType === "grapple" &&
+    !sim.carriedBoulderId &&
+    !sim.carriedTrashId &&
+    !!floodForGrapple &&
+    floodForGrapple.active &&
+    floodForGrapple.phase === "active" &&
+    floodForGrapple.collectedUnits >= FLOOD_COLLECTION_THRESHOLD &&
+    isFloodTrashGrabPose(
+      floodForGrapple,
+      grappleClamp,
+      terrain,
+      grappleJawSamples,
+    );
+  const rockGrabReady =
+    !!wrappableRock && grappleGroundPickupHud && grappleReadyToCloseGrab;
+  const floodGrabReady = floodGrabLoadReady && grappleReadyToCloseGrab;
   const canGrab =
     sim.attachmentType === "grapple" &&
     !sim.carriedBoulderId &&
-    !!wrappableRock &&
+    !sim.carriedTrashId &&
     angleReady &&
-    grappleGroundPickupHud &&
-    grappleReadyToCloseGrab;
+    (rockGrabReady || floodGrabReady);
   const grappleNeedsAlignment =
     sim.attachmentType === "grapple" &&
     !sim.carriedBoulderId &&
-    !!wrappableRock &&
-    grappleGroundPickupHud &&
-    grappleReadyToCloseGrab &&
+    !sim.carriedTrashId &&
+    (rockGrabReady || floodGrabReady) &&
     !angleReady;
   const canDropRock =
     sim.attachmentType === "grapple" &&
-    !!sim.carriedBoulderId &&
-    runtime.grappleGrip.liftChecked &&
-    alignedForHaulTruck &&
-    grappleClamp.y >= HAUL_TRUCK_ALIGN.cavityMinY;
+    ((!!sim.carriedBoulderId &&
+      runtime.grappleGrip.liftChecked &&
+      alignedForHaulTruck &&
+      grappleClamp.y >= HAUL_TRUCK_ALIGN.cavityMinY) ||
+      (!!sim.carriedTrashId &&
+        runtime.grappleGrip.liftChecked &&
+        runtime.grappleGrip.liftResult === "success" &&
+        !!floodForGrapple &&
+        isInsideFloodIncinerator(
+          floodForGrapple,
+          grappleClamp.x,
+          grappleClamp.z,
+        )));
   const showGripGauge =
     sim.attachmentType === "grapple" &&
-    !!sim.carriedBoulderId &&
+    (!!sim.carriedBoulderId || !!sim.carriedTrashId) &&
     !runtime.grappleGrip.liftChecked;
   const gripState = runtime.grappleGrip;
 
@@ -2379,7 +2670,16 @@ export function tickExcavatorSim(params: SimTickParams) {
     const rt = runtime as SimLoopRuntime & {
       floodBladeStrokeDist?: number;
     };
-    rt.floodBladeStrokeDist = (rt.floodBladeStrokeDist ?? 0) + forwardTravel * dt;
+    const travelStep = forwardTravel * dt;
+    rt.floodBladeStrokeDist = (rt.floodBladeStrokeDist ?? 0) + travelStep;
+    const pushHeading = sim.heading;
+    advanceFloodDebrisBladePush(
+      terrain,
+      bladeContact.x,
+      bladeContact.z,
+      pushHeading,
+      travelStep,
+    );
     fb.bladeWorking = true;
     runtime.bladeSpray.active = true;
     runtime.bladeSpray.intensity = Math.min(
@@ -2399,6 +2699,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       const { moved, collectionFilled } = pushFloodDebrisToCollection(
         terrain,
         pushUnits,
+        { x: bladeContact.x, z: bladeContact.z },
       );
       if (moved > 0) {
         onFloodDebrisPushed?.(moved);
@@ -2422,7 +2723,9 @@ export function tickExcavatorSim(params: SimTickParams) {
 
   // Flood burn sequence: wait for player to leave, then play burn FX.
   if (floodZone?.phase === "readyToBurn") {
-    tryStartFloodBurn(terrain, sim.posX, sim.posZ);
+    if (tryStartFloodBurn(terrain, sim.posX, sim.posZ)) {
+      onFloodBurnStarted?.();
+    }
   }
   if (floodZone?.phase === "burning") {
     const capacity = floodZone.incineratorCapacity;

@@ -24,7 +24,7 @@ const GRADE_FILE: Record<ItemGrade, string> = {
 
 const ITEM_GRADES = Object.keys(GRADE_FILE) as ItemGrade[];
 
-const CHASSIS_MODEL_THUMB_VERSION = 13;
+const CHASSIS_MODEL_THUMB_VERSION = 14;
 
 const preloadedIconUrls = new Set<string>();
 

@@ -50,6 +50,7 @@ export {
   SPORTS_MEET_PORTAL,
   SPORTS_MEET_UNLOCK_LEVEL,
   SPORTS_MEET_COUNTDOWN_MS,
+  SPORTS_MEET_SPEED_BUFF_MS,
   SPORTS_MEET_SPEED_BUFF_MULT,
   isInSportsMeetPortalRange,
   buildCourseStars,
@@ -67,6 +68,8 @@ export {
   noteSportsDumpDepart,
   noteSportsAsphaltBreak,
   noteSportsRockDump,
+  noteSportsFloodIncineratorFill,
+  noteSportsFloodBurnStarted,
   sportsMeetStageWaypoint,
 } from "./runState";
 export {

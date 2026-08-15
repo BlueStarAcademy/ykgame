@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { LanguagePicker } from "@/components/i18n/LanguagePicker";
 import { LocalizedImage } from "@/components/i18n/LocalizedImage";
 import { SiteLegendLegalFooter } from "@/components/auth/SiteLegendLegalFooter";
 import { useSiteLegendLoginBgm } from "@/components/auth/useSiteLegendLoginBgm";
@@ -13,11 +14,13 @@ type AuthPanel = "splash" | "login";
 
 export function SiteLegendAuthScreen() {
   const t = useTranslations("auth");
+  const legalT = useTranslations("siteLegendLegal");
   const [panel, setPanel] = useState<AuthPanel>("splash");
   useSiteLegendLoginBgm(true);
 
   return (
     <div className={`site-legend-auth ${panel === "login" ? "is-login-panel" : ""}`}>
+      <LanguagePicker variant="splash" />
       <div
         className="site-legend-auth-bg"
         aria-hidden
@@ -67,8 +70,8 @@ export function SiteLegendAuthScreen() {
       <div className="site-legend-auth-frame">
         <div className="site-legend-auth-title-wrap">
           <LocalizedImage
-            src="/images/site-legend/title.png"
-            alt="SITE LEGEND"
+            src="/images/site-legend/title.png?v=14"
+            alt={legalT("titleAlt")}
             className="site-legend-auth-title"
             draggable={false}
           />

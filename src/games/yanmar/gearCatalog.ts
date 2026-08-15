@@ -219,7 +219,20 @@ export type MasterOptionKey =
   | "hillDumpXpPct"
   | "hillDumpGearDrop"
   | "haulTruckFullScore"
-  | "haulTruckFullGearDrop";
+  | "haulTruckFullGearDrop"
+  | "floodWorkScorePct"
+  | "floodWorkXpPct"
+  | "floodWorkGearDrop"
+  | "floodBurnScore"
+  | "floodBurnGearDrop"
+  | "floodBladePushPct"
+  | "sportsMeetDriveSpeedPct"
+  | "sportsMeetSpeedBuffDurationPct"
+  | "sportsMeetStarRewardPct"
+  | "sportsMeetDigFillPct"
+  | "sportsMeetCrashHitPct"
+  | "dismantleJackpotChancePct"
+  | "dismantleJackpotCoreBonusPct";
 
 export interface MasterOptionDef {
   key: MasterOptionKey;
@@ -247,6 +260,19 @@ export const MASTER_OPTION_POOL: readonly MasterOptionDef[] = [
   { key: "hillDumpGearDrop", label: "돌 하역 시 장비 획득 확률 증가", hideValue: true, min: 10, max: 10, isPercent: true, isDropRateBonus: true },
   { key: "haulTruckFullScore", label: "돌트럭 만재 시 점수 추가", hideValue: false, min: 1000, max: 3000, isPercent: false, isDropRateBonus: false },
   { key: "haulTruckFullGearDrop", label: "돌트럭 만재 시 장비 획득 확률 증가", hideValue: true, min: 10, max: 10, isPercent: true, isDropRateBonus: true },
+  { key: "floodWorkScorePct", label: "수해복구 작업 시 획득 점수 추가", hideValue: false, min: 30, max: 50, isPercent: true, isDropRateBonus: false },
+  { key: "floodWorkXpPct", label: "수해복구 작업 시 경험치 추가", hideValue: false, min: 30, max: 50, isPercent: true, isDropRateBonus: false },
+  { key: "floodWorkGearDrop", label: "수해복구 작업 시 장비 획득 확률 증가", hideValue: true, min: 10, max: 10, isPercent: true, isDropRateBonus: true },
+  { key: "floodBurnScore", label: "잔해 소각 완료 시 점수 추가", hideValue: false, min: 1000, max: 3000, isPercent: false, isDropRateBonus: false },
+  { key: "floodBurnGearDrop", label: "잔해 소각 완료 시 장비 획득 확률 증가", hideValue: true, min: 10, max: 10, isPercent: true, isDropRateBonus: true },
+  { key: "floodBladePushPct", label: "블레이드 잔해 수거량 추가", hideValue: false, min: 15, max: 25, isPercent: true, isDropRateBonus: false },
+  { key: "sportsMeetDriveSpeedPct", label: "운동회 주행 시 이동속도 추가", hideValue: false, min: 8, max: 12, isPercent: true, isDropRateBonus: false },
+  { key: "sportsMeetSpeedBuffDurationPct", label: "운동회 속도 버프 지속시간 추가", hideValue: false, min: 20, max: 35, isPercent: true, isDropRateBonus: false },
+  { key: "sportsMeetStarRewardPct", label: "운동회 코스 별 획득 스타 추가", hideValue: false, min: 20, max: 40, isPercent: true, isDropRateBonus: false },
+  { key: "sportsMeetDigFillPct", label: "운동회 흙 구간 적재량 추가", hideValue: false, min: 10, max: 20, isPercent: true, isDropRateBonus: false },
+  { key: "sportsMeetCrashHitPct", label: "운동회 파쇄 구간 타격 데미지 추가", hideValue: false, min: 15, max: 25, isPercent: true, isDropRateBonus: false },
+  { key: "dismantleJackpotChancePct", label: "장비 분해 대박 확률 증가", hideValue: false, min: 10, max: 20, isPercent: true, isDropRateBonus: false },
+  { key: "dismantleJackpotCoreBonusPct", label: "장비 분해 대박 강화코어 추가 획득", hideValue: false, min: 20, max: 50, isPercent: true, isDropRateBonus: false },
 ] as const;
 
 export interface MainOptionDef {
@@ -276,7 +302,13 @@ export const WORK_GEAR_DROP_BASE_CHANCE = 0.1;
 
 /** 작업 완료 시 강화코어 독립 드롭 */
 export const WORK_CORE_DROP: Record<
-  "soilDump" | "breaker" | "hillDump" | "dumpTruckFull" | "haulTruckFull",
+  | "soilDump"
+  | "breaker"
+  | "hillDump"
+  | "dumpTruckFull"
+  | "haulTruckFull"
+  | "floodWork"
+  | "floodBurn",
   { chance: number; min: number; max: number }
 > = {
   soilDump: { chance: 0.08, min: 1, max: 1 },
@@ -284,6 +316,8 @@ export const WORK_CORE_DROP: Record<
   hillDump: { chance: 0.12, min: 1, max: 2 },
   dumpTruckFull: { chance: 0.15, min: 2, max: 3 },
   haulTruckFull: { chance: 0.15, min: 2, max: 3 },
+  floodWork: { chance: 0.1, min: 1, max: 2 },
+  floodBurn: { chance: 0.15, min: 2, max: 3 },
 };
 
 export const WORK_GEAR_DROP_GRADES: { grade: ItemGrade; weight: number }[] = [

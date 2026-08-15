@@ -36,12 +36,12 @@ const REWARD_PREVIEW_ITEMS = [
   },
   {
     key: "gachaPremium",
-    range: "2개",
+    count: 2,
     icons: ["/images/yanmar/2d/gacha-ticket-premium.svg"],
   },
   {
     key: "gachaStandard",
-    range: "4개",
+    count: 4,
     icons: ["/images/yanmar/2d/gacha-ticket-standard.svg"],
   },
   {
@@ -424,7 +424,7 @@ export function HourlyAdBanner({
             <div className={styles.teaserTitle}>{creativeCopy.teaserTitle}</div>
             <div className={styles.teaserSub}>{creativeCopy.teaserSub}</div>
             <div className={styles.teaserTimer}>
-              <span className={styles.teaserTimerLabel}>남은 시간</span>
+              <span className={styles.teaserTimerLabel}>{t("ads.remainingTime")}</span>
               <span>{formatMmSs(bannerSec)}</span>
             </div>
           </div>
@@ -474,11 +474,13 @@ export function HourlyAdBanner({
                     />
                   </div>
                   {watchLeft > 0 ? (
-                    <p className={styles.adHint}>{watchLeft}초 후 보상 획득</p>
+                    <p className={styles.adHint}>
+                      {t("ads.rewardAfterSeconds", { seconds: watchLeft })}
+                    </p>
                   ) : null}
                   <div className={styles.rewardPreview}>
                     <p className={styles.rewardPreviewLabel}>
-                      아래 보상중 한 가지 획득
+                      {t("ads.oneOfRewards")}
                     </p>
                     <div className={styles.rewardPreviewRow}>
                       {REWARD_PREVIEW_ITEMS.map((item) => (
@@ -504,7 +506,9 @@ export function HourlyAdBanner({
                             ))}
                           </div>
                           <span className={styles.rewardPreviewRange}>
-                            {item.range}
+                            {"count" in item
+                              ? t("ads.count", { count: item.count })
+                              : item.range}
                           </span>
                         </div>
                       ))}
@@ -521,7 +525,7 @@ export function HourlyAdBanner({
                     onClick={requestCloseAd}
                     disabled={phase === "claiming"}
                   >
-                    닫기
+                    {t("ads.close")}
                   </button>
                   <button
                     type="button"
@@ -532,10 +536,10 @@ export function HourlyAdBanner({
                     disabled={watchLeft > 0 || phase === "claiming"}
                   >
                     {phase === "claiming"
-                      ? "지급 중…"
+                      ? t("ads.granting")
                       : watchLeft > 0
-                        ? `${watchLeft}초`
-                        : "보상받기"}
+                        ? t("ads.seconds", { seconds: watchLeft })
+                        : t("ads.claim")}
                   </button>
                 </div>
 
@@ -551,7 +555,7 @@ export function HourlyAdBanner({
                         id="hourly-ad-close-confirm-title"
                         className={styles.confirmText}
                       >
-                        보상을 받지 않고 창을 닫으시겠습니까?
+                        {t("ads.closeWithoutReward")}
                       </p>
                       <div className={styles.confirmActions}>
                         <button
@@ -559,14 +563,14 @@ export function HourlyAdBanner({
                           className={styles.btnGhost}
                           onClick={cancelCloseAd}
                         >
-                          취소
+                          {t("ads.cancel")}
                         </button>
                         <button
                           type="button"
                           className={styles.btnPrimary}
                           onClick={confirmCloseAd}
                         >
-                          닫기
+                          {t("ads.close")}
                         </button>
                       </div>
                     </div>
@@ -589,12 +593,14 @@ export function HourlyAdBanner({
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
-                aria-label="광고 보상"
+                aria-label={t("ads.rewardDialogAria")}
               >
                 <div className={styles.panelHeader}>
                   <div>
                     <h2 className={styles.panelTitle}>
-                      {phase === "result" ? "보상 획득!" : "보상 추첨 중"}
+                      {phase === "result"
+                        ? t("ads.rewardAcquired")
+                        : t("ads.drawingReward")}
                     </h2>
                   </div>
                   {phase === "result" ? (
@@ -602,7 +608,7 @@ export function HourlyAdBanner({
                       type="button"
                       className={styles.panelClose}
                       onClick={closeResult}
-                      aria-label="닫기"
+                      aria-label={t("ads.close")}
                     >
                       ×
                     </button>
@@ -641,8 +647,8 @@ export function HourlyAdBanner({
                       <div className={styles.slotResultAmount}>
                         {reward.kind === "gachaPremium" ||
                         reward.kind === "gachaStandard"
-                          ? `${reward.amount}개`
-                          : reward.amount.toLocaleString("ko-KR")}
+                          ? t("ads.count", { count: reward.amount })
+                          : reward.amount.toLocaleString(locale)}
                       </div>
                     </div>
                   )}
@@ -654,7 +660,7 @@ export function HourlyAdBanner({
                       className={styles.btnGold}
                       onClick={requestStopSpin}
                     >
-                      멈춤
+                      {t("ads.stop")}
                     </button>
                   ) : (
                     <button
@@ -662,7 +668,7 @@ export function HourlyAdBanner({
                       className={styles.btnPrimary}
                       onClick={closeResult}
                     >
-                      확인
+                      {t("ads.confirm")}
                     </button>
                   )}
                 </div>

@@ -135,7 +135,7 @@ const FLOOD_UPGRADES = [
   {
     key: "incinerator_power" as const,
     label: "소각장 화력",
-    description: "소각 시간 감소",
+    description: "소각 시간 -10초",
     maxLevel: 10,
   },
   {

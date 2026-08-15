@@ -2,6 +2,7 @@
 
 import { useLayoutEffect } from "react";
 import { RoundedBox, Text } from "@react-three/drei";
+import { useTranslations } from "next-intl";
 import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
@@ -319,6 +320,7 @@ export function PremiumDumpTruckModel({
   exhaustRef: React.RefObject<THREE.Mesh | null>;
   wheelRefs: React.MutableRefObject<(THREE.Group | null)[]>;
 }) {
+  const t = useTranslations("yanmar.scene");
   const ykMark = useLoader(THREE.TextureLoader, YK_GEONGI_LOGO.white);
   const sideMark = ykMark;
   useLayoutEffect(() => {
@@ -372,7 +374,7 @@ export function PremiumDumpTruckModel({
         outlineWidth={0.035}
         outlineColor={COLOR.paintRedDark}
       >
-        흙 하역
+        {t("soilUnload")}
       </Text>
     </group>
   );

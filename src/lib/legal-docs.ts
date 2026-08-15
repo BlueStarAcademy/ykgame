@@ -1,8 +1,12 @@
+import type { Locale } from "@/i18n/config";
+
 export type LegalDocId = "privacy" | "terms" | "email";
 
-export const LEGAL_DOCS: Record<
+type LegalDoc = { title: string; body: string };
+
+const KOREAN_LEGAL_DOCS: Record<
   LegalDocId,
-  { title: string; body: string }
+  LegalDoc
 > = {
   privacy: {
     title: "개인정보처리방침",
@@ -536,3 +540,137 @@ b) 장비의 위치, 경로, 운행상태를 제공하는 서비스의 제공(SA
 정보통신망법 제50조의2(전자우편주소의 무단 수집행위 등 금지)`,
   },
 };
+
+const ENGLISH_LEGAL_DOCS: Record<LegalDocId, LegalDoc> = {
+  privacy: {
+    title: "Privacy Policy",
+    body: `Privacy Policy of YK Geongi Co., Ltd.
+
+YK Geongi Co., Ltd. (the “Company”) complies with applicable Korean privacy laws, including the Personal Information Protection Act. We establish and publish this Privacy Policy to explain how personal information is collected, used, safeguarded and disposed of.
+
+1. Information we collect
+We may collect information needed to provide membership, equipment, service and website/app functions. This can include name, contact information, address, account ID, password, equipment information and service-use records. Additional information, such as date of birth, email address, payment details, location information, cookies, IP address and access history, is collected only where applicable and with the required consent.
+
+2. Purposes of use
+We use personal information to verify identity, provide and improve services, manage memberships and equipment-related requests, process payments where applicable, respond to inquiries, deliver notices, prevent misuse and comply with legal obligations.
+
+3. Retention and disposal
+We retain information only for as long as necessary for the stated purpose or for a period required by law. When retention is no longer required, information is deleted or irreversibly destroyed using appropriate technical and administrative procedures.
+
+4. Sharing and processing
+We do not provide personal information to third parties except with consent or where permitted or required by law. Where a service provider processes information on our behalf, we maintain appropriate contractual and managerial safeguards.
+
+5. Your rights
+You may request access to, correction of, deletion of, or suspension of processing of your personal information, subject to applicable law. You may also withdraw consent where processing is based on consent.
+
+6. Security and contact
+We apply administrative, technical and physical safeguards to protect personal information. For privacy requests or questions, please contact YK Geongi through the contact information published on this site.
+
+This English text is a translation provided for convenience. The Korean Privacy Policy is the authoritative version and prevails if there is any difference.`,
+  },
+  terms: {
+    title: "Terms of Use",
+    body: `Terms of Use for YK Geongi Members
+
+1. Purpose and agreement
+These Terms govern use of the Company’s website, application, membership and related services. By creating an account or using the services, you agree to these Terms and applicable policies.
+
+2. Membership and account responsibility
+Members must provide accurate information and keep account credentials secure. Members are responsible for activity performed through their accounts and must promptly notify the Company of unauthorised use.
+
+3. Service use
+The Company provides information, equipment-related services, games and other features as available. Service features may be changed, suspended or discontinued when reasonably necessary for operation, maintenance, legal compliance or service improvement.
+
+4. Prohibited conduct
+Members must not violate laws or third-party rights, interfere with service operation, attempt unauthorised access, distribute harmful software, use another person’s account, or misuse content and data provided through the services.
+
+5. Intellectual property
+All service content, trademarks, software, designs and other intellectual property belong to the Company or their respective rights holders. They may not be reproduced, altered, distributed or commercially used without authorisation.
+
+6. Limitation of liability
+To the extent permitted by law, the Company is not liable for losses caused by circumstances beyond its reasonable control, member fault, network failures, or the use of third-party services.
+
+7. Personal location information
+Where location-based functions are provided, the Company handles personal location information in accordance with applicable Korean law and the location-based service provisions included in the Korean Terms.
+
+8. Governing version
+These English Terms are a translation provided for convenience. The Korean Terms of Use are the authoritative version and prevail if there is any difference.`,
+  },
+  email: {
+    title: "No Unauthorised Email Collection",
+    body: `The unauthorised collection of email addresses published on this website through email-harvesting programs or any other technical means is prohibited.
+
+Violations may be subject to criminal penalties under Article 50-2 of the Act on Promotion of Information and Communications Network Utilization and Information Protection of the Republic of Korea.`,
+  },
+};
+
+const JAPANESE_LEGAL_DOCS: Record<LegalDocId, LegalDoc> = {
+  privacy: {
+    title: "プライバシーポリシー",
+    body: `YK建機株式会社 プライバシーポリシー
+
+YK建機株式会社（以下「当社」といいます。）は、個人情報保護法その他の韓国の関連法令を遵守し、個人情報の収集、利用、保護および廃棄に関する方針を定めています。
+
+1. 収集する情報
+当社は、会員、機械、サービスおよびウェブサイト・アプリの機能を提供するために必要な情報を収集します。氏名、連絡先、住所、ID、パスワード、保有機械情報、サービス利用記録などが含まれることがあります。生年月日、メールアドレス、決済情報、位置情報、Cookie、IPアドレスおよびアクセス履歴などは、必要な場合に限り、必要な同意を得た上で収集します。
+
+2. 利用目的
+本人確認、会員・機械関連サービスの提供と改善、決済処理、お問い合わせへの対応、通知の送付、不正利用の防止および法令上の義務の履行のために利用します。
+
+3. 保有期間と廃棄
+個人情報は利用目的の達成に必要な期間、または法令で定められた期間のみ保有します。保有の必要がなくなった情報は、適切な技術的・管理的手続により削除または復元不能な方法で廃棄します。
+
+4. 第三者提供および委託
+法令により認められる、または要求される場合を除き、本人の同意なく個人情報を第三者に提供しません。業務委託先が当社に代わって情報を処理する場合は、契約および管理上の保護措置を講じます。
+
+5. お客様の権利
+法令の範囲内で、個人情報の閲覧、訂正、削除、処理停止を請求できます。同意に基づく処理については、同意を撤回することもできます。
+
+6. 安全管理とお問い合わせ
+当社は個人情報を保護するための管理的、技術的、物理的な安全措置を実施します。個人情報に関するお問い合わせは、本サイトに掲載された連絡先を通じて当社へご連絡ください。
+
+本日本語文は便宜上の翻訳です。内容に相違がある場合は、韓国語のプライバシーポリシーを優先します。`,
+  },
+  terms: {
+    title: "利用規約",
+    body: `YK建機 会員利用規約
+
+1. 目的および同意
+本規約は、当社のウェブサイト、アプリ、会員サービスおよび関連サービスの利用に適用されます。アカウントの作成またはサービスの利用により、お客様は本規約および適用されるポリシーに同意したものとします。
+
+2. 会員およびアカウントの責任
+会員は正確な情報を提供し、アカウント情報を適切に管理する責任を負います。アカウントを通じて行われた活動について責任を負い、不正利用を発見した場合は速やかに当社へ通知しなければなりません。
+
+3. サービスの利用
+当社は、情報、機械関連サービス、ゲームその他の機能を提供します。運営、保守、法令遵守またはサービス改善のために合理的に必要な場合、サービスの内容を変更、一時停止または終了することがあります。
+
+4. 禁止行為
+会員は、法令または第三者の権利を侵害する行為、サービス運営の妨害、不正アクセス、有害なソフトウェアの配布、他人のアカウントの使用、サービス上のコンテンツやデータの不正利用をしてはなりません。
+
+5. 知的財産権
+サービス上のコンテンツ、商標、ソフトウェア、デザインその他の知的財産権は、当社または各権利者に帰属します。許可なく複製、改変、配布または商業利用することはできません。
+
+6. 責任の制限
+法令で認められる範囲で、当社の合理的な支配を超える事情、会員の責任、ネットワーク障害または第三者サービスの利用により生じた損害について、当社は責任を負いません。
+
+7. 個人位置情報
+位置情報に基づく機能を提供する場合、当社は韓国の関連法令および韓国語版規約に含まれる位置情報サービスに関する定めに従って個人位置情報を取り扱います。
+
+8. 優先する文書
+本日本語文は便宜上の翻訳です。内容に相違がある場合は、韓国語の利用規約を優先します。`,
+  },
+  email: {
+    title: "メールアドレスの無断収集拒否",
+    body: `本サイトに掲載されているメールアドレスを、メールアドレス収集プログラムその他の技術的手段により無断で収集することを拒否します。
+
+これに違反した場合、韓国「情報通信網利用促進および情報保護等に関する法律」第50条の2により刑事処罰の対象となることがあります。`,
+  },
+};
+
+export const LEGAL_DOCS = KOREAN_LEGAL_DOCS;
+
+export function getLegalDocs(locale: Locale): Record<LegalDocId, LegalDoc> {
+  if (locale === "en") return ENGLISH_LEGAL_DOCS;
+  if (locale === "ja") return JAPANESE_LEGAL_DOCS;
+  return KOREAN_LEGAL_DOCS;
+}

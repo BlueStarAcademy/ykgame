@@ -1,5 +1,4 @@
 import type { SitePoint } from "../siteLayout";
-import type { SportsMeetMissionBalance } from "./missionBalance";
 import type {
   SportsMeetCourseStar,
   SportsMeetSpeedBuffPickup,
@@ -282,21 +281,23 @@ export function buildCourseStars(
 }
 
 export function buildSpeedBuffPickups(
-  path: readonly SitePoint[],
-  mission: SportsMeetMissionBalance,
+  drivePaths: readonly (readonly SitePoint[])[],
   heightAt: (x: number, z: number) => number,
 ): SportsMeetSpeedBuffPickup[] {
-  const n = mission.drive.speedBuffCount;
-  if (n <= 0 || path.length < 2) return [];
-  // Place between stars — offset along path mid-segments.
-  const points = samplePathPoints(path, n + 2).slice(1, n + 1);
-  return points.map((p, i) => ({
-    id: `course-speed-${i}`,
-    x: p[0],
-    y: heightAt(p[0], p[1]) + 1.15,
-    z: p[1],
-    collected: false,
-  }));
+  // Place one normal-map booster at the front of every drive leg so the
+  // player starts each run segment by collecting it.
+  return drivePaths.flatMap((path, i) => {
+    if (path.length < 2) return [];
+    const [p] = samplePathPoints(path, 10);
+    if (!p) return [];
+    return [{
+      id: `course-speed-${i}`,
+      x: p[0],
+      y: heightAt(p[0], p[1]) + 1.15,
+      z: p[1],
+      collected: false,
+    }];
+  });
 }
 
 export const SPORTS_MEET_PICKUP_RADIUS = 2.4;

@@ -127,7 +127,7 @@ function CompactQuestReward({
   }
   if (parts.length === 0) return null;
   return (
-    <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
+    <span className="inline-flex flex-nowrap items-center gap-x-1 overflow-x-auto">
       {parts.map((part, index) => (
         <span key={index} className="inline-flex items-center gap-1 whitespace-nowrap">
           {index > 0 ? <span className="text-amber-200/40">+</span> : null}
@@ -218,7 +218,9 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
                               {t("tags.required")}
                             </span>
                           ) : null}
-                          {task.label}
+                          {t(`missionTasks.${task.kind}`, {
+                            target: task.target,
+                          })}
                         </p>
                         <span
                           className={`shrink-0 pt-px text-[7px] font-bold tabular-nums leading-snug ${

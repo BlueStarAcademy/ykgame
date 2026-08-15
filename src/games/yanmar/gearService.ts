@@ -205,7 +205,9 @@ export type WorkDropTrigger =
   | "breaker"
   | "hillDump"
   | "dumpTruckFull"
-  | "haulTruckFull";
+  | "haulTruckFull"
+  | "floodWork"
+  | "floodBurn";
 
 const DROP_MASTER_KEY: Record<WorkDropTrigger, MasterOptionKey> = {
   soilDump: "soilDumpGearDrop",
@@ -213,6 +215,8 @@ const DROP_MASTER_KEY: Record<WorkDropTrigger, MasterOptionKey> = {
   hillDump: "hillDumpGearDrop",
   dumpTruckFull: "dumpTruckFullGearDrop",
   haulTruckFull: "haulTruckFullGearDrop",
+  floodWork: "floodWorkGearDrop",
+  floodBurn: "floodBurnGearDrop",
 };
 
 export function workDropChance(
@@ -311,7 +315,9 @@ export async function tryWorkGearDrop(
         ? workshopLuckyDropBonus(workshopById.crash.lucky_drop ?? 0)
         : trigger === "hillDump" || trigger === "haulTruckFull"
           ? workshopLuckyDropBonus(workshopById.hill.lucky_drop ?? 0)
-          : 0;
+          : trigger === "floodWork" || trigger === "floodBurn"
+            ? workshopLuckyDropBonus(workshopById.flood.lucky_drop ?? 0)
+            : 0;
   const chance = workDropChance(trigger, stats.activeMasters, scopedLuck);
   if (Math.random() >= chance) {
     return { dropped: false as const, reason: "miss" as const };
@@ -409,10 +415,11 @@ export function rollWorkEnhanceCoresTotal(
 }
 
 export function applyMasterScoreXpBonus(
-  trigger: "soil" | "breaker" | "hill",
+  trigger: "soil" | "breaker" | "hill" | "flood",
   baseScore: number,
   baseXp: number,
   activeMasters: Partial<Record<MasterOptionKey, MasterOptionInst>>,
+  floodKind?: "collect" | "grapple" | "burn",
 ) {
   let score = baseScore;
   let xp = baseXp;
@@ -426,6 +433,16 @@ export function applyMasterScoreXpBonus(
     const x = activeMasters.breakerXpPct;
     if (s) score = Math.round(score * (1 + s.value / 100));
     if (x) xp = Math.round(xp * (1 + x.value / 100));
+  } else if (trigger === "flood") {
+    if (floodKind === "burn") {
+      const flat = activeMasters.floodBurnScore;
+      if (flat) score = Math.round(score + flat.value);
+    } else {
+      const s = activeMasters.floodWorkScorePct;
+      const x = activeMasters.floodWorkXpPct;
+      if (s) score = Math.round(score * (1 + s.value / 100));
+      if (x) xp = Math.round(xp * (1 + x.value / 100));
+    }
   } else {
     const s = activeMasters.hillDumpScorePct;
     const x = activeMasters.hillDumpXpPct;
@@ -433,6 +450,16 @@ export function applyMasterScoreXpBonus(
     if (x) xp = Math.round(xp * (1 + x.value / 100));
   }
   return { score, xp };
+}
+
+/** Apply sports-meet course-star master option (percent bonus). */
+export function applySportsMeetStarRewardBonus(
+  baseStars: number,
+  starRewardPct: number,
+) {
+  const pct = Math.max(0, starRewardPct);
+  if (pct <= 0) return Math.round(baseStars);
+  return Math.round(baseStars * (1 + pct / 100));
 }
 
 export function applyWorkExpGainSub(

@@ -20,9 +20,9 @@ export const YANMAR_REWARD_CONFIG = {
   filterSetCouponSeasonLimit: 1,
   /**
    * 스타와 독립적인 쿠폰 추가 드롭 확률.
-   * 0.00001% = 1e-7
+   * 0.001% = 1e-5
    */
-  couponDropChance: 0.0000001,
+  couponDropChance: 0.00001,
   /**
    * 쿠폰 드롭 성공 시 종류 선택 상대 가중치 (합으로 정규화).
    * 지금은 동일 비중, 추후 종류별 조정 가능.
@@ -196,6 +196,16 @@ export interface YanmarEquipmentStats {
   bladeEfficiency?: number;
   /** Flood recovery blade push units per valid stroke (default 500). */
   floodPushUnits?: number;
+  /** 운동회: 주행 구간 이동속도 배수 (기본 1) */
+  sportsMeetDriveSpeedMult?: number;
+  /** 운동회: 속도 버프 지속시간 배수 (기본 1) */
+  sportsMeetSpeedBuffDurationMult?: number;
+  /** 운동회: 코스 별 스타 추가 % (0 = 없음) */
+  sportsMeetStarRewardPct?: number;
+  /** 운동회: 흙 구간 적재량 배수 (기본 1) */
+  sportsMeetDigFillMult?: number;
+  /** 운동회: 파쇄 구간 타격 데미지 배수 (기본 1) */
+  sportsMeetCrashHitMult?: number;
   /** 작업 반경/도달 (기본 1). 능력치 파생으로 확장 가능 */
   reachMultiplier?: number;
 }

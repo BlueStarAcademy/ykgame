@@ -82,8 +82,6 @@ const SOIL_LOAD_BASE_GAIN = 0.16;
 const SOIL_DUMP_BASE_GAIN = 0.22;
 /** Keep under horns / breaker so travel drone does not dominate. */
 const TRAVEL_BASE_GAIN = 0.48;
-const UI_CLICK_POOL_SIZE = 4;
-const ITEM_ACQUIRE_POOL_SIZE = 4;
 /** Crossfade length when building a seamless loop buffer from travel clips. */
 const TRAVEL_LOOP_CROSSFADE_SEC = 0.14;
 const TRAVEL_FADE_IN_SEC = 0.09;
@@ -91,7 +89,7 @@ const TRAVEL_FADE_IN_SEC = 0.09;
 const GLOBAL_CTRL = "__ykYanmarAudioCtrl";
 const GLOBAL_CTRL_REV = "__ykYanmarAudioCtrlRev";
 /** Bump when controller public surface changes (forces HMR refresh). */
-const CTRL_REV = 10;
+const CTRL_REV = 11;
 
 type TravelRpm = 1 | 2;
 
@@ -144,23 +142,14 @@ function makeSeamlessLoopBuffer(
 }
 
 class YanmarAudioController {
-  private hornCache = new Map<HornId, HTMLAudioElement>();
-  private enhanceSfxCache = new Map<"success" | "fail", HTMLAudioElement>();
-  private uiClickPool: HTMLAudioElement[] = [];
-  private uiClickPoolIndex = 0;
-  private engineStartAudio: HTMLAudioElement | null = null;
-  private engineOffAudio: HTMLAudioElement | null = null;
-  private serviceEnterAudio: HTMLAudioElement | null = null;
-  private monumentEnterAudio: HTMLAudioElement | null = null;
-  private starAcquireAudio: HTMLAudioElement | null = null;
-  private buffAcquireAudio: HTMLAudioElement | null = null;
-  private sportsCountdownAudio: HTMLAudioElement | null = null;
-  private rouletteSpinAudio: HTMLAudioElement | null = null;
-  private attachmentUnlockAudio: HTMLAudioElement | null = null;
-  private itemAcquirePool: HTMLAudioElement[] = [];
-  private itemAcquirePoolIndex = 0;
-  private masterItemAcquirePool: HTMLAudioElement[] = [];
-  private masterItemAcquirePoolIndex = 0;
+  /** Decoded one-shot / loop SFX — Web Audio avoids OS media-player chrome. */
+  private sfxBuffers = new Map<string, AudioBuffer>();
+  private sfxBufferLoadings = new Map<string, Promise<AudioBuffer | null>>();
+  private rouletteSpinSource: AudioBufferSourceNode | null = null;
+  private rouletteSpinGain: GainNode | null = null;
+  private rouletteSpinToken = 0;
+  private sportsCountdownSource: AudioBufferSourceNode | null = null;
+  private engineStartSource: AudioBufferSourceNode | null = null;
   private hornId: HornId = 1;
   private unlocked = false;
   private sfxEnabled = true;
@@ -221,6 +210,9 @@ class YanmarAudioController {
         this.travelWanted = false;
         this.stopBreakerImmediate();
         this.stopTravelImmediate();
+        this.stopRouletteSpin();
+        this.stopSportsCountdown();
+        this.stopEngineStartImmediate();
         this.stopBgm(false);
         this.unbindBgmGesture();
         void suspendWebAudioBgmContext("ingame");
@@ -241,6 +233,8 @@ class YanmarAudioController {
         this.travelWanted = false;
         this.stopBreakerImmediate();
         this.stopTravelImmediate();
+        this.stopRouletteSpin();
+        this.stopSportsCountdown();
         this.stopEngineStartImmediate();
         this.unbindBgmGesture();
         this.stopBgm(true);
@@ -253,16 +247,13 @@ class YanmarAudioController {
           this.travelBuffers.clear();
           this.travelBufferLoadings.clear();
           this.travelGain = null;
+          this.sfxBuffers.clear();
+          this.sfxBufferLoadings.clear();
+          this.rouletteSpinSource = null;
+          this.rouletteSpinGain = null;
+          this.sportsCountdownSource = null;
+          this.engineStartSource = null;
         }
-        for (const audio of this.hornCache.values()) {
-          try {
-            audio.pause();
-            audio.src = "";
-          } catch {
-            // ignore
-          }
-        }
-        this.hornCache.clear();
         clearBrowserMediaSession();
       },
     });
@@ -297,8 +288,7 @@ class YanmarAudioController {
     if (sfxVolumeChanged || sfxEnableChanged || sfxDetailsChanged) {
       this.applyBreakerGain();
       this.applyTravelGain();
-      this.applyHornVolumes();
-      this.applyLiveHtmlSfxVolumes();
+      this.applyLiveWebSfxVolumes();
     }
     if (sfxEnableChanged || sfxDetailsChanged) {
       this.syncBreakerPlayback();
@@ -389,7 +379,7 @@ class YanmarAudioController {
     this.sfxVolume = Math.max(0, Math.min(100, Math.round(volume0to100)));
     this.applyBreakerGain();
     this.applyTravelGain();
-    this.applyLiveHtmlSfxVolumes();
+    this.applyLiveWebSfxVolumes();
   }
 
   setBreakerSfxEnabled(enabled: boolean) {
@@ -462,75 +452,34 @@ class YanmarAudioController {
     this.travelGain.gain.setValueAtTime(peak, this.audioCtx.currentTime);
   }
 
-  private applyHornVolumes() {
-    const volume = HORN_BASE_VOLUME * this.effectGain("horn");
-    for (const audio of this.hornCache.values()) {
-      audio.volume = volume;
+  private applyLiveWebSfxVolumes() {
+    if (this.rouletteSpinGain) {
+      this.rouletteSpinGain.gain.value =
+        SPIN_WHOOSH_BASE_VOLUME * this.effectGain("roulette");
     }
-  }
-
-  /** Retarget volume on any HTML one-shot/loop that may already be audible. */
-  private applyLiveHtmlSfxVolumes() {
-    const setVol = (
-      audio: HTMLAudioElement | null | undefined,
-      base: number,
-      id: SfxDetailId,
-    ) => {
-      if (!audio) return;
-      audio.volume = Math.max(0, Math.min(1, base * this.effectGain(id)));
-    };
-    setVol(this.engineStartAudio, ENGINE_START_BASE_VOLUME, "engine");
-    setVol(this.engineOffAudio, ENGINE_OFF_BASE_VOLUME, "engine");
-    setVol(this.serviceEnterAudio, SERVICE_ENTER_BASE_VOLUME, "service");
-    setVol(this.monumentEnterAudio, MONUMENT_ENTER_BASE_VOLUME, "monument");
-    setVol(this.starAcquireAudio, STAR_ACQUIRE_BASE_VOLUME, "star");
-    setVol(this.buffAcquireAudio, BUFF_ACQUIRE_BASE_VOLUME, "buff");
-    setVol(this.sportsCountdownAudio, SPORTS_COUNTDOWN_BASE_VOLUME, "sports");
-    setVol(this.rouletteSpinAudio, SPIN_WHOOSH_BASE_VOLUME, "roulette");
-    setVol(this.attachmentUnlockAudio, ATTACHMENT_UNLOCK_BASE_VOLUME, "attachment");
-    for (const audio of this.uiClickPool) {
-      setVol(audio, UI_CLICK_BASE_VOLUME, "ui");
-    }
-    for (const audio of this.itemAcquirePool) {
-      setVol(audio, ITEM_ACQUIRE_BASE_VOLUME, "item");
-    }
-    for (const audio of this.masterItemAcquirePool) {
-      setVol(audio, MASTER_ITEM_ACQUIRE_BASE_VOLUME, "masterItem");
-    }
-    for (const audio of this.enhanceSfxCache.values()) {
-      setVol(audio, ENHANCE_SFX_BASE_VOLUME, "enhance");
-    }
-    this.applyHornVolumes();
   }
 
   /** Call from a user gesture so subsequent playback can start. */
   unlock() {
     if (typeof window === "undefined") return;
     this.ensureStoreSubscription();
-    // Critical: resume the BGM AudioContext while the gesture is still live.
+    // Critical: resume AudioContexts while the gesture is still live.
     // Scene-ready / rAF unlocks cannot create an audible context on their own.
     primeWebAudioBgmContext("ingame");
-    void this.ensureAudioContext();
+    void this.ensureAudioContext().then((ctx) => {
+      if (!ctx) return;
+      this.unlocked = true;
+      void this.ensureBreakerBuffer();
+      void this.ensureSfxBuffer(SPIN_WHOOSH_SRC);
+      void this.ensureSfxBuffer(ITEM_ACQUIRE_SRC);
+      void this.ensureSfxBuffer(STAR_ACQUIRE_SRC);
+      this.syncBgm();
+    });
     void preloadWebAudioBgm("ingame", INGAME_BGM_SRC);
     void preloadWebAudioBgm("ingame", SPORTS_MEET_BGM_SRC);
     void this.ensureTravelBuffer(1);
     void this.ensureTravelBuffer(2);
     this.syncBgm();
-    if (this.unlocked) return;
-    const probe = new Audio(HORN_SRC[this.hornId]);
-    probe.volume = 0;
-    void probe
-      .play()
-      .then(() => {
-        probe.pause();
-        probe.src = "";
-        this.unlocked = true;
-        void this.ensureBreakerBuffer();
-        this.syncBgm();
-      })
-      .catch(() => {
-        probe.src = "";
-      });
   }
 
   private syncBgm() {
@@ -627,35 +576,135 @@ class YanmarAudioController {
     clearBrowserMediaSession();
   }
 
-  private playHtmlAudio(audio: HTMLAudioElement, volume: number) {
-    audio.volume = volume;
-    try {
-      audio.currentTime = 0;
-      void audio
-        .play()
-        .then(() => {
-          this.unlocked = true;
-          void this.ensureAudioContext();
-        })
-        .catch(() => {
-          // Unsupported codec / autoplay block — ignore
-        });
-    } catch {
-      // ignore
-    }
+  private async ensureSfxBuffer(src: string) {
+    const cached = this.sfxBuffers.get(src);
+    if (cached) return cached;
+    const inflight = this.sfxBufferLoadings.get(src);
+    if (inflight) return inflight;
+
+    const loading = (async () => {
+      const ctx = await this.ensureAudioContext();
+      if (!ctx) return null;
+      try {
+        const res = await fetch(src);
+        const data = await res.arrayBuffer();
+        const buffer = await ctx.decodeAudioData(data.slice(0));
+        this.sfxBuffers.set(src, buffer);
+        return buffer;
+      } catch {
+        return null;
+      } finally {
+        this.sfxBufferLoadings.delete(src);
+      }
+    })();
+
+    this.sfxBufferLoadings.set(src, loading);
+    return loading;
+  }
+
+  /** Fire-and-forget one-shot via Web Audio (no OS media-player session). */
+  private playWebAudioOneShot(src: string, volume: number) {
+    void (async () => {
+      const ctx = await this.ensureAudioContext();
+      const buffer = await this.ensureSfxBuffer(src);
+      if (!ctx || !buffer) return;
+      const gain = ctx.createGain();
+      gain.gain.value = Math.max(0, Math.min(1, volume));
+      gain.connect(ctx.destination);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(gain);
+      source.onended = () => {
+        try {
+          source.disconnect();
+        } catch {
+          // ignore
+        }
+        try {
+          gain.disconnect();
+        } catch {
+          // ignore
+        }
+      };
+      try {
+        source.start(0);
+        this.unlocked = true;
+        clearBrowserMediaSession();
+      } catch {
+        try {
+          source.disconnect();
+          gain.disconnect();
+        } catch {
+          // ignore
+        }
+      }
+    })();
+  }
+
+  /**
+   * One-shot that can be cut early (engine start / sports countdown).
+   * Only one active source is tracked at a time for the given slot.
+   */
+  private playWebAudioTrackedOneShot(
+    slot: "engineStart" | "sportsCountdown",
+    src: string,
+    volume: number,
+  ) {
+    void (async () => {
+      if (slot === "engineStart") this.stopEngineStartImmediate();
+      if (slot === "sportsCountdown") this.stopSportsCountdown();
+
+      const ctx = await this.ensureAudioContext();
+      const buffer = await this.ensureSfxBuffer(src);
+      if (!ctx || !buffer) return;
+
+      const gain = ctx.createGain();
+      gain.gain.value = Math.max(0, Math.min(1, volume));
+      gain.connect(ctx.destination);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(gain);
+      source.onended = () => {
+        if (slot === "engineStart" && this.engineStartSource === source) {
+          this.engineStartSource = null;
+        }
+        if (slot === "sportsCountdown" && this.sportsCountdownSource === source) {
+          this.sportsCountdownSource = null;
+        }
+        try {
+          source.disconnect();
+        } catch {
+          // ignore
+        }
+        try {
+          gain.disconnect();
+        } catch {
+          // ignore
+        }
+      };
+      try {
+        source.start(0);
+        this.unlocked = true;
+        clearBrowserMediaSession();
+      } catch {
+        try {
+          source.disconnect();
+          gain.disconnect();
+        } catch {
+          // ignore
+        }
+        return;
+      }
+      if (slot === "engineStart") this.engineStartSource = source;
+      if (slot === "sportsCountdown") this.sportsCountdownSource = source;
+    })();
   }
 
   playHorn(hornId: HornId = this.hornId) {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("horn")) return;
-    let audio = this.hornCache.get(hornId);
-    if (!audio) {
-      audio = new Audio(HORN_SRC[hornId]);
-      audio.preload = "auto";
-      this.hornCache.set(hornId, audio);
-    }
-    this.playHtmlAudio(
-      audio,
+    this.playWebAudioOneShot(
+      HORN_SRC[hornId],
       HORN_BASE_VOLUME * this.effectGain("horn"),
     );
   }
@@ -663,15 +712,8 @@ class YanmarAudioController {
   playEnhanceResult(success: boolean) {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("enhance")) return;
-    const key = success ? "success" : "fail";
-    let audio = this.enhanceSfxCache.get(key);
-    if (!audio) {
-      audio = new Audio(success ? ENHANCE_SUCCESS_SRC : ENHANCE_FAIL_SRC);
-      audio.preload = "auto";
-      this.enhanceSfxCache.set(key, audio);
-    }
-    this.playHtmlAudio(
-      audio,
+    this.playWebAudioOneShot(
+      success ? ENHANCE_SUCCESS_SRC : ENHANCE_FAIL_SRC,
       ENHANCE_SFX_BASE_VOLUME * this.effectGain("enhance"),
     );
   }
@@ -680,15 +722,8 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("ui")) return;
     this.ensureStoreSubscription();
-    let audio = this.uiClickPool[this.uiClickPoolIndex];
-    if (!audio) {
-      audio = new Audio(UI_CLICK_SRC);
-      audio.preload = "auto";
-      this.uiClickPool[this.uiClickPoolIndex] = audio;
-    }
-    this.uiClickPoolIndex = (this.uiClickPoolIndex + 1) % UI_CLICK_POOL_SIZE;
-    this.playHtmlAudio(
-      audio,
+    this.playWebAudioOneShot(
+      UI_CLICK_SRC,
       UI_CLICK_BASE_VOLUME * this.effectGain("ui"),
     );
   }
@@ -698,12 +733,9 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("engine")) return;
     this.ensureStoreSubscription();
-    if (!this.engineStartAudio) {
-      this.engineStartAudio = new Audio(ENGINE_START_SRC);
-      this.engineStartAudio.preload = "auto";
-    }
-    this.playHtmlAudio(
-      this.engineStartAudio,
+    this.playWebAudioTrackedOneShot(
+      "engineStart",
+      ENGINE_START_SRC,
       ENGINE_START_BASE_VOLUME * this.effectGain("engine"),
     );
   }
@@ -713,12 +745,8 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("engine")) return;
     this.ensureStoreSubscription();
-    if (!this.engineOffAudio) {
-      this.engineOffAudio = new Audio(ENGINE_OFF_SRC);
-      this.engineOffAudio.preload = "auto";
-    }
-    this.playHtmlAudio(
-      this.engineOffAudio,
+    this.playWebAudioOneShot(
+      ENGINE_OFF_SRC,
       ENGINE_OFF_BASE_VOLUME * this.effectGain("engine"),
     );
   }
@@ -728,12 +756,8 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("service")) return;
     this.ensureStoreSubscription();
-    if (!this.serviceEnterAudio) {
-      this.serviceEnterAudio = new Audio(SERVICE_ENTER_SRC);
-      this.serviceEnterAudio.preload = "auto";
-    }
-    this.playHtmlAudio(
-      this.serviceEnterAudio,
+    this.playWebAudioOneShot(
+      SERVICE_ENTER_SRC,
       SERVICE_ENTER_BASE_VOLUME * this.effectGain("service"),
     );
   }
@@ -743,12 +767,8 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("monument")) return;
     this.ensureStoreSubscription();
-    if (!this.monumentEnterAudio) {
-      this.monumentEnterAudio = new Audio(MONUMENT_ENTER_SRC);
-      this.monumentEnterAudio.preload = "auto";
-    }
-    this.playHtmlAudio(
-      this.monumentEnterAudio,
+    this.playWebAudioOneShot(
+      MONUMENT_ENTER_SRC,
       MONUMENT_ENTER_BASE_VOLUME * this.effectGain("monument"),
     );
   }
@@ -758,12 +778,8 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("star")) return;
     this.ensureStoreSubscription();
-    if (!this.starAcquireAudio) {
-      this.starAcquireAudio = new Audio(STAR_ACQUIRE_SRC);
-      this.starAcquireAudio.preload = "auto";
-    }
-    this.playHtmlAudio(
-      this.starAcquireAudio,
+    this.playWebAudioOneShot(
+      STAR_ACQUIRE_SRC,
       STAR_ACQUIRE_BASE_VOLUME * this.effectGain("star"),
     );
   }
@@ -773,12 +789,8 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("buff")) return;
     this.ensureStoreSubscription();
-    if (!this.buffAcquireAudio) {
-      this.buffAcquireAudio = new Audio(BUFF_ACQUIRE_SRC);
-      this.buffAcquireAudio.preload = "auto";
-    }
-    this.playHtmlAudio(
-      this.buffAcquireAudio,
+    this.playWebAudioOneShot(
+      BUFF_ACQUIRE_SRC,
       BUFF_ACQUIRE_BASE_VOLUME * this.effectGain("buff"),
     );
   }
@@ -788,16 +800,8 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("item")) return;
     this.ensureStoreSubscription();
-    let audio = this.itemAcquirePool[this.itemAcquirePoolIndex];
-    if (!audio) {
-      audio = new Audio(ITEM_ACQUIRE_SRC);
-      audio.preload = "auto";
-      this.itemAcquirePool[this.itemAcquirePoolIndex] = audio;
-    }
-    this.itemAcquirePoolIndex =
-      (this.itemAcquirePoolIndex + 1) % ITEM_ACQUIRE_POOL_SIZE;
-    this.playHtmlAudio(
-      audio,
+    this.playWebAudioOneShot(
+      ITEM_ACQUIRE_SRC,
       ITEM_ACQUIRE_BASE_VOLUME * this.effectGain("item"),
     );
   }
@@ -807,16 +811,8 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("masterItem")) return;
     this.ensureStoreSubscription();
-    let audio = this.masterItemAcquirePool[this.masterItemAcquirePoolIndex];
-    if (!audio) {
-      audio = new Audio(MASTER_ITEM_ACQUIRE_SRC);
-      audio.preload = "auto";
-      this.masterItemAcquirePool[this.masterItemAcquirePoolIndex] = audio;
-    }
-    this.masterItemAcquirePoolIndex =
-      (this.masterItemAcquirePoolIndex + 1) % ITEM_ACQUIRE_POOL_SIZE;
-    this.playHtmlAudio(
-      audio,
+    this.playWebAudioOneShot(
+      MASTER_ITEM_ACQUIRE_SRC,
       MASTER_ITEM_ACQUIRE_BASE_VOLUME * this.effectGain("masterItem"),
     );
   }
@@ -826,23 +822,26 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("sports")) return;
     this.ensureStoreSubscription();
-    if (!this.sportsCountdownAudio) {
-      this.sportsCountdownAudio = new Audio(SPORTS_COUNTDOWN_SRC);
-      this.sportsCountdownAudio.preload = "auto";
-    }
-    this.playHtmlAudio(
-      this.sportsCountdownAudio,
+    this.playWebAudioTrackedOneShot(
+      "sportsCountdown",
+      SPORTS_COUNTDOWN_SRC,
       SPORTS_COUNTDOWN_BASE_VOLUME * this.effectGain("sports"),
     );
   }
 
   /** Stop mid-countdown if the sports-meet run is aborted. */
   stopSportsCountdown() {
-    const audio = this.sportsCountdownAudio;
-    if (!audio) return;
+    const source = this.sportsCountdownSource;
+    this.sportsCountdownSource = null;
+    if (!source) return;
     try {
-      audio.pause();
-      audio.currentTime = 0;
+      source.onended = null;
+      source.stop();
+    } catch {
+      // already stopped
+    }
+    try {
+      source.disconnect();
     } catch {
       // ignore
     }
@@ -853,29 +852,80 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("roulette")) return;
     this.ensureStoreSubscription();
-    if (!this.rouletteSpinAudio) {
-      this.rouletteSpinAudio = new Audio(SPIN_WHOOSH_SRC);
-      this.rouletteSpinAudio.preload = "auto";
+    const token = ++this.rouletteSpinToken;
+    void this.startRouletteSpin(token);
+  }
+
+  private async startRouletteSpin(token: number) {
+    if (!this.canPlayEffect("roulette")) return;
+    this.cutRouletteSpinNodes();
+    const ctx = await this.ensureAudioContext();
+    const buffer = await this.ensureSfxBuffer(SPIN_WHOOSH_SRC);
+    if (token !== this.rouletteSpinToken) return;
+    if (!ctx || !buffer || !this.canPlayEffect("roulette")) return;
+    if (this.rouletteSpinSource) return;
+
+    const gain = ctx.createGain();
+    gain.gain.value = SPIN_WHOOSH_BASE_VOLUME * this.effectGain("roulette");
+    gain.connect(ctx.destination);
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(gain);
+    try {
+      source.start(0);
+    } catch {
+      gain.disconnect();
+      return;
     }
-    const audio = this.rouletteSpinAudio;
-    audio.loop = true;
-    this.playHtmlAudio(
-      audio,
-      SPIN_WHOOSH_BASE_VOLUME * this.effectGain("roulette"),
-    );
+
+    this.rouletteSpinGain = gain;
+    this.rouletteSpinSource = source;
+    this.unlocked = true;
+    clearBrowserMediaSession();
+
+    source.onended = () => {
+      if (this.rouletteSpinSource === source) {
+        this.rouletteSpinSource = null;
+        this.rouletteSpinGain?.disconnect();
+        this.rouletteSpinGain = null;
+      }
+    };
+  }
+
+  private cutRouletteSpinNodes() {
+    const source = this.rouletteSpinSource;
+    const gain = this.rouletteSpinGain;
+    this.rouletteSpinSource = null;
+    this.rouletteSpinGain = null;
+    if (source) {
+      try {
+        source.onended = null;
+        source.stop();
+      } catch {
+        // already stopped
+      }
+      try {
+        source.disconnect();
+      } catch {
+        // ignore
+      }
+    }
+    if (gain) {
+      try {
+        gain.disconnect();
+      } catch {
+        // ignore
+      }
+    }
   }
 
   /** Cut roulette spin SFX the moment the reel lands. */
   stopRouletteSpin() {
-    const audio = this.rouletteSpinAudio;
-    if (!audio) return;
-    try {
-      audio.loop = false;
-      audio.pause();
-      audio.currentTime = 0;
-    } catch {
-      // ignore
-    }
+    this.rouletteSpinToken += 1;
+    this.cutRouletteSpinNodes();
+    clearBrowserMediaSession();
   }
 
   /** One-shot when breaker/grapple unlock popup appears (Lv.10 / Lv.15). */
@@ -883,12 +933,8 @@ class YanmarAudioController {
     if (typeof window === "undefined") return;
     if (!this.canPlayEffect("attachment")) return;
     this.ensureStoreSubscription();
-    if (!this.attachmentUnlockAudio) {
-      this.attachmentUnlockAudio = new Audio(ATTACHMENT_UNLOCK_SRC);
-      this.attachmentUnlockAudio.preload = "auto";
-    }
-    this.playHtmlAudio(
-      this.attachmentUnlockAudio,
+    this.playWebAudioOneShot(
+      ATTACHMENT_UNLOCK_SRC,
       ATTACHMENT_UNLOCK_BASE_VOLUME * this.effectGain("attachment"),
     );
   }
@@ -1239,12 +1285,17 @@ class YanmarAudioController {
   }
 
   private stopEngineStartImmediate() {
-    const audio = this.engineStartAudio;
-    if (!audio) return;
+    const source = this.engineStartSource;
+    this.engineStartSource = null;
+    if (!source) return;
     try {
-      audio.onended = null;
-      audio.pause();
-      audio.currentTime = 0;
+      source.onended = null;
+      source.stop();
+    } catch {
+      // already stopped
+    }
+    try {
+      source.disconnect();
     } catch {
       // ignore
     }
@@ -1272,86 +1323,11 @@ class YanmarAudioController {
     this.breakerBufferLoading = null;
     this.travelBuffers.clear();
     this.travelBufferLoadings.clear();
+    this.sfxBuffers.clear();
+    this.sfxBufferLoadings.clear();
     if (this.audioCtx) {
       void this.audioCtx.close().catch(() => undefined);
       this.audioCtx = null;
-    }
-    for (const audio of this.hornCache.values()) {
-      audio.pause();
-      audio.src = "";
-    }
-    this.hornCache.clear();
-    for (const audio of this.enhanceSfxCache.values()) {
-      audio.pause();
-      audio.src = "";
-    }
-    this.enhanceSfxCache.clear();
-    for (const audio of this.uiClickPool) {
-      audio.pause();
-      audio.src = "";
-    }
-    this.uiClickPool = [];
-    this.uiClickPoolIndex = 0;
-    if (this.engineStartAudio) {
-      this.engineStartAudio.pause();
-      this.engineStartAudio.src = "";
-      this.engineStartAudio = null;
-    }
-    if (this.engineOffAudio) {
-      this.engineOffAudio.pause();
-      this.engineOffAudio.src = "";
-      this.engineOffAudio = null;
-    }
-    if (this.serviceEnterAudio) {
-      this.serviceEnterAudio.pause();
-      this.serviceEnterAudio.src = "";
-      this.serviceEnterAudio = null;
-    }
-    if (this.monumentEnterAudio) {
-      this.monumentEnterAudio.pause();
-      this.monumentEnterAudio.src = "";
-      this.monumentEnterAudio = null;
-    }
-    if (this.starAcquireAudio) {
-      this.starAcquireAudio.pause();
-      this.starAcquireAudio.src = "";
-      this.starAcquireAudio = null;
-    }
-    if (this.buffAcquireAudio) {
-      this.buffAcquireAudio.pause();
-      this.buffAcquireAudio.src = "";
-      this.buffAcquireAudio = null;
-    }
-    if (this.sportsCountdownAudio) {
-      this.sportsCountdownAudio.pause();
-      this.sportsCountdownAudio.src = "";
-      this.sportsCountdownAudio = null;
-    }
-    if (this.rouletteSpinAudio) {
-      this.rouletteSpinAudio.pause();
-      this.rouletteSpinAudio.src = "";
-      this.rouletteSpinAudio = null;
-    }
-    if (this.attachmentUnlockAudio) {
-      this.attachmentUnlockAudio.pause();
-      this.attachmentUnlockAudio.src = "";
-      this.attachmentUnlockAudio = null;
-    }
-    if (this.itemAcquirePool.length) {
-      for (const audio of this.itemAcquirePool) {
-        audio.pause();
-        audio.src = "";
-      }
-      this.itemAcquirePool = [];
-      this.itemAcquirePoolIndex = 0;
-    }
-    if (this.masterItemAcquirePool.length) {
-      for (const audio of this.masterItemAcquirePool) {
-        audio.pause();
-        audio.src = "";
-      }
-      this.masterItemAcquirePool = [];
-      this.masterItemAcquirePoolIndex = 0;
     }
     clearBrowserMediaSession();
   }

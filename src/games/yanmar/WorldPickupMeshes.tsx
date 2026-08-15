@@ -11,7 +11,7 @@ const BOOST_SPIN = 1.55;
 const BOB_AMP = 0.12;
 const BOB_SPEED = 2.4;
 
-function BoosterMesh() {
+export function BoosterMesh() {
   // Cylinder/cone default axis is +Y — keep upright (standing rocket).
   return (
     <group>

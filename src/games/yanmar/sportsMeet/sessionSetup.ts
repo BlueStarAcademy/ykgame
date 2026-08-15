@@ -1,4 +1,5 @@
 import {
+  createFloodRecoveryZone,
   createSportsCrashZone,
   createSportsHillZone,
   createTerrain,
@@ -157,6 +158,7 @@ function sculptSportsMeetArena(
   const dig = pattern.zones.dig;
   const crash = pattern.zones.crash;
   const hill = pattern.zones.hill;
+  const flood = pattern.zones.flood;
 
   // Cheap base pad + light ripple (no per-cell segment scans).
   for (let gz = 0; gz < terrain.gridSizeZ; gz++) {
@@ -189,6 +191,7 @@ function sculptSportsMeetArena(
   );
   stampCirclePad(terrain, crash[0], crash[1], 16, 0.72, 0.85);
   stampCirclePad(terrain, hill[0], hill[1], 18, 0.78, 0.55);
+  stampCirclePad(terrain, flood[0], flood[1], 22, 0.72, 0.8);
 }
 
 /** Build an isolated sports arena with this week's linear course layout. */
@@ -203,7 +206,7 @@ export function createSportsMeetTerrain(
   return terrain;
 }
 
-/** Place dig/crash/hill from pattern + mission quotas. */
+/** Place dig/crash/hill/flood stages from pattern + mission quotas. */
 export function applySportsMeetTerrain(
   terrain: TerrainData,
   mission: SportsMeetMissionBalance,
@@ -212,6 +215,7 @@ export function applySportsMeetTerrain(
   const [digX, digZ] = pattern.zones.dig;
   const [crashX, crashZ] = pattern.zones.crash;
   const [hillX, hillZ] = pattern.zones.hill;
+  const [floodX, floodZ] = pattern.zones.flood;
 
   terrain.digZones = [
     {
@@ -249,7 +253,16 @@ export function applySportsMeetTerrain(
     terrain.hillZone.dropX = hillX + 10;
     terrain.hillZone.dropZ = hillZ + 2;
   }
-  terrain.floodZone = null;
+  // Two 500-unit collection/grapple loops fill the 1_000 incinerator; leaving
+  // the filled incinerator starts burn and clears the sports flood stage.
+  const floodZone = createFloodRecoveryZone(floodX, floodZ, 1_000);
+  floodZone.incineratorX = floodX + 14;
+  floodZone.incineratorZ = floodZ;
+  floodZone.incineratorYaw = Math.atan2(
+    floodX - floodZone.incineratorX,
+    floodZ - floodZone.incineratorZ,
+  );
+  terrain.floodZone = floodZone;
 }
 
 export function applySportsMeetEquipmentOverrides(

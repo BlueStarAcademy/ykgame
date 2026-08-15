@@ -9,6 +9,7 @@ import {
   canonicalizeSubOptions,
   createGearItem,
   getDismantleEnhanceCores,
+  rollDismantleCoreReward,
   getEnhanceCost,
   getEnhanceCoreCost,
   getEnhanceFailBonusAdd,
@@ -255,12 +256,22 @@ export async function POST(req: Request) {
         if (items.length !== itemIds.length) throw new Error("NOT_FOUND");
         if (items.some((item) => item.equippedSlot)) throw new Error("EQUIPPED");
 
+        const dismantleStats = (await loadUserFinalStats(tx, session.user.id)).stats;
+        let baseCores = 0;
         let cores = 0;
+        let jackpotCount = 0;
         for (const item of items) {
-          cores += getDismantleEnhanceCores(
-            item.grade as ItemGrade,
-            item.enhanceLevel,
+          const reward = rollDismantleCoreReward(
+            getDismantleEnhanceCores(
+              item.grade as ItemGrade,
+              item.enhanceLevel,
+            ),
+            dismantleStats.dismantleJackpotChanceBonusPct,
+            dismantleStats.dismantleJackpotCoreBonusPct,
           );
+          baseCores += reward.baseCores;
+          cores += reward.cores;
+          if (reward.jackpot) jackpotCount += 1;
         }
 
         await tx.gearItem.deleteMany({
@@ -283,6 +294,9 @@ export async function POST(req: Request) {
           ok: true,
           refund: 0,
           cores,
+          baseCores,
+          bonusCores: cores - baseCores,
+          jackpotCount,
           count: items.length,
           dismantledIds: itemIds,
           currency: updatedUser.currency,
@@ -519,15 +533,20 @@ export async function POST(req: Request) {
 
       // dismantle — 스타 환불 없음, 강화코어만
       if (item.equippedSlot) throw new Error("EQUIPPED");
-      const cores = getDismantleEnhanceCores(
-        item.grade as ItemGrade,
-        item.enhanceLevel,
+      const dismantleStats = (await loadUserFinalStats(tx, session.user.id)).stats;
+      const reward = rollDismantleCoreReward(
+        getDismantleEnhanceCores(
+          item.grade as ItemGrade,
+          item.enhanceLevel,
+        ),
+        dismantleStats.dismantleJackpotChanceBonusPct,
+        dismantleStats.dismantleJackpotCoreBonusPct,
       );
       await tx.gearItem.delete({ where: { id: item.id } });
       const updatedUser = await tx.user.update({
         where: { id: session.user.id },
         data: {
-          enhanceCores: { increment: cores },
+          enhanceCores: { increment: reward.cores },
         },
         select: { currency: true, enhanceCores: true },
       });
@@ -535,7 +554,11 @@ export async function POST(req: Request) {
       return {
         ok: true,
         refund: 0,
-        cores,
+        cores: reward.cores,
+        baseCores: reward.baseCores,
+        bonusCores: reward.bonusCores,
+        jackpot: reward.jackpot,
+        jackpotChance: reward.jackpotChance,
         currency: updatedUser.currency,
         enhanceCores: updatedUser.enhanceCores,
         stats: loaded.stats,

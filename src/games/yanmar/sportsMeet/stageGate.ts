@@ -1,7 +1,7 @@
 import type { SportsMeetStageKind } from "./patterns";
 import type { AttachmentType } from "../types";
 
-export type SportsMeetWorkKind = "dig" | "dump" | "crash" | "hill";
+export type SportsMeetWorkKind = "dig" | "dump" | "crash" | "hill" | "flood";
 
 export function getSportsMeetAllowedAttachment(
   stage: SportsMeetStageKind | null | undefined,
@@ -15,6 +15,9 @@ export function getSportsMeetAllowedAttachment(
       return "breaker";
     case "hill":
       return "grapple";
+    case "flood":
+      // This stage requires both the dozer blade and grapple.
+      return null;
   }
 }
 
@@ -31,6 +34,8 @@ export function isSportsMeetWorkAllowed(
       return stage === "crash";
     case "hill":
       return stage === "hill";
+    case "flood":
+      return stage === "flood";
   }
 }
 
@@ -47,5 +52,7 @@ export function sportsMeetStageLockMessage(
       return "아스팔트 파쇄를 먼저 완료하세요";
     case "hill":
       return "돌 하역을 먼저 완료하세요";
+    case "flood":
+      return "수해복구를 먼저 완료하세요";
   }
 }

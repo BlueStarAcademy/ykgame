@@ -18,7 +18,6 @@ import {
   getGearInventoryExpandCost,
   type GearSlot,
   type ItemGrade,
-  type MasterOptionKey,
 } from "./gearCatalog";
 import {
   getEnhanceCost,
@@ -29,6 +28,8 @@ import {
   previewMainAtLevel,
   canonicalizeMainOption,
   canonicalizeSubOptions,
+  DISMANTLE_JACKPOT_BASE_CHANCE,
+  resolveMaxMasterByKey,
 } from "./gearGenerate";
 import { GearIconCell } from "./GearIconCell";
 import type { TutorialGearAction } from "./tutorial";
@@ -36,13 +37,8 @@ import {
   GachaResultModal,
   type GachaResultItem,
 } from "./GachaResultModal";
-import {
-  equippedBySlot,
-  formatChassisStatLines,
-  formatDerivedStatLines,
-} from "./gearSummary";
+import { equippedBySlot } from "./gearSummary";
 import { type ChassisModelId } from "./chassisCatalog";
-import { calculateFinalYanmarStats } from "./gearStats";
 import type { YanmarEquipmentStats } from "./equipment";
 import { yanmarAudio } from "./yanmarAudio";
 import {
@@ -51,6 +47,7 @@ import {
   gearSlotLabel,
   gearStatLabel,
 } from "@/i18n/yanmarCatalog";
+import { GearEquipStatsPanel } from "./GearEquipStatsPanel";
 
 export interface GearPanelItem {
   id: string;
@@ -119,6 +116,10 @@ export type EnhanceActionResult = {
 export type DismantleActionResult = {
   cores: number;
   count?: number;
+  baseCores?: number;
+  bonusCores?: number;
+  jackpot?: boolean;
+  jackpotCount?: number;
 };
 
 const BULK_GRADE_OPTIONS: readonly ItemGrade[] = [
@@ -127,6 +128,33 @@ const BULK_GRADE_OPTIONS: readonly ItemGrade[] = [
   "PRECISION",
   "MASTER",
 ];
+
+const DISMANTLE_JACKPOT_BASE_PCT = Math.round(
+  DISMANTLE_JACKPOT_BASE_CHANCE * 100,
+);
+
+function DismantleJackpotChanceLabel({
+  bonusPct,
+  label,
+}: {
+  bonusPct: number;
+  label: string;
+}) {
+  const bonus = Math.max(0, Math.round(bonusPct));
+  return (
+    <p className="yanmar-gear-dismantle-jackpot-chance">
+      <span>
+        {label} {DISMANTLE_JACKPOT_BASE_PCT}
+      </span>
+      {bonus > 0 ? (
+        <span className="yanmar-gear-dismantle-jackpot-chance-bonus">
+          +{bonus}
+        </span>
+      ) : null}
+      <span>%</span>
+    </p>
+  );
+}
 
 export type SellActionResult = {
   stars: number;
@@ -200,16 +228,6 @@ type BubbleState =
   | { kind: "equipped"; itemId: string; slot: GearSlot }
   | { kind: "compare"; itemId: string; slot: GearSlot }
   | null;
-
-/** 장착 2×3 그리드: 왼(버켓/브레이커/집게) · 오른(암/붐/트랙) */
-const GEAR_EQUIP_GRID_ORDER: readonly GearSlot[] = [
-  "BUCKET",
-  "ARM",
-  "BREAKER",
-  "BOOM",
-  "GRAPPLE",
-  "TRACK",
-];
 
 function gradeTextClass(grade: ItemGrade) {
   switch (grade) {
@@ -463,6 +481,9 @@ export function GearPanel({
     grade: ItemGrade;
     enhanceLevel: number;
     cores: number;
+    baseCores?: number;
+    bonusCores?: number;
+    jackpot?: boolean;
   } | null>(null);
   const [pendingSellId, setPendingSellId] = useState<string | null>(null);
   const [sellResult, setSellResult] = useState<{
@@ -489,7 +510,14 @@ export function GearPanel({
     MASTER: false,
   });
   const [bulkDone, setBulkDone] = useState<
-    | { kind: "dismantle"; count: number; cores: number }
+    | {
+        kind: "dismantle";
+        count: number;
+        cores: number;
+        baseCores?: number;
+        bonusCores?: number;
+        jackpotCount?: number;
+      }
     | { kind: "sell"; count: number; stars: number }
     | null
   >(null);
@@ -526,43 +554,6 @@ export function GearPanel({
   const progressFillRef = useRef<HTMLDivElement>(null);
 
   const bySlot = useMemo(() => equippedBySlot(items), [items]);
-  const previewStats = useMemo(
-    () =>
-      calculateFinalYanmarStats({
-        chassisId: activeChassisId,
-        equipped: items
-          .filter((i) => i.equippedSlot)
-          .map((i) => ({
-            slot: i.slot,
-            durability: i.durability,
-            data: {
-              slot: i.slot,
-              grade: i.grade,
-              enhanceLevel: i.enhanceLevel,
-              mainOption: canonicalizeMainOption(
-                i.slot,
-                i.grade,
-                i.enhanceLevel,
-                i.mainOption as Parameters<typeof canonicalizeMainOption>[3],
-              ),
-              subOptions: canonicalizeSubOptions(i.subOptions),
-              masterOption: i.masterOption
-                ? {
-                    key: i.masterOption.key as MasterOptionKey,
-                    value: i.masterOption.value,
-                    label: i.masterOption.label,
-                    hideValue: i.masterOption.hideValue,
-                    isPercent: i.masterOption.isPercent,
-                    isDropRateBonus: false,
-                  }
-                : null,
-            },
-          })),
-      }),
-    [items, activeChassisId],
-  );
-  const chassisLines = formatChassisStatLines(previewStats.chassisStats);
-  const derivedLines = formatDerivedStatLines(previewStats);
 
   const activeFilterCount = GEAR_SLOTS.filter((s) => slotFilters[s]).length;
   const filterAll = activeFilterCount === GEAR_SLOTS.length || activeFilterCount === 0;
@@ -627,6 +618,17 @@ export function GearPanel({
         pendingDismantle.enhanceLevel,
       )
     : 0;
+  const dismantleJackpotBonusPct = useMemo(() => {
+    const masters = resolveMaxMasterByKey(
+      items
+        .filter((item) => item.equippedSlot)
+        .map((item) => item.masterOption),
+    );
+    return Math.max(
+      0,
+      masters.get("dismantleJackpotChancePct")?.value ?? 0,
+    );
+  }, [items]);
   const pendingSell = pendingSellId
     ? (items.find((i) => i.id === pendingSellId) ?? null)
     : null;
@@ -806,6 +808,9 @@ export function GearPanel({
       grade: snap.grade,
       enhanceLevel: snap.enhanceLevel,
       cores: result.cores,
+      baseCores: result.baseCores,
+      bonusCores: result.bonusCores,
+      jackpot: result.jackpot,
     });
   }
 
@@ -948,21 +953,43 @@ export function GearPanel({
             count:
               typeof result.count === "number" ? result.count : ids.length,
             cores: result.cores,
+            baseCores: result.baseCores,
+            bonusCores: result.bonusCores,
+            jackpotCount: result.jackpotCount,
           });
         }
         return;
       }
       let cores = 0;
+      let baseCores = 0;
+      let bonusCores = 0;
+      let jackpotCount = 0;
       let count = 0;
       for (const target of targets) {
         const result = await onDismantle(target.id);
         if (result && typeof result.cores === "number") {
           cores += result.cores;
+          baseCores +=
+            typeof result.baseCores === "number"
+              ? result.baseCores
+              : result.cores;
+          bonusCores +=
+            typeof result.bonusCores === "number" ? result.bonusCores : 0;
+          if (result.jackpot) jackpotCount += 1;
           count += 1;
         }
       }
       exitBulkMode();
-      if (count > 0) setBulkDone({ kind: "dismantle", count, cores });
+      if (count > 0) {
+        setBulkDone({
+          kind: "dismantle",
+          count,
+          cores,
+          baseCores,
+          bonusCores,
+          jackpotCount,
+        });
+      }
       return;
     }
     if (bulkMode === "sell") {
@@ -1333,83 +1360,25 @@ export function GearPanel({
       ) : null}
 
       <div className="yanmar-gear-mgr-body">
-        <section className="yanmar-gear-mgr-compact">
-          <div className="yanmar-gear-mgr-compact-left">
-            <header className="yanmar-gear-mgr-pane-head">
-              <h3>{t("equip")}</h3>
-            </header>
-            <div className="yanmar-gear-mgr-equip-grid yanmar-gear-mgr-equip-grid--2x3">
-              {GEAR_EQUIP_GRID_ORDER.map((slot) => {
-                const eq = bySlot[slot];
-                const selected =
-                  bubble?.slot === slot &&
-                  (bubble.kind === "equipped"
-                    ? bubble.itemId === eq?.id
-                    : true);
-                return (
-                  <div key={slot} className="yanmar-gear-mgr-equip-slot">
-                    <GearIconCell
-                      slot={slot}
-                      grade={eq?.grade ?? null}
-                      enhanceLevel={eq?.enhanceLevel ?? 0}
-                      empty={!eq}
-                      equipped={!!eq}
-                      selected={selected}
-                      size="md"
-                      onClick={() => {
-                        if (!eq) {
-                          setBubble(null);
-                          return;
-                        }
-                        setBubble({
-                          kind: "equipped",
-                          itemId: eq.id,
-                          slot,
-                        });
-                      }}
-                      title={
-                        eq
-                          ? `${eq.nameSnapshot}${
-                              eq.enhanceLevel > 0 ? ` +${eq.enhanceLevel}` : ""
-                            }`
-                          : `${gearSlotLabel(catalogT, slot)} (${t("empty")})`
-                      }
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <aside className="yanmar-gear-mgr-compact-stats" aria-label={t("stats")}>
-            <header className="yanmar-gear-mgr-pane-head">
-              <h3>{t("stats")}</h3>
-            </header>
-            <div className="yanmar-gear-mgr-stats-stack">
-              <div
-                className="yanmar-gear-mgr-stat-grid yanmar-gear-mgr-stat-grid--2x3"
-                aria-label={t("baseStats")}
-              >
-                {chassisLines.map((line) => (
-                  <p key={line.label} className="yanmar-gear-mgr-stat-cell">
-                    <span>{line.label}</span>
-                    <strong>{Number(line.value).toFixed(0)}</strong>
-                  </p>
-                ))}
-              </div>
-              <div
-                className="yanmar-gear-mgr-stat-derived"
-                aria-label={t("combatWorkStats")}
-              >
-                {derivedLines.map((line) => (
-                  <p key={line.label} className="yanmar-gear-mgr-stat-cell">
-                    <span>{line.label}</span>
-                    <strong>{line.value}</strong>
-                  </p>
-                ))}
-              </div>
-            </div>
-          </aside>
-        </section>
+        <GearEquipStatsPanel
+          items={items}
+          activeChassisId={activeChassisId}
+          selectedSlot={bubble?.slot ?? null}
+          selectedItemId={
+            bubble?.kind === "equipped" ? bubble.itemId : null
+          }
+          onSlotClick={(slot, eq) => {
+            if (!eq) {
+              setBubble(null);
+              return;
+            }
+            setBubble({
+              kind: "equipped",
+              itemId: eq.id,
+              slot,
+            });
+          }}
+        />
 
         <section className="yanmar-gear-mgr-inv">
           <div className="yanmar-gear-mgr-inv-bar">
@@ -2172,12 +2141,18 @@ export function GearPanel({
             <p className="yanmar-gear-confirm-eyebrow">{t("dismantleEyebrow")}</p>
             <h3 id="yanmar-gear-dismantle-title">{t("dismantleConfirmTitle")}</h3>
             <div className="yanmar-gear-confirm-item">
-              <GearIconCell
-                slot={pendingDismantle.slot}
-                grade={pendingDismantle.grade}
-                enhanceLevel={pendingDismantle.enhanceLevel}
-                size="md"
-              />
+              <div className="yanmar-gear-confirm-item-art">
+                <GearIconCell
+                  slot={pendingDismantle.slot}
+                  grade={pendingDismantle.grade}
+                  enhanceLevel={pendingDismantle.enhanceLevel}
+                  size="md"
+                />
+                <DismantleJackpotChanceLabel
+                  bonusPct={dismantleJackpotBonusPct}
+                  label={t("dismantleJackpotChance")}
+                />
+              </div>
               <div className="yanmar-gear-confirm-item-meta">
                 <p
                   className={`yanmar-gear-mgr-name ${gradeTextClass(
@@ -2298,6 +2273,13 @@ export function GearPanel({
                 </strong>
               </span>
             </div>
+            {dismantleResult.jackpot ? (
+              <p className="yanmar-gear-confirm-eyebrow text-amber-300">
+                {t("dismantleJackpot", {
+                  bonus: dismantleResult.bonusCores ?? 0,
+                })}
+              </p>
+            ) : null}
             <div className="yanmar-gear-confirm-actions yanmar-gear-confirm-actions--single">
               <button
                 type="button"
@@ -2589,16 +2571,22 @@ export function GearPanel({
                   {t("expectedGain")}
                 </span>
                 {bulkMode === "dismantle" ? (
-                  <span className="yanmar-gear-confirm-reward-value">
-                    <img
-                      src="/images/yanmar/2d/enhance-core.png?v=3"
-                      alt=""
-                      width={22}
-                      height={22}
-                      draggable={false}
+                  <span className="yanmar-gear-confirm-reward-value yanmar-gear-confirm-reward-value--stack">
+                    <span className="yanmar-gear-confirm-reward-value-row">
+                      <img
+                        src="/images/yanmar/2d/enhance-core.png?v=3"
+                        alt=""
+                        width={22}
+                        height={22}
+                        draggable={false}
+                      />
+                      <strong className="tabular-nums">+{bulkCoresPreview}</strong>
+                      <span>{t("enhanceCore")}</span>
+                    </span>
+                    <DismantleJackpotChanceLabel
+                      bonusPct={dismantleJackpotBonusPct}
+                      label={t("dismantleJackpotChance")}
                     />
-                    <strong className="tabular-nums">+{bulkCoresPreview}</strong>
-                    <span>{t("enhanceCore")}</span>
                   </span>
                 ) : (
                   <span className="yanmar-gear-confirm-reward-value">
@@ -2695,6 +2683,15 @@ export function GearPanel({
                 </span>
               )}
             </div>
+            {bulkDone.kind === "dismantle" &&
+            (bulkDone.jackpotCount ?? 0) > 0 ? (
+              <p className="yanmar-gear-confirm-eyebrow text-amber-300">
+                {t("bulkDismantleJackpot", {
+                  count: bulkDone.jackpotCount ?? 0,
+                  bonus: bulkDone.bonusCores ?? 0,
+                })}
+              </p>
+            ) : null}
             <div className="yanmar-gear-confirm-actions yanmar-gear-confirm-actions--single">
               <button
                 type="button"

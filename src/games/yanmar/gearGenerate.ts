@@ -421,6 +421,38 @@ export function getDismantleEnhanceCores(
   );
 }
 
+export const DISMANTLE_JACKPOT_BASE_CHANCE = 0.15;
+
+export function rollDismantleCoreReward(
+  baseCores: number,
+  jackpotChanceBonusPct = 0,
+  jackpotCoreBonusPct = 0,
+  random = Math.random,
+) {
+  const safeBaseCores = Math.max(0, Math.floor(baseCores));
+  const jackpotChance = Math.min(
+    1,
+    DISMANTLE_JACKPOT_BASE_CHANCE +
+      Math.max(0, jackpotChanceBonusPct) / 100,
+  );
+  const jackpot = random() < jackpotChance;
+  const cores = jackpot
+    ? Math.ceil(
+        safeBaseCores *
+          2 *
+          (1 + Math.max(0, jackpotCoreBonusPct) / 100),
+      )
+    : safeBaseCores;
+
+  return {
+    baseCores: safeBaseCores,
+    cores,
+    bonusCores: cores - safeBaseCores,
+    jackpot,
+    jackpotChance,
+  };
+}
+
 export function applyMilestoneSubs(
   item: GearItemData,
   reachedLevel: number,

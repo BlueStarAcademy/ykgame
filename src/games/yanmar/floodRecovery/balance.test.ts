@@ -79,10 +79,11 @@ describe("floodRecovery/balance", () => {
     assert.equal(withMaster, Math.floor(FLOOD_BASE_PUSH_UNITS * 1.5));
   });
 
-  it("reduces burn time with floor", () => {
-    assert.ok(floodBurnDurationSec(0) > FLOOD_MIN_BURN_SEC);
-    assert.equal(floodBurnDurationSec(10), 4);
-    assert.equal(floodBurnDurationSec(99), 4);
+  it("reduces burn time by 10s per level from 5 minutes", () => {
+    assert.equal(floodBurnDurationSec(0), 300);
+    assert.equal(floodBurnDurationSec(1), 290);
+    assert.equal(floodBurnDurationSec(10), 200);
+    assert.equal(floodBurnDurationSec(99), 200);
     assert.ok(floodBurnDurationSec(10) >= FLOOD_MIN_BURN_SEC);
   });
 

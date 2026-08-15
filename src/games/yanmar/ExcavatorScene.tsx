@@ -7,6 +7,7 @@ import "./troikaTextSetup";
 import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
+import { useTranslations } from "next-intl";
 import { Billboard, ContactShadows, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 import { YK_GEONGI_LOGO } from "@/lib/brand-assets";
@@ -49,7 +50,6 @@ import { getChassisVisualProfile } from "./chassisVisualConfig";
 import { yanmarAudio } from "./yanmarAudio";
 import {
   createTerrain,
-  digZoneLabel,
   getActiveDigZones,
   getHaulTruckReturnEtaSec,
   isHaulTruckVisible,
@@ -179,6 +179,8 @@ interface ExcavatorSceneProps {
   onFloodDebrisPushed?: (amount: number) => void;
   onFloodCollectFilled?: (eventId: string, amount: number) => void;
   onFloodTrashGrapple?: (eventId: string, awardCycleReward: boolean) => void;
+  onFloodIncineratorFilled?: (units: number) => void;
+  onFloodBurnStarted?: () => void;
   onFloodBurnComplete?: (eventId: string, burnedUnits: number) => void;
   onAttachmentWarning: (message: string) => void;
   onDumpTruckFull?: () => void;
@@ -1595,6 +1597,7 @@ function ExcavatorArm({
   const breakerChiselRef = useRef<THREE.Group>(null);
   const grappleVisualRef = useRef<THREE.Group>(null);
   const carriedRockRef = useRef<THREE.Mesh>(null);
+  const carriedTrashRef = useRef<THREE.Group>(null);
   const dirtRef = useRef<THREE.Group>(null);
   const tipRef = useRef<THREE.Mesh>(null);
   const bladeRef = useRef<THREE.Group>(null);
@@ -1837,6 +1840,15 @@ function ExcavatorArm({
         carriedRockRef.current.scale.setScalar(0.72 + scale * 0.55);
       }
     }
+    if (carriedTrashRef.current) {
+      const carrying =
+        s.attachmentType === "grapple" && s.carriedTrashId != null;
+      carriedTrashRef.current.visible = carrying;
+      if (carrying) {
+        const pulse = 1 + Math.sin(performance.now() * 0.008) * 0.025;
+        carriedTrashRef.current.scale.setScalar(pulse);
+      }
+    }
     if (bladeRef.current) {
       // 흙밭: 레버 그대로(절반 침투 허용). 아스팔트: 표면에서 클램프.
       // 카메라3는 차체 그룹을 낮추므로, 도저만 보일 때도 3인칭과 같은 높이로 보정.
@@ -1995,6 +2007,39 @@ function ExcavatorArm({
                   <dodecahedronGeometry args={[0.58, 1]} />
                   <meshStandardMaterial color="#5b6470" roughness={0.92} />
                 </mesh>
+                <group
+                  ref={carriedTrashRef}
+                  position={[
+                    YANMAR_MACHINE_RIG.grappleClampLocalX - 0.12,
+                    YANMAR_MACHINE_RIG.grappleClampLocalY - 0.12,
+                    0,
+                  ]}
+                  visible={false}
+                >
+                  <mesh position={[0, 0, 0]} castShadow>
+                    <sphereGeometry args={[0.46, 10, 8]} />
+                    <meshStandardMaterial color="#334155" roughness={0.94} />
+                  </mesh>
+                  <mesh position={[0.2, 0.18, 0.12]} rotation={[0.2, 0.3, 0.3]} castShadow>
+                    <boxGeometry args={[0.56, 0.28, 0.38]} />
+                    <meshStandardMaterial color="#64748b" roughness={0.84} />
+                  </mesh>
+                  {[-0.24, 0.08, 0.3].map((x, index) => (
+                    <mesh
+                      key={index}
+                      position={[x, 0.16 + (index % 2) * 0.16, index === 1 ? -0.22 : 0.2]}
+                      rotation={[0.2, 0.5, Math.PI / 2]}
+                      castShadow
+                    >
+                      <cylinderGeometry args={[0.075, 0.085, 0.38, 10]} />
+                      <meshStandardMaterial
+                        color={index === 0 ? "#ef4444" : index === 1 ? "#facc15" : "#e2e8f0"}
+                        metalness={0.55}
+                        roughness={0.32}
+                      />
+                    </mesh>
+                  ))}
+                </group>
               </group>
             </group>
           </group>
@@ -2020,6 +2065,7 @@ function CabinLevelUpBurst({
   terrainRef: React.MutableRefObject<TerrainData>;
   burst: { key: number; level: number } | null;
 }) {
+  const sceneT = useTranslations("yanmar.scene");
   const groupRef = useRef<THREE.Group>(null);
   const startedAtRef = useRef(0);
   useLayoutEffect(() => {
@@ -2067,7 +2113,7 @@ function CabinLevelUpBurst({
           outlineWidth={0.028}
           outlineColor="#1e3a8a"
         >
-          {`${burst.level}레벨`}
+          {sceneT("levelUpBurst", { level: burst.level })}
         </Text>
       </Billboard>
     </group>
@@ -2353,6 +2399,8 @@ function SimLoop({
   onFloodDebrisPushed,
   onFloodCollectFilled,
   onFloodTrashGrapple,
+  onFloodIncineratorFilled,
+  onFloodBurnStarted,
   onFloodBurnComplete,
   onAttachmentWarning,
   onDumpTruckFull,
@@ -2418,6 +2466,8 @@ function SimLoop({
       onFloodDebrisPushed,
       onFloodCollectFilled,
       onFloodTrashGrapple,
+      onFloodIncineratorFilled,
+      onFloodBurnStarted,
       onFloodBurnComplete,
       onAttachmentWarning,
       onDumpTruckFull,
@@ -2521,12 +2571,25 @@ const GROUND_PAINT_LIFT = 0.055;
 
 type NavGuideLabel = "DIG" | "DUMP" | "CRASH" | "STONE";
 
-const NAV_GUIDE_LABELS: Record<NavGuideLabel, string> = {
-  DIG: "흙더미",
-  DUMP: "하역",
-  CRASH: "파쇄",
-  STONE: "석재",
+const NAV_GUIDE_KEYS: Record<NavGuideLabel, string> = {
+  DIG: "navGuide.dig",
+  DUMP: "navGuide.dump",
+  CRASH: "navGuide.crash",
+  STONE: "navGuide.stone",
 };
+
+/** Same numbering as `digZoneLabel`, but rendered from the active locale. */
+function digZoneLabelKey(zoneId: string, index = 0) {
+  if (zoneId === "site-dig" || zoneId === "practice-dig") {
+    return { key: "digZone", index: "" };
+  }
+  const match = zoneId.match(/(\d+)\s*$/);
+  const n = match ? Number(match[1]) : index + 1;
+  return {
+    key: "digZoneNumbered",
+    index: n === 1 ? "I" : n === 2 ? "II" : String(n),
+  };
+}
 
 function createGroundArrowGeometry() {
   // Flat on XZ: tip at +Z so group.rotation.y = atan2(dx, dz) aims at the target.
@@ -2631,6 +2694,7 @@ function ZoneMarkers({
   simRef: React.MutableRefObject<ExcavatorSimState>;
   equipmentStatsRef: React.RefObject<YanmarEquipmentStats>;
 }) {
+  const t = useTranslations("yanmar.scene");
   const [zones, setZones] = useState(() =>
     getActiveDigZones(terrainRef.current).map((zone) => ({ ...zone })),
   );
@@ -2642,6 +2706,22 @@ function ZoneMarkers({
   const digLabelRefs = useRef(new Map<string, THREE.Object3D & { text?: string }>());
   const dumpGroupRef = useRef<THREE.Group>(null);
   const dumpBedMeshRef = useRef<THREE.Mesh>(null);
+
+  const digZoneStatusText = (zone: {
+    id: string;
+    remainingUnits: number;
+    capacityUnits: number;
+  }) => {
+    const { key, index } = digZoneLabelKey(zone.id);
+    return t("digZoneStatus", {
+      label: index ? t(key, { index }) : t(key),
+      remaining: Math.max(
+        0,
+        Math.ceil(zone.remainingUnits / 10) * 10,
+      ).toLocaleString("ko-KR"),
+      capacity: zone.capacityUnits.toLocaleString("ko-KR"),
+    });
+  };
 
   useFrame(() => {
     const terrain = terrainRef.current;
@@ -2687,10 +2767,7 @@ function ZoneMarkers({
       }
       const label = digLabelRefs.current.get(zone.id);
       if (label && "text" in label) {
-        const nextText = `${digZoneLabel(zone.id)} · 흙 ${Math.max(
-          0,
-          Math.ceil(zone.remainingUnits / 10) * 10,
-        ).toLocaleString("ko-KR")} / ${zone.capacityUnits.toLocaleString("ko-KR")}`;
+        const nextText = digZoneStatusText(zone);
         if (label.text !== nextText) label.text = nextText;
       }
     }
@@ -2789,10 +2866,7 @@ function ZoneMarkers({
                   material-polygonOffsetUnits={-2}
                   material-toneMapped={false}
                 >
-                  {`${digZoneLabel(zone.id)} · 흙 ${Math.max(
-                    0,
-                    Math.ceil(zone.remainingUnits / 10) * 10,
-                  ).toLocaleString("ko-KR")} / ${zone.capacityUnits.toLocaleString("ko-KR")}`}
+                  {digZoneStatusText(zone)}
                 </Text>
               </>
             )}
@@ -2854,7 +2928,7 @@ function ZoneMarkers({
           material-polygonOffsetUnits={-2}
           material-toneMapped={false}
         >
-          하역
+          {t("dumpZone")}
         </Text>
       </group>
       <mesh
@@ -2877,6 +2951,7 @@ function TierBoundaryBarriers({
   terrainRef: React.MutableRefObject<TerrainData>;
   terrainRevision?: number;
 }) {
+  const t = useTranslations("yanmar.scene");
   const terrain = terrainRef.current;
   void terrainRevision;
   const eastLocked = terrain.mapTier < 2;
@@ -2935,7 +3010,7 @@ function TierBoundaryBarriers({
             outlineWidth={0.08}
             outlineColor="#7f1d1d"
           >
-            {`Lv.${level} 작업장 확장`}
+            {t("tierExpand", { level })}
           </Text>
         </Billboard>
       </group>
@@ -3022,6 +3097,7 @@ function NavigationGuide({
   sportsMeetRunRef?: React.RefObject<SportsMeetRunState | null>;
   sportsMeetPattern?: SportsMeetPattern | null;
 }) {
+  const t = useTranslations("yanmar.scene");
   const groupRef = useRef<THREE.Group>(null);
   const targetRef = useRef<NavigationTarget | null>(null);
   const [target, setTarget] = useState<NavigationTarget | null>(null);
@@ -3186,7 +3262,7 @@ function NavigationGuide({
 
   const meterText = target.meterOnly
     ? `${Math.round(target.distance)}m`
-    : `${NAV_GUIDE_LABELS[target.label ?? "DIG"]} ${Math.round(target.distance)}m`;
+    : `${t(NAV_GUIDE_KEYS[target.label ?? "DIG"])} ${Math.round(target.distance)}m`;
 
   return (
     <group ref={groupRef} renderOrder={0}>
@@ -3265,6 +3341,7 @@ function DumpTruckWorldHud({
   stateRef: React.MutableRefObject<DumpTruckRuntimeState>;
   statsRef: React.RefObject<YanmarEquipmentStats>;
 }) {
+  const t = useTranslations("yanmar.scene");
   const groupRef = useRef<THREE.Group>(null);
   const labelRef = useRef<THREE.Object3D & { text?: string }>(null);
   const lastTextRef = useRef("");
@@ -3294,9 +3371,11 @@ function DumpTruckWorldHud({
 
     let nextText: string;
     if (shouldShowDumpTruckReturnTimer(state)) {
-      nextText = `복귀 ${formatDumpTruckReturnTime(
-        getDumpTruckReturnEtaSec(state, cooldownSec),
-      )}`;
+      nextText = t("truckReturn", {
+        time: formatDumpTruckReturnTime(
+          getDumpTruckReturnEtaSec(state, cooldownSec),
+        ),
+      });
     } else {
       // Quantize fill readout so Troika does not retypeset every unit.
       nextText = `${Math.floor(Math.round(state.fillUnits) / 10) * 10}/${capacity}`;
@@ -3333,6 +3412,7 @@ function HaulTruckWorldHud({
   terrainRef: React.MutableRefObject<TerrainData>;
   statsRef: React.RefObject<YanmarEquipmentStats>;
 }) {
+  const t = useTranslations("yanmar.scene");
   const groupRef = useRef<THREE.Group>(null);
   const labelRef = useRef<THREE.Object3D & { text?: string }>(null);
   const lastTextRef = useRef("");
@@ -3367,9 +3447,11 @@ function HaulTruckWorldHud({
 
     let nextText: string;
     if (shouldShowHaulTruckReturnTimer(truck)) {
-      nextText = `복귀 ${formatDumpTruckReturnTime(
-        getHaulTruckReturnEtaSec(truck, cooldownSec),
-      )}`;
+      nextText = t("truckReturn", {
+        time: formatDumpTruckReturnTime(
+          getHaulTruckReturnEtaSec(truck, cooldownSec),
+        ),
+      });
     } else {
       nextText = `${truck.loadCount}/${capacity}`;
     }
@@ -3405,6 +3487,7 @@ function DumpTruck({
   stateRef: React.MutableRefObject<DumpTruckRuntimeState>;
   statsRef: React.RefObject<YanmarEquipmentStats>;
 }) {
+  const t = useTranslations("yanmar.scene");
   const groupRef = useRef<THREE.Group>(null);
   const bodyRef = useRef<THREE.Group>(null);
   const fillMeshRef = useRef<THREE.Mesh>(null);
@@ -3674,7 +3757,7 @@ function DumpTruck({
         outlineWidth={0.035}
         outlineColor="#8a1010"
       >
-        흙 하역
+        {t("soilUnload")}
       </Text>
         </>
       ) : null}

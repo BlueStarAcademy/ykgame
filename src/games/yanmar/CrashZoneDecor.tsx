@@ -3,6 +3,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import { Outlines, Text } from "@react-three/drei";
+import { useTranslations } from "next-intl";
 import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import * as THREE from "three";
 import {
@@ -23,10 +24,15 @@ type TroikaLabel = THREE.Object3D & { text?: string };
 
 const TILE_VISUAL_MIN_MS = 125;
 
-function crashZoneLabelText(respawnEtaSec: number) {
+function crashZoneLabelText(
+  respawnEtaSec: number,
+  t: (key: string, values?: Record<string, string | number>) => string,
+) {
   return respawnEtaSec > 0
-    ? `노면 파쇄 · 리젠 ${formatDumpTruckReturnTime(respawnEtaSec)}`
-    : "노면 파쇄 작업구역";
+    ? t("crashZoneRespawn", {
+        time: formatDumpTruckReturnTime(respawnEtaSec),
+      })
+    : t("crashZone");
 }
 
 export function CrashZoneDecor({
@@ -38,6 +44,7 @@ export function CrashZoneDecor({
   showZoneLabel?: boolean;
   highlightTiles?: boolean;
 }) {
+  const t = useTranslations("yanmar.scene");
   const loaded = useLoader(THREE.TextureLoader, [
     PREMIUM_SITE_TEXTURES.asphaltAlbedo,
     PREMIUM_SITE_TEXTURES.asphaltNormal,
@@ -70,7 +77,7 @@ export function CrashZoneDecor({
 
     const label = labelRef.current;
     if (label && "text" in label) {
-      const nextLabel = crashZoneLabelText(getCrashZoneRespawnEtaSec(zone));
+      const nextLabel = crashZoneLabelText(getCrashZoneRespawnEtaSec(zone), t);
       if (label.text !== nextLabel) label.text = nextLabel;
     }
 
@@ -89,8 +96,14 @@ export function CrashZoneDecor({
   if (!zone) return null;
 
   const terrain = terrainRef.current;
-  const tileWidth = zone.width / 3;
-  const tileDepth = zone.depth / 3;
+  let cols = 1;
+  let rows = 1;
+  for (const tile of zone.tiles) {
+    cols = Math.max(cols, tile.col + 1);
+    rows = Math.max(rows, tile.row + 1);
+  }
+  const tileWidth = zone.width / cols;
+  const tileDepth = zone.depth / rows;
   const ground = sampleHeight(terrain, zone.centerX, zone.centerZ);
 
   return (
@@ -143,7 +156,10 @@ export function CrashZoneDecor({
                     roughness={0.96}
                     color={damage > 0.65 ? "#3e4448" : "#555b60"}
                   />
-                  {highlightTiles ? <Outlines thickness={0.055} color="#fbbf24" /> : null}
+                  <Outlines
+                    thickness={highlightTiles ? 0.075 : 0.045}
+                    color={highlightTiles ? "#fbbf24" : "#f8fafc"}
+                  />
                 </mesh>
                 {damage > 0.1
                   ? Array.from({ length: Math.ceil(damage * 6) }, (_, index) => {
@@ -210,7 +226,7 @@ export function CrashZoneDecor({
           outlineWidth={0.06}
           outlineColor="#111827"
         >
-          {crashZoneLabelText(getCrashZoneRespawnEtaSec(zone))}
+          {crashZoneLabelText(getCrashZoneRespawnEtaSec(zone), t)}
         </Text>
       ) : null}
     </group>

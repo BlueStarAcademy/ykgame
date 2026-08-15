@@ -1,13 +1,22 @@
-import type { ChassisModelId } from "@/games/yanmar/chassisCatalog";
-import {
-  CHASSIS_CATALOG,
-  DEFAULT_CHASSIS_ID,
-} from "@/games/yanmar/chassisCatalog";
-import { chassisModelThumbSrc } from "@/games/yanmar/gearArt";
 import { containsProfanity } from "@/lib/profanity";
 
 /** 닉네임 변경(최초 설정 제외) 비용 */
-export const NICKNAME_CHANGE_COST_STARS = 300;
+export const NICKNAME_CHANGE_COST_STARS = 2000;
+
+export const PROFILE_AVATAR_IDS = [
+  "initial",
+  "yanmar-01",
+  "yanmar-02",
+  "yanmar-03",
+  "yanmar-04",
+  "yanmar-05",
+  "yanmar-06",
+  "yanmar-07",
+  "yanmar-08",
+  "yanmar-09",
+  "yanmar-10",
+] as const;
+export type ProfileAvatarId = (typeof PROFILE_AVATAR_IDS)[number];
 
 /** 한글 음절 등 유니코드 코드포인트 기준 길이 */
 export const NICKNAME_MIN_LENGTH = 2;
@@ -71,25 +80,26 @@ export function validateNickname(
 
 export function isValidProfileAvatarId(
   id: unknown,
-): id is ChassisModelId {
+): id is ProfileAvatarId {
   return (
-    typeof id === "string" && CHASSIS_CATALOG.some((c) => c.id === id)
+    typeof id === "string" &&
+    (PROFILE_AVATAR_IDS as readonly string[]).includes(id)
   );
 }
 
 export function resolveProfileAvatarId(
   profileAvatarId: string | null | undefined,
-  fallbackChassisId?: string | null,
-): ChassisModelId {
+): ProfileAvatarId {
   if (isValidProfileAvatarId(profileAvatarId)) return profileAvatarId;
-  if (isValidProfileAvatarId(fallbackChassisId)) return fallbackChassisId;
-  return DEFAULT_CHASSIS_ID;
+  if (profileAvatarId === "yanmar") return "yanmar-01";
+  return "initial";
 }
 
 export function profileAvatarSrc(
   profileAvatarId: string | null | undefined,
-  fallbackChassisId?: string | null,
-): string {
-  const id = resolveProfileAvatarId(profileAvatarId, fallbackChassisId);
-  return chassisModelThumbSrc(id);
+): string | null {
+  const avatarId = resolveProfileAvatarId(profileAvatarId);
+  return avatarId === "initial"
+    ? null
+    : `/images/yanmar/2d/avatars/${avatarId}.png?v=1`;
 }

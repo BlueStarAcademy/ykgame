@@ -1,44 +1,46 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
-import { LEGAL_DOCS, type LegalDocId } from "@/lib/legal-docs";
-
-const LINKS: { id: LegalDocId; label: string }[] = [
-  { id: "privacy", label: "개인정보처리방침" },
-  { id: "terms", label: "이용약관" },
-  { id: "email", label: "이메일주소 무단수집거부" },
-];
+import { getLegalDocs, type LegalDocId } from "@/lib/legal-docs";
+import type { Locale } from "@/i18n/config";
 
 export function SiteLegendLegalFooter() {
+  const t = useTranslations("siteLegendLegal");
+  const locale = useLocale() as Locale;
   const [openDoc, setOpenDoc] = useState<LegalDocId | null>(null);
-  const doc = openDoc ? LEGAL_DOCS[openDoc] : null;
+  const docs = getLegalDocs(locale);
+  const doc = openDoc ? docs[openDoc] : null;
+  const links: { id: LegalDocId; label: string }[] = [
+    { id: "privacy", label: t("privacy") },
+    { id: "terms", label: t("terms") },
+    { id: "email", label: t("email") },
+  ];
 
   return (
     <>
       <footer className="site-legend-legal-footer">
-        <nav className="site-legend-legal-links" aria-label="약관 및 정책">
-          {LINKS.map((link) => (
+        <nav className="site-legend-legal-links" aria-label={t("linksAriaLabel")}>
+          {links.map((link) => (
             <button key={link.id} type="button" onClick={() => setOpenDoc(link.id)}>
               {link.label}
             </button>
           ))}
         </nav>
         <p className="site-legend-legal-meta">
-          경기도 안양시 만안구 경수대로 1357
+          {t("address")}
           <span aria-hidden> | </span>
           TEL: 1588-3806
           <span aria-hidden> | </span>
           FAX: 031-474-3806
         </p>
         <p className="site-legend-legal-meta">
-          사업자번호 : 119-81-30845
+          {t("businessNumber")}
           <span aria-hidden> | </span>
-          대표자 : 채호선
+          {t("representative")}
         </p>
-        <p className="site-legend-legal-copy">
-          Copyright © sunnyyk.co.kr All rights reserved.
-        </p>
+        <p className="site-legend-legal-copy">{t("copyright")}</p>
       </footer>
 
       <AppModalOverlay
@@ -51,7 +53,7 @@ export function SiteLegendLegalFooter() {
             <div className="site-legend-legal-modal-head">
               <h2>{doc.title}</h2>
               <button type="button" onClick={() => setOpenDoc(null)}>
-                닫기
+                {t("close")}
               </button>
             </div>
             <div className="site-legend-legal-modal-body">

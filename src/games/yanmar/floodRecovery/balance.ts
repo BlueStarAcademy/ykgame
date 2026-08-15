@@ -10,6 +10,13 @@ export const FLOOD_INCINERATOR_BASE_CAPACITY = 3000;
 /** Collection pad fill needed before grapple pickup is allowed. */
 export const FLOOD_COLLECTION_THRESHOLD = 500;
 
+/**
+ * XZ radius for grapple pickup of the central collection pile.
+ * Matches `isGrappleGroundPickupPose` for FLOOD_TRASH_GRIP_PROFILE (size 0.52)
+ * in simLoop — much tighter than the painted pad (`collectionRadius` ≈ 5.5).
+ */
+export const FLOOD_COLLECTION_GRAB_RADIUS = 2.1;
+
 /** Base blade push amount for a valid straight push stroke. */
 export const FLOOD_BASE_PUSH_UNITS = 500;
 
@@ -18,11 +25,11 @@ export const FLOOD_GRAPPLE_CHUNK = 500;
 
 export const FLOOD_ZONE_RESPAWN_MS = 5 * 60 * 1000;
 
-/** Base burn FX duration (seconds) before incinerator_power upgrades. */
-export const FLOOD_BASE_BURN_SEC = 8;
+/** Base burn duration (seconds) before incinerator_power upgrades — matches other workshop cycles. */
+export const FLOOD_BASE_BURN_SEC = 5 * 60;
 
-/** Minimum burn FX duration so upgrades never skip the animation. */
-export const FLOOD_MIN_BURN_SEC = 3;
+/** Minimum burn duration so upgrades never skip the cycle. */
+export const FLOOD_MIN_BURN_SEC = 30;
 
 /** Safety radius around incinerator — player must leave before burn starts. */
 export const FLOOD_INCINERATOR_SAFE_RADIUS = 10;
@@ -41,8 +48,8 @@ export const FLOOD_PUSH_STAT_WEIGHTS = {
 export const FLOOD_CLEANING_MASTER_BONUS_PER_LEVEL = 0.05;
 export const FLOOD_CLEANING_MASTER_MAX_LEVEL = 10;
 
-/** incinerator_power: -5% burn time per level, max 10. */
-export const FLOOD_INCINERATOR_POWER_REDUCTION_PER_LEVEL = 0.05;
+/** incinerator_power: -10s burn time per level, max 10. */
+export const FLOOD_INCINERATOR_POWER_REDUCTION_PER_LEVEL = 10;
 export const FLOOD_INCINERATOR_POWER_MAX_LEVEL = 10;
 
 /** incinerator_capacity: +500 total per level, max 5. */
@@ -94,10 +101,10 @@ export function floodBurnDurationSec(powerLevel = 0): number {
     0,
     Math.min(FLOOD_INCINERATOR_POWER_MAX_LEVEL, Math.floor(powerLevel)),
   );
-  const scaled =
-    FLOOD_BASE_BURN_SEC *
-    (1 - level * FLOOD_INCINERATOR_POWER_REDUCTION_PER_LEVEL);
-  return Math.max(FLOOD_MIN_BURN_SEC, scaled);
+  return Math.max(
+    FLOOD_MIN_BURN_SEC,
+    FLOOD_BASE_BURN_SEC - level * FLOOD_INCINERATOR_POWER_REDUCTION_PER_LEVEL,
+  );
 }
 
 export function floodCleaningMasterMult(cleaningMasterLevel = 0): number {

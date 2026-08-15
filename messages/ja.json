@@ -66,6 +66,18 @@
     "loadingGameInfo": "情報を読み込み中",
     "loginWithDifferentAccount": "別のIDでログイン"
   },
+  "siteLegendLegal": {
+    "titleAlt": "現場伝説",
+    "linksAriaLabel": "規約とポリシー",
+    "privacy": "プライバシーポリシー",
+    "terms": "利用規約",
+    "email": "メールアドレスの無断収集拒否",
+    "close": "閉じる",
+    "address": "大韓民国 京畿道安養市万安区京水大路1357",
+    "businessNumber": "事業者登録番号：119-81-30845",
+    "representative": "代表者：チェ・ホソン",
+    "copyright": "Copyright © sunnyyk.co.kr. All rights reserved."
+  },
   "landing": {
     "heroTitle": "重機体験ゾーン",
     "gameExperience": "ゲーム体験",
@@ -97,7 +109,13 @@
     "iosInstallStep3": "名前を確認して「追加」を押すとYKゲームのアイコンが作成されます",
     "addToHomeTitle": "ホームに追加する方法",
     "addToHomeDescription": "ブラウザメニューで「アプリをインストール」または「ホーム画面に追加」を選ぶと、YKゲームのアイコンがホーム画面に作成されます。",
-    "generatingQr": "QRを生成中..."
+    "generatingQr": "QRを生成中...",
+    "webExperience": {
+      "title": "モバイルQR体験",
+      "lead": "スマートフォンでスキャンするとログイン画面が開きます",
+      "steps": "QR → ログイン → 体験入場",
+      "description": "スキャン後、装備選択画面に移動します。インストール不要でブラウザからすぐ体験できます。iPhoneはSafariの共有 → ホーム画面に追加でアプリのように利用できます。"
+    }
   },
   "shell": {
     "menu": "メニュー",
@@ -137,7 +155,9 @@
       "expired": "有効期限が切れています",
       "noBarcode": "バーコードを表示できません",
       "expiresAt": "有効期限 {date}",
-      "exchange": "交換"
+      "exchange": "交換",
+      "used": "使用済み",
+      "daysLeft": "残り{days}日"
     },
     "coupons": {
       "YK_PARTS_DISCOUNT": "YK建機パーツ割引券",
@@ -166,7 +186,11 @@
       "emojiPickerAriaLabel": "絵文字を選択",
       "inputAvailableAfter": "{seconds}秒後に入力できます",
       "messagePlaceholder": "メッセージを入力",
-      "send": "送信"
+      "send": "送信",
+      "profileTitle": "プロフィール",
+      "profileChassis": "車体",
+      "profileLoading": "プロフィールを読み込み中…",
+      "profileLoadFailed": "プロフィールを読み込めませんでした。"
     },
     "inquiry": {
       "title": "お問い合わせ",
@@ -252,7 +276,8 @@
       "seasonTop10": "Top 10 · シーズン累計スコア",
       "loading": "読み込み中…",
       "sportsMyRank": "自分の順位 {rank}位",
-      "reward": "報酬 {stars}★"
+      "reward": "報酬 {stars}★",
+      "rankValue": "{rank}位"
     },
     "immersive": {
       "exit": "終了",
@@ -283,10 +308,26 @@
       "logout": "ログアウト",
       "admin": "管理",
       "inquiry": "お問い合わせ",
-      "language": "言語"
+      "language": "言語",
+      "detailedSettings": "詳細設定"
     },
     "ads": {
       "rewardHint": "報酬を見る",
+      "remainingTime": "残り時間",
+      "rewardAfterSeconds": "{seconds}秒後に報酬を獲得",
+      "oneOfRewards": "以下の報酬から1つ獲得",
+      "count": "{count}個",
+      "seconds": "{seconds}秒",
+      "close": "閉じる",
+      "cancel": "キャンセル",
+      "claim": "報酬を受け取る",
+      "granting": "付与中…",
+      "closeWithoutReward": "報酬を受け取らずに閉じますか？",
+      "rewardDialogAria": "広告報酬",
+      "rewardAcquired": "報酬獲得！",
+      "drawingReward": "報酬抽選中",
+      "stop": "停止",
+      "confirm": "確認",
       "m15": {
         "teaserTitle": "SV10・SV11 発売！",
         "teaserSub": "タップして報酬を受け取る",
@@ -312,6 +353,20 @@
         "ariaLabel": "ジョンディア純正部品20%オフ広告"
       }
     },
+    "maintenanceRoulette": {
+      "stars": "スター +{amount}",
+      "points": "{pointKind} +{amount}",
+      "enhanceCore": "強化コア +{amount}",
+      "standardTicketCount": "ノーマルガチャチケット {count}個",
+      "premiumTicketCount": "プレミアムガチャチケット {count}個",
+      "exchangeReward": "交換報酬",
+      "count": "{count}個",
+      "drawingReward": "報酬抽選",
+      "rewardAcquired": "交換報酬獲得！",
+      "allRewards": "獲得した全報酬",
+      "stop": "停止",
+      "confirm": "確認"
+    },
     "hud": {
       "engineOn": "始動 ON",
       "engineOff": "始動 OFF",
@@ -328,7 +383,50 @@
       "game": "ゲーム",
       "pause": "一時停止",
       "resume": "再開",
-      "exit": "終了"
+      "exit": "終了",
+      "quest": "クエスト",
+      "gear": "装備",
+      "shop": "ショップ",
+      "tutorial": "チュートリアル",
+      "questLocked": "クエストはロック中、レベル{level}が必要です",
+      "questClose": "クエストを閉じる",
+      "questOpen": "クエストを開く",
+      "questOpenClaimable": "クエストを開く、受取可能な報酬 {count}件",
+      "gearLocked": "装備はロック中、レベル{level}が必要です",
+      "gearClose": "装備強化を閉じる",
+      "gearOpen": "装備強化を開く",
+      "shopClose": "ショップを閉じる",
+      "shopOpen": "ショップを開く",
+      "shopOpenFreeGacha": "ショップを開く、無料抽選が可能です",
+      "rideExperience": "搭乗体験 · 実操作シミュレーター",
+      "status": {
+        "currentLoad": "現在の積載量",
+        "canDump": "荷下ろし可能",
+        "faceTruckBed": "荷台の正面を向けてください",
+        "moveToTruck": "車体をトラックへ寄せてください",
+        "canLoad": "積込可能（{amount}）",
+        "breakerVertical": "ブレーカーを垂直に近づけてください。",
+        "canStrike": "破砕可能",
+        "canGrab": "つかみ可能",
+        "alignGrapple": "バケットの角度をグラップルに合わせてください",
+        "openLeftPedal": "左ペダル：開く",
+        "soilSpilling": "土がこぼれています — バケットを巻いてください",
+        "raiseBoomArm": "ブーム・アームを上げてください",
+        "haulTruckFull": "石材トラックは満載です — 荷下ろし位置から離れてください",
+        "floodLeaveIncinerator": "焼却場の外へ移動してください",
+        "floodBurning": "焼却中 · {percent}%",
+        "carryingTrash": "ごみ運搬中 — 焼却場へ投入してください",
+        "incinerator": "焼却 {current}/{capacity}",
+        "collection": "集結 {current}/{capacity}"
+      }
+    },
+    "gameHud": {
+      "score": "スコア",
+      "cumulativeScore": "累計スコア",
+      "camera": "カメラ{mode}",
+      "cameraAria": "カメラ視点 {mode}",
+      "respawnWait": "再出現待ち",
+      "monument": "モニュメント"
     },
     "toasts": {
       "inventoryFullTitle": "インベントリの空きがありません。",
@@ -498,9 +596,12 @@
       "dismantleConfirmTitle": "本当に分解しますか？",
       "expectedGain": "予想獲得",
       "dismantleWarn": "分解した装備は元に戻せません。",
+      "dismantleJackpotChance": "大当たり確率",
       "closeDismantleResult": "分解結果を閉じる",
       "dismantleDoneEyebrow": "分解完了",
       "dismantleDoneTitle": "装備を分解しました",
+      "dismantleJackpot": "大当たり！強化コア追加 +{bonus}",
+      "bulkDismantleJackpot": "大当たり ×{count}！強化コア追加 +{bonus}",
       "gained": "獲得",
       "enhanceCore": "強化コア",
       "closeSellConfirm": "売却確認を閉じる",
@@ -568,7 +669,16 @@
       "boomSwing": "ブームスイング",
       "travel": "走行",
       "pedalBreaker": "ブレーカー",
-      "pedalGrapple": "グラップル"
+      "pedalGrapple": "グラップル",
+      "autoClose": "閉じる",
+      "autoEdit": "編集",
+      "autoEditTitle": "実行名を編集",
+      "autoEditHint": "実行ボタンの名前を{min}〜{max}文字で設定できます。",
+      "autoExecute": "実行{slot}",
+      "autoSave": "保存",
+      "autoSaveSlot": "保存{slot}",
+      "autoCancel": "キャンセル",
+      "autoLabelValidation": "実行{slot}の名前は{min}〜{max}文字で入力してください。"
     },
     "quest": {
       "title": "クエスト",
@@ -576,6 +686,16 @@
       "claimed": "完了",
       "progress": "進行",
       "empty": "進行中のクエストはありません",
+      "missionTasks": {
+        "soilDump": "土の荷下ろし {target}",
+        "asphaltBreak": "破砕 {target}個",
+        "rockLoad": "石積載成功 {target}回",
+        "horn": "ホーン {target}回",
+        "swing180": "上部180°旋回 {target}回",
+        "travel": "走行距離 {target}m",
+        "dumpTruckDepart": "ダンプトラックを{target}回送る",
+        "haulTruckDepart": "石トラックを{target}回送る"
+      },
       "defs": {
         "repeat-soil-dump-10000": "土の荷下ろし {target}",
         "repeat-asphalt-10": "破砕 {target}個",
@@ -589,6 +709,7 @@
         "daily-travel-3000": "走行距離 {target}m",
         "daily-asphalt-9": "破砕 {target}回",
         "daily-rock-load-5": "石の積込成功 {target}回",
+        "daily-gear-gacha-5": "装備ガチャ {target}回",
         "daily-gear-enhance-3": "装備強化を試す {target}回",
         "daily-gear-dismantle-5": "装備分解 {target}個",
         "daily-gear-synthesize-1": "装備合成を試す {target}回",
@@ -597,6 +718,59 @@
         "daily-sports-ranked-1": "運動会ランキングに参加 {target}回",
         "daily-all-complete": "デイリークエスト {target}個完了",
         "daily-mission-clear-3": "ミッションクエスト {target}回完了"
+      },
+      "close": "クエストを閉じる",
+      "rewards": "報酬",
+      "rewardsAwaiting": "受取待ちの報酬",
+      "unclaimedRewards": "未受取の報酬 {count}件",
+      "reset": "リセット",
+      "resetCountdown": "デイリークエストのリセットまでの時間",
+      "tabs": {
+        "daily": "デイリー",
+        "mission": "ミッション",
+        "repeat": "リピート"
+      },
+      "tags": {
+        "required": "必須",
+        "optional": "任意",
+        "bonus": "ボーナス"
+      },
+      "todayProgress": "今日の達成",
+      "missionProgress": "ミッション進行",
+      "repeatQuests": "リピートクエスト",
+      "repeatNote": "達成するたびに再挑戦できます",
+      "claimedToday": "今日 {count}回受取",
+      "loading": "クエスト情報を読み込んでいます",
+      "loadingHint": "しばらくしてからご確認ください。",
+      "missionsComplete": "ミッションクエスト完了",
+      "missionsCompleteHint": "リセット後に新しいミッションが割り当てられます。",
+      "missionRound": "ミッション {current}/{total}",
+      "missionComplete": "ミッション完了",
+      "collapseMission": "ミッションパネルを折りたたむ",
+      "expandMission": "ミッションパネルを開く",
+      "difficulty": "難易度",
+      "difficultyValue": "難易度 {value}",
+      "clearRewards": "クリア報酬",
+      "goals": "目標",
+      "claimMission": "ミッション報酬を受け取る",
+      "claimRewards": "報酬を受け取る",
+      "claiming": "受取中",
+      "claimingShort": "受取中",
+      "nextMissionHint": "すべての目標を達成すると次のミッションが開きます。",
+      "noRewards": "報酬なし",
+      "progressAria": "{title} の進行度",
+      "goalReached": "目標達成",
+      "remaining": "残り {count}",
+      "done": "完了",
+      "inProgress": "進行中",
+      "scoreUnit": "点",
+      "rewardLabels": {
+        "xp": "経験値",
+        "stars": "スター",
+        "score": "スコア",
+        "enhanceCore": "強化コア",
+        "standardTicket": "ノーマルガチャチケット",
+        "premiumTicket": "プレミアムガチャチケット"
       }
     },
     "shop": {
@@ -632,266 +806,317 @@
           "name": "ランカーの意志",
           "effect": "スコア2倍確率 35%"
         }
+      },
+      "close": "ショップを閉じる",
+      "gacha": {
+        "gearTab": "装備",
+        "buffTab": "バフ",
+        "standardTitle": "ノーマルガチャ",
+        "premiumTitle": "プレミアムガチャ",
+        "standardDraw": "基本装備ガチャ",
+        "premiumChanceUp": "高グレード確率アップ",
+        "availableGrades": "登場グレード",
+        "grades": {
+          "normal": "ノーマル",
+          "enhanced": "強化",
+          "precision": "精密",
+          "master": "マスター"
+        },
+        "ownedTickets": "所持 {count}",
+        "freePulls": "無料 {count}回",
+        "free": "無料",
+        "singlePull": "1回",
+        "tenPull": "10回",
+        "standardTicket": "ノーマルガチャチケット",
+        "premiumTicket": "プレミアムガチャチケット"
       }
     },
     "workshop": {
-      "title": "???",
-      "upgrade": "???????",
+      "title": "作業場",
+      "upgrade": "アップグレード",
       "level": "Lv.{level}",
-      "close": "???????",
-      "rewards": "??",
-      "rewardsAwaiting": "????",
-      "unclaimedRewards": "??? ?? {count}?",
+      "close": "作業場を閉じる",
+      "rewards": "報酬",
+      "rewardsAwaiting": "受取待ち",
+      "unclaimedRewards": "未受取の報酬 {count}件",
       "tabs": {
-        "quest": "???",
-        "upgrade": "?????",
-        "shop": "??"
+        "quest": "クエスト",
+        "upgrade": "アップグレード",
+        "shop": "ショップ"
       },
-      "questsTitle": "???????",
-      "questRewardNote": "????????????????????",
-      "oneUpgradeAtATime": "????????????????1??????",
-      "owned": "??",
-      "shopTitle": "???????",
-      "weeklyReset": "??????{limit}?????0?(KST)????",
+      "questsTitle": "作業場クエスト",
+      "questRewardNote": "達成報酬は作業場ポイントで支給されます",
+      "signQuestComplete": "クエスト完了",
+      "oneUpgradeAtATime": "同時に1つだけ進行できます",
+      "owned": "所持",
+      "shopTitle": "作業場ショップ",
+      "weeklyReset": "商品ごと週{limit}回・月曜0時(KST)リセット",
       "tags": {
-        "daily": "??",
-        "repeat": "??"
+        "daily": "デイリー",
+        "repeat": "リピート"
       },
-      "claimed": "????",
-      "done": "??",
-      "levelRequirement": "???{level}???",
-      "instantComplete": "????",
-      "insufficient": "????",
-      "thisWeek": "?? {count}/{limit}",
-      "purchaseConfirmation": "????",
-      "purchasePrompt": "{item}????????",
-      "consume": "??",
-      "cancel": "??",
-      "purchase": "??",
-      "acquiredResult": "????",
-      "confirm": "??",
-      "upgradeConfirmation": "?????????",
-      "duration": "????",
-      "instantCompleteConfirmation": "???????",
-      "secondsPreview": "{from}? ? {to}?",
-      "capacityPreview": "{from} ? {to}??? {base}?",
-      "countPreview": "{from}? ? {to}???? {base}?",
+      "claimed": "受取済み",
+      "done": "完了",
+      "levelRequirement": "レベル{level}が必要",
+      "instantComplete": "即時完了",
+      "insufficient": "（不足）",
+      "thisWeek": "今週 {count}/{limit}",
+      "purchaseConfirmation": "購入確認",
+      "purchasePrompt": "{item}を購入しますか？",
+      "consume": "消費",
+      "cancel": "キャンセル",
+      "purchase": "購入",
+      "acquiredResult": "獲得結果",
+      "confirm": "確認",
+      "upgradeConfirmation": "アップグレード確認",
+      "duration": "所要時間",
+      "instantCompleteConfirmation": "即時完了の確認",
+      "secondsPreview": "{from}秒 → {to}秒",
+      "capacityPreview": "{from} → {to}（基本 {base}）",
+      "countPreview": "{from}個 → {to}個（基本 {base}）",
       "catalog": {
         "workshops": {
           "dump": {
-            "label": "???????",
-            "pointsLabel": "????????"
+            "label": "土の荷降ろし場",
+            "pointsLabel": "荷降ろしポイント"
           },
           "crash": {
-            "label": "????????",
-            "pointsLabel": "?????????"
+            "label": "ブレーカー作業場",
+            "pointsLabel": "ブレーカーポイント"
           },
           "hill": {
-            "label": "???????",
-            "pointsLabel": "??????????"
+            "label": "石の荷降ろし場",
+            "pointsLabel": "石の荷降ろしポイント"
+          },
+          "flood": {
+            "label": "水害復旧作業場",
+            "pointsLabel": "水害復旧ポイント"
           }
         },
         "upgrades": {
           "truck_capacity": {
-            "label": "??????",
-            "description": "??????????????????"
+            "label": "ダンプ積載量",
+            "description": "ダンプトラックの最大荷降ろし量が増加"
           },
           "truck_cooldown": {
-            "label": "???????",
-            "description": "?????????????????"
+            "label": "ダンプ復帰時間",
+            "description": "ダンプトラックの復帰待ち時間が減少"
           },
           "haul_capacity": {
-            "label": "????????",
-            "description": "??????????+1"
+            "label": "石トラック積載量",
+            "description": "石トラックの積載上限 +1"
           },
           "haul_cooldown": {
-            "label": "?????????",
-            "description": "???????????????"
+            "label": "石トラック復帰時間",
+            "description": "石トラックの復帰待ち時間が減少"
           },
           "breaker_power": {
-            "label": "????????",
-            "description": "?????????+10%"
+            "label": "ブレーカーパワー",
+            "description": "ブレーカーのダメージ +10%"
           },
           "score_rank": {
-            "label": "??????",
-            "description": "???????+10%"
+            "label": "作業ランカー",
+            "description": "作業完了スコア +10%"
           },
           "xp_expert": {
-            "label": "?????",
-            "description": "???????+5%"
+            "label": "作業熟練者",
+            "description": "作業完了の経験値 +5%"
           },
           "lucky_drop": {
-            "label": "??????",
-            "description": "??????+1%p"
+            "label": "幸運の作業者",
+            "description": "装備の獲得確率 +1%p"
           },
           "rock_appraiser": {
-            "label": "????",
-            "description": "??????+1?"
+            "label": "石の鑑定士",
+            "description": "石エリアの石 +1個"
+          },
+          "cleaning_master": {
+            "label": "清掃の達人",
+            "description": "ブレード集結量 +5%"
+          },
+          "incinerator_power": {
+            "label": "焼却炉火力",
+            "description": "焼却時間 -10秒"
+          },
+          "incinerator_capacity": {
+            "label": "焼却炉拡張",
+            "description": "焼却炉の総量 +500"
           }
         },
         "quests": {
-          "dump-daily-soil-8000": "?????? 8,000",
-          "dump-daily-truck-2": "????????? 2?",
-          "dump-repeat-soil-4000": "?????? 4,000",
-          "crash-daily-asphalt-9": "?? 9?",
-          "crash-daily-asphalt-18": "?? 18?",
-          "crash-repeat-asphalt-3": "?? 3?",
-          "hill-daily-rock-5": "?????? 5?",
-          "hill-daily-haul-1": "???????? 1?",
-          "hill-repeat-rock-2": "?????? 2?"
+          "dump-daily-soil-8000": "土の荷降ろし 8,000",
+          "dump-daily-truck-2": "ダンプトラック出発 2回",
+          "dump-repeat-soil-4000": "土の荷降ろし 4,000",
+          "crash-daily-asphalt-9": "破砕 9個",
+          "crash-daily-asphalt-18": "破砕 18個",
+          "crash-repeat-asphalt-3": "破砕 3個",
+          "hill-daily-rock-5": "石の荷降ろし 5個",
+          "hill-daily-haul-1": "運搬トラック出発 1回",
+          "hill-repeat-rock-2": "石の荷降ろし 2個",
+          "flood-daily-collect-3000": "ゴミ集結 3,000",
+          "flood-daily-grapple-3": "グラップル積載成功 3回",
+          "flood-repeat-burn-1000": "ゴミ焼却 1,000"
         },
         "shop": {
           "ticket_standard": {
-            "label": "??????",
-            "description": "????1?5????????"
+            "label": "ノーマルガチャチケット",
+            "description": "購入時に1〜5個をランダム獲得"
           },
           "ticket_premium": {
-            "label": "??????",
-            "description": "????1?3????????"
+            "label": "プレミアムガチャチケット",
+            "description": "購入時に1〜3個をランダム獲得"
           },
           "enhance_core": {
-            "label": "????",
-            "description": "????1?10????????"
+            "label": "強化コア",
+            "description": "購入時に1〜10個をランダム獲得"
           }
         }
       }
     },
     "repair": {
-      "title": "??",
-      "repair": "??",
-      "free": "??",
-      "durability": "???",
-      "close": "??????",
-      "exchangeAvailable": "????",
-      "expiringSoon": "????????",
-      "normal": "??",
-      "rewardRange": "??????",
-      "stars": "???",
-      "enhanceCore": "????",
-      "standardTicket": "??????",
-      "premiumTicket": "??????",
+      "title": "メンテナンス",
+      "repair": "整備",
+      "free": "無料",
+      "durability": "耐久度",
+      "close": "メンテナンスを閉じる",
+      "exchangeAvailable": "交換可能",
+      "expiringSoon": "期限間近",
+      "normal": "正常",
+      "rewardRange": "交換報酬の範囲",
+      "stars": "スター",
+      "enhanceCore": "強化コア",
+      "standardTicket": "ノーマルガチャチケット",
+      "premiumTicket": "プレミアムガチャチケット",
       "gaugeLabel": "{fluid} {percent}%",
-      "exchangeRewards": "??????",
-      "exchange": "????",
-      "waiting": "???",
-      "cancel": "??",
-      "cycleHours": "???? {hours}??",
-      "items": "?",
+      "exchangeRewards": "交換時の報酬",
+      "exchange": "交換する",
+      "waiting": "待機中",
+      "cancel": "キャンセル",
+      "cycleHours": "交換サイクル {hours}時間",
+      "items": "個",
+      "statusClose": "消耗品ガイドを閉じる",
+      "statusEyebrow": "YK建機サービス拠点",
+      "statusTitle": "消耗品交換ガイド",
+      "remaining": "残り {time}",
+      "exchangeNow": "交換",
+      "statusHint": "交換は現場のサービス拠点で行えます。",
+      "confirm": "確認",
       "catalog": {
         "pointKinds": {
-          "dump": "????????",
-          "crash": "?????????",
-          "hill": "??????????",
-          "monument": "??????????"
+          "dump": "荷降ろしポイント",
+          "crash": "ブレーカーポイント",
+          "hill": "石の荷降ろしポイント",
+          "monument": "モニュメントポイント"
         },
         "fluids": {
           "engineOil": {
-            "label": "???????",
-            "blurb": "??????????????????????",
-            "whyReplace": "???????????????????????????????"
+            "label": "エンジンオイル",
+            "blurb": "エンジンの摩擦を減らし、熱を冷ます潤滑油です。",
+            "whyReplace": "古くなると粘度が崩れて出力・燃費が落ち、オーバーヒートの危険が高まります。"
           },
           "engineOilFilter": {
-            "label": "????????????",
-            "blurb": "?????????????????????????????",
-            "whyReplace": "????????????????????????????????"
+            "label": "エンジンオイルフィルター",
+            "blurb": "エンジンオイル内の金属粉・不純物を濾すフィルターです。",
+            "whyReplace": "詰まるとオイル循環が悪化し、エンジンの摩耗と応答低下が早まります。"
           },
           "hydraulicOil": {
-            "label": "?????",
-            "blurb": "???????????????????????????",
-            "whyReplace": "???????????????????????????????"
+            "label": "作動油",
+            "blurb": "ブーム・アーム・バケットを動かす油圧装置の作動油です。",
+            "whyReplace": "劣化すると圧力が失われ、作業速度・ブレーカーの力が弱まります。"
           },
           "hydraulicFilter": {
-            "label": "???????",
-            "blurb": "???????????????????????",
-            "whyReplace": "??????????????????????????????"
+            "label": "油圧フィルター",
+            "blurb": "作動油内の異物を防ぎ、バルブ・ポンプを保護します。",
+            "whyReplace": "詰まると油圧回路が不安定になり、精密操作・出力が揺らぎます。"
           },
           "fuelFilter": {
-            "label": "???????",
-            "blurb": "???????????????????????",
-            "whyReplace": "???????????????????????????????"
+            "label": "燃料フィルター",
+            "blurb": "燃料内の水分・不純物を濾し、エンジンにきれいな燃料を送ります。",
+            "whyReplace": "詰まると燃料供給が不安定になり、走行・作業の応答が鈍くなります。"
           },
           "gearOil": {
-            "label": "?????",
-            "blurb": "???????????????????????",
-            "whyReplace": "???????????????????????????????"
+            "label": "ギアオイル",
+            "blurb": "走行・旋回ギアボックスを摩擦と衝撃から守ります。",
+            "whyReplace": "不足・劣化するとギアの摩耗が進み、走行・旋回が重くなり騒音が出ます。"
           }
         },
         "buffs": {
-          "engineOil": "?? +5%?45?",
-          "engineOilFilter": "?? +5%?1??",
-          "hydraulicOil": "?? +5%?1??30?",
-          "hydraulicFilter": "???? +8%?2??",
-          "fuelFilter": "???? +8%?4??",
-          "gearOil": "???? +8%?8??"
+          "engineOil": "敏捷 +5% · 45分",
+          "engineOilFilter": "敏捷 +5% · 1時間",
+          "hydraulicOil": "敏捷 +5% · 1時間30分",
+          "hydraulicFilter": "力・忍耐 +8% · 2時間",
+          "fuelFilter": "力・忍耐 +8% · 4時間",
+          "gearOil": "力・忍耐 +8% · 8時間"
         }
       }
     },
     "monument": {
-      "title": "YK??????",
-      "upgrade": "?????",
-      "points": "??????????",
-      "close": "??????????",
-      "rewards": "??",
-      "rewardsAwaiting": "????",
-      "next": "??",
+      "title": "YKモニュメント",
+      "upgrade": "アップグレード",
+      "points": "モニュメントポイント",
+      "close": "モニュメントを閉じる",
+      "rewards": "報酬",
+      "rewardsAwaiting": "受取待ち",
+      "next": "次回",
       "minutes": "{value}?",
       "seconds": "{value}?",
-      "storageFull": "???????",
-      "claim": "??",
+      "storageFull": "保管がいっぱい",
+      "claim": "受取",
       "tabs": {
-        "quest": "???",
-        "upgrade": "?????",
-        "shop": "??"
+        "quest": "クエスト",
+        "upgrade": "アップグレード",
+        "shop": "ショップ"
       },
-      "unclaimedRewards": "??? ?? {count}?",
-      "constructionMissions": "???????",
-      "constructionMissionNote": "???????????????????????",
-      "questsTitle": "??????????",
-      "questRewardNote": "???????????????????????",
+      "unclaimedRewards": "未受取の報酬 {count}件",
+      "constructionMissions": "建設ミッション",
+      "constructionMissionNote": "基本ミッションを達成すると建設を開始できます",
+      "questsTitle": "モニュメントクエスト",
+      "questRewardNote": "達成報酬はモニュメントポイントで支給されます",
       "tags": {
-        "build": "??",
-        "daily": "??",
-        "repeat": "??"
+        "build": "建設",
+        "daily": "デイリー",
+        "repeat": "リピート"
       },
-      "done": "??",
-      "claimed": "????",
-      "startConstruction": "?????60??",
-      "constructionInProgress": "???",
-      "constructionInProgressNote": "??????????????????????????",
-      "constructionComplete": "??????????",
-      "completeConstruction": "????",
-      "levelRequirement": "???{level}???",
-      "instantComplete": "????",
-      "insufficient": "????",
-      "weeklyReset": "??????{limit}?????0?(KST)????",
-      "thisWeek": "?? {count}/{limit}",
-      "purchaseConfirmation": "????",
-      "purchasePrompt": "{item}????????",
-      "consume": "??",
-      "cancel": "??",
-      "purchase": "??",
-      "acquiredResult": "????",
-      "confirm": "??",
-      "upgradeConfirmation": "?????????",
-      "duration": "????",
+      "done": "完了",
+      "claimed": "受取済み",
+      "startConstruction": "建設開始（60分）",
+      "constructionInProgress": "建設中",
+      "constructionInProgressNote": "時間が終わったら近くで建設完了を押してください。",
+      "constructionComplete": "建設が完了しました！",
+      "completeConstruction": "建設完了",
+      "levelRequirement": "レベル{level}が必要",
+      "instantComplete": "即時完了",
+      "insufficient": "（不足）",
+      "weeklyReset": "商品ごと週{limit}回・月曜0時(KST)リセット",
+      "thisWeek": "今週 {count}/{limit}",
+      "purchaseConfirmation": "購入確認",
+      "purchasePrompt": "{item}を購入しますか？",
+      "consume": "消費",
+      "cancel": "キャンセル",
+      "purchase": "購入",
+      "acquiredResult": "獲得結果",
+      "confirm": "確認",
+      "upgradeConfirmation": "アップグレード確認",
+      "duration": "所要時間",
       "catalog": {
         "upgrades": {
           "storage_cap": {
-            "label": "?????"
+            "label": "最大保管量"
           },
           "prod_speed": {
-            "label": "????"
+            "label": "生産速度"
           }
         },
         "questMetrics": {
-          "soilDump": "?????? {target}",
-          "dumpTruckDepart": "????????{target}???",
-          "asphaltBreak": "?? {target}?",
-          "haulTruckDepart": "??????{target}???",
-          "rockDump": "?????? {target}?",
-          "travel": "???? {target}m"
+          "soilDump": "土の荷降ろし {target}",
+          "dumpTruckDepart": "ダンプトラック {target}回 出発",
+          "asphaltBreak": "破砕 {target}個",
+          "haulTruckDepart": "石トラック {target}回 出発",
+          "rockDump": "石の荷降ろし {target}個",
+          "travel": "走行距離 {target}m"
         }
-      }
+      },
+      "secondsPreview": "{from}秒 → {to}秒"
     },
     "controlsGuide": {
       "title": "操作ガイド",
@@ -988,6 +1213,16 @@
         "repair": "整備",
         "monument": "モニュメント",
         "sports": "運動会"
+      },
+      "teleport": {
+        "eyebrow": "ファストトラベル",
+        "title": "{destination}へ瞬間移動しますか？",
+        "description": "現在地から選択した現場へすぐに移動します。",
+        "costAria": "瞬間移動の費用：10スター",
+        "insufficient": "スターが足りません。",
+        "cancel": "キャンセル",
+        "confirm": "瞬間移動",
+        "moving": "移動中…"
       }
     },
     "sportsMeet": {
@@ -1045,7 +1280,7 @@
         "heavy": "大型"
       },
       "weight": "{weight}kg",
-      "defaultTrait": "標準支給・キャノピー",
+      "defaultTrait": "全国トップの販売実績を誇るYK建機の代表機",
       "bonusPointsTitle": "配分可能なボーナスポイント",
       "bonus": "ボーナス {points}",
       "save": "保存",
@@ -1329,6 +1564,65 @@
           }
         }
       }
+    },
+    "scene": {
+      "navGuide": {
+        "dig": "土山",
+        "dump": "荷下ろし",
+        "crash": "破砕",
+        "stone": "石材"
+      },
+      "digZone": "土山",
+      "digZoneNumbered": "土山 {index}",
+      "digZoneStatus": "{label} · 土 {remaining} / {capacity}",
+      "dumpZone": "荷下ろし",
+      "soilUnload": "土の荷下ろし",
+      "truckReturn": "帰還 {time}",
+      "tierExpand": "Lv.{level} 作業場拡張",
+      "levelUpBurst": "レベル{level}",
+      "crashZone": "路面破砕作業区域",
+      "crashZoneRespawn": "路面破砕 · リジェン {time}",
+      "hillZone": "石材",
+      "hillZoneCount": "石材 · {count}",
+      "hillZoneRespawn": "石材 · リジェン {time}",
+      "hillUnload": "石材荷下ろし場",
+      "floodZone": "水害復旧",
+      "floodZoneFill": "水害復旧 · {current}/{capacity}",
+      "floodZoneRespawn": "水害復旧 · リジェン {time}",
+      "floodLeaveIncinerator": "焼却場の外へ移動してください",
+      "floodBurning": "焼却中 · {percent}%",
+      "floodCollection": "集結 {current}/{capacity}",
+      "floodIncinerator": "焼却場 {current}/{capacity}"
+    },
+    "sitePrompt": {
+      "monument": "モニュメント",
+      "monumentEnter": "モニュメント入場",
+      "monumentEnterAria": "モニュメント入場、受取可能スター {stars}",
+      "monumentQuest": "ミッション確認",
+      "monumentBuilding": "建設状況",
+      "monumentClaimStars": "スター受取 {stars}",
+      "monumentComplete": "建設完了",
+      "sportsMeetEnter": "運動会入場",
+      "sportsMeetEnterAria": "運動会入場、入場券 {remaining}/{limit}",
+      "serviceBrand": "YK建機",
+      "serviceLabel": "サービス拠点",
+      "serviceAria": "YK建機サービス拠点を開く",
+      "serviceAriaClaimable": "YK建機サービス拠点を開く、交換可能 {count}件",
+      "workshopManage": "管理する",
+      "workshopOpenAria": "{name} を開く",
+      "workshopOpenAriaClaimable": "{name} を開く、完了クエスト {count}件"
+    }
+  },
+  "home": {
+    "profile": {
+      "ariaLabel": "プレイヤープロフィール",
+      "player": "プレイヤー",
+      "logout": "ログアウト",
+      "currencyStars": "保有スター（通貨）",
+      "totalStars": "獲得スター合計",
+      "score": "スコア",
+      "scoreUnit": "点",
+      "ranking": "ランキング"
     }
   }
 }

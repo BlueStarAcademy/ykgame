@@ -21,6 +21,7 @@ import {
   DUMP_TRUCK_ENGINE_START_DURATION_SEC,
 } from "@/games/yanmar/dumpTruckState";
 import {
+  DISMANTLE_JACKPOT_BASE_CHANCE,
   getEnhanceCost,
   getEnhanceCoreCost,
   getEnhanceSuccessRate,
@@ -91,7 +92,7 @@ export function getGameProbabilityReport() {
           label: "기본 획득 판정",
           value: pct(WORK_GEAR_DROP_BASE_CHANCE),
           detail:
-            "흙 하역 / 파쇄 / 돌 하역 / 트럭 만재 시 독립 판정 · 마스터 옵션 보유 시 상대 +10%",
+            "흙 하역 / 파쇄 / 돌 하역 / 수해복구 / 트럭 만재 시 독립 판정 · 마스터 옵션 보유 시 상대 +10%",
         },
         {
           label: "등급 확률 (성공 시)",
@@ -196,6 +197,12 @@ export function getGameProbabilityReport() {
             columns: ["등급", "코어(+0~+10)"],
             rows: dismantleRows,
           },
+        },
+        {
+          label: "분해 대박",
+          value: pct(DISMANTLE_JACKPOT_BASE_CHANCE, 0),
+          detail:
+            "장비마다 독립 판정 · 대박 시 기본코어×2 · 장착 마스터 옵션으로 대박확률 +10~20%p / 대박 시 코어 추가 +20~50% (2배 후 적용, 서버 RNG)",
         },
         {
           label: "마일스톤",

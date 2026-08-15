@@ -89,9 +89,20 @@ export async function POST(request: Request) {
           }
 
           const rolled = sportsMeetStarRewardFromEventId(eventId);
+          const { ensureYanmarGearMigration } = await import(
+            "@/games/yanmar/gearMigrate"
+          );
+          await ensureYanmarGearMigration(tx, session.user.id);
+          const { loadUserFinalStats, applySportsMeetStarRewardBonus } =
+            await import("@/games/yanmar/gearService");
+          const loaded = await loadUserFinalStats(tx, session.user.id);
+          const stars = applySportsMeetStarRewardBonus(
+            rolled,
+            loaded.stats.sportsMeetStarRewardPct ?? 0,
+          );
           const { next, granted } = cappedCurrencyIncrement(
             user.currency,
-            rolled,
+            stars,
           );
           const updated = await tx.user.update({
             where: { id: session.user.id },

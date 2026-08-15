@@ -66,6 +66,18 @@
     "loadingGameInfo": "정보 불러오는 중",
     "loginWithDifferentAccount": "다른 아이디로 로그인"
   },
+  "siteLegendLegal": {
+    "titleAlt": "현장전설",
+    "linksAriaLabel": "약관 및 정책",
+    "privacy": "개인정보처리방침",
+    "terms": "이용약관",
+    "email": "이메일주소 무단수집거부",
+    "close": "닫기",
+    "address": "경기도 안양시 만안구 경수대로 1357",
+    "businessNumber": "사업자번호 : 119-81-30845",
+    "representative": "대표자 : 채호선",
+    "copyright": "Copyright © sunnyyk.co.kr All rights reserved."
+  },
   "landing": {
     "heroTitle": "중장비 체험존",
     "gameExperience": "게임 체험",
@@ -97,7 +109,13 @@
     "iosInstallStep3": "이름 확인 후 추가를 누르면 YK게임 아이콘이 생성됩니다",
     "addToHomeTitle": "홈 추가 방법",
     "addToHomeDescription": "브라우저 메뉴에서 앱 설치 또는 홈 화면에 추가를 선택하면 YK게임 아이콘이 홈 화면에 생성됩니다.",
-    "generatingQr": "QR 생성 중..."
+    "generatingQr": "QR 생성 중...",
+    "webExperience": {
+      "title": "모바일 QR 체험",
+      "lead": "스마트폰으로 스캔하면 로그인 화면이 열립니다",
+      "steps": "QR → 로그인 → 체험 입장",
+      "description": "스캔 후 장비 선택 화면으로 이동합니다. 별도 설치 없이 브라우저에서 바로 체험합니다. iPhone은 Safari 공유 → 홈 화면에 추가 후 앱처럼 이용할 수 있습니다."
+    }
   },
   "shell": {
     "menu": "메뉴",
@@ -137,7 +155,9 @@
       "expired": "유효기간이 만료되었습니다",
       "noBarcode": "바코드를 표시할 수 없습니다",
       "expiresAt": "유효기간 {date}",
-      "exchange": "교환"
+      "exchange": "교환",
+      "used": "사용됨",
+      "daysLeft": "{days}일 남음"
     },
     "coupons": {
       "YK_PARTS_DISCOUNT": "YK건기 부품 할인권",
@@ -166,7 +186,11 @@
       "emojiPickerAriaLabel": "이모지 선택",
       "inputAvailableAfter": "{seconds}초 후 입력 가능",
       "messagePlaceholder": "메시지 입력",
-      "send": "전송"
+      "send": "전송",
+      "profileTitle": "프로필",
+      "profileChassis": "차체",
+      "profileLoading": "프로필을 불러오는 중…",
+      "profileLoadFailed": "프로필을 불러오지 못했습니다."
     },
     "inquiry": {
       "title": "고객문의",
@@ -252,7 +276,8 @@
       "seasonTop10": "Top 10 · 시즌 누적 점수",
       "loading": "불러오는 중…",
       "sportsMyRank": "내 순위 {rank}위",
-      "reward": "보상 {stars}★"
+      "reward": "보상 {stars}★",
+      "rankValue": "{rank}위"
     },
     "immersive": {
       "exit": "종료",
@@ -283,10 +308,26 @@
       "logout": "로그아웃",
       "admin": "관리",
       "inquiry": "고객문의",
-      "language": "언어"
+      "language": "언어",
+      "detailedSettings": "상세 설정"
     },
     "ads": {
       "rewardHint": "보상 보기",
+      "remainingTime": "남은 시간",
+      "rewardAfterSeconds": "{seconds}초 후 보상 획득",
+      "oneOfRewards": "아래 보상 중 한 가지 획득",
+      "count": "{count}개",
+      "seconds": "{seconds}초",
+      "close": "닫기",
+      "cancel": "취소",
+      "claim": "보상받기",
+      "granting": "지급 중…",
+      "closeWithoutReward": "보상을 받지 않고 창을 닫으시겠습니까?",
+      "rewardDialogAria": "광고 보상",
+      "rewardAcquired": "보상 획득!",
+      "drawingReward": "보상 추첨 중",
+      "stop": "멈춤",
+      "confirm": "확인",
       "m15": {
         "teaserTitle": "SV10·SV11 출시!",
         "teaserSub": "탭하고 보상 받기",
@@ -312,6 +353,20 @@
         "ariaLabel": "존디어 순정 부품 20% 인하 광고"
       }
     },
+    "maintenanceRoulette": {
+      "stars": "스타 +{amount}",
+      "points": "{pointKind} +{amount}",
+      "enhanceCore": "강화코어 +{amount}",
+      "standardTicketCount": "일반 뽑기권 {count}개",
+      "premiumTicketCount": "고급 뽑기권 {count}개",
+      "exchangeReward": "교환 보상",
+      "count": "{count}개",
+      "drawingReward": "보상 뽑기",
+      "rewardAcquired": "교환 보상 획득!",
+      "allRewards": "획득한 전체 보상",
+      "stop": "멈춤",
+      "confirm": "확인"
+    },
     "hud": {
       "engineOn": "시동 ON",
       "engineOff": "시동 OFF",
@@ -328,7 +383,50 @@
       "game": "게임",
       "pause": "일시정지",
       "resume": "계속",
-      "exit": "나가기"
+      "exit": "나가기",
+      "quest": "퀘스트",
+      "gear": "장비",
+      "shop": "상점",
+      "tutorial": "튜토리얼",
+      "questLocked": "퀘스트 잠김, 레벨 {level} 필요",
+      "questClose": "퀘스트 닫기",
+      "questOpen": "퀘스트 열기",
+      "questOpenClaimable": "퀘스트 열기, 미수령 보상 {count}개",
+      "gearLocked": "장비 잠김, 레벨 {level} 필요",
+      "gearClose": "장비강화 닫기",
+      "gearOpen": "장비강화 열기",
+      "shopClose": "상점 닫기",
+      "shopOpen": "상점 열기",
+      "shopOpenFreeGacha": "상점 열기, 무료 뽑기 가능",
+      "rideExperience": "탑승 체험 · 실제 조작 시뮬레이터",
+      "status": {
+        "currentLoad": "현재 적재량",
+        "canDump": "하역가능",
+        "faceTruckBed": "정면을 짐칸으로",
+        "moveToTruck": "트럭에 차체 붙이기",
+        "canLoad": "적재가능({amount})",
+        "breakerVertical": "브레이커를 수직에 가깝게 세우세요.",
+        "canStrike": "타격가능",
+        "canGrab": "집게가능",
+        "alignGrapple": "버켓 각도를 집게와 맞추세요",
+        "openLeftPedal": "발판 왼쪽: 열기",
+        "soilSpilling": "흙 유실 — 버켓 말기",
+        "raiseBoomArm": "붐·암 들기",
+        "haulTruckFull": "돌트럭 만차 — 하역 위치에서 벗어나세요",
+        "floodLeaveIncinerator": "소각장 밖으로 이동하세요",
+        "floodBurning": "소각 중 · {percent}%",
+        "carryingTrash": "쓰레기 운반 중 — 소각장에 투입하세요",
+        "incinerator": "소각 {current}/{capacity}",
+        "collection": "집결 {current}/{capacity}"
+      }
+    },
+    "gameHud": {
+      "score": "점수",
+      "cumulativeScore": "누적 점수",
+      "camera": "카메라{mode}",
+      "cameraAria": "카메라 {mode}번 시점",
+      "respawnWait": "리젠 대기",
+      "monument": "조형물"
     },
     "toasts": {
       "inventoryFullTitle": "인벤토리 공간이 부족합니다.",
@@ -498,9 +596,12 @@
       "dismantleConfirmTitle": "정말 분해할까요?",
       "expectedGain": "예상 획득",
       "dismantleWarn": "분해한 장비는 되돌릴 수 없습니다.",
+      "dismantleJackpotChance": "대박확률",
       "closeDismantleResult": "분해 결과 닫기",
       "dismantleDoneEyebrow": "분해 완료",
       "dismantleDoneTitle": "장비를 분해했습니다",
+      "dismantleJackpot": "대박! 강화코어 추가 +{bonus}",
+      "bulkDismantleJackpot": "대박 ×{count}! 강화코어 추가 +{bonus}",
       "gained": "획득",
       "enhanceCore": "강화코어",
       "closeSellConfirm": "판매 확인 닫기",
@@ -568,7 +669,16 @@
       "boomSwing": "붐스윙",
       "travel": "주행",
       "pedalBreaker": "브레이커",
-      "pedalGrapple": "집게"
+      "pedalGrapple": "집게",
+      "autoClose": "닫기",
+      "autoEdit": "편집",
+      "autoEditTitle": "실행 이름 편집",
+      "autoEditHint": "실행 버튼 이름을 {min}~{max}글자로 설정할 수 있습니다.",
+      "autoExecute": "실행{slot}",
+      "autoSave": "저장",
+      "autoSaveSlot": "저장{slot}",
+      "autoCancel": "취소",
+      "autoLabelValidation": "실행{slot} 이름은 {min}~{max}글자로 입력하세요."
     },
     "quest": {
       "title": "퀘스트",
@@ -576,6 +686,16 @@
       "claimed": "완료",
       "progress": "진행",
       "empty": "진행 중인 퀘스트가 없습니다",
+      "missionTasks": {
+        "soilDump": "흙 하역 {target}",
+        "asphaltBreak": "파쇄 {target}개",
+        "rockLoad": "돌 적재 성공 {target}회",
+        "horn": "경적 {target}회",
+        "swing180": "상부 180° 회전 {target}회",
+        "travel": "주행거리 {target}m",
+        "dumpTruckDepart": "덤프트럭 보내기 {target}회",
+        "haulTruckDepart": "돌트럭 보내기 {target}회"
+      },
       "defs": {
         "repeat-soil-dump-10000": "흙 하역하기 {target}",
         "repeat-asphalt-10": "파쇄하기 {target}개",
@@ -589,6 +709,7 @@
         "daily-travel-3000": "주행거리 {target}m",
         "daily-asphalt-9": "파쇄하기 {target}회",
         "daily-rock-load-5": "돌 적재 성공하기 {target}회",
+        "daily-gear-gacha-5": "장비뽑기 {target}회",
         "daily-gear-enhance-3": "장비 강화 시도하기 {target}회",
         "daily-gear-dismantle-5": "장비 분해하기 {target}개",
         "daily-gear-synthesize-1": "장비 합성 시도하기 {target}회",
@@ -597,6 +718,59 @@
         "daily-sports-ranked-1": "운동회 랭킹전 참여하기 {target}회",
         "daily-all-complete": "일일 퀘스트 {target}개 완료하기",
         "daily-mission-clear-3": "미션퀘스트 {target}회 완료하기"
+      },
+      "close": "퀘스트 닫기",
+      "rewards": "보상",
+      "rewardsAwaiting": "수령 대기 중인 보상",
+      "unclaimedRewards": "미수령 보상 {count}개",
+      "reset": "초기화",
+      "resetCountdown": "일일 퀘스트 초기화까지 남은 시간",
+      "tabs": {
+        "daily": "일일",
+        "mission": "미션",
+        "repeat": "반복"
+      },
+      "tags": {
+        "required": "필수",
+        "optional": "선택",
+        "bonus": "보너스"
+      },
+      "todayProgress": "오늘 달성",
+      "missionProgress": "미션 진행",
+      "repeatQuests": "반복 퀘스트",
+      "repeatNote": "완료할 때마다 다시 도전할 수 있습니다",
+      "claimedToday": "오늘 {count}회 수령",
+      "loading": "퀘스트 정보를 불러오는 중입니다",
+      "loadingHint": "잠시 후 다시 확인해 주세요.",
+      "missionsComplete": "미션 퀘스트 완료",
+      "missionsCompleteHint": "초기화 후 새로운 미션이 배정됩니다.",
+      "missionRound": "미션 {current}/{total}",
+      "missionComplete": "미션 완료",
+      "collapseMission": "미션 패널 접기",
+      "expandMission": "미션 패널 펼치기",
+      "difficulty": "난이도",
+      "difficultyValue": "난이도 {value}",
+      "clearRewards": "클리어 보상",
+      "goals": "목표",
+      "claimMission": "미션 보상 받기",
+      "claimRewards": "보상 받기",
+      "claiming": "받는 중",
+      "claimingShort": "수령 중",
+      "nextMissionHint": "모든 목표를 달성하면 다음 미션이 열립니다.",
+      "noRewards": "보상 없음",
+      "progressAria": "{title} 진행도",
+      "goalReached": "목표 달성",
+      "remaining": "남은 {count}",
+      "done": "완료",
+      "inProgress": "진행 중",
+      "scoreUnit": "점",
+      "rewardLabels": {
+        "xp": "경험치",
+        "stars": "스타",
+        "score": "점수",
+        "enhanceCore": "강화코어",
+        "standardTicket": "일반 뽑기권",
+        "premiumTicket": "고급 뽑기권"
       }
     },
     "shop": {
@@ -632,266 +806,317 @@
           "name": "랭커의의지",
           "effect": "점수 2배 확률 35%"
         }
+      },
+      "close": "상점 닫기",
+      "gacha": {
+        "gearTab": "장비",
+        "buffTab": "버프",
+        "standardTitle": "일반 뽑기",
+        "premiumTitle": "고급 뽑기",
+        "standardDraw": "기본 장비 뽑기",
+        "premiumChanceUp": "고급 등급 확률 업",
+        "availableGrades": "등장 등급",
+        "grades": {
+          "normal": "일반",
+          "enhanced": "강화",
+          "precision": "정밀",
+          "master": "마스터"
+        },
+        "ownedTickets": "보유 {count}",
+        "freePulls": "무료 {count}회",
+        "free": "무료",
+        "singlePull": "1회",
+        "tenPull": "10회",
+        "standardTicket": "일반 뽑기권",
+        "premiumTicket": "고급 뽑기권"
       }
     },
     "workshop": {
-      "title": "???",
-      "upgrade": "?????",
+      "title": "작업장",
+      "upgrade": "업그레이드",
       "level": "Lv.{level}",
-      "close": "??? ??",
-      "rewards": "??",
-      "rewardsAwaiting": "?? ??",
-      "unclaimedRewards": "??? ?? {count}?",
+      "close": "작업장 닫기",
+      "rewards": "보상",
+      "rewardsAwaiting": "수령 대기",
+      "unclaimedRewards": "미수령 보상 {count}개",
       "tabs": {
-        "quest": "???",
-        "upgrade": "?????",
-        "shop": "??"
+        "quest": "퀘스트",
+        "upgrade": "업그레이드",
+        "shop": "상점"
       },
-      "questsTitle": "??? ???",
-      "questRewardNote": "?? ??? ??? ???? ?????",
-      "oneUpgradeAtATime": "??? 1?? ??? ? ????",
-      "owned": "??",
-      "shopTitle": "??? ??",
-      "weeklyReset": "??? ?? {limit}? ? ??? 0?(KST) ??",
+      "questsTitle": "작업장 퀘스트",
+      "questRewardNote": "완료 보상은 작업장 포인트로 지급됩니다",
+      "signQuestComplete": "퀘스트완료",
+      "oneUpgradeAtATime": "동시에 1개만 진행할 수 있습니다",
+      "owned": "보유",
+      "shopTitle": "작업장 상점",
+      "weeklyReset": "상품당 주간 {limit}회 · 월요일 0시(KST) 리셋",
       "tags": {
-        "daily": "??",
-        "repeat": "??"
+        "daily": "일일",
+        "repeat": "반복"
       },
-      "claimed": "???",
-      "done": "??",
-      "levelRequirement": "???? {level}",
-      "instantComplete": "????",
-      "insufficient": " (??)",
-      "thisWeek": "?? ? {count}/{limit}",
-      "purchaseConfirmation": "?? ??",
-      "purchasePrompt": "{item}?(?) ?????????",
-      "consume": "??",
-      "cancel": "??",
-      "purchase": "??",
-      "acquiredResult": "?? ??",
-      "confirm": "??",
-      "upgradeConfirmation": "????? ??",
-      "duration": "?? ??",
-      "instantCompleteConfirmation": "???? ??",
-      "secondsPreview": "{from}? ? {to}?",
-      "capacityPreview": "{from} ? {to} (?? {base})",
-      "countPreview": "{from}? ? {to}? (?? {base})",
+      "claimed": "수령됨",
+      "done": "완료",
+      "levelRequirement": "레벨제한 {level}",
+      "instantComplete": "즉시완료",
+      "insufficient": " (부족)",
+      "thisWeek": "이번 주 {count}/{limit}",
+      "purchaseConfirmation": "구매 확인",
+      "purchasePrompt": "{item}을(를) 구매하시겠습니까?",
+      "consume": "소모",
+      "cancel": "취소",
+      "purchase": "구매",
+      "acquiredResult": "획득 결과",
+      "confirm": "확인",
+      "upgradeConfirmation": "업그레이드 확인",
+      "duration": "소요 시간",
+      "instantCompleteConfirmation": "즉시완료 확인",
+      "secondsPreview": "{from}초 → {to}초",
+      "capacityPreview": "{from} → {to} (기본 {base})",
+      "countPreview": "{from}개 → {to}개 (기본 {base})",
       "catalog": {
         "workshops": {
           "dump": {
-            "label": "? ???",
-            "pointsLabel": "??? ???"
+            "label": "흙 하역장",
+            "pointsLabel": "하역장 포인트"
           },
           "crash": {
-            "label": "???? ???",
-            "pointsLabel": "???? ???"
+            "label": "브레이커 작업장",
+            "pointsLabel": "브레이커 포인트"
           },
           "hill": {
-            "label": "? ???",
-            "pointsLabel": "? ??? ???"
+            "label": "돌 하역장",
+            "pointsLabel": "돌 하역장 포인트"
+          },
+          "flood": {
+            "label": "수해복구 작업장",
+            "pointsLabel": "수해복구 포인트"
           }
         },
         "upgrades": {
           "truck_capacity": {
-            "label": "?? ???",
-            "description": "???? ?? ??? ??"
+            "label": "덤프 적재량",
+            "description": "덤프트럭 최대 하역량 증가"
           },
           "truck_cooldown": {
-            "label": "?? ????",
-            "description": "???? ?? ???? ??"
+            "label": "덤프 복귀시간",
+            "description": "덤프트럭 복귀 대기시간 감소"
           },
           "haul_capacity": {
-            "label": "??? ???",
-            "description": "? ?? ?? ?? +1"
+            "label": "돌트럭 적재량",
+            "description": "돌 트럭 적재 한도 +1"
           },
           "haul_cooldown": {
-            "label": "??? ????",
-            "description": "? ?? ?? ???? ??"
+            "label": "돌트럭 복귀시간",
+            "description": "돌 트럭 복귀 대기시간 감소"
           },
           "breaker_power": {
-            "label": "???? ??",
-            "description": "???? ??? +10%"
+            "label": "브레이커 파워",
+            "description": "브레이커 데미지 +10%"
           },
           "score_rank": {
-            "label": "?? ??",
-            "description": "?? ?? ?? +10%"
+            "label": "작업 랭커",
+            "description": "작업 완료 점수 +10%"
           },
           "xp_expert": {
-            "label": "?? ???",
-            "description": "?? ?? ??? +5%"
+            "label": "작업 숙련자",
+            "description": "작업 완료 경험치 +5%"
           },
           "lucky_drop": {
-            "label": "??? ???",
-            "description": "?? ?? ?? +1%p"
+            "label": "행운의 작업자",
+            "description": "장비 획득 확률 +1%p"
           },
           "rock_appraiser": {
-            "label": "? ???",
-            "description": "? ?? ? +1?"
+            "label": "돌 감정사",
+            "description": "돌 지역 돌 +1개"
+          },
+          "cleaning_master": {
+            "label": "청소의 달인",
+            "description": "블레이드 집결량 +5%"
+          },
+          "incinerator_power": {
+            "label": "소각장 화력",
+            "description": "소각 시간 -10초"
+          },
+          "incinerator_capacity": {
+            "label": "소각장 확장",
+            "description": "소각장 총량 +500"
           }
         },
         "quests": {
-          "dump-daily-soil-8000": "? ?? 8,000",
-          "dump-daily-truck-2": "???? ?? 2?",
-          "dump-repeat-soil-4000": "? ?? 4,000",
-          "crash-daily-asphalt-9": "?? 9?",
-          "crash-daily-asphalt-18": "?? 18?",
-          "crash-repeat-asphalt-3": "?? 3?",
-          "hill-daily-rock-5": "? ?? 5?",
-          "hill-daily-haul-1": "???? ?? 1?",
-          "hill-repeat-rock-2": "? ?? 2?"
+          "dump-daily-soil-8000": "흙 하역 8,000",
+          "dump-daily-truck-2": "덤프트럭 출발 2회",
+          "dump-repeat-soil-4000": "흙 하역 4,000",
+          "crash-daily-asphalt-9": "파쇄 9개",
+          "crash-daily-asphalt-18": "파쇄 18개",
+          "crash-repeat-asphalt-3": "파쇄 3개",
+          "hill-daily-rock-5": "돌 하역 5개",
+          "hill-daily-haul-1": "운반트럭 출발 1회",
+          "hill-repeat-rock-2": "돌 하역 2개",
+          "flood-daily-collect-3000": "쓰레기 집결 3,000",
+          "flood-daily-grapple-3": "집게 적재 성공 3회",
+          "flood-repeat-burn-1000": "쓰레기 소각 1,000"
         },
         "shop": {
           "ticket_standard": {
-            "label": "?? ???",
-            "description": "?? ? 1~5? ?? ??"
+            "label": "일반 뽑기권",
+            "description": "구매 시 1~5개 랜덤 획득"
           },
           "ticket_premium": {
-            "label": "?? ???",
-            "description": "?? ? 1~3? ?? ??"
+            "label": "고급 뽑기권",
+            "description": "구매 시 1~3개 랜덤 획득"
           },
           "enhance_core": {
-            "label": "????",
-            "description": "?? ? 1~10? ?? ??"
+            "label": "강화코어",
+            "description": "구매 시 1~10개 랜덤 획득"
           }
         }
       }
     },
     "repair": {
-      "title": "??",
-      "repair": "??",
-      "free": "??",
-      "durability": "???",
-      "close": "?? ??",
-      "exchangeAvailable": "?? ??",
-      "expiringSoon": "? ??",
-      "normal": "??",
-      "rewardRange": "?? ?? ??",
-      "stars": "??",
-      "enhanceCore": "????",
-      "standardTicket": "?? ???",
-      "premiumTicket": "?? ???",
+      "title": "정비소",
+      "repair": "정비",
+      "free": "무료",
+      "durability": "내구도",
+      "close": "정비소 닫기",
+      "exchangeAvailable": "교환 가능",
+      "expiringSoon": "곧 만료",
+      "normal": "정상",
+      "rewardRange": "교환 보상 범위",
+      "stars": "스타",
+      "enhanceCore": "강화코어",
+      "standardTicket": "일반 뽑기권",
+      "premiumTicket": "고급 뽑기권",
       "gaugeLabel": "{fluid} {percent}%",
-      "exchangeRewards": "?? ? ??",
-      "exchange": "????",
-      "waiting": "?? ?",
-      "cancel": "??",
-      "cycleHours": "?? ?? {hours}??",
-      "items": "?",
+      "exchangeRewards": "교환 시 보상",
+      "exchange": "교환하기",
+      "waiting": "대기 중",
+      "cancel": "취소",
+      "cycleHours": "교환 주기 {hours}시간",
+      "items": "개",
+      "statusClose": "소모품 안내 닫기",
+      "statusEyebrow": "YK건기 정비소",
+      "statusTitle": "소모품 교환 안내",
+      "remaining": "남은 {time}",
+      "exchangeNow": "교환",
+      "statusHint": "교환은 현장 정비소(서비스지점)에서 진행할 수 있습니다.",
+      "confirm": "확인",
       "catalog": {
         "pointKinds": {
-          "dump": "?? ???",
-          "crash": "???? ???",
-          "hill": "??? ???",
-          "monument": "??? ???"
+          "dump": "하역 포인트",
+          "crash": "브레이커 포인트",
+          "hill": "돌하역 포인트",
+          "monument": "조형물 포인트"
         },
         "fluids": {
           "engineOil": {
-            "label": "????",
-            "blurb": "?? ??? ??? ?? ?? ?? ??????.",
-            "whyReplace": "???? ??? ??? ?????? ???? ?? ??? ????."
+            "label": "엔진오일",
+            "blurb": "엔진 마찰을 줄이고 열을 식혀 주는 윤활유입니다.",
+            "whyReplace": "오래되면 점도가 무너져 출력·연비가 떨어지고 과열 위험이 커집니다."
           },
           "engineOilFilter": {
-            "label": "??????",
-            "blurb": "???? ? ???????? ?? ?? ?????.",
-            "whyReplace": "??? ?? ??? ??? ?? ??? ?? ??? ?????."
+            "label": "엔진오일필터",
+            "blurb": "엔진오일 속 금속분·불순물을 걸러 주는 필터입니다.",
+            "whyReplace": "막히면 오일 순환이 나빠져 엔진 마모와 응답 저하가 빨라집니다."
           },
           "hydraulicOil": {
-            "label": "???",
-            "blurb": "??????? ???? ?? ??? ??????.",
-            "whyReplace": "???? ?? ??? ? ?? ??????? ?? ?????."
+            "label": "유압유",
+            "blurb": "붐·암·버켓을 움직이는 유압 장치의 작동유입니다.",
+            "whyReplace": "열화되면 압력 손실이 나 작업 속도·브레이커 힘이 약해집니다."
           },
           "hydraulicFilter": {
-            "label": "????",
-            "blurb": "??? ? ???? ?? ?????? ?????.",
-            "whyReplace": "??? ?? ??? ?????? ?? ?????? ?????."
+            "label": "유압필터",
+            "blurb": "유압유 속 이물질을 막아 밸브·펌프를 보호합니다.",
+            "whyReplace": "막히면 유압 회로가 불안정해지고 정밀 조작·출력이 흔들립니다."
           },
           "fuelFilter": {
-            "label": "????",
-            "blurb": "?? ? ??????? ?? ??? ??? ??? ????.",
-            "whyReplace": "??? ?? ??? ????? ????? ??? ?????."
+            "label": "연료필터",
+            "blurb": "연료 속 수분·찌꺼기를 걸러 엔진에 깨끗한 연료를 보냅니다.",
+            "whyReplace": "막히면 연료 공급이 들쭉날쭉해 주행·작업 응답이 둔해집니다."
           },
           "gearOil": {
-            "label": "????",
-            "blurb": "????? ????? ??? ???? ?? ?? ?? ???.",
-            "whyReplace": "????? ? ?? ??? ?? ?????? ??? ??? ???."
+            "label": "기어오일",
+            "blurb": "주행·선회 기어박스의 마찰과 충격으로 받는 힘을 막아 줍니다.",
+            "whyReplace": "부족·열화 시 기어 마모가 커져 주행·선회가 무겁고 소음이 납니다."
           }
         },
         "buffs": {
-          "engineOil": "?? +5% ? 45?",
-          "engineOilFilter": "?? +5% ? 1??",
-          "hydraulicOil": "?? +5% ? 1?? 30?",
-          "hydraulicFilter": "???? +8% ? 2??",
-          "fuelFilter": "???? +8% ? 4??",
-          "gearOil": "???? +8% ? 8??"
+          "engineOil": "민첩 +5% · 45분",
+          "engineOilFilter": "민첩 +5% · 1시간",
+          "hydraulicOil": "민첩 +5% · 1시간 30분",
+          "hydraulicFilter": "힘·인내 +8% · 2시간",
+          "fuelFilter": "힘·인내 +8% · 4시간",
+          "gearOil": "힘·인내 +8% · 8시간"
         }
       }
     },
     "monument": {
-      "title": "YK ???",
-      "upgrade": "?????",
-      "points": "??? ???",
-      "close": "??? ??",
-      "rewards": "??",
-      "rewardsAwaiting": "?? ??",
-      "next": "??",
+      "title": "YK 조형물",
+      "upgrade": "업그레이드",
+      "points": "조형물 포인트",
+      "close": "조형물 닫기",
+      "rewards": "보상",
+      "rewardsAwaiting": "수령 대기",
+      "next": "다음",
       "minutes": "{value}?",
       "seconds": "{value}?",
-      "storageFull": "?? ?? ?",
-      "claim": "??",
+      "storageFull": "저장 가득 참",
+      "claim": "수령",
       "tabs": {
-        "quest": "???",
-        "upgrade": "?????",
-        "shop": "??"
+        "quest": "퀘스트",
+        "upgrade": "업그레이드",
+        "shop": "상점"
       },
-      "unclaimedRewards": "??? ?? {count}?",
-      "constructionMissions": "?? ??",
-      "constructionMissionNote": "?? ??? ???? ??? ??? ? ????",
-      "questsTitle": "??? ???",
-      "questRewardNote": "?? ??? ??? ???? ?????",
+      "unclaimedRewards": "미수령 보상 {count}개",
+      "constructionMissions": "건설 미션",
+      "constructionMissionNote": "기본 미션을 완료하면 건설을 시작할 수 있습니다",
+      "questsTitle": "조형물 퀘스트",
+      "questRewardNote": "완료 보상은 조형물 포인트로 지급됩니다",
       "tags": {
-        "build": "??",
-        "daily": "??",
-        "repeat": "??"
+        "build": "건설",
+        "daily": "일일",
+        "repeat": "반복"
       },
-      "done": "??",
-      "claimed": "???",
-      "startConstruction": "?? ?? (60?)",
-      "constructionInProgress": "?? ?? ?",
-      "constructionInProgressNote": "??? ??? ????? ????? ?? ???.",
-      "constructionComplete": "??? ???????!",
-      "completeConstruction": "????",
-      "levelRequirement": "???? {level}",
-      "instantComplete": "????",
-      "insufficient": " (??)",
-      "weeklyReset": "??? ?? {limit}? ? ??? 0?(KST) ??",
-      "thisWeek": "?? ? {count}/{limit}",
-      "purchaseConfirmation": "?? ??",
-      "purchasePrompt": "{item}?(?) ?????????",
-      "consume": "??",
-      "cancel": "??",
-      "purchase": "??",
-      "acquiredResult": "?? ??",
-      "confirm": "??",
-      "upgradeConfirmation": "????? ??",
-      "duration": "?? ??",
+      "done": "완료",
+      "claimed": "수령됨",
+      "startConstruction": "건설 시작 (60분)",
+      "constructionInProgress": "건설 진행 중",
+      "constructionInProgressNote": "시간이 끝나면 가까이에서 건설완료를 눌러 주세요.",
+      "constructionComplete": "건설이 완료되었습니다!",
+      "completeConstruction": "건설완료",
+      "levelRequirement": "레벨제한 {level}",
+      "instantComplete": "즉시완료",
+      "insufficient": " (부족)",
+      "weeklyReset": "상품당 주간 {limit}회 · 월요일 0시(KST) 리셋",
+      "thisWeek": "이번 주 {count}/{limit}",
+      "purchaseConfirmation": "구매 확인",
+      "purchasePrompt": "{item}을(를) 구매하시겠습니까?",
+      "consume": "소모",
+      "cancel": "취소",
+      "purchase": "구매",
+      "acquiredResult": "획득 결과",
+      "confirm": "확인",
+      "upgradeConfirmation": "업그레이드 확인",
+      "duration": "소요 시간",
       "catalog": {
         "upgrades": {
           "storage_cap": {
-            "label": "?? ???"
+            "label": "최대 저장량"
           },
           "prod_speed": {
-            "label": "?? ??"
+            "label": "생산 속도"
           }
         },
         "questMetrics": {
-          "soilDump": "? ?? {target}",
-          "dumpTruckDepart": "???? {target}? ???",
-          "asphaltBreak": "?? {target}?",
-          "haulTruckDepart": "? ?? {target}? ???",
-          "rockDump": "? ?? {target}?",
-          "travel": "?? ?? {target}m"
+          "soilDump": "흙 하역 {target}",
+          "dumpTruckDepart": "덤프트럭 {target}회 보내기",
+          "asphaltBreak": "파쇄 {target}개",
+          "haulTruckDepart": "돌 트럭 {target}회 보내기",
+          "rockDump": "돌 하역 {target}개",
+          "travel": "주행 거리 {target}m"
         }
-      }
+      },
+      "secondsPreview": "{from}초 → {to}초"
     },
     "controlsGuide": {
       "title": "조작 가이드",
@@ -988,6 +1213,16 @@
         "repair": "정비",
         "monument": "조형물",
         "sports": "운동회"
+      },
+      "teleport": {
+        "eyebrow": "빠른 이동",
+        "title": "{destination}(으)로 순간이동할까요?",
+        "description": "현재 작업 위치에서 선택한 현장으로 즉시 이동합니다.",
+        "costAria": "순간이동 비용 10 스타",
+        "insufficient": "스타가 부족합니다.",
+        "cancel": "취소",
+        "confirm": "순간이동",
+        "moving": "이동 중…"
       }
     },
     "sportsMeet": {
@@ -1045,7 +1280,7 @@
         "heavy": "대형"
       },
       "weight": "{weight}kg",
-      "defaultTrait": "기본 지급·캐노피",
+      "defaultTrait": "전국 최고의 판매량을 보여주는 YK건기의 대표 굴착기",
       "bonusPointsTitle": "분배 가능 보너스 포인트",
       "bonus": "보너스 {points}",
       "save": "저장",
@@ -1329,6 +1564,65 @@
           }
         }
       }
+    },
+    "scene": {
+      "navGuide": {
+        "dig": "흙더미",
+        "dump": "하역",
+        "crash": "파쇄",
+        "stone": "석재"
+      },
+      "digZone": "흙더미",
+      "digZoneNumbered": "흙더미 {index}",
+      "digZoneStatus": "{label} · 흙 {remaining} / {capacity}",
+      "dumpZone": "하역",
+      "soilUnload": "흙 하역",
+      "truckReturn": "복귀 {time}",
+      "tierExpand": "Lv.{level} 작업장 확장",
+      "levelUpBurst": "{level}레벨",
+      "crashZone": "노면 파쇄 작업구역",
+      "crashZoneRespawn": "노면 파쇄 · 리젠 {time}",
+      "hillZone": "석재",
+      "hillZoneCount": "석재 · {count}",
+      "hillZoneRespawn": "석재 · 리젠 {time}",
+      "hillUnload": "석재 하역장",
+      "floodZone": "수해복구",
+      "floodZoneFill": "수해복구 · {current}/{capacity}",
+      "floodZoneRespawn": "수해복구 · 리젠 {time}",
+      "floodLeaveIncinerator": "소각장 밖으로 이동하세요",
+      "floodBurning": "소각 중 · {percent}%",
+      "floodCollection": "집결 {current}/{capacity}",
+      "floodIncinerator": "소각장 {current}/{capacity}"
+    },
+    "sitePrompt": {
+      "monument": "조형물",
+      "monumentEnter": "조형물 입장",
+      "monumentEnterAria": "조형물 입장, 수령 가능 스타 {stars}",
+      "monumentQuest": "미션 확인",
+      "monumentBuilding": "건설 현황",
+      "monumentClaimStars": "스타 수령 {stars}",
+      "monumentComplete": "건설완료",
+      "sportsMeetEnter": "운동회 입장",
+      "sportsMeetEnterAria": "운동회 입장, 입장권 {remaining}/{limit}",
+      "serviceBrand": "YK건기",
+      "serviceLabel": "서비스지점",
+      "serviceAria": "YK건기 서비스지점 열기",
+      "serviceAriaClaimable": "YK건기 서비스지점 열기, 교환 가능 {count}개",
+      "workshopManage": "관리하기",
+      "workshopOpenAria": "{name} 열기",
+      "workshopOpenAriaClaimable": "{name} 열기, 완료 퀘스트 {count}개"
+    }
+  },
+  "home": {
+    "profile": {
+      "ariaLabel": "플레이어 프로필",
+      "player": "플레이어",
+      "logout": "로그아웃",
+      "currencyStars": "보유 별 (재화)",
+      "totalStars": "획득 별 합계",
+      "score": "점수",
+      "scoreUnit": "점",
+      "ranking": "랭킹"
     }
   }
 }

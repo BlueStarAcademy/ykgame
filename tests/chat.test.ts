@@ -4,6 +4,8 @@ import {
   CHAT_BODY_MAX_LENGTH,
   CHAT_CHANNEL_MAX,
   CHAT_CHANNEL_MIN,
+  CHAT_RETENTION_MS,
+  chatRetentionCutoff,
   clampChatBody,
   isValidChatChannel,
 } from "../src/lib/chat-constants";
@@ -46,6 +48,13 @@ test("chat redis keys stay namespaced", () => {
   assert.match(chatUserPresenceKey("ykgame", "user-1"), /^ykgame:v1:chat:presence:/);
   assert.match(chatCooldownKey("ykgame", "user-1"), /^ykgame:v1:chat:cd:/);
   assert.equal(chatPubSubChannel("ykgame"), "ykgame:v1:chat:pubsub");
+});
+
+test("chat retention cutoff is seven days before now", () => {
+  const now = Date.UTC(2026, 7, 15, 6, 0, 0);
+  const cutoff = chatRetentionCutoff(now);
+  assert.equal(cutoff.getTime(), now - CHAT_RETENTION_MS);
+  assert.equal(CHAT_RETENTION_MS, 7 * 24 * 60 * 60 * 1000);
 });
 
 test("master enhance announce condition helpers", () => {

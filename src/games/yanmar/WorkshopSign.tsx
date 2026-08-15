@@ -1,6 +1,7 @@
 "use client";
 
 import { Billboard, Text } from "@react-three/drei";
+import { useTranslations } from "next-intl";
 import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import type { WorkshopId } from "./workshop/types";
 import { WORKSHOP_DEFS } from "./workshop/catalog";
@@ -19,6 +20,7 @@ function SignLabel({
   label: string;
   claimable: boolean;
 }) {
+  const t = useTranslations("yanmar.workshop");
   return (
     <Billboard position={[0, 3.35, 0]} follow lockX={false} lockZ={false}>
       <Text
@@ -56,7 +58,7 @@ function SignLabel({
             outlineWidth={0.025}
             outlineColor="#ecfdf5"
           >
-            퀘스트완료
+            {t("signQuestComplete")}
           </Text>
         </group>
       ) : null}
@@ -73,6 +75,7 @@ export function WorkshopSign({
   claimable?: boolean;
   visible?: boolean;
 }) {
+  const catalogT = useTranslations("yanmar");
   if (!visible) return null;
   const def = WORKSHOP_DEFS[workshopId];
   const { x, z, rotationY } = def.sign;
@@ -99,7 +102,10 @@ export function WorkshopSign({
         <boxGeometry args={[2.25, 0.08, 0.04]} />
         <meshStandardMaterial color={BOARD_EDGE} roughness={0.6} />
       </mesh>
-      <SignLabel label={def.label} claimable={claimable} />
+      <SignLabel
+        label={catalogT(`workshop.catalog.workshops.${workshopId}.label`)}
+        claimable={claimable}
+      />
     </group>
   );
 }

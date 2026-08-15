@@ -28,6 +28,8 @@ interface ExcavatorMinimapProps {
   monumentPhase?: MonumentPhase;
   /** 범례 표시 (확대 모달에서는 별도 UI로 대체 가능) */
   showLegend?: boolean;
+  /** 캔버스 위 지역명 콜아웃 표시 여부 */
+  showRegionLabels?: boolean;
   /** 탭/클릭 시 맵 확대 */
   onExpand?: () => void;
   /** Lv.25+ sports meet portal marker */
@@ -174,6 +176,165 @@ function drawMinimapBooster(
   ctx.strokeStyle = prevStroke;
 }
 
+type MapMarkerIcon =
+  | "dig"
+  | "dump"
+  | "crash"
+  | "hill"
+  | "flood"
+  | "repair"
+  | "sports"
+  | "monument";
+
+/**
+ * Readable at the HUD scale and detailed enough for the expanded map.
+ * The pin is drawn over each translucent work area; labels live in the
+ * external modal legend so they never obscure the map itself.
+ */
+function drawMinimapMapMarker(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  icon: MapMarkerIcon,
+  tone: string,
+  scale: number,
+) {
+  const radius = Math.max(4.5, 6.3 * scale);
+  const line = Math.max(1, 1.15 * scale);
+
+  ctx.save();
+  ctx.shadowColor = `${tone}99`;
+  ctx.shadowBlur = 5 * scale;
+  ctx.fillStyle = "rgba(8, 12, 18, 0.94)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = tone;
+  ctx.lineWidth = line;
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.72)";
+  ctx.lineWidth = Math.max(0.55, line * 0.45);
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius - line * 1.1, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = "#f8fafc";
+  ctx.fillStyle = "#f8fafc";
+  ctx.lineWidth = Math.max(1, 1.2 * scale);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  if (icon === "dig") {
+    ctx.beginPath();
+    ctx.moveTo(cx - radius * 0.38, cy - radius * 0.42);
+    ctx.lineTo(cx + radius * 0.18, cy + radius * 0.16);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx - radius * 0.43, cy - radius * 0.47, radius * 0.14, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = tone;
+    ctx.beginPath();
+    ctx.moveTo(cx + radius * 0.08, cy + radius * 0.05);
+    ctx.lineTo(cx + radius * 0.48, cy + radius * 0.28);
+    ctx.lineTo(cx + radius * 0.14, cy + radius * 0.53);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (icon === "dump") {
+    ctx.strokeRect(cx - radius * 0.42, cy - radius * 0.18, radius * 0.84, radius * 0.5);
+    ctx.beginPath();
+    ctx.moveTo(cx - radius * 0.5, cy - radius * 0.23);
+    ctx.lineTo(cx + radius * 0.5, cy - radius * 0.23);
+    ctx.stroke();
+    ctx.fillStyle = tone;
+    ctx.fillRect(cx - radius * 0.25, cy - radius * 0.58, radius * 0.5, radius * 0.24);
+  } else if (icon === "crash") {
+    ctx.fillStyle = tone;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - radius * 0.58);
+    ctx.lineTo(cx + radius * 0.55, cy + radius * 0.43);
+    ctx.lineTo(cx - radius * 0.55, cy + radius * 0.43);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#101319";
+    ctx.fillRect(cx - line * 0.45, cy - radius * 0.2, line * 0.9, radius * 0.38);
+    ctx.beginPath();
+    ctx.arc(cx, cy + radius * 0.25, line * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (icon === "hill") {
+    ctx.fillStyle = tone;
+    ctx.beginPath();
+    ctx.moveTo(cx - radius * 0.56, cy + radius * 0.38);
+    ctx.lineTo(cx - radius * 0.1, cy - radius * 0.43);
+    ctx.lineTo(cx + radius * 0.08, cy - radius * 0.08);
+    ctx.lineTo(cx + radius * 0.34, cy - radius * 0.32);
+    ctx.lineTo(cx + radius * 0.6, cy + radius * 0.38);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (icon === "flood") {
+    ctx.strokeStyle = tone;
+    for (const offset of [-0.28, 0.1, 0.48]) {
+      ctx.beginPath();
+      ctx.moveTo(cx - radius * 0.58, cy + radius * offset);
+      ctx.quadraticCurveTo(
+        cx - radius * 0.3,
+        cy + radius * (offset - 0.19),
+        cx,
+        cy + radius * offset,
+      );
+      ctx.quadraticCurveTo(
+        cx + radius * 0.3,
+        cy + radius * (offset + 0.19),
+        cx + radius * 0.58,
+        cy + radius * offset,
+      );
+      ctx.stroke();
+    }
+  } else if (icon === "repair") {
+    ctx.strokeStyle = tone;
+    ctx.beginPath();
+    ctx.moveTo(cx - radius * 0.42, cy + radius * 0.42);
+    ctx.lineTo(cx + radius * 0.26, cy - radius * 0.26);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx + radius * 0.3, cy - radius * 0.31, radius * 0.24, 0.2, Math.PI * 1.65);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx - radius * 0.43, cy + radius * 0.43, radius * 0.12, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (icon === "sports") {
+    ctx.beginPath();
+    ctx.moveTo(cx - radius * 0.35, cy + radius * 0.53);
+    ctx.lineTo(cx - radius * 0.35, cy - radius * 0.57);
+    ctx.stroke();
+    ctx.fillStyle = tone;
+    ctx.fillRect(cx - radius * 0.28, cy - radius * 0.5, radius * 0.7, radius * 0.52);
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(cx - radius * 0.28, cy - radius * 0.5, radius * 0.18, radius * 0.17);
+    ctx.fillRect(cx + radius * 0.08, cy - radius * 0.33, radius * 0.18, radius * 0.17);
+  } else {
+    ctx.fillStyle = tone;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - radius * 0.6);
+    ctx.lineTo(cx + radius * 0.32, cy - radius * 0.1);
+    ctx.lineTo(cx + radius * 0.22, cy + radius * 0.52);
+    ctx.lineTo(cx - radius * 0.22, cy + radius * 0.52);
+    ctx.lineTo(cx - radius * 0.32, cy - radius * 0.1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#e30613";
+    ctx.beginPath();
+    ctx.arc(cx, cy - radius * 0.23, Math.max(0.8, radius * 0.12), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 /**
  * Expanded maps have room for a small map-callout. Keeping these in the
  * canvas means labels stay precisely attached to their moving/active regions
@@ -252,7 +413,8 @@ export function ExcavatorMinimap({
   embedded = false,
   displaySize = DEFAULT_DISPLAY_SIZE,
   monumentPhase = "locked",
-  showLegend = true,
+  showLegend = false,
+  showRegionLabels = true,
   onExpand,
   sportsMeetUnlocked = false,
 }: ExcavatorMinimapProps) {
@@ -360,7 +522,10 @@ export function ExcavatorMinimap({
         context.beginPath();
         context.arc(dig.px, dig.py, 3.5 * (size / DEFAULT_DISPLAY_SIZE), 0, Math.PI * 2);
         context.fill();
-        drawMinimapRegionLabel(context, dig.px, dig.py, t("world.dig"), "#ffd166", size);
+        drawMinimapMapMarker(context, dig.px, dig.py, "dig", "#ffd166", size / DEFAULT_DISPLAY_SIZE);
+        if (showRegionLabels) {
+          drawMinimapRegionLabel(context, dig.px, dig.py, t("world.dig"), "#ffd166", size);
+        }
       }
 
       if (terrain.crashZone?.active) {
@@ -397,7 +562,10 @@ export function ExcavatorMinimap({
           context.lineTo(crash.px - width / 2 + stripe + depth, crash.py - depth / 2);
           context.stroke();
         }
-        drawMinimapRegionLabel(context, crash.px, crash.py, t("world.crash"), "#fbbf24", size);
+        drawMinimapMapMarker(context, crash.px, crash.py, "crash", "#fbbf24", size / DEFAULT_DISPLAY_SIZE);
+        if (showRegionLabels) {
+          drawMinimapRegionLabel(context, crash.px, crash.py, t("world.crash"), "#fbbf24", size);
+        }
       }
 
       if (terrain.hillZone?.active) {
@@ -423,7 +591,10 @@ export function ExcavatorMinimap({
         context.lineTo(hill.px + radius * 0.42, hill.py + radius * 0.22);
         context.closePath();
         context.fill();
-        drawMinimapRegionLabel(context, hill.px, hill.py, t("world.hill"), "#dbeafe", size);
+        drawMinimapMapMarker(context, hill.px, hill.py, "hill", "#dbeafe", size / DEFAULT_DISPLAY_SIZE);
+        if (showRegionLabels) {
+          drawMinimapRegionLabel(context, hill.px, hill.py, t("world.hill"), "#dbeafe", size);
+        }
       }
 
       if (terrain.floodZone) {
@@ -454,14 +625,17 @@ export function ExcavatorMinimap({
         );
         context.fillStyle = "#f97316";
         context.fillRect(incinerator.px - 2.5, incinerator.py - 3.5, 5, 7);
-        drawMinimapRegionLabel(
-          context,
-          flood.px,
-          flood.py,
-          t("world.flood"),
-          "#7dd3fc",
-          size,
-        );
+        drawMinimapMapMarker(context, flood.px, flood.py, "flood", "#7dd3fc", size / DEFAULT_DISPLAY_SIZE);
+        if (showRegionLabels) {
+          drawMinimapRegionLabel(
+            context,
+            flood.px,
+            flood.py,
+            t("world.flood"),
+            "#7dd3fc",
+            size,
+          );
+        }
       }
 
       const dump = worldToMinimap(DUMP_ZONE.x, DUMP_ZONE.z, bounds, size, pad);
@@ -480,7 +654,10 @@ export function ExcavatorMinimap({
       context.rotate(Math.PI / 4);
       context.fillRect(-dumpMark, -dumpMark, dumpMark * 2, dumpMark * 2);
       context.restore();
-      drawMinimapRegionLabel(context, dump.px, dump.py, t("world.dump"), "#a7f3d0", size);
+      drawMinimapMapMarker(context, dump.px, dump.py, "dump", "#a7f3d0", size / DEFAULT_DISPLAY_SIZE);
+      if (showRegionLabels) {
+        drawMinimapRegionLabel(context, dump.px, dump.py, t("world.dump"), "#a7f3d0", size);
+      }
 
       const repair = worldToMinimap(REPAIR_TENT.x, REPAIR_TENT.z, bounds, size, pad);
       const repairR =
@@ -511,7 +688,10 @@ export function ExcavatorMinimap({
       context.strokeStyle = "#8b1e1e";
       context.lineWidth = Math.max(1, 1.2 * repairScale);
       context.stroke();
-      drawMinimapRegionLabel(context, repair.px, repair.py, t("world.repair"), "#f5d78e", size);
+      drawMinimapMapMarker(context, repair.px, repair.py, "repair", "#f5d78e", repairScale);
+      if (showRegionLabels) {
+        drawMinimapRegionLabel(context, repair.px, repair.py, t("world.repair"), "#f5d78e", size);
+      }
 
       if (sportsMeetUnlocked) {
         const portal = worldToMinimap(
@@ -533,7 +713,10 @@ export function ExcavatorMinimap({
         context.arc(portal.px, portal.py, pr * 0.45, 0, Math.PI * 2);
         context.fillStyle = "#fbbf24";
         context.fill();
-        drawMinimapRegionLabel(context, portal.px, portal.py, t("world.sports"), "#7dd3fc", size);
+        drawMinimapMapMarker(context, portal.px, portal.py, "sports", "#7dd3fc", repairScale);
+        if (showRegionLabels) {
+          drawMinimapRegionLabel(context, portal.px, portal.py, t("world.sports"), "#7dd3fc", size);
+        }
       }
 
       if (monumentPhase !== "locked") {
@@ -596,7 +779,10 @@ export function ExcavatorMinimap({
           Math.PI * 2,
         );
         context.fill();
-        drawMinimapRegionLabel(context, monPx, monPy, t("world.monument"), "#ffe082", size);
+        drawMinimapMapMarker(context, monPx, monPy, "monument", "#ffe082", repairScale);
+        if (showRegionLabels) {
+          drawMinimapRegionLabel(context, monPx, monPy, t("world.monument"), "#ffe082", size);
+        }
       }
 
       const pickups = worldPickupsRef?.current?.active;
@@ -726,7 +912,7 @@ export function ExcavatorMinimap({
         dprQuery.removeListener(onDprChange);
       }
     };
-  }, [visible, displaySize, monumentPhase, sportsMeetUnlocked, simRef, terrainRef, tutorialStepRef, tutorialWaypointRef, worldPickupsRef, t]);
+  }, [visible, displaySize, monumentPhase, showRegionLabels, sportsMeetUnlocked, simRef, terrainRef, tutorialStepRef, tutorialWaypointRef, worldPickupsRef, t]);
 
   if (!visible) return null;
 

@@ -40,6 +40,10 @@ scripts/load/.production-cookies.json
 scripts/load/.staging-mixed-result.txt
 scripts/load/.staging-*-result.txt
 
+# text-integrity check reports
+_enc-report.txt
+_i18n-report.txt
+
 # vercel
 .vercel
 

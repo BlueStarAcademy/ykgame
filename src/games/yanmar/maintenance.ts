@@ -613,6 +613,7 @@ export function maintenancePayoutRanges(
 export function maintenancePackageHighlight(
   fluidId: MaintenanceFluidId,
   bonus: MaintenanceBonusOutcome | MaintenanceBonusSpec,
+  translate?: (key: string, values?: Record<string, string | number>) => string,
 ): { key: string; iconKind: "stars" | "points" | "cores" | "ticket-std" | "ticket-prem"; label: string } {
   const guaranteed = MAINTENANCE_REWARDS[fluidId];
   const pointKind = MAINTENANCE_FLUIDS[fluidId].pointKind;
@@ -623,7 +624,9 @@ export function maintenancePackageHighlight(
     return {
       key,
       iconKind: "stars",
-      label: `스타 +${total.toLocaleString()}`,
+      label: translate
+        ? translate("maintenanceRoulette.stars", { amount: total.toLocaleString() })
+        : `스타 +${total.toLocaleString()}`,
     };
   }
   if (bonus.workshopPoints) {
@@ -631,7 +634,12 @@ export function maintenancePackageHighlight(
     return {
       key,
       iconKind: "points",
-      label: `${pointKindLabel(pointKind)} +${total.toLocaleString()}`,
+      label: translate
+        ? translate("maintenanceRoulette.points", {
+            pointKind: translate(`repair.catalog.pointKinds.${pointKind}`),
+            amount: total.toLocaleString(),
+          })
+        : `${pointKindLabel(pointKind)} +${total.toLocaleString()}`,
     };
   }
   if (bonus.enhanceCores) {
@@ -639,7 +647,11 @@ export function maintenancePackageHighlight(
     return {
       key,
       iconKind: "cores",
-      label: `강화코어 +${total.toLocaleString()}`,
+      label: translate
+        ? translate("maintenanceRoulette.enhanceCore", {
+            amount: total.toLocaleString(),
+          })
+        : `강화코어 +${total.toLocaleString()}`,
     };
   }
   if (
@@ -653,9 +665,13 @@ export function maintenancePackageHighlight(
       key,
       iconKind: "ticket-std",
       label:
-        lo === hi
-          ? `일반 뽑기권 ${lo}개`
-          : `일반 뽑기권 ${lo}~${hi}개`,
+        translate
+          ? translate("maintenanceRoulette.standardTicketCount", {
+              count: lo === hi ? lo : `${lo}~${hi}`,
+            })
+          : lo === hi
+            ? `일반 뽑기권 ${lo}개`
+            : `일반 뽑기권 ${lo}~${hi}개`,
     };
   }
   if (bonus.gachaTicketsStandard) {
@@ -664,7 +680,9 @@ export function maintenancePackageHighlight(
     return {
       key,
       iconKind: "ticket-std",
-      label: `일반 뽑기권 ${total}개`,
+      label: translate
+        ? translate("maintenanceRoulette.standardTicketCount", { count: total })
+        : `일반 뽑기권 ${total}개`,
     };
   }
   if (
@@ -678,9 +696,13 @@ export function maintenancePackageHighlight(
       key,
       iconKind: "ticket-prem",
       label:
-        lo === hi
-          ? `고급 뽑기권 ${lo}개`
-          : `고급 뽑기권 ${lo}~${hi}개`,
+        translate
+          ? translate("maintenanceRoulette.premiumTicketCount", {
+              count: lo === hi ? lo : `${lo}~${hi}`,
+            })
+          : lo === hi
+            ? `고급 뽑기권 ${lo}개`
+            : `고급 뽑기권 ${lo}~${hi}개`,
     };
   }
   if (bonus.gachaTicketsPremium) {
@@ -689,13 +711,15 @@ export function maintenancePackageHighlight(
     return {
       key,
       iconKind: "ticket-prem",
-      label: `고급 뽑기권 ${total}개`,
+      label: translate
+        ? translate("maintenanceRoulette.premiumTicketCount", { count: total })
+        : `고급 뽑기권 ${total}개`,
     };
   }
   return {
     key,
     iconKind: "stars",
-    label: bonus.label || "교환 보상",
+    label: bonus.label || (translate ? translate("maintenanceRoulette.exchangeReward") : "교환 보상"),
   };
 }
 

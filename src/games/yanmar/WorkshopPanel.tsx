@@ -32,6 +32,12 @@ import {
   YANMAR_BASE_HILL_BOULDER_COUNT,
 } from "./equipment";
 import {
+  FLOOD_INCINERATOR_BASE_CAPACITY,
+  floodBurnDurationSec,
+  floodCleaningMasterMult,
+  floodIncineratorCapacity,
+} from "./floodRecovery/balance";
+import {
   workshopBreakerPowerMult,
   workshopHaulTruckCapacity,
   workshopHillBoulderCount,
@@ -177,6 +183,22 @@ function effectPreview(
       from: workshopHillBoulderCount(level),
       to: workshopHillBoulderCount(Math.min(5, next)),
       base: YANMAR_BASE_HILL_BOULDER_COUNT,
+    });
+  }
+  if (key === "cleaning_master") {
+    return `+${Math.round((floodCleaningMasterMult(level) - 1) * 100)}% → +${Math.round((floodCleaningMasterMult(Math.min(10, next)) - 1) * 100)}%`;
+  }
+  if (key === "incinerator_power") {
+    return t("secondsPreview", {
+      from: floodBurnDurationSec(level),
+      to: floodBurnDurationSec(Math.min(10, next)),
+    });
+  }
+  if (key === "incinerator_capacity") {
+    return t("capacityPreview", {
+      from: floodIncineratorCapacity(level),
+      to: floodIncineratorCapacity(Math.min(5, next)),
+      base: FLOOD_INCINERATOR_BASE_CAPACITY,
     });
   }
   void workshopId;

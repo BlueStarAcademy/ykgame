@@ -8,8 +8,8 @@ import { setUserLocale } from "@/i18n/locale-actions";
 
 interface LanguagePickerProps {
   className?: string;
-  /** compact = select only; default includes label; game = in-game settings row */
-  variant?: "default" | "compact" | "game";
+  /** compact = select only; default includes label; game = in-game settings row; splash = login/home corner */
+  variant?: "default" | "compact" | "game" | "splash";
 }
 
 export function LanguagePicker({
@@ -50,6 +50,31 @@ export function LanguagePicker({
           ))}
         </select>
       </label>
+    );
+  }
+
+  if (variant === "splash") {
+    return (
+      <div
+        className={`pointer-events-auto absolute top-[max(0.7rem,env(safe-area-inset-top))] right-[max(0.7rem,env(safe-area-inset-right))] z-30 ${className}`.trim()}
+      >
+        <label className="block">
+          <span className="sr-only">{t("language")}</span>
+          <select
+            value={locale}
+            disabled={pending}
+            onChange={(e) => onChange(e.target.value)}
+            aria-label={t("language")}
+            className="site-legend-lang-picker-select"
+          >
+            {locales.map((code) => (
+              <option key={code} value={code} className="bg-zinc-900 text-white">
+                {localeLabels[code]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
     );
   }
 

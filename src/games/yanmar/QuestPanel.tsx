@@ -393,7 +393,9 @@ export function QuestPanel({
                     return (
                       <QuestCard
                         key={task.id}
-                        title={task.label}
+                        title={t(`missionTasks.${task.kind}`, {
+                          target: task.target,
+                        })}
                         tag={
                           task.required
                             ? { label: t("tags.required"), tone: "required" }

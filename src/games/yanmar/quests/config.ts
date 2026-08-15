@@ -107,6 +107,14 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
     reward: { stars: 10, xp: 2000, enhanceCores: 2 },
   },
   {
+    id: "daily-gear-gacha-5",
+    title: (t) => `장비뽑기 ${t}회`,
+    metric: "gearGacha",
+    target: 5,
+    minLevel: 1,
+    reward: { stars: 10, xp: 1000, enhanceCores: 2 },
+  },
+  {
     id: "daily-gear-enhance-3",
     title: (t) => `장비 강화 시도하기 ${t}회`,
     metric: "gearEnhance",

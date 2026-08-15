@@ -52,6 +52,8 @@ export type SportsMeetRunState = {
   dumpDeparted: boolean;
   asphaltBroken: number;
   rocksDumped: number;
+  floodIncineratorUnits: number;
+  floodBurnStarted: boolean;
   splits: SportsMeetSplit[];
   runId: string | null;
   speedBuffUntilMs: number;
@@ -82,6 +84,8 @@ export function createInitialSportsMeetRunState(
     dumpDeparted: false,
     asphaltBroken: 0,
     rocksDumped: 0,
+    floodIncineratorUnits: 0,
+    floodBurnStarted: false,
     splits: [],
     runId: null,
     speedBuffUntilMs: 0,

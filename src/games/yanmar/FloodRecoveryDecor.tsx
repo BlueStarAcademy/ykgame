@@ -4,10 +4,14 @@ import { useRef, useState } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
+import { useTranslations } from "next-intl";
 import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import type { FloodRecoveryZone, TerrainData } from "./terrain";
 import { getFloodZoneRespawnEtaSec, sampleHeight } from "./terrain";
-import { FLOOD_COLLECTION_THRESHOLD } from "./floodRecovery/balance";
+import {
+  FLOOD_COLLECTION_GRAB_RADIUS,
+  FLOOD_COLLECTION_THRESHOLD,
+} from "./floodRecovery/balance";
 import { formatDumpTruckReturnTime } from "./dumpTruckState";
 
 const GROUND_PAINT_MATERIAL = {
@@ -25,19 +29,161 @@ const GROUND_PAINT_LIFT = 0.055;
 
 type TroikaLabel = THREE.Object3D & { text?: string };
 
-function floodLabelText(zone: FloodRecoveryZone) {
+function FloodTrashPile({
+  amount,
+  variant,
+  scraped = false,
+}: {
+  amount: number;
+  variant: number;
+  scraped?: boolean;
+}) {
+  const fullness = Math.max(0.2, Math.min(1, amount / 500));
+  const pieces = Array.from({ length: scraped ? 6 : 8 }, (_, index) => {
+    const angle = index * 2.41 + variant * 0.73;
+    const radius = scraped
+      ? 0.2 + (index % 3) * 0.18
+      : 0.35 + (index % 4) * 0.28;
+    const lateral = scraped ? ((index % 5) - 2) * 0.22 : Math.cos(angle) * radius;
+    const depth = scraped ? (index % 2) * 0.12 - 0.05 : Math.sin(angle) * radius;
+    return {
+      x: lateral,
+      z: depth,
+      y: 0.04 + (index % 3) * 0.03,
+      yaw: scraped ? index * 0.55 : angle + index * 0.4,
+    };
+  });
+
+  return (
+    <group
+      scale={
+        scraped
+          ? [fullness * 1.45, 0.42 + fullness * 0.18, fullness * 0.72]
+          : [fullness * 1.15, 0.55 + fullness * 0.2, fullness * 1.15]
+      }
+    >
+      {/* Flat mound base — wide and low; scraped piles stretch along the blade. */}
+      <mesh
+        position={[0, 0.08, 0]}
+        scale={scraped ? [1.55, 0.18, 0.85] : [1.35, 0.22, 1.15]}
+        castShadow
+        receiveShadow
+      >
+        <sphereGeometry args={[0.72, 12, 8]} />
+        <meshStandardMaterial color="#1f2937" roughness={0.94} />
+      </mesh>
+      <mesh
+        position={scraped ? [0.15, 0.09, -0.08] : [0.2, 0.1, -0.15]}
+        scale={scraped ? [1.2, 0.15, 0.7] : [0.95, 0.18, 0.85]}
+        castShadow
+        receiveShadow
+      >
+        <sphereGeometry args={[0.55, 10, 7]} />
+        <meshStandardMaterial color="#334155" roughness={0.92} />
+      </mesh>
+      <mesh
+        position={[-0.15, 0.12, 0.05]}
+        rotation={[0.05, scraped ? 0.05 : 0.35, 0.02]}
+        castShadow
+        receiveShadow
+      >
+        <boxGeometry args={scraped ? [1.35, 0.12, 0.55] : [1.1, 0.14, 0.72]} />
+        <meshStandardMaterial color="#35556b" roughness={0.82} />
+      </mesh>
+      {pieces.map((piece, index) => (
+        <group
+          key={index}
+          position={[piece.x, piece.y, piece.z]}
+          rotation={[
+            Math.PI / 2 + 0.08 * (index % 2),
+            piece.yaw,
+            0.12 * ((index % 3) - 1),
+          ]}
+        >
+          <mesh castShadow>
+            <cylinderGeometry args={[0.08, 0.09, 0.42, 10]} />
+            <meshStandardMaterial
+              color={index % 3 === 0 ? "#ef4444" : index % 3 === 1 ? "#facc15" : "#d1d5db"}
+              metalness={0.55}
+              roughness={0.35}
+            />
+          </mesh>
+          {index % 2 === 0 ? (
+            <mesh position={[0.1, 0, 0.02]} rotation={[0, 0.2, 0.05]}>
+              <planeGeometry args={[0.5, 0.34]} />
+              <meshStandardMaterial color="#f8fafc" roughness={0.95} side={THREE.DoubleSide} />
+            </mesh>
+          ) : null}
+        </group>
+      ))}
+      <mesh position={[0.42, 0.08, -0.32]} rotation={[0.04, 0.7, 0.02]} castShadow>
+        <boxGeometry args={[0.9, 0.1, 0.55]} />
+        <meshStandardMaterial color="#d6d3d1" roughness={0.96} />
+      </mesh>
+      <mesh position={[-0.45, 0.07, 0.28]} rotation={[0.03, -0.5, 0.04]} castShadow>
+        <boxGeometry args={[0.7, 0.09, 0.42]} />
+        <meshStandardMaterial color="#78716c" roughness={0.94} />
+      </mesh>
+    </group>
+  );
+}
+
+function FloodCollectionLoad({ fill }: { fill: number }) {
+  if (fill <= 0.02) return null;
+  const count = Math.max(2, Math.ceil(fill * 10));
+  return (
+    <group position={[0, 0.08, 0]}>
+      {Array.from({ length: count }, (_, index) => {
+        const angle = index * 2.4;
+        const radius = 0.35 + (index % 3) * 0.24;
+        return (
+          <group
+            key={index}
+            position={[
+              Math.cos(angle) * radius,
+              0.1 + Math.floor(index / 3) * 0.2,
+              Math.sin(angle) * radius,
+            ]}
+            rotation={[0.15, angle, 0.1 * (index % 2)]}
+          >
+            <mesh castShadow>
+              <sphereGeometry args={[0.38, 9, 7]} />
+              <meshStandardMaterial color={index % 2 ? "#334155" : "#4b5563"} roughness={0.94} />
+            </mesh>
+            <mesh position={[0.18, 0.16, 0.08]} rotation={[0.25, 0.6, 0.15]}>
+              <cylinderGeometry args={[0.065, 0.075, 0.34, 9]} />
+              <meshStandardMaterial color={index % 3 ? "#f59e0b" : "#e5e7eb"} metalness={0.5} roughness={0.35} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function floodLabelText(
+  zone: FloodRecoveryZone,
+  t: (key: string, values?: Record<string, string | number>) => string,
+) {
   const respawnEtaSec = getFloodZoneRespawnEtaSec(zone);
   if (respawnEtaSec > 0) {
-    return `수해복구 · 리젠 ${formatDumpTruckReturnTime(respawnEtaSec)}`;
+    return t("floodZoneRespawn", {
+      time: formatDumpTruckReturnTime(respawnEtaSec),
+    });
   }
-  if (zone.phase === "readyToBurn") return "소각장 밖으로 이동하세요";
+  if (zone.phase === "readyToBurn") return t("floodLeaveIncinerator");
   if (zone.phase === "burning") {
-    return `소각 중 · ${Math.round(zone.burnProgress * 100)}%`;
+    return t("floodBurning", {
+      percent: Math.round(zone.burnProgress * 100),
+    });
   }
   if (zone.active) {
-    return `수해복구 · ${zone.incineratorUnits}/${zone.incineratorCapacity}`;
+    return t("floodZoneFill", {
+      current: zone.incineratorUnits,
+      capacity: zone.incineratorCapacity,
+    });
   }
-  return "수해복구";
+  return t("floodZone");
 }
 
 function floodVisualSig(zone: FloodRecoveryZone) {
@@ -49,9 +195,98 @@ function floodVisualSig(zone: FloodRecoveryZone) {
     zone.incineratorUnits,
     zone.incineratorCapacity,
     zone.carriedTrashId ?? "",
+    zone.debrisRespawnAt ?? "",
     Math.floor(zone.burnProgress * 20),
-    zone.debris.map((d) => `${d.id}:${d.active ? 1 : 0}:${d.remaining}`).join(","),
+    zone.debris
+      .map(
+        (d) =>
+          `${d.id}:${d.active ? 1 : 0}:${Math.floor(d.remaining)}:${d.cleaved ? 1 : 0}`,
+      )
+      .join(","),
   ].join("|");
+}
+
+function FloodDebrisPiles({
+  terrainRef,
+  visible,
+}: {
+  terrainRef: React.MutableRefObject<TerrainData>;
+  visible: boolean;
+}) {
+  const groupRefs = useRef(new Map<string, THREE.Group>());
+  const membershipRef = useRef("");
+  const [, setRev] = useState(0);
+
+  useFrame(() => {
+    const zone = terrainRef.current.floodZone;
+    if (!zone || !visible) return;
+    const terrain = terrainRef.current;
+
+    for (const d of zone.debris) {
+      const group = groupRefs.current.get(d.id);
+      if (!group) continue;
+      const live = d.active && d.remaining > 0;
+      group.visible = live;
+      if (!live) continue;
+      const y = sampleHeight(terrain, d.x, d.z);
+      const scale = 0.55 + Math.min(1, d.remaining / 500) * 0.65;
+      const scraped = !!d.yaw || !!d.cleaved;
+      group.position.set(d.x, y + 0.02, d.z);
+      group.rotation.set(0, d.yaw ?? group.rotation.y, 0);
+      group.scale.set(
+        scraped ? scale * 1.15 : scale,
+        scale * (scraped ? 0.38 : 0.45),
+        scraped ? scale * 0.75 : scale,
+      );
+    }
+
+    const membership = zone.debris
+      .filter((d) => d.active && d.remaining > 0)
+      .map((d) => `${d.id}:${d.cleaved ? 1 : 0}:${Math.floor(d.remaining / 40)}`)
+      .join("|");
+    if (membership !== membershipRef.current) {
+      membershipRef.current = membership;
+      setRev((v) => v + 1);
+    }
+  });
+
+  if (!visible) return null;
+  const zone = terrainRef.current.floodZone;
+  if (!zone) return null;
+
+  return (
+    <>
+      {zone.debris
+        .filter((d) => d.active && d.remaining > 0)
+        .map((d, index) => {
+          const y = sampleHeight(terrainRef.current, d.x, d.z);
+          const scale = 0.55 + Math.min(1, d.remaining / 500) * 0.65;
+          const scraped = !!d.yaw || !!d.cleaved;
+          return (
+            <group
+              key={d.id}
+              ref={(node) => {
+                if (node) groupRefs.current.set(d.id, node);
+                else groupRefs.current.delete(d.id);
+              }}
+              position={[d.x, y + 0.02, d.z]}
+              rotation={[0, d.yaw ?? index * 0.7, 0]}
+              scale={[
+                scraped ? scale * 1.15 : scale,
+                scale * (scraped ? 0.38 : 0.45),
+                scraped ? scale * 0.75 : scale,
+              ]}
+            >
+              <FloodTrashPile
+                amount={d.remaining}
+                variant={index}
+                scraped={scraped}
+              />
+            </group>
+          );
+        })}
+    </>
+  );
 }
 
 export function FloodRecoveryDecor({
@@ -61,6 +296,7 @@ export function FloodRecoveryDecor({
   terrainRef: React.MutableRefObject<TerrainData>;
   showZonePaint?: boolean;
 }) {
+  const t = useTranslations("yanmar.scene");
   const [, setRev] = useState(0);
   const sigRef = useRef("");
   const labelRef = useRef<TroikaLabel>(null);
@@ -73,7 +309,7 @@ export function FloodRecoveryDecor({
 
     const label = labelRef.current;
     if (label && "text" in label) {
-      const next = floodLabelText(zone);
+      const next = floodLabelText(zone, t);
       if (label.text !== next) label.text = next;
     }
 
@@ -144,7 +380,7 @@ export function FloodRecoveryDecor({
             material-transparent
             material-toneMapped={false}
           >
-            {floodLabelText(zone)}
+            {floodLabelText(zone, t)}
           </Text>
         </group>
       ) : null}
@@ -170,11 +406,27 @@ export function FloodRecoveryDecor({
               emissiveIntensity={0.35}
             />
           </mesh>
-          {collectionPct > 0.02 ? (
-            <mesh position={[0, 0.25 + collectionPct * 0.7, 0]} castShadow>
-              <dodecahedronGeometry args={[0.9 + collectionPct * 0.7, 0]} />
-              <meshStandardMaterial color="#78716c" roughness={0.85} />
+          {/* Grab range hugs the pile — pad rim is only for blade collection. */}
+          {collectionPct >= 1 ? (
+            <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry
+                args={[
+                  FLOOD_COLLECTION_GRAB_RADIUS - 0.22,
+                  FLOOD_COLLECTION_GRAB_RADIUS,
+                  36,
+                ]}
+              />
+              <meshStandardMaterial
+                color="#4ade80"
+                emissive="#166534"
+                emissiveIntensity={0.55}
+                transparent
+                opacity={0.9}
+              />
             </mesh>
+          ) : null}
+          {collectionPct > 0.02 ? (
+            <FloodCollectionLoad fill={collectionPct} />
           ) : null}
           <Text
             font={YANMAR_SCENE_FONT}
@@ -185,58 +437,61 @@ export function FloodRecoveryDecor({
             outlineWidth={0.05}
             outlineColor="#111827"
           >
-            {`집결 ${Math.floor(zone.collectedUnits)}/${FLOOD_COLLECTION_THRESHOLD}`}
+            {t("floodCollection", {
+              current: Math.floor(zone.collectedUnits),
+              capacity: FLOOD_COLLECTION_THRESHOLD,
+            })}
           </Text>
         </group>
       ) : null}
 
-      {/* Debris piles */}
-      {showActive
-        ? zone.debris
-            .filter((d) => d.active && d.remaining > 0)
-            .map((d, index) => {
-              const y = sampleHeight(terrain, d.x, d.z);
-              const scale = 0.45 + Math.min(1, d.remaining / 500) * 0.7;
-              return (
-                <group
-                  key={d.id}
-                  position={[d.x, y + scale * 0.4, d.z]}
-                  rotation={[0, index * 0.7, 0]}
-                  scale={[scale, scale * 0.7, scale]}
-                >
-                  <mesh castShadow receiveShadow>
-                    <dodecahedronGeometry args={[1, 0]} />
-                    <meshStandardMaterial color={index % 2 ? "#57534e" : "#44403c"} roughness={0.9} />
-                  </mesh>
-                  <mesh position={[0.3, 0.2, 0.2]} scale={[0.35, 0.2, 0.45]}>
-                    <boxGeometry args={[1, 1, 1]} />
-                    <meshStandardMaterial color="#a8a29e" roughness={0.75} />
-                  </mesh>
-                </group>
-              );
-            })
-        : null}
+      {/* Debris piles — positions follow the blade every frame while scraped. */}
+      <FloodDebrisPiles terrainRef={terrainRef} visible={showActive} />
 
-      {/* Incinerator */}
-      <group position={[zone.incineratorX, incineratorY, zone.incineratorZ]}>
-        <mesh position={[0, 1.4, 0]} castShadow>
-          <boxGeometry args={[6.5, 2.8, 5.2]} />
+      {/* Incinerator — NE map corner, hopper open toward the debris field. */}
+      <group
+        position={[zone.incineratorX, incineratorY, zone.incineratorZ]}
+        rotation={[0, zone.incineratorYaw ?? 0, 0]}
+      >
+        {/* Open-top hopper: load it from above just like a truck bed. */}
+        <mesh position={[0, 0.25, 0]} castShadow receiveShadow>
+          <boxGeometry args={[6.5, 0.5, 5.2]} />
+          <meshStandardMaterial color="#27272a" metalness={0.5} roughness={0.42} />
+        </mesh>
+        <mesh position={[-3.0, 1.65, 0]} castShadow>
+          <boxGeometry args={[0.5, 2.8, 5.2]} />
           <meshStandardMaterial color="#3f3f46" metalness={0.45} roughness={0.4} />
         </mesh>
-        <mesh position={[0, 3.1, 0]} castShadow>
-          <boxGeometry args={[5.8, 0.55, 4.6]} />
-          <meshStandardMaterial color="#27272a" metalness={0.5} roughness={0.35} />
+        <mesh position={[3.0, 1.65, 0]} castShadow>
+          <boxGeometry args={[0.5, 2.8, 5.2]} />
+          <meshStandardMaterial color="#3f3f46" metalness={0.45} roughness={0.4} />
+        </mesh>
+        <mesh position={[0, 1.65, -2.35]} castShadow>
+          <boxGeometry args={[5.5, 2.8, 0.5]} />
+          <meshStandardMaterial color="#3f3f46" metalness={0.45} roughness={0.4} />
+        </mesh>
+        <mesh position={[0, 3.05, -2.35]} castShadow>
+          <boxGeometry args={[6.5, 0.24, 0.3]} />
+          <meshStandardMaterial color="#171717" metalness={0.65} roughness={0.32} />
+        </mesh>
+        <mesh position={[-3.0, 3.05, 0]} castShadow>
+          <boxGeometry args={[0.3, 0.24, 5.2]} />
+          <meshStandardMaterial color="#171717" metalness={0.65} roughness={0.32} />
+        </mesh>
+        <mesh position={[3.0, 3.05, 0]} castShadow>
+          <boxGeometry args={[0.3, 0.24, 5.2]} />
+          <meshStandardMaterial color="#171717" metalness={0.65} roughness={0.32} />
         </mesh>
         {/* Chimney */}
         <mesh position={[1.8, 5.2, -1.2]} castShadow>
           <cylinderGeometry args={[0.55, 0.7, 3.6, 12]} />
           <meshStandardMaterial color="#52525b" metalness={0.55} roughness={0.35} />
         </mesh>
-        {/* Intake hatch */}
+        {/* Fold-down front gate keeps the top and front clear for loading. */}
         <mesh
-          position={[0, 1.5, 2.7]}
+          position={[0, 0.7, 2.35]}
           rotation={[
-            zone.phase === "burning" || zone.phase === "readyToBurn" ? -0.05 : 0.55,
+            zone.phase === "burning" || zone.phase === "readyToBurn" ? -0.05 : 1.42,
             0,
             0,
           ]}
@@ -245,24 +500,39 @@ export function FloodRecoveryDecor({
           <boxGeometry args={[3.2, 1.8, 0.18]} />
           <meshStandardMaterial color="#b45309" metalness={0.4} roughness={0.45} />
         </mesh>
+        {incineratorPct > 0.02 ? (
+          <group position={[0, 0.58, -0.1]}>
+            {Array.from({ length: Math.max(3, Math.ceil(incineratorPct * 16)) }, (_, index) => {
+              const angle = index * 2.4;
+              const radius = 0.45 + (index % 3) * 0.4;
+              return (
+                <group
+                  key={index}
+                  position={[
+                    Math.cos(angle) * radius,
+                    Math.floor(index / 5) * 0.22,
+                    Math.sin(angle) * radius,
+                  ]}
+                  rotation={[0.12, angle, 0.08]}
+                >
+                  <mesh castShadow>
+                    <sphereGeometry args={[0.3, 8, 7]} />
+                    <meshStandardMaterial color={index % 2 ? "#3f4c5d" : "#565f68"} roughness={0.95} />
+                  </mesh>
+                  <mesh position={[0.14, 0.15, 0.07]} rotation={[0.2, 0.5, 0]}>
+                    <cylinderGeometry args={[0.055, 0.065, 0.28, 8]} />
+                    <meshStandardMaterial color="#facc15" metalness={0.45} roughness={0.4} />
+                  </mesh>
+                </group>
+              );
+            })}
+          </group>
+        ) : null}
         {/* Fill level window */}
         <mesh position={[-2.2, 1.5, 0]} castShadow>
           <boxGeometry args={[0.15, 2.0, 2.4]} />
           <meshStandardMaterial color="#18181b" />
         </mesh>
-        {incineratorPct > 0.02 ? (
-          <mesh
-            position={[-2.05, 0.55 + incineratorPct, 0]}
-            scale={[1, incineratorPct * 1.7, 1]}
-          >
-            <boxGeometry args={[0.12, 1, 2.1]} />
-            <meshStandardMaterial
-              color="#a16207"
-              emissive="#78350f"
-              emissiveIntensity={0.4}
-            />
-          </mesh>
-        ) : null}
         <mesh ref={flameRef} position={[0, 2.2, 0]} visible={false}>
           <coneGeometry args={[1.1, 2.4, 10]} />
           <meshStandardMaterial
@@ -299,7 +569,10 @@ export function FloodRecoveryDecor({
           outlineWidth={0.05}
           outlineColor="#111827"
         >
-          {`소각장 ${Math.floor(zone.incineratorUnits)}/${zone.incineratorCapacity}`}
+          {t("floodIncinerator", {
+            current: Math.floor(zone.incineratorUnits),
+            capacity: zone.incineratorCapacity,
+          })}
         </Text>
       </group>
     </group>

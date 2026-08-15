@@ -10,6 +10,17 @@ import type { TutorialStep, TutorialWaypoint } from "./tutorial";
 import type { MonumentPhase } from "./monument/types";
 import type { WorldPickupsState } from "./worldPickups";
 
+export const MAP_TELEPORT_COST = 10;
+export type MapTeleportDestination =
+  | "dig"
+  | "dump"
+  | "crash"
+  | "hill"
+  | "flood"
+  | "repair"
+  | "monument"
+  | "sports";
+
 const LEGEND = [
   { labelKey: "legend.dig", tone: "dig" },
   { labelKey: "legend.dump", tone: "dump" },
@@ -57,6 +68,8 @@ export function ExcavatorMapModal({
   worldPickupsRef,
   monumentPhase = "locked",
   sportsMeetUnlocked = false,
+  stars,
+  onTeleport,
 }: {
   open: boolean;
   onClose: () => void;
@@ -67,17 +80,33 @@ export function ExcavatorMapModal({
   worldPickupsRef?: React.RefObject<WorldPickupsState | null>;
   monumentPhase?: MonumentPhase;
   sportsMeetUnlocked?: boolean;
+  stars: number;
+  onTeleport: (destination: MapTeleportDestination) => Promise<boolean>;
 }) {
   const t = useTranslations("yanmar.map");
   const mapSize = useExpandedMapSize(open);
+  const [pendingTeleport, setPendingTeleport] =
+    useState<MapTeleportDestination | null>(null);
+  const [teleporting, setTeleporting] = useState(false);
   const legend = sportsMeetUnlocked
     ? LEGEND
     : LEGEND.filter((item) => item.tone !== "sports");
 
+  const closeMap = () => {
+    setPendingTeleport(null);
+    setTeleporting(false);
+    onClose();
+  };
+
+  const selectedLabel = pendingTeleport
+    ? t(`legend.${pendingTeleport}`)
+    : "";
+  const canTeleport = stars >= MAP_TELEPORT_COST;
+
   return (
     <AppModalOverlay
       open={open}
-      onClose={onClose}
+      onClose={closeMap}
       panelClassName="yanmar-map-modal-panel"
     >
       <div className="yanmar-map-modal">
@@ -126,6 +155,7 @@ export function ExcavatorMapModal({
               monumentPhase={monumentPhase}
               sportsMeetUnlocked={sportsMeetUnlocked}
               showLegend={false}
+              showRegionLabels={false}
             />
           </div>
 
@@ -135,13 +165,67 @@ export function ExcavatorMapModal({
                 key={item.labelKey}
                 className={`yanmar-map-modal-legend-item is-${item.tone}`}
               >
-                <span className="yanmar-map-modal-legend-dot" aria-hidden />
-                <span>{t(item.labelKey)}</span>
+                <button
+                  type="button"
+                  className="yanmar-map-modal-legend-button"
+                  onClick={() =>
+                    setPendingTeleport(item.tone as MapTeleportDestination)
+                  }
+                >
+                  <span className="yanmar-map-modal-legend-dot" aria-hidden />
+                  <span>{t(item.labelKey)}</span>
+                </button>
               </li>
             ))}
           </ul>
         </div>
       </div>
+      {pendingTeleport ? (
+        <AppModalOverlay
+          open
+          onClose={() => !teleporting && setPendingTeleport(null)}
+          panelClassName="yanmar-map-teleport-confirm-panel"
+          nested
+        >
+          <div className="yanmar-map-teleport-confirm">
+            <p className="yanmar-map-teleport-confirm-eyebrow">{t("teleport.eyebrow")}</p>
+            <h3>{t("teleport.title", { destination: selectedLabel })}</h3>
+            <p>{t("teleport.description")}</p>
+            <div className="yanmar-map-teleport-cost" aria-label={t("teleport.costAria")}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/star-currency.svg" alt="" width={24} height={24} />
+              <strong>{MAP_TELEPORT_COST}</strong>
+            </div>
+            {!canTeleport ? (
+              <p className="yanmar-map-teleport-insufficient">{t("teleport.insufficient")}</p>
+            ) : null}
+            <div className="yanmar-map-teleport-actions">
+              <button
+                type="button"
+                onClick={() => setPendingTeleport(null)}
+                disabled={teleporting}
+              >
+                {t("teleport.cancel")}
+              </button>
+              <button
+                type="button"
+                disabled={!canTeleport || teleporting}
+                onClick={async () => {
+                  setTeleporting(true);
+                  const succeeded = await onTeleport(pendingTeleport);
+                  setTeleporting(false);
+                  if (succeeded) {
+                    setPendingTeleport(null);
+                    closeMap();
+                  }
+                }}
+              >
+                {teleporting ? t("teleport.moving") : t("teleport.confirm")}
+              </button>
+            </div>
+          </div>
+        </AppModalOverlay>
+      ) : null}
     </AppModalOverlay>
   );
 }

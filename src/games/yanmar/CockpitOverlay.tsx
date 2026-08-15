@@ -42,7 +42,10 @@ import {
 import type { HornId } from "./soundSettings";
 import { yanmarAudio } from "./yanmarAudio";
 
-type TranslateFn = (key: string) => string;
+type TranslateFn = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
 
 const CockpitTranslationContext = createContext<{
   cockpit: TranslateFn;
@@ -2314,6 +2317,7 @@ function AutoPoseLabelsModal({
   onClose: () => void;
   onSave: (labels: AutoPoseSlotLabels) => void;
 }) {
+  const cockpit = useTranslations("yanmar.cockpit");
   const [draft, setDraft] = useState<AutoPoseSlotLabels>(labels);
   const [error, setError] = useState<string | null>(null);
 
@@ -2332,7 +2336,13 @@ function AutoPoseLabelsModal({
       const trimmed = draft[i].normalize("NFC").trim();
       const len = countAutoPoseLabelChars(trimmed);
       if (len < AUTO_POSE_LABEL_MIN_CHARS || len > AUTO_POSE_LABEL_MAX_CHARS) {
-        setError(`실행${i + 1} 이름은 ${AUTO_POSE_LABEL_MIN_CHARS}~${AUTO_POSE_LABEL_MAX_CHARS}글자로 입력하세요.`);
+        setError(
+          cockpit("autoLabelValidation", {
+            slot: i + 1,
+            min: AUTO_POSE_LABEL_MIN_CHARS,
+            max: AUTO_POSE_LABEL_MAX_CHARS,
+          }),
+        );
         return;
       }
       next[i] = Array.from(trimmed).join("");
@@ -2346,7 +2356,7 @@ function AutoPoseLabelsModal({
       <button
         type="button"
         className="yanmar-auto-label-modal-backdrop"
-        aria-label="닫기"
+        aria-label={cockpit("autoClose")}
         onClick={onClose}
       />
       <div
@@ -2356,20 +2366,22 @@ function AutoPoseLabelsModal({
         aria-labelledby="yanmar-auto-label-modal-title"
       >
         <div className="yanmar-auto-label-modal-header">
-          <h2 id="yanmar-auto-label-modal-title">실행 이름 편집</h2>
-          <button type="button" onClick={onClose} aria-label="닫기">
+          <h2 id="yanmar-auto-label-modal-title">{cockpit("autoEditTitle")}</h2>
+          <button type="button" onClick={onClose} aria-label={cockpit("autoClose")}>
             ✕
           </button>
         </div>
         <p className="yanmar-auto-label-modal-hint">
-          실행 버튼 이름을 {AUTO_POSE_LABEL_MIN_CHARS}~{AUTO_POSE_LABEL_MAX_CHARS}
-          글자로 설정할 수 있습니다.
+          {cockpit("autoEditHint", {
+            min: AUTO_POSE_LABEL_MIN_CHARS,
+            max: AUTO_POSE_LABEL_MAX_CHARS,
+          })}
         </p>
         <ul className="yanmar-auto-label-modal-list">
           {AUTO_POSE_SLOT_ORDER.map((slot) => (
             <li key={slot}>
               <label htmlFor={`yanmar-auto-label-${slot}`}>
-                실행{slot + 1}
+                {cockpit("autoExecute", { slot: slot + 1 })}
               </label>
               <input
                 id={`yanmar-auto-label-${slot}`}
@@ -2400,10 +2412,10 @@ function AutoPoseLabelsModal({
         {error ? <p className="yanmar-auto-label-modal-error">{error}</p> : null}
         <div className="yanmar-auto-label-modal-actions">
           <button type="button" onClick={onClose}>
-            취소
+            {cockpit("autoCancel")}
           </button>
           <button type="button" className="is-primary" onClick={handleSave}>
-            저장
+            {cockpit("autoSave")}
           </button>
         </div>
       </div>
@@ -2559,7 +2571,8 @@ function AutoMenu({
           const hasSavedPose = autoPose.slots[slot] != null;
           const isExecutingThis =
             autoPose.executing && autoPose.activeSlot === slot;
-          const executeLabel = autoPoseLabels[slot] || `실행${slot + 1}`;
+          const executeLabel =
+            autoPoseLabels[slot] || cockpit("autoExecute", { slot: slot + 1 });
           const executeBlockedByEngine = !engineOn && hasSavedPose;
           const executeDisabled =
             !hasSavedPose ||
@@ -2611,7 +2624,7 @@ function AutoMenu({
                   <AutoMenuActionButton
                     variant="save"
                     slot={slot}
-                    label={`저장${slot + 1}`}
+                    label={cockpit("autoSaveSlot", { slot: slot + 1 })}
                     active={hasSavedPose}
                     disabled={savePoseDisabled}
                     onClick={() => onSavePose(slot)}
@@ -2644,9 +2657,9 @@ function AutoMenu({
               height: `calc(${buttonSize} * 0.72)`,
             }}
             onPointerDown={activateOnPointerDown(onEditLabels)}
-            aria-label="실행 이름 편집"
+            aria-label={cockpit("autoEditTitle")}
           >
-            <span className="yanmar-auto-menu-edit-label">편집</span>
+            <span className="yanmar-auto-menu-edit-label">{cockpit("autoEdit")}</span>
           </button>
         </div>
       </div>

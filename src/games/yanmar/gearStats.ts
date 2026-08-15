@@ -34,7 +34,7 @@ import {
   parseAbilityAlloc,
   type AbilityAlloc,
 } from "./abilityAlloc";
-import { calculateFloodPushUnits } from "./floodRecovery/balance";
+import { calculateFloodPushUnits, FLOOD_BASE_PUSH_UNITS } from "./floodRecovery/balance";
 
 export type RepairBuffKind = "NONE" | "SMALL" | "LARGE";
 
@@ -52,6 +52,10 @@ export interface FinalYanmarStats extends YanmarEquipmentStats {
   scoreMult: number;
   /** Multiplier applied to work XP after sub-option bonus. */
   workXpMult: number;
+  /** Additional percentage points for equipment-dismantle jackpot chance. */
+  dismantleJackpotChanceBonusPct: number;
+  /** Additional enhancement-core percentage applied after a jackpot doubles cores. */
+  dismantleJackpotCoreBonusPct: number;
   chassisId: ChassisModelId;
   /** 차체 + 장착 주옵션(+정비버프)이 반영된 최종 6능력치 */
   chassisStats: ChassisBaseStats;
@@ -224,11 +228,40 @@ export function calculateFinalYanmarStats(input: {
     balance: Math.round(stats.balance),
     technique: Math.round(stats.technique),
   };
-  const floodPushUnits = calculateFloodPushUnits({
-    chassisStats: chassisStatsRounded,
-    baseChassisStats: chassis.stats,
-    cleaningMasterLevel: input.workshopLevels?.cleaning_master ?? 0,
-  });
+  const bladePushPct = Math.max(0, activeMasters.floodBladePushPct?.value ?? 0);
+  const floodPushUnits = Math.max(
+    FLOOD_BASE_PUSH_UNITS,
+    Math.floor(
+      calculateFloodPushUnits({
+        chassisStats: chassisStatsRounded,
+        baseChassisStats: chassis.stats,
+        cleaningMasterLevel: input.workshopLevels?.cleaning_master ?? 0,
+      }) *
+        (1 + bladePushPct / 100),
+    ),
+  );
+
+  const sportsMeetDriveSpeedMult =
+    1 + Math.max(0, activeMasters.sportsMeetDriveSpeedPct?.value ?? 0) / 100;
+  const sportsMeetSpeedBuffDurationMult =
+    1 +
+    Math.max(0, activeMasters.sportsMeetSpeedBuffDurationPct?.value ?? 0) / 100;
+  const sportsMeetStarRewardPct = Math.max(
+    0,
+    activeMasters.sportsMeetStarRewardPct?.value ?? 0,
+  );
+  const sportsMeetDigFillMult =
+    1 + Math.max(0, activeMasters.sportsMeetDigFillPct?.value ?? 0) / 100;
+  const sportsMeetCrashHitMult =
+    1 + Math.max(0, activeMasters.sportsMeetCrashHitPct?.value ?? 0) / 100;
+  const dismantleJackpotChanceBonusPct = Math.max(
+    0,
+    activeMasters.dismantleJackpotChancePct?.value ?? 0,
+  );
+  const dismantleJackpotCoreBonusPct = Math.max(
+    0,
+    activeMasters.dismantleJackpotCoreBonusPct?.value ?? 0,
+  );
 
   return {
     maxLoadUnits: Math.round(maxLoadUnits),
@@ -251,6 +284,13 @@ export function calculateFinalYanmarStats(input: {
     breakerEvery3HitMult: breakerEvery3,
     bladeEfficiency,
     floodPushUnits,
+    sportsMeetDriveSpeedMult,
+    sportsMeetSpeedBuffDurationMult,
+    sportsMeetStarRewardPct,
+    sportsMeetDigFillMult,
+    sportsMeetCrashHitMult,
+    dismantleJackpotChanceBonusPct,
+    dismantleJackpotCoreBonusPct,
     reachMultiplier,
     durabilityMaxPerPiece: base.durabilityMaxPerPiece,
     durabilityDrainMult,

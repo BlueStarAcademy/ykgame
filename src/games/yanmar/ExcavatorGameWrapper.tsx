@@ -86,7 +86,11 @@ import {
   type HydraulicVelocity,
 } from "./controls";
 import { ExcavatorMinimap } from "./ExcavatorMinimap";
-import { ExcavatorMapModal } from "./ExcavatorMapModal";
+import {
+  ExcavatorMapModal,
+  MAP_TELEPORT_COST,
+  type MapTeleportDestination,
+} from "./ExcavatorMapModal";
 import { GrappleGripGauge } from "./DigHintPanel";
 import { DumpHintPanel } from "./DumpHintPanel";
 import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
@@ -273,6 +277,7 @@ import {
   GEAR_SLOTS,
   GEAR_SLOT_LABEL,
   ITEM_GRADE_LABEL,
+  REPAIR_TENT,
   type GearSlot,
   type ItemGrade,
 } from "./gearCatalog";
@@ -348,8 +353,11 @@ import {
   noteSportsAsphaltBreak,
   noteSportsDumpDepart,
   noteSportsDumpFill,
+  noteSportsFloodBurnStarted,
+  noteSportsFloodIncineratorFill,
   noteSportsRockDump,
   prepareSportsMeetStageContent,
+  SPORTS_MEET_SPEED_BUFF_MS,
   SPORTS_MEET_UNLOCK_LEVEL,
   sportsMeetDriveStarQuota,
   sportsMeetElapsedMs,
@@ -1363,6 +1371,11 @@ export function ExcavatorGameWrapper({
   const config = getMissionConfig("yanmar");
   const { data: session, status: sessionStatus, update } = useSession();
   const hudT = useTranslations("yanmar.hud");
+  const gameHudT = useTranslations("yanmar.gameHud");
+  const sitePromptT = useTranslations("yanmar.sitePrompt");
+  const workshopCatalogT = useTranslations("yanmar.workshop.catalog");
+  const repairT = useTranslations("yanmar.repair");
+  const catalogT = useTranslations("yanmar");
   const defaultEquipmentStats = defaultFinalStats();
   const [mode, setMode] = useState<GameMode>("intro");
   const [audioArmed, setAudioArmed] = useState(false);
@@ -2761,6 +2774,65 @@ export function ExcavatorGameWrapper({
     if (velocity) velocity.travel = 0;
   }, []);
 
+  const teleportToMapDestination = useCallback(
+    (destination: MapTeleportDestination) => {
+      const sim = simRef.current;
+      if (!sim) return false;
+
+      const target = (() => {
+        switch (destination) {
+          case "dig":
+            return { x: SITE_LAYOUT.dig[0], z: SITE_LAYOUT.dig[1], heading: 0 };
+          case "dump":
+            return { x: SITE_LAYOUT.dump[0] - 7, z: SITE_LAYOUT.dump[1], heading: Math.PI / 2 };
+          case "crash":
+            return { x: SITE_LAYOUT.crash[0] - 10, z: SITE_LAYOUT.crash[1], heading: Math.PI / 2 };
+          case "hill":
+            return { x: SITE_LAYOUT.hill[0] + 8, z: SITE_LAYOUT.hill[1] - 9, heading: 0 };
+          case "flood":
+            return { x: SITE_LAYOUT.flood[0] - 18, z: SITE_LAYOUT.flood[1] - 10, heading: Math.atan2(18, 10) };
+          case "repair":
+            return { x: REPAIR_TENT.x - REPAIR_TENT.radius - 3, z: REPAIR_TENT.z, heading: Math.PI / 2 };
+          case "monument":
+            return { x: SITE_LAYOUT.monument[0], z: SITE_LAYOUT.monument[1] - 8, heading: 0 };
+          case "sports":
+            return { x: SITE_LAYOUT.sportsPortal[0] - 6, z: SITE_LAYOUT.sportsPortal[1], heading: Math.PI / 2 };
+        }
+      })();
+
+      sim.posX = target.x;
+      sim.posZ = target.z;
+      sim.heading = target.heading;
+      const velocity = velRef.current;
+      if (velocity) velocity.travel = 0;
+      return true;
+    },
+    [],
+  );
+
+  const handleMapTeleport = useCallback(
+    async (destination: MapTeleportDestination) => {
+      if (modeRef.current !== "game") {
+        if (previewStars < MAP_TELEPORT_COST) return false;
+        setPreviewStars((stars) => Math.max(0, stars - MAP_TELEPORT_COST));
+        return teleportToMapDestination(destination);
+      }
+
+      try {
+        const res = await fetch("/api/yanmar/map-teleport", { method: "POST" });
+        const data = (await res.json().catch(() => null)) as {
+          currency?: number;
+        } | null;
+        if (!res.ok || !data || typeof data.currency !== "number") return false;
+        syncSessionBalances(data, { syncPreviewCurrency: true });
+        return teleportToMapDestination(destination);
+      } catch {
+        return false;
+      }
+    },
+    [previewStars, syncSessionBalances, teleportToMapDestination],
+  );
+
   const warpToSportsMeetPortal = useCallback(() => {
     const sim = simRef.current;
     if (!sim) return;
@@ -3023,7 +3095,16 @@ export function ExcavatorGameWrapper({
         return;
       }
       const eventId = sportsMeetStarEventId(run.runId, starId);
-      const optimistic = sportsMeetStarRewardFromEventId(eventId);
+      const baseStars = sportsMeetStarRewardFromEventId(eventId);
+      const optimistic = Math.round(
+        baseStars *
+          (1 +
+            Math.max(
+              0,
+              equipmentStatsRef.current.sportsMeetStarRewardPct ?? 0,
+            ) /
+              100),
+      );
       const before = currencyRef.current;
       currencyRef.current = clampUserCurrency(before + optimistic);
       setCurrency(currencyRef.current);
@@ -3932,6 +4013,18 @@ export function ExcavatorGameWrapper({
           cores: data.cores as number,
           count:
             typeof data.count === "number" ? (data.count as number) : itemIds.length,
+          baseCores:
+            typeof data.baseCores === "number"
+              ? (data.baseCores as number)
+              : undefined,
+          bonusCores:
+            typeof data.bonusCores === "number"
+              ? (data.bonusCores as number)
+              : undefined,
+          jackpotCount:
+            typeof data.jackpotCount === "number"
+              ? (data.jackpotCount as number)
+              : undefined,
         };
       } finally {
         setGearBusy(false);
@@ -4294,6 +4387,7 @@ export function ExcavatorGameWrapper({
           setLastGachaBanner(banner);
           setLastGachaResults(data.items);
           setShowGachaResultModal(true);
+          pushQuestProgress("gearGacha", data.items.length);
           // Single pull: play immediately. Multi-pull SFX plays per card reveal.
           if (data.items.length === 1) {
             if (data.items[0]?.grade === "MASTER") {
@@ -4308,7 +4402,7 @@ export function ExcavatorGameWrapper({
         setGachaBusy(false);
       }
     },
-    [gearInventorySlots, gearItems.length, loadEquipment],
+    [gearInventorySlots, gearItems.length, loadEquipment, pushQuestProgress],
   );
 
   const handleWorkshopClaim = useCallback(
@@ -5747,6 +5841,11 @@ export function ExcavatorGameWrapper({
           simRef.current.posZ,
           now,
           getSportsMeetPattern(run.weekKey),
+          SPORTS_MEET_SPEED_BUFF_MS *
+            Math.max(
+              1,
+              equipmentStatsRef.current.sportsMeetSpeedBuffDurationMult ?? 1,
+            ),
         );
         run = noteSportsDumpFill(
           run,
@@ -7098,6 +7197,12 @@ export function ExcavatorGameWrapper({
 
   const handleFloodDebrisPushed = useCallback(
     (amount: number) => {
+      if (
+        modeRef.current === "sportsRanked" ||
+        modeRef.current === "sportsPractice"
+      ) {
+        return;
+      }
       pushQuestProgress("trashCollect", amount);
     },
     [pushQuestProgress],
@@ -7105,6 +7210,12 @@ export function ExcavatorGameWrapper({
 
   const handleFloodCollectFilled = useCallback(
     (eventId: string, _amount: number) => {
+      if (
+        modeRef.current === "sportsRanked" ||
+        modeRef.current === "sportsPractice"
+      ) {
+        return;
+      }
       void claimSpecialReward("flood-collect", eventId);
     },
     [claimSpecialReward],
@@ -7112,6 +7223,12 @@ export function ExcavatorGameWrapper({
 
   const handleFloodTrashGrapple = useCallback(
     (eventId: string, awardCycleReward: boolean) => {
+      if (
+        modeRef.current === "sportsRanked" ||
+        modeRef.current === "sportsPractice"
+      ) {
+        return;
+      }
       pushQuestProgress("trashGrapple", 1);
       if (awardCycleReward) {
         void claimSpecialReward("flood-grapple", eventId);
@@ -7120,8 +7237,39 @@ export function ExcavatorGameWrapper({
     [claimSpecialReward, pushQuestProgress],
   );
 
+  const handleFloodIncineratorFilled = useCallback((units: number) => {
+    const isSports =
+      modeRef.current === "sportsRanked" ||
+      modeRef.current === "sportsPractice";
+    if (!isSports || !sportsMeetRunRef.current) return;
+    const next = noteSportsFloodIncineratorFill(
+      sportsMeetRunRef.current,
+      units,
+    );
+    sportsMeetRunRef.current = next;
+    setSportsMeetRun(next);
+  }, []);
+
+  const handleFloodBurnStarted = useCallback(() => {
+    const isSports =
+      modeRef.current === "sportsRanked" ||
+      modeRef.current === "sportsPractice";
+    if (!isSports || !sportsMeetRunRef.current) return;
+    const before = sportsMeetRunRef.current;
+    let next = noteSportsFloodBurnStarted(before, Date.now());
+    next = finalizeSportsMeetStageAdvance(before, next);
+    sportsMeetRunRef.current = next;
+    setSportsMeetRun(next);
+  }, [finalizeSportsMeetStageAdvance]);
+
   const handleFloodBurnComplete = useCallback(
     (eventId: string, burnedUnits: number) => {
+      if (
+        modeRef.current === "sportsRanked" ||
+        modeRef.current === "sportsPractice"
+      ) {
+        return;
+      }
       pushQuestProgress("trashBurn", burnedUnits);
       pushQuestProgress("trashBurnComplete", 1);
       void claimSpecialReward("flood-burn", eventId);
@@ -7361,6 +7509,38 @@ export function ExcavatorGameWrapper({
     nearWorkshopId && workshopQuestState
       ? countClaimableWorkshopQuests(workshopQuestState, nearWorkshopId)
       : 0;
+  const floodStatusHud =
+    digFeedback.floodActive &&
+    digFeedback.floodPhase === "active" &&
+    digFeedback.floodIncineratorCapacity > 0 ? (
+      <div className="yanmar-flood-status-hud w-full rounded-xl border border-sky-200/40 bg-black/65 px-2 py-1.5 text-center text-white shadow-lg backdrop-blur-sm">
+        <div className="truncate text-[10px] font-black text-sky-100">
+          {hudT("status.incinerator", {
+            current: digFeedback.floodIncineratorUnits,
+            capacity: digFeedback.floodIncineratorCapacity,
+          })}
+        </div>
+        <div className="mt-0.5 truncate text-[9px] font-bold text-white/75">
+          {hudT("status.collection", {
+            current: digFeedback.floodCollectedUnits,
+            capacity: digFeedback.floodCollectionThreshold,
+          })}
+        </div>
+        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/20">
+          <span
+            className="block h-full rounded-full bg-gradient-to-r from-sky-400 to-cyan-200"
+            style={{
+              width: `${Math.min(
+                100,
+                (digFeedback.floodIncineratorUnits /
+                  digFeedback.floodIncineratorCapacity) *
+                  100,
+              )}%`,
+            }}
+          />
+        </div>
+      </div>
+    ) : null;
   const repairClaimableCount = maintenance
     ? MAINTENANCE_FLUID_IDS.filter(
         (id) => maintenance.fluids[id].exchangeEligible,
@@ -7491,7 +7671,14 @@ export function ExcavatorGameWrapper({
           onDismantle={async (id) => {
             const data = await runGearAction("dismantle", id);
             if (!data || typeof data.cores !== "number") return null;
-            return { cores: data.cores as number };
+            return {
+              cores: data.cores as number,
+              baseCores:
+                typeof data.baseCores === "number" ? data.baseCores : undefined,
+              bonusCores:
+                typeof data.bonusCores === "number" ? data.bonusCores : undefined,
+              jackpot: data.jackpot === true,
+            };
           }}
           onDismantleMany={async (ids) => runGearDismantleMany(ids)}
           onSell={async (id) => {
@@ -7559,12 +7746,14 @@ export function ExcavatorGameWrapper({
             <button
               type="button"
               className="yanmar-maintenance-status-backdrop"
-              aria-label="소모품 안내 닫기"
+              aria-label={repairT("statusClose")}
               onClick={() => setMaintenanceStatusOpen(false)}
             />
             <div className="yanmar-maintenance-status-card">
-              <p className="yanmar-maintenance-status-eyebrow">YK건기 정비소</p>
-              <h3 id="yanmar-maintenance-status-title">소모품 교환 안내</h3>
+              <p className="yanmar-maintenance-status-eyebrow">
+                {repairT("statusEyebrow")}
+              </p>
+              <h3 id="yanmar-maintenance-status-title">{repairT("statusTitle")}</h3>
               <ul className="yanmar-maintenance-status-list">
                 {MAINTENANCE_FLUID_IDS.map((id) => {
                   const fluid = maintenance.fluids[id];
@@ -7585,22 +7774,28 @@ export function ExcavatorGameWrapper({
                         draggable={false}
                       />
                       <div className="yanmar-maintenance-status-meta">
-                        <strong>{fluid.label}</strong>
+                        <strong>{catalogT(`repair.catalog.fluids.${id}.label`)}</strong>
                         <span>
                           {ready
-                            ? "교환 가능"
-                            : `남은 ${formatRemainingDuration(fluid.remainingMs)}`}
+                            ? repairT("exchangeAvailable")
+                            : repairT("remaining", {
+                                time: formatRemainingDuration(fluid.remainingMs),
+                              })}
                         </span>
                       </div>
                       <span className="yanmar-maintenance-status-pill">
-                        {ready ? "교환" : warn ? "임박" : "정상"}
+                        {ready
+                          ? repairT("exchangeNow")
+                          : warn
+                            ? repairT("expiringSoon")
+                            : repairT("normal")}
                       </span>
                     </li>
                   );
                 })}
               </ul>
               <p className="yanmar-maintenance-status-hint">
-                교환은 현장 정비소(서비스지점)에서 진행할 수 있습니다.
+                {repairT("statusHint")}
               </p>
               <div className="yanmar-maintenance-status-actions">
                 <button
@@ -7608,7 +7803,7 @@ export function ExcavatorGameWrapper({
                   className="yanmar-gear-btn yanmar-gear-btn--enhance"
                   onClick={() => setMaintenanceStatusOpen(false)}
                 >
-                  확인
+                  {repairT("confirm")}
                 </button>
               </div>
             </div>
@@ -7667,6 +7862,8 @@ export function ExcavatorGameWrapper({
             monumentPanelState?.phase ?? monumentPhaseRef.current ?? "locked"
           }
           sportsMeetUnlocked={sportsMeetUnlocked}
+          stars={mode === "game" ? currency : previewStars}
+          onTeleport={handleMapTeleport}
         />
 
         {mode !== "intro" && mode !== "gameReady" && travelRaiseWarn ? (
@@ -7700,7 +7897,7 @@ export function ExcavatorGameWrapper({
 
         {mode === "ride" ? (
           <div className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 whitespace-nowrap rounded-xl border border-sky-200/35 bg-sky-950/75 px-3 py-1.5 text-[11px] font-black text-sky-100 shadow-lg backdrop-blur-sm">
-            탑승 체험 · 실제 조작 시뮬레이터
+            {hudT("rideExperience")}
           </div>
         ) : null}
 
@@ -7724,12 +7921,14 @@ export function ExcavatorGameWrapper({
                       aria-expanded={showQuestPanel}
                       aria-label={
                         !questPanelUnlocked
-                          ? `퀘스트 잠김, 레벨 ${PLAYER_UNLOCKS.QUESTS} 필요`
+                          ? hudT("questLocked", { level: PLAYER_UNLOCKS.QUESTS })
                           : showQuestPanel
-                          ? "퀘스트 닫기"
+                          ? hudT("questClose")
                           : questClaimableCount > 0
-                            ? `퀘스트 열기, 미수령 보상 ${questClaimableCount}개`
-                            : "퀘스트 열기"
+                            ? hudT("questOpenClaimable", {
+                                count: questClaimableCount,
+                              })
+                            : hudT("questOpen")
                       }
                     >
                       <img
@@ -7738,7 +7937,7 @@ export function ExcavatorGameWrapper({
                         alt=""
                         draggable={false}
                       />
-                      <span className="yanmar-quest-button-label">퀘스트</span>
+                      <span className="yanmar-quest-button-label">{hudT("quest")}</span>
                       {questPanelUnlocked && questClaimableCount > 0 ? (
                         <span
                           className="yanmar-quest-notify-badge is-icon"
@@ -7767,10 +7966,12 @@ export function ExcavatorGameWrapper({
                       aria-expanded={showEquipmentUpgrade}
                       aria-label={
                         !gearCraftUnlocked
-                          ? `장비 잠김, 레벨 ${PLAYER_UNLOCKS.GEAR_CRAFT} 필요`
+                          ? hudT("gearLocked", {
+                              level: PLAYER_UNLOCKS.GEAR_CRAFT,
+                            })
                           : showEquipmentUpgrade
-                            ? "장비강화 닫기"
-                            : "장비강화 열기"
+                            ? hudT("gearClose")
+                            : hudT("gearOpen")
                       }
                     >
                       <img
@@ -7779,7 +7980,7 @@ export function ExcavatorGameWrapper({
                         alt=""
                         draggable={false}
                       />
-                      <span className="yanmar-upgrade-hud-button-label">장비</span>
+                      <span className="yanmar-upgrade-hud-button-label">{hudT("gear")}</span>
                       <HudFeatureLock
                         locked={!gearCraftUnlocked}
                         level={PLAYER_UNLOCKS.GEAR_CRAFT}
@@ -7799,10 +8000,10 @@ export function ExcavatorGameWrapper({
                       aria-expanded={showShopPanel}
                       aria-label={
                         showShopPanel
-                          ? "상점 닫기"
+                          ? hudT("shopClose")
                           : shopHasFreeGacha
-                            ? "상점 열기, 무료 뽑기 가능"
-                            : "상점 열기"
+                            ? hudT("shopOpenFreeGacha")
+                            : hudT("shopOpen")
                       }
                     >
                       <img
@@ -7811,7 +8012,7 @@ export function ExcavatorGameWrapper({
                         alt=""
                         draggable={false}
                       />
-                      <span className="yanmar-shop-button-label">상점</span>
+                      <span className="yanmar-shop-button-label">{hudT("shop")}</span>
                       {shopHasFreeGacha ? (
                         <span
                           className="yanmar-quest-notify-badge is-dot"
@@ -7839,23 +8040,30 @@ export function ExcavatorGameWrapper({
                           })}
                           aria-label={
                             monumentStarsClaimable
-                              ? `조형물 입장, 수령 가능 스타 ${monumentPanelState?.starsStored?.toLocaleString() ?? 0}`
-                              : "조형물 입장"
+                              ? sitePromptT("monumentEnterAria", {
+                                  stars:
+                                    monumentPanelState?.starsStored?.toLocaleString() ??
+                                    0,
+                                })
+                              : sitePromptT("monumentEnter")
                           }
                         >
                           <span className="yanmar-site-prompt-hud-copy">
                             <span className="yanmar-site-prompt-hud-eyebrow">
-                              조형물
+                              {sitePromptT("monument")}
                             </span>
                             <span className="yanmar-site-prompt-hud-label">
                               {monumentPanelState?.phase === "quest"
-                                ? "미션 확인"
+                                ? sitePromptT("monumentQuest")
                                 : monumentPanelState?.phase === "building"
-                                  ? "건설 현황"
+                                  ? sitePromptT("monumentBuilding")
                                   : monumentPanelState?.phase === "active" &&
                                       (monumentPanelState.starsStored ?? 0) > 0
-                                    ? `스타 수령 ${monumentPanelState.starsStored.toLocaleString()}`
-                                    : "조형물 입장"}
+                                    ? sitePromptT("monumentClaimStars", {
+                                        stars:
+                                          monumentPanelState.starsStored.toLocaleString(),
+                                      })
+                                    : sitePromptT("monumentEnter")}
                             </span>
                           </span>
                           {monumentStarsClaimable ? (
@@ -7877,14 +8085,14 @@ export function ExcavatorGameWrapper({
                                     void handleMonumentClaimConstruction();
                                   })
                             }
-                            aria-label="건설완료"
+                            aria-label={sitePromptT("monumentComplete")}
                           >
                             <span className="yanmar-site-prompt-hud-copy">
                               <span className="yanmar-site-prompt-hud-eyebrow">
-                                조형물
+                                {sitePromptT("monument")}
                               </span>
                               <span className="yanmar-site-prompt-hud-label">
-                                건설완료
+                                {sitePromptT("monumentComplete")}
                               </span>
                             </span>
                           </button>
@@ -7909,11 +8117,14 @@ export function ExcavatorGameWrapper({
                           void refreshSportsMeetTicket();
                           setShowSportsMeetPanel(true);
                         })}
-                        aria-label={`운동회 입장, 입장권 ${sportsMeetTicket.remaining}/${sportsMeetTicket.limit}`}
+                        aria-label={sitePromptT("sportsMeetEnterAria", {
+                          remaining: sportsMeetTicket.remaining,
+                          limit: sportsMeetTicket.limit,
+                        })}
                       >
                         <span className="yanmar-site-prompt-hud-copy">
                           <span className="yanmar-site-prompt-hud-label">
-                            운동회 입장
+                            {sitePromptT("sportsMeetEnter")}
                           </span>
                         </span>
                         <span className="yanmar-sports-meet-prompt-ticket">
@@ -7950,8 +8161,10 @@ export function ExcavatorGameWrapper({
                         })}
                         aria-label={
                           repairClaimableCount > 0
-                            ? `YK건기 서비스지점 열기, 교환 가능 ${repairClaimableCount}개`
-                            : "YK건기 서비스지점 열기"
+                            ? sitePromptT("serviceAriaClaimable", {
+                                count: repairClaimableCount,
+                              })
+                            : sitePromptT("serviceAria")
                         }
                       >
                         <span className="yanmar-site-prompt-hud-icon-wrap">
@@ -7964,10 +8177,10 @@ export function ExcavatorGameWrapper({
                         </span>
                         <span className="yanmar-site-prompt-hud-copy">
                           <span className="yanmar-site-prompt-hud-eyebrow">
-                            YK건기
+                            {sitePromptT("serviceBrand")}
                           </span>
                           <span className="yanmar-site-prompt-hud-label">
-                            서비스지점
+                            {sitePromptT("serviceLabel")}
                           </span>
                         </span>
                         {repairClaimableCount > 0 ? (
@@ -7983,46 +8196,60 @@ export function ExcavatorGameWrapper({
                     !showWorkshopPanel &&
                     !nearRepairTent &&
                     !nearMonument ? (
-                      <button
-                        type="button"
-                        className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
-                          workshopClaimableCount > 0 ? " is-claimable" : ""
-                        }`}
-                        onPointerDown={activateOnPointerDown(() => {
-                          setShowQuestPanel(false);
-                          setShowShopPanel(false);
-                          setShowEquipmentUpgrade(false);
-                          setShowProfileModal(false);
-                          setShowRepairPanel(false);
-                          setActiveWorkshopId(nearWorkshopId);
-                          setShowWorkshopPanel(true);
-                          void loadWorkshopState();
-                        })}
-                        aria-label={
-                          workshopClaimableCount > 0
-                            ? `${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기, 완료 퀘스트 ${workshopClaimableCount}개`
-                            : `${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기`
-                        }
-                      >
-                        <span className="yanmar-site-prompt-hud-copy">
-                          <span className="yanmar-site-prompt-hud-eyebrow">
-                            {WORKSHOP_DEFS[nearWorkshopId].promptTitle}
+                      <div className="pointer-events-auto inline-flex flex-col items-stretch gap-1.5">
+                        <button
+                          type="button"
+                          className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
+                            workshopClaimableCount > 0 ? " is-claimable" : ""
+                          }`}
+                          onPointerDown={activateOnPointerDown(() => {
+                            setShowQuestPanel(false);
+                            setShowShopPanel(false);
+                            setShowEquipmentUpgrade(false);
+                            setShowProfileModal(false);
+                            setShowRepairPanel(false);
+                            setActiveWorkshopId(nearWorkshopId);
+                            setShowWorkshopPanel(true);
+                            void loadWorkshopState();
+                          })}
+                          aria-label={
+                            workshopClaimableCount > 0
+                              ? sitePromptT("workshopOpenAriaClaimable", {
+                                  name: workshopCatalogT(
+                                    `workshops.${nearWorkshopId}.label`,
+                                  ),
+                                  count: workshopClaimableCount,
+                                })
+                              : sitePromptT("workshopOpenAria", {
+                                  name: workshopCatalogT(
+                                    `workshops.${nearWorkshopId}.label`,
+                                  ),
+                                })
+                          }
+                        >
+                          <span className="yanmar-site-prompt-hud-copy">
+                            <span className="yanmar-site-prompt-hud-eyebrow">
+                              {workshopCatalogT(
+                                `workshops.${nearWorkshopId}.label`,
+                              )}
+                            </span>
+                            <span className="yanmar-site-prompt-hud-label">
+                              {sitePromptT("workshopManage")}
+                            </span>
                           </span>
-                          <span className="yanmar-site-prompt-hud-label">
-                            {WORKSHOP_DEFS[nearWorkshopId].promptAction}
-                          </span>
-                        </span>
-                        {workshopClaimableCount > 0 ? (
-                          <span
-                            className="yanmar-quest-notify-badge is-icon"
-                            aria-hidden
-                          >
-                            {workshopClaimableCount > 9
-                              ? "9+"
-                              : workshopClaimableCount}
-                          </span>
-                        ) : null}
-                      </button>
+                          {workshopClaimableCount > 0 ? (
+                            <span
+                              className="yanmar-quest-notify-badge is-icon"
+                              aria-hidden
+                            >
+                              {workshopClaimableCount > 9
+                                ? "9+"
+                                : workshopClaimableCount}
+                            </span>
+                          ) : null}
+                        </button>
+                        {nearWorkshopId === "flood" ? floodStatusHud : null}
+                      </div>
                     ) : null}
                   </div>
                   {tutorialGuideHud}
@@ -8097,10 +8324,12 @@ export function ExcavatorGameWrapper({
                     aria-expanded={showEquipmentUpgrade}
                     aria-label={
                       !gearCraftUnlocked
-                        ? `장비 잠김, 레벨 ${PLAYER_UNLOCKS.GEAR_CRAFT} 필요`
+                        ? hudT("gearLocked", {
+                            level: PLAYER_UNLOCKS.GEAR_CRAFT,
+                          })
                         : showEquipmentUpgrade
-                          ? "장비강화 닫기"
-                          : "장비강화 열기"
+                          ? hudT("gearClose")
+                          : hudT("gearOpen")
                     }
                   >
                     <img
@@ -8109,7 +8338,7 @@ export function ExcavatorGameWrapper({
                       alt=""
                       draggable={false}
                     />
-                    <span className="yanmar-upgrade-hud-button-label">장비</span>
+                    <span className="yanmar-upgrade-hud-button-label">{hudT("gear")}</span>
                     <HudFeatureLock
                       locked={!gearCraftUnlocked}
                       level={PLAYER_UNLOCKS.GEAR_CRAFT}
@@ -8121,7 +8350,7 @@ export function ExcavatorGameWrapper({
                       onPointerDown={activateOnPointerDown(openTutorialList)}
                       className="relative h-[2.75rem] rounded-lg border border-white/20 bg-black/70 px-2.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
                     >
-                      튜토리얼
+                      {hudT("tutorial")}
                       {tutorialNotify ? (
                         <span
                           className="yanmar-quest-notify-badge is-dot"
@@ -8147,23 +8376,30 @@ export function ExcavatorGameWrapper({
                       })}
                       aria-label={
                         monumentStarsClaimable
-                          ? `조형물 입장, 수령 가능 스타 ${monumentPanelState?.starsStored?.toLocaleString() ?? 0}`
-                          : "조형물 입장"
+                          ? sitePromptT("monumentEnterAria", {
+                              stars:
+                                monumentPanelState?.starsStored?.toLocaleString() ??
+                                0,
+                            })
+                          : sitePromptT("monumentEnter")
                       }
                     >
                       <span className="yanmar-site-prompt-hud-copy">
                         <span className="yanmar-site-prompt-hud-eyebrow">
-                          조형물
+                          {sitePromptT("monument")}
                         </span>
                         <span className="yanmar-site-prompt-hud-label">
                           {monumentPanelState?.phase === "quest"
-                            ? "미션 확인"
+                            ? sitePromptT("monumentQuest")
                             : monumentPanelState?.phase === "building"
-                              ? "건설 현황"
+                              ? sitePromptT("monumentBuilding")
                               : monumentPanelState?.phase === "active" &&
                                   (monumentPanelState.starsStored ?? 0) > 0
-                                ? `스타 수령 ${monumentPanelState.starsStored.toLocaleString()}`
-                                : "조형물 입장"}
+                                ? sitePromptT("monumentClaimStars", {
+                                    stars:
+                                      monumentPanelState.starsStored.toLocaleString(),
+                                  })
+                                : sitePromptT("monumentEnter")}
                         </span>
                       </span>
                       {monumentStarsClaimable ? (
@@ -8185,14 +8421,14 @@ export function ExcavatorGameWrapper({
                                 void handleMonumentClaimConstruction();
                               })
                         }
-                        aria-label="건설완료"
+                        aria-label={sitePromptT("monumentComplete")}
                       >
                         <span className="yanmar-site-prompt-hud-copy">
                           <span className="yanmar-site-prompt-hud-eyebrow">
-                            조형물
+                            {sitePromptT("monument")}
                           </span>
                           <span className="yanmar-site-prompt-hud-label">
-                            건설완료
+                            {sitePromptT("monumentComplete")}
                           </span>
                         </span>
                       </button>
@@ -8213,8 +8449,10 @@ export function ExcavatorGameWrapper({
                     })}
                     aria-label={
                       repairClaimableCount > 0
-                        ? `YK건기 서비스지점 열기, 교환 가능 ${repairClaimableCount}개`
-                        : "YK건기 서비스지점 열기"
+                        ? sitePromptT("serviceAriaClaimable", {
+                            count: repairClaimableCount,
+                          })
+                        : sitePromptT("serviceAria")
                     }
                   >
                     <span className="yanmar-site-prompt-hud-icon-wrap">
@@ -8227,10 +8465,10 @@ export function ExcavatorGameWrapper({
                     </span>
                     <span className="yanmar-site-prompt-hud-copy">
                       <span className="yanmar-site-prompt-hud-eyebrow">
-                        YK건기
+                        {sitePromptT("serviceBrand")}
                       </span>
                       <span className="yanmar-site-prompt-hud-label">
-                        서비스지점
+                        {sitePromptT("serviceLabel")}
                       </span>
                     </span>
                     {repairClaimableCount > 0 ? (
@@ -8246,43 +8484,55 @@ export function ExcavatorGameWrapper({
                 !showWorkshopPanel &&
                 !nearRepairTent &&
                 !nearMonument ? (
-                  <button
-                    type="button"
-                    className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
-                      workshopClaimableCount > 0 ? " is-claimable" : ""
-                    }`}
-                    onPointerDown={activateOnPointerDown(() => {
-                      setShowEquipmentUpgrade(false);
-                      setShowRepairPanel(false);
-                      setActiveWorkshopId(nearWorkshopId);
-                      setShowWorkshopPanel(true);
-                      void loadWorkshopState();
-                    })}
-                    aria-label={
-                      workshopClaimableCount > 0
-                        ? `${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기, 완료 퀘스트 ${workshopClaimableCount}개`
-                        : `${WORKSHOP_DEFS[nearWorkshopId].promptTitle} 열기`
-                    }
-                  >
-                    <span className="yanmar-site-prompt-hud-copy">
-                      <span className="yanmar-site-prompt-hud-eyebrow">
-                        {WORKSHOP_DEFS[nearWorkshopId].promptTitle}
+                  <div className="pointer-events-auto inline-flex flex-col items-stretch gap-1.5">
+                    <button
+                      type="button"
+                      className={`yanmar-site-prompt-hud-btn touch-none active:scale-95${
+                        workshopClaimableCount > 0 ? " is-claimable" : ""
+                      }`}
+                      onPointerDown={activateOnPointerDown(() => {
+                        setShowEquipmentUpgrade(false);
+                        setShowRepairPanel(false);
+                        setActiveWorkshopId(nearWorkshopId);
+                        setShowWorkshopPanel(true);
+                        void loadWorkshopState();
+                      })}
+                      aria-label={
+                        workshopClaimableCount > 0
+                          ? sitePromptT("workshopOpenAriaClaimable", {
+                              name: workshopCatalogT(
+                                `workshops.${nearWorkshopId}.label`,
+                              ),
+                              count: workshopClaimableCount,
+                            })
+                          : sitePromptT("workshopOpenAria", {
+                              name: workshopCatalogT(
+                                `workshops.${nearWorkshopId}.label`,
+                              ),
+                            })
+                      }
+                    >
+                      <span className="yanmar-site-prompt-hud-copy">
+                        <span className="yanmar-site-prompt-hud-eyebrow">
+                          {workshopCatalogT(`workshops.${nearWorkshopId}.label`)}
+                        </span>
+                        <span className="yanmar-site-prompt-hud-label">
+                          {sitePromptT("workshopManage")}
+                        </span>
                       </span>
-                      <span className="yanmar-site-prompt-hud-label">
-                        {WORKSHOP_DEFS[nearWorkshopId].promptAction}
-                      </span>
-                    </span>
-                    {workshopClaimableCount > 0 ? (
-                      <span
-                        className="yanmar-quest-notify-badge is-icon"
-                        aria-hidden
-                      >
-                        {workshopClaimableCount > 9
-                          ? "9+"
-                          : workshopClaimableCount}
-                      </span>
-                    ) : null}
-                  </button>
+                      {workshopClaimableCount > 0 ? (
+                        <span
+                          className="yanmar-quest-notify-badge is-icon"
+                          aria-hidden
+                        >
+                          {workshopClaimableCount > 9
+                            ? "9+"
+                            : workshopClaimableCount}
+                        </span>
+                      ) : null}
+                    </button>
+                    {nearWorkshopId === "flood" ? floodStatusHud : null}
+                  </div>
                 ) : null}
                 </div>
                 {(mode === "sportsRanked" || mode === "sportsPractice") &&
@@ -8360,8 +8610,8 @@ export function ExcavatorGameWrapper({
                   {mode === "game" ||
                   mode === "sportsRanked" ||
                   mode === "sportsPractice"
-                    ? "누적 점수"
-                    : "점수"}
+                    ? gameHudT("cumulativeScore")
+                    : gameHudT("score")}
                 </span>
                 <span className="mt-0.5 text-sm font-black tabular-nums text-yellow-100">
                   {(
@@ -8377,7 +8627,7 @@ export function ExcavatorGameWrapper({
             {showBucketLoad ? (
               <div className="min-w-[7.5rem] rounded-xl border border-orange-200/45 bg-black/65 px-2.5 py-1.5 text-center text-white shadow-lg backdrop-blur-sm">
                 <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-orange-100">
-                  <span>현재 적재량</span>
+                  <span>{hudT("status.currentLoad")}</span>
                   <span className="tabular-nums">
                     {loadOverlayUnits}/{equipmentStats.maxLoadUnits}
                   </span>
@@ -8392,49 +8642,47 @@ export function ExcavatorGameWrapper({
             ) : null}
             {digFeedback.canDump && hud.bucketLoad > 0.02 ? (
               <div className="rounded-xl border border-emerald-200/50 bg-emerald-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                하역가능
+                {hudT("status.canDump")}
               </div>
             ) : hud.bucketLoad > 0.02 &&
               digFeedback.truckPresent &&
               digFeedback.dumpBodyTouching &&
               !digFeedback.dumpFacingBed ? (
               <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                정면을 짐칸으로
+                {hudT("status.faceTruckBed")}
               </div>
             ) : hud.bucketLoad > 0.02 &&
               digFeedback.truckPresent &&
               digFeedback.inDumpZone &&
               !digFeedback.dumpBodyTouching ? (
               <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                트럭에 차체 붙이기
+                {hudT("status.moveToTruck")}
               </div>
             ) : digFeedback.canLoad ? (
               <div className="rounded-xl border border-orange-200/50 bg-orange-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                적재가능(
-                <span className="tabular-nums">
-                  {Math.round(digFeedback.digZoneRemainingUnits)}
-                </span>
-                )
+                {hudT("status.canLoad", {
+                  amount: Math.round(digFeedback.digZoneRemainingUnits),
+                })}
               </div>
             ) : digFeedback.breakerNeedsVertical ? (
               <div className="rounded-xl border border-orange-200/50 bg-orange-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                브레이커를 수직에 가깝게 세우세요.
+                {hudT("status.breakerVertical")}
               </div>
             ) : digFeedback.canStrike ? (
               <div className="rounded-xl border border-amber-200/50 bg-amber-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                타격가능
+                {hudT("status.canStrike")}
               </div>
             ) : digFeedback.canGrab ? (
               <div className="rounded-xl border border-sky-200/50 bg-sky-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                집게가능
+                {hudT("status.canGrab")}
               </div>
             ) : digFeedback.grappleNeedsAlignment ? (
               <div className="whitespace-nowrap rounded-xl border border-orange-200/50 bg-orange-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                버켓 각도를 집게와 맞추세요
+                {hudT("status.alignGrapple")}
               </div>
             ) : digFeedback.canDropRock ? (
               <div className="rounded-xl border border-violet-200/50 bg-violet-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                발판 왼쪽: 열기
+                {hudT("status.openLeftPedal")}
               </div>
             ) : attachmentType === "grapple" &&
               digFeedback.carryingRock &&
@@ -8445,7 +8693,7 @@ export function ExcavatorGameWrapper({
               !digFeedback.showGripGauge &&
               !digFeedback.canGrab ? (
               <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                정면을 짐칸으로
+                {hudT("status.faceTruckBed")}
               </div>
             ) : attachmentType === "grapple" &&
               digFeedback.carryingRock &&
@@ -8455,62 +8703,37 @@ export function ExcavatorGameWrapper({
               !digFeedback.showGripGauge &&
               !digFeedback.canGrab ? (
               <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                트럭에 차체 붙이기
+                {hudT("status.moveToTruck")}
               </div>
             ) : digFeedback.soilSpilling && hud.bucketLoad > 0.02 ? (
               <div className="rounded-xl border border-amber-200/50 bg-amber-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                흙 유실 — 버켓 말기
+                {hudT("status.soilSpilling")}
               </div>
             ) : digFeedback.raiseArmForDump &&
               digFeedback.truckPresent &&
               hud.bucketLoad > 0.02 ? (
               <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                붐·암 들기
+                {hudT("status.raiseBoomArm")}
               </div>
             ) : digFeedback.haulTruckPresent &&
               !digFeedback.haulTruckCanAccept &&
               digFeedback.haulTruckCooldownRemaining <= 0 ? (
               <div className="whitespace-nowrap rounded-xl border border-amber-200/50 bg-amber-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                돌트럭 만차 — 하역 위치에서 벗어나세요
+                {hudT("status.haulTruckFull")}
               </div>
             ) : digFeedback.floodPhase === "readyToBurn" ? (
               <div className="whitespace-nowrap rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                소각장 밖으로 이동하세요
+                {hudT("status.floodLeaveIncinerator")}
               </div>
             ) : digFeedback.floodPhase === "burning" ? (
               <div className="whitespace-nowrap rounded-xl border border-orange-200/50 bg-orange-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                소각 중 · {Math.round(digFeedback.floodBurnProgress * 100)}%
+                {hudT("status.floodBurning", {
+                  percent: Math.round(digFeedback.floodBurnProgress * 100),
+                })}
               </div>
             ) : digFeedback.carryingTrash ? (
               <div className="whitespace-nowrap rounded-xl border border-cyan-200/50 bg-cyan-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
-                쓰레기 운반 중 — 소각장에 투입하세요
-              </div>
-            ) : null}
-            {digFeedback.floodActive &&
-            digFeedback.floodPhase === "active" &&
-            digFeedback.floodIncineratorCapacity > 0 ? (
-              <div className="min-w-[8.5rem] rounded-xl border border-sky-200/40 bg-black/65 px-2.5 py-1.5 text-center text-white shadow-lg backdrop-blur-sm">
-                <div className="text-[10px] font-black text-sky-100">
-                  소각 {digFeedback.floodIncineratorUnits}/
-                  {digFeedback.floodIncineratorCapacity}
-                </div>
-                <div className="mt-0.5 text-[9px] font-bold text-white/75">
-                  집결 {digFeedback.floodCollectedUnits}/
-                  {digFeedback.floodCollectionThreshold}
-                </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/20">
-                  <span
-                    className="block h-full rounded-full bg-gradient-to-r from-sky-400 to-cyan-200"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        (digFeedback.floodIncineratorUnits /
-                          digFeedback.floodIncineratorCapacity) *
-                          100,
-                      )}%`,
-                    }}
-                  />
-                </div>
+                {hudT("status.carryingTrash")}
               </div>
             ) : null}
             {digFeedback.crashTileMaxHp > 0 ? (
@@ -8583,20 +8806,20 @@ export function ExcavatorGameWrapper({
                               className="yanmar-profile-chip-avatar"
                               aria-hidden
                             >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                key={profileAvatarSrc(
-                                  profileAvatarId,
-                                  String(activeChassisId),
-                                )}
-                                src={profileAvatarSrc(
-                                  profileAvatarId,
-                                  String(activeChassisId),
-                                )}
-                                alt=""
-                                className="yanmar-profile-chip-avatar-img"
-                                draggable={false}
-                              />
+                              {profileAvatarSrc(profileAvatarId) ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  key={profileAvatarSrc(profileAvatarId)}
+                                  src={profileAvatarSrc(profileAvatarId) ?? ""}
+                                  alt=""
+                                  className="yanmar-profile-chip-avatar-img"
+                                  draggable={false}
+                                />
+                              ) : (
+                                <span className="yanmar-profile-chip-avatar-initial">
+                                  {nickname.trim().charAt(0) || "?"}
+                                </span>
+                              )}
                               {bonusRemaining > 0 ? (
                                 <em
                                   className="yanmar-bonus-point-badge is-on-chip"
@@ -8639,7 +8862,9 @@ export function ExcavatorGameWrapper({
                     ? createPortal(
                         <div className="inline-flex h-8 w-max min-w-[6.5rem] max-w-[10.5rem] flex-col items-center justify-center rounded-lg border border-white/20 bg-black/30 px-2.5 text-white shadow-sm">
                           <span className="text-[8px] font-bold uppercase leading-none tracking-[0.12em] text-white/75">
-                            {headerLikeGame ? "누적 점수" : "점수"}
+                            {headerLikeGame
+                              ? gameHudT("cumulativeScore")
+                              : gameHudT("score")}
                           </span>
                           <span className="mt-0.5 max-w-full truncate text-[13px] font-black leading-none tabular-nums text-yellow-100">
                             {displayScore.toLocaleString()}
@@ -8696,7 +8921,7 @@ export function ExcavatorGameWrapper({
                     setCameraMode((current) => ((current % 3) + 1) as CameraMode);
                   })}
                   className="flex h-6 w-full items-center justify-center gap-0.5 border-b border-white/10 px-1 text-[9px] font-black whitespace-nowrap text-white hover:bg-white/10"
-                  aria-label={`카메라 ${cameraMode}번 시점`}
+                  aria-label={gameHudT("cameraAria", { mode: cameraMode })}
                 >
                   <span
                     className="relative h-3 w-4 shrink-0 rounded-[0.2rem] border border-white/65"
@@ -8705,7 +8930,7 @@ export function ExcavatorGameWrapper({
                     <span className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/75" />
                     <span className="absolute left-0.5 top-[-0.18rem] h-0.5 w-1.5 rounded-t-[0.12rem] border-x border-t border-white/55" />
                   </span>
-                  <span>카메라{cameraMode}</span>
+                  <span>{gameHudT("camera", { mode: cameraMode })}</span>
                 </button>
               ) : null}
               {showMinimap ? (
@@ -8743,11 +8968,11 @@ export function ExcavatorGameWrapper({
               showMonumentMinimapProgress ? (
                 <ul
                   className="flex w-full flex-col gap-0.5 border-t border-white/10 px-1 py-0.5"
-                  aria-label="리젠 대기"
+                  aria-label={gameHudT("respawnWait")}
                 >
                   {showMonumentMinimapProgress ? (
                     <li className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85">
-                      <span className="truncate">조형물</span>
+                      <span className="truncate">{gameHudT("monument")}</span>
                       <span
                         className={`shrink-0 tabular-nums ${
                           monumentMinimapStorageFull
@@ -9177,6 +9402,8 @@ export function ExcavatorGameWrapper({
               onFloodDebrisPushed={handleFloodDebrisPushed}
               onFloodCollectFilled={handleFloodCollectFilled}
               onFloodTrashGrapple={handleFloodTrashGrapple}
+              onFloodIncineratorFilled={handleFloodIncineratorFilled}
+              onFloodBurnStarted={handleFloodBurnStarted}
               onFloodBurnComplete={handleFloodBurnComplete}
               onAttachmentWarning={showAttachmentWarning}
               onDumpTruckFull={handleDumpTruckFull}

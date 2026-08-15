@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import {
   CHAT_BODY_MAX_LENGTH,
@@ -15,6 +15,7 @@ import {
   CHAT_CHANNEL_MAX,
   CHAT_CHANNEL_MIN,
   CHAT_COOLDOWN_MS,
+  CHAT_RETENTION_MS,
   CHAT_SSE_MAX_MS,
 } from "@/lib/chat-constants";
 import type {
@@ -22,9 +23,8 @@ import type {
   ChatNotice,
   ChatWireMessage,
 } from "@/lib/chat/types";
-import { GearIconCell } from "@/games/yanmar/GearIconCell";
-import { type GearSlot, type ItemGrade } from "@/games/yanmar/gearCatalog";
-import { gearGradeLabel, gearSlotLabel } from "@/i18n/yanmarCatalog";
+import { ChatGearInspectModal } from "@/components/games/ChatGearInspectModal";
+import { ChatUserProfileModal } from "@/components/games/ChatUserProfileModal";
 
 type JoinResponse = {
   connectionId: string;
@@ -37,6 +37,48 @@ type JoinResponse = {
 };
 
 const CHAT_EMOJIS = ["😀", "😄", "😂", "😍", "🥳", "👍", "👏", "🔥", "💪", "🎉"];
+const CHAT_TZ = "Asia/Seoul";
+
+function isWithinChatRetention(createdAt: string, now = Date.now()): boolean {
+  const ts = Date.parse(createdAt);
+  if (Number.isNaN(ts)) return false;
+  return now - ts <= CHAT_RETENTION_MS;
+}
+
+function pruneRetainedMessages(
+  list: ChatWireMessage[],
+  now = Date.now(),
+): ChatWireMessage[] {
+  return list.filter((m) => isWithinChatRetention(m.createdAt, now));
+}
+
+function chatDayKey(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: CHAT_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+}
+
+function formatChatTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: CHAT_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+function formatChatDateLabel(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: CHAT_TZ,
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  }).format(new Date(iso));
+}
 
 function formatPreview(
   message: ChatWireMessage | null,
@@ -47,50 +89,6 @@ function formatPreview(
   if (!message) return notice?.message ?? noNotices;
   const name = message.nickname?.trim() || anonymous;
   return `${name}: ${message.body}`;
-}
-
-function ChatGearInspect({
-  snapshot,
-  onClose,
-}: {
-  snapshot: ChatGearSnapshot;
-  onClose: () => void;
-}) {
-  const t = useTranslations("shell.chat");
-  const catalogT = useTranslations("yanmar");
-  const slot = snapshot.slot as GearSlot;
-  const grade = snapshot.grade as ItemGrade;
-  return (
-    <AppModalOverlay open nested onClose={onClose} panelClassName="bg-slate-950 text-amber-50 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-black">{t("inspectGear")}</h3>
-        <button
-          type="button"
-          className="rounded-lg bg-white/10 px-2 py-1 text-xs"
-          onClick={onClose}
-        >
-          {t("close")}
-        </button>
-      </div>
-      <div className="mt-3 flex items-center gap-3">
-        <GearIconCell
-          slot={slot}
-          grade={grade}
-          enhanceLevel={snapshot.enhanceLevel}
-          size="lg"
-        />
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold">
-            {snapshot.nameSnapshot}
-            {snapshot.enhanceLevel > 0 ? ` +${snapshot.enhanceLevel}` : ""}
-          </p>
-          <p className="text-[11px] text-amber-200/80">
-            {gearSlotLabel(catalogT, slot)} · {gearGradeLabel(catalogT, grade)}
-          </p>
-        </div>
-      </div>
-    </AppModalOverlay>
-  );
 }
 
 function renderMessageBody(
@@ -124,6 +122,7 @@ function renderMessageBody(
 
 export function GameChatBoard() {
   const t = useTranslations("shell.chat");
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [channel, setChannel] = useState(CHAT_CHANNEL_MIN);
@@ -137,6 +136,10 @@ export function GameChatBoard() {
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const [inspect, setInspect] = useState<ChatGearSnapshot | null>(null);
+  const [profileTarget, setProfileTarget] = useState<{
+    userId: string;
+    nickname: string;
+  } | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const lastEventIdRef = useRef<string | null>(null);
@@ -154,7 +157,9 @@ export function GameChatBoard() {
     setChannel(data.channel);
     setMemberCount(data.memberCount ?? 0);
     setNotices(Array.isArray(data.notices) ? data.notices : []);
-    const list = Array.isArray(data.messages) ? data.messages : [];
+    const list = pruneRetainedMessages(
+      Array.isArray(data.messages) ? data.messages : [],
+    );
     setMessages(list);
     if (list.length > 0) {
       lastEventIdRef.current = list[list.length - 1]!.id;
@@ -251,7 +256,7 @@ export function GameChatBoard() {
           lastEventIdRef.current = message.id;
           setMessages((prev) => {
             if (prev.some((m) => m.id === message.id)) return prev;
-            return [...prev, message].slice(-200);
+            return pruneRetainedMessages([...prev, message]);
           });
         } catch {
           /* ignore */
@@ -336,6 +341,17 @@ export function GameChatBoard() {
     return () => clearInterval(id);
   }, [cooldownUntil]);
 
+  // Drop messages as they age past the 7-day retention window.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setMessages((prev) => {
+        const next = pruneRetainedMessages(prev);
+        return next.length === prev.length ? prev : next;
+      });
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const onChannelChange = async (next: number) => {
     if (next === channel) return;
     await join({
@@ -378,7 +394,7 @@ export function GameChatBoard() {
       if (data.message) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === data.message!.id)) return prev;
-          return [...prev, data.message!].slice(-200);
+          return pruneRetainedMessages([...prev, data.message!]);
         });
         lastEventIdRef.current = data.message.id;
       }
@@ -494,23 +510,66 @@ export function GameChatBoard() {
             {messages.length === 0 ? (
               <p className="text-[11px] text-amber-200/50">{t("noMessages")}</p>
             ) : (
-              messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`text-[12px] leading-snug ${
-                    m.kind === "SYSTEM"
-                      ? "text-sky-200"
-                      : "text-amber-50"
-                  }`}
-                >
-                  {m.kind === "USER" ? (
-                    <span className="font-bold text-amber-300">
-                      {m.nickname ?? t("anonymous")}:{" "}
-                    </span>
-                  ) : null}
-                  {renderMessageBody(m, setInspect)}
-                </div>
-              ))
+              messages.map((m, index) => {
+                const prev = index > 0 ? messages[index - 1] : null;
+                const showDateDivider =
+                  !prev || chatDayKey(prev.createdAt) !== chatDayKey(m.createdAt);
+                const timeLabel = formatChatTime(m.createdAt);
+                const nickname = m.nickname?.trim() || t("anonymous");
+                const canOpenProfile = m.kind === "USER" && Boolean(m.userId);
+
+                return (
+                  <div key={m.id}>
+                    {showDateDivider ? (
+                      <div
+                        className="my-2 flex items-center gap-2"
+                        role="separator"
+                        aria-label={formatChatDateLabel(m.createdAt, locale)}
+                      >
+                        <span className="h-px flex-1 bg-amber-500/25" />
+                        <span className="shrink-0 text-[10px] font-semibold tabular-nums text-amber-200/55">
+                          {formatChatDateLabel(m.createdAt, locale)}
+                        </span>
+                        <span className="h-px flex-1 bg-amber-500/25" />
+                      </div>
+                    ) : null}
+                    <div
+                      className={`text-[12px] leading-snug ${
+                        m.kind === "SYSTEM" ? "text-sky-200" : "text-amber-50"
+                      }`}
+                    >
+                      <span className="mr-1.5 inline-block tabular-nums text-[10px] text-amber-200/45">
+                        {timeLabel}
+                      </span>
+                      {m.kind === "USER" ? (
+                        canOpenProfile ? (
+                          <button
+                            type="button"
+                            className="font-bold text-amber-300 hover:underline"
+                            onClick={() => {
+                              setInspect(null);
+                              setProfileTarget({
+                                userId: m.userId!,
+                                nickname,
+                              });
+                            }}
+                          >
+                            {nickname}
+                          </button>
+                        ) : (
+                          <span className="font-bold text-amber-300">
+                            {nickname}
+                          </span>
+                        )
+                      ) : null}
+                      {m.kind === "USER" ? (
+                        <span className="font-bold text-amber-300">: </span>
+                      ) : null}
+                      {renderMessageBody(m, setInspect)}
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
 
@@ -580,7 +639,18 @@ export function GameChatBoard() {
       </AppModalOverlay>
 
       {inspect ? (
-        <ChatGearInspect snapshot={inspect} onClose={() => setInspect(null)} />
+        <ChatGearInspectModal
+          snapshot={inspect}
+          onClose={() => setInspect(null)}
+        />
+      ) : null}
+
+      {profileTarget ? (
+        <ChatUserProfileModal
+          userId={profileTarget.userId}
+          fallbackNickname={profileTarget.nickname}
+          onClose={() => setProfileTarget(null)}
+        />
       ) : null}
     </>
   );

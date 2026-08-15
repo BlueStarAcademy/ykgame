@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Outlines, Text } from "@react-three/drei";
+import { useTranslations } from "next-intl";
 import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import { HaulTruckModel } from "./HaulTruckModel";
 import type { HillBoulder, HillZone, TerrainData } from "./terrain";
@@ -31,16 +32,21 @@ const BOULDER_VISUAL_MIN_MS = 125;
 
 type TroikaLabel = THREE.Object3D & { text?: string };
 
-function hillZoneLabelText(zone: HillZone) {
+function hillZoneLabelText(
+  zone: HillZone,
+  t: (key: string, values?: Record<string, string | number>) => string,
+) {
   const remaining = zone.boulders.filter(
     (rock) => rock.active && !rock.delivered && !rock.extracted,
   ).length;
   const respawnEtaSec = getHillZoneRespawnEtaSec(zone);
   if (respawnEtaSec > 0) {
-    return `석재 · 리젠 ${formatDumpTruckReturnTime(respawnEtaSec)}`;
+    return t("hillZoneRespawn", {
+      time: formatDumpTruckReturnTime(respawnEtaSec),
+    });
   }
-  if (zone.active) return `석재 · ${remaining}`;
-  return "석재";
+  if (zone.active) return t("hillZoneCount", { count: remaining });
+  return t("hillZone");
 }
 
 function boulderVisualSig(zone: HillZone) {
@@ -176,10 +182,12 @@ function StoneZonePaint({
   zone,
   terrain,
   labelRef,
+  labelText,
 }: {
   zone: HillZone;
   terrain: TerrainData;
   labelRef: React.RefObject<TroikaLabel | null>;
+  labelText: string;
 }) {
   const radius = getHillZoneCoreRadius(zone);
   const paintY = zoneRingPaintY(terrain, zone.centerX, zone.centerZ, radius);
@@ -217,7 +225,7 @@ function StoneZonePaint({
         material-polygonOffsetUnits={-2}
         material-toneMapped={false}
       >
-        {hillZoneLabelText(zone)}
+        {labelText}
       </Text>
     </group>
   );
@@ -232,6 +240,7 @@ export function HillZoneDecor({
   showZonePaint?: boolean;
   highlightBoulders?: boolean;
 }) {
+  const t = useTranslations("yanmar.scene");
   const [, setBoulderRev] = useState(0);
   const boulderSigRef = useRef("");
   const lastBoulderVisualAtRef = useRef(0);
@@ -243,7 +252,7 @@ export function HillZoneDecor({
 
     const label = labelRef.current;
     if (label && "text" in label) {
-      const nextLabel = hillZoneLabelText(zone);
+      const nextLabel = hillZoneLabelText(zone, t);
       if (label.text !== nextLabel) label.text = nextLabel;
     }
 
@@ -267,7 +276,12 @@ export function HillZoneDecor({
   return (
     <group>
       {(showQuarry || showRespawnPaint) && showZonePaint ? (
-        <StoneZonePaint zone={zone} terrain={terrain} labelRef={labelRef} />
+        <StoneZonePaint
+          zone={zone}
+          terrain={terrain}
+          labelRef={labelRef}
+          labelText={hillZoneLabelText(zone, t)}
+        />
       ) : null}
 
       {/* Distant quarry face decor — outside the harvest ring so it is not mistaken for pickups. */}
@@ -356,7 +370,7 @@ export function HillZoneDecor({
             outlineWidth={0.05}
             outlineColor="#111827"
           >
-            석재 하역장
+            {t("hillUnload")}
           </Text>
         ) : null}
       </group>

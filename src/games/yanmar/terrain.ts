@@ -158,6 +158,10 @@ export interface FloodDebris {
   /** Remaining source debris units at this pile (visual). */
   remaining: number;
   active: boolean;
+  /** World yaw when scraped into a blade windrow (radians). */
+  yaw?: number;
+  /** True after the blade has cleaved this pile into side chunks. */
+  cleaved?: boolean;
 }
 
 export interface FloodRecoveryZone {
@@ -170,9 +174,11 @@ export interface FloodRecoveryZone {
   collectionX: number;
   collectionZ: number;
   collectionRadius: number;
-  /** Incinerator in front of the debris field (south-west of center). */
+  /** Incinerator at the map NE corner, facing the debris field. */
   incineratorX: number;
   incineratorZ: number;
+  /** Yaw so the open hopper face points toward the collection field. */
+  incineratorYaw: number;
   incineratorRadius: number;
   active: boolean;
   phase: FloodPhase;
@@ -197,6 +203,12 @@ export interface FloodRecoveryZone {
   burnDurationSec: number;
   clearedAt: number | null;
   respawnAt: number | null;
+  /**
+   * Leave-based field debris regen (crash-style). Starts when the player is
+   * outside the flood circle while piles are depleted; cancelled on re-enter.
+   */
+  debrisLeftAt: number | null;
+  debrisRespawnAt: number | null;
 }
 
 export interface TerrainData {
@@ -1158,7 +1170,7 @@ function createFloodDebris(
   centerZ: number,
   totalUnits: number,
 ): FloodDebris[] {
-  const pileCount = 8;
+  const pileCount = 10;
   const perPile = Math.floor(totalUnits / pileCount);
   return Array.from({ length: pileCount }, (_, index) => {
     const angle = (index / pileCount) * Math.PI * 2 + 0.4;
@@ -1182,13 +1194,19 @@ export function createFloodRecoveryZone(
   const cycleId = `flood-${Date.now().toString(36)}-${Math.floor(
     Math.random() * 1_000_000,
   ).toString(36)}`;
+  // Allow sports-meet / mission overrides below the main-map base (3_000),
+  // but never below one collection chunk.
   const capacity = Math.max(
-    FLOOD_INCINERATOR_BASE_CAPACITY,
+    FLOOD_COLLECTION_THRESHOLD,
     Math.floor(incineratorCapacity),
   );
-  // Incinerator sits in front of the field (toward approach from SW).
-  const incineratorX = centerX - 14;
-  const incineratorZ = centerZ - 16;
+  // Park the incinerator in the absolute NE map corner, facing the field.
+  const incineratorX = SITE_LAYOUT.floodIncinerator[0];
+  const incineratorZ = SITE_LAYOUT.floodIncinerator[1];
+  const incineratorYaw = Math.atan2(
+    centerX - incineratorX,
+    centerZ - incineratorZ,
+  );
   return {
     id: cycleId,
     centerX,
@@ -1199,6 +1217,7 @@ export function createFloodRecoveryZone(
     collectionRadius: 5.5,
     incineratorX,
     incineratorZ,
+    incineratorYaw,
     incineratorRadius: FLOOD_INCINERATOR_SAFE_RADIUS,
     active: true,
     phase: "active",
@@ -1215,15 +1234,63 @@ export function createFloodRecoveryZone(
     burnDurationSec: Math.max(1, burnDurationSec),
     clearedAt: null,
     respawnAt: null,
+    debrisLeftAt: null,
+    debrisRespawnAt: null,
   };
 }
 
 export function normalizeFloodRecoveryZone(
   zone: FloodRecoveryZone,
 ): FloodRecoveryZone {
+  const layoutCenterX = SITE_LAYOUT.flood[0];
+  const layoutCenterZ = SITE_LAYOUT.flood[1];
+  const layoutIncineratorX = SITE_LAYOUT.floodIncinerator[0];
+  const layoutIncineratorZ = SITE_LAYOUT.floodIncinerator[1];
+
+  // Pull older placements clear of the north/east edge safety panels.
+  const centerFar =
+    Math.hypot(zone.centerX - layoutCenterX, zone.centerZ - layoutCenterZ) > 6;
+  const centerX = centerFar ? layoutCenterX : zone.centerX;
+  const centerZ = centerFar ? layoutCenterZ : zone.centerZ;
+
+  const incineratorX = Number.isFinite(zone.incineratorX)
+    ? zone.incineratorX
+    : layoutIncineratorX;
+  const incineratorZ = Number.isFinite(zone.incineratorZ)
+    ? zone.incineratorZ
+    : layoutIncineratorZ;
+  const incineratorFar =
+    Math.hypot(
+      incineratorX - layoutIncineratorX,
+      incineratorZ - layoutIncineratorZ,
+    ) > 6;
+  const nextIncineratorX = incineratorFar ? layoutIncineratorX : incineratorX;
+  const nextIncineratorZ = incineratorFar ? layoutIncineratorZ : incineratorZ;
+  const incineratorYaw =
+    incineratorFar || centerFar || !Number.isFinite(zone.incineratorYaw)
+      ? Math.atan2(centerX - nextIncineratorX, centerZ - nextIncineratorZ)
+      : zone.incineratorYaw;
+
   return {
     ...zone,
-    debris: zone.debris.map((d) => ({ ...d })),
+    centerX,
+    centerZ,
+    collectionX: centerFar ? centerX : zone.collectionX,
+    collectionZ: centerFar ? centerZ : zone.collectionZ,
+    incineratorX: nextIncineratorX,
+    incineratorZ: nextIncineratorZ,
+    incineratorYaw,
+    debrisLeftAt: zone.debrisLeftAt ?? null,
+    debrisRespawnAt: zone.debrisRespawnAt ?? null,
+    debris: zone.debris.map((d) => {
+      if (!centerFar) return { ...d };
+      // Keep debris relative to the shifted field center.
+      return {
+        ...d,
+        x: d.x + (centerX - zone.centerX),
+        z: d.z + (centerZ - zone.centerZ),
+      };
+    }),
   };
 }
 
@@ -1278,6 +1345,168 @@ export function isOutsideFloodIncineratorSafe(
   );
 }
 
+/** Dozer moldboard half-width used for flood debris catch / cleave. */
+const FLOOD_BLADE_HALF_WIDTH = 1.4;
+const FLOOD_BLADE_CATCH_AHEAD = 2.4;
+const FLOOD_BLADE_CATCH_BEHIND = 0.65;
+const FLOOD_DEBRIS_MAX_PILES = 30;
+const FLOOD_CLEAVE_MIN_REMAINING = 100;
+
+function floodBladeLocal(
+  px: number,
+  pz: number,
+  bladeX: number,
+  bladeZ: number,
+  fwdX: number,
+  fwdZ: number,
+  rightX: number,
+  rightZ: number,
+): { fwd: number; right: number } {
+  const dx = px - bladeX;
+  const dz = pz - bladeZ;
+  return {
+    fwd: dx * fwdX + dz * fwdZ,
+    right: dx * rightX + dz * rightZ,
+  };
+}
+
+function isInFloodBladeSweep(
+  local: { fwd: number; right: number },
+  radius = 0.55,
+): boolean {
+  return (
+    Math.abs(local.right) <= FLOOD_BLADE_HALF_WIDTH + radius &&
+    local.fwd >= -FLOOD_BLADE_CATCH_BEHIND &&
+    local.fwd <= FLOOD_BLADE_CATCH_AHEAD
+  );
+}
+
+function cleaveFloodDebrisAcrossBlade(
+  zone: FloodRecoveryZone,
+  pile: FloodDebris,
+  rightX: number,
+  rightZ: number,
+  heading: number,
+): void {
+  if (pile.cleaved || pile.remaining < FLOOD_CLEAVE_MIN_REMAINING) return;
+  const activeCount = zone.debris.reduce((n, d) => n + (d.active ? 1 : 0), 0);
+  if (activeCount >= FLOOD_DEBRIS_MAX_PILES - 1) {
+    pile.cleaved = true;
+    return;
+  }
+
+  const leftAmt = Math.floor(pile.remaining * 0.34);
+  const rightAmt = Math.floor(pile.remaining * 0.34);
+  if (leftAmt < 25 || rightAmt < 25) {
+    pile.cleaved = true;
+    return;
+  }
+  pile.remaining -= leftAmt + rightAmt;
+  pile.cleaved = true;
+  pile.yaw = heading;
+
+  const lateral = 0.7 + (pile.remaining % 7) * 0.08;
+  const stamp = Date.now().toString(36).slice(-4);
+  zone.debris.push({
+    id: `${pile.id}-L-${stamp}`,
+    x: pile.x + rightX * lateral,
+    z: pile.z + rightZ * lateral,
+    remaining: leftAmt,
+    active: true,
+    yaw: heading,
+    cleaved: true,
+  });
+  if (
+    zone.debris.reduce((n, d) => n + (d.active ? 1 : 0), 0) < FLOOD_DEBRIS_MAX_PILES
+  ) {
+    zone.debris.push({
+      id: `${pile.id}-R-${stamp}`,
+      x: pile.x - rightX * lateral,
+      z: pile.z - rightZ * lateral,
+      remaining: rightAmt,
+      active: true,
+      yaw: heading,
+      cleaved: true,
+    });
+  }
+}
+
+/**
+ * While the lowered blade scrapes forward, cleave nearby trash piles across the
+ * moldboard and drag the resulting windrows with the blade face.
+ */
+export function advanceFloodDebrisBladePush(
+  terrain: TerrainData,
+  bladeX: number,
+  bladeZ: number,
+  heading: number,
+  travel: number,
+): void {
+  const zone = terrain.floodZone;
+  if (!zone?.active || zone.phase !== "active" || travel <= 0) return;
+
+  const fwdX = Math.sin(heading);
+  const fwdZ = Math.cos(heading);
+  const rightX = Math.cos(heading);
+  const rightZ = -Math.sin(heading);
+  const pushDist = travel * 1.08;
+  const faceTarget = 0.42;
+  // Snapshot length so newly cleaved fragments are not double-pushed this frame.
+  const pileCount = zone.debris.length;
+
+  for (let i = 0; i < pileCount; i += 1) {
+    const pile = zone.debris[i]!;
+    if (!pile.active || pile.remaining <= 0) continue;
+    const local = floodBladeLocal(
+      pile.x,
+      pile.z,
+      bladeX,
+      bladeZ,
+      fwdX,
+      fwdZ,
+      rightX,
+      rightZ,
+    );
+    if (!isInFloodBladeSweep(local)) continue;
+
+    pile.yaw = heading;
+    pile.x += fwdX * pushDist;
+    pile.z += fwdZ * pushDist;
+
+    // Keep scraped debris pressed against the blade face (not under the tracks).
+    const after = floodBladeLocal(
+      pile.x,
+      pile.z,
+      bladeX,
+      bladeZ,
+      fwdX,
+      fwdZ,
+      rightX,
+      rightZ,
+    );
+    if (after.fwd > faceTarget) {
+      const pull = Math.min(after.fwd - faceTarget, travel * 1.6 + 0.08);
+      pile.x -= fwdX * pull;
+      pile.z -= fwdZ * pull;
+    } else if (after.fwd < 0.12) {
+      const lift = Math.min(0.12 - after.fwd, travel * 0.9 + 0.04);
+      pile.x += fwdX * lift;
+      pile.z += fwdZ * lift;
+    }
+
+    // Mild lateral spread so cleaved chunks stay spread along the blade.
+    if (pile.cleaved && Math.abs(after.right) < 0.2) {
+      const side = after.right >= 0 ? 1 : -1;
+      pile.x += rightX * side * travel * 0.35;
+      pile.z += rightZ * side * travel * 0.35;
+    }
+
+    if (!pile.cleaved) {
+      cleaveFloodDebrisAcrossBlade(zone, pile, rightX, rightZ, heading);
+    }
+  }
+}
+
 /**
  * Push source debris into the collection pad.
  * Returns units actually moved and whether the collection threshold was newly reached.
@@ -1285,6 +1514,7 @@ export function isOutsideFloodIncineratorSafe(
 export function pushFloodDebrisToCollection(
   terrain: TerrainData,
   amount: number,
+  preferNear?: { x: number; z: number },
 ): { moved: number; collectionFilled: boolean } {
   const zone = terrain.floodZone;
   if (!zone?.active || zone.phase !== "active") {
@@ -1303,11 +1533,31 @@ export function pushFloodDebrisToCollection(
   zone.sourceRemaining -= moved;
   zone.collectedUnits += moved;
 
-  // Drain visual piles proportionally.
+  // Drain piles nearest the blade (or collection pad) first so pushed windrows
+  // disappear into the pad instead of remote untouched mounds.
+  const anchorX = preferNear?.x ?? zone.collectionX;
+  const anchorZ = preferNear?.z ?? zone.collectionZ;
+  const ordered = zone.debris
+    .filter((pile) => pile.active && pile.remaining > 0)
+    .sort((a, b) => {
+      const da = Math.hypot(a.x - anchorX, a.z - anchorZ);
+      const db = Math.hypot(b.x - anchorX, b.z - anchorZ);
+      return da - db;
+    });
+
   let left = moved;
-  for (const pile of zone.debris) {
-    if (left <= 0 || !pile.active) continue;
+  for (const pile of ordered) {
+    if (left <= 0) break;
     const take = Math.min(pile.remaining, left);
+    const toCollectionX = zone.collectionX - pile.x;
+    const toCollectionZ = zone.collectionZ - pile.z;
+    const distance = Math.hypot(toCollectionX, toCollectionZ);
+    if (distance > 0.75) {
+      const pushDistance =
+        Math.min(2.2, distance - 0.75) * (take / Math.max(1, pile.remaining));
+      pile.x += (toCollectionX / distance) * pushDistance;
+      pile.z += (toCollectionZ / distance) * pushDistance;
+    }
     pile.remaining -= take;
     left -= take;
     if (pile.remaining <= 0) {
@@ -1367,6 +1617,15 @@ export function dropFloodCarriedTrash(terrain: TerrainData) {
   zone.carriedTrashId = null;
 }
 
+/** A failed grapple lift scatters the collected load and clears its carry lock. */
+export function failFloodTrashCarry(terrain: TerrainData): boolean {
+  const zone = terrain.floodZone;
+  if (!zone?.carriedTrashId) return false;
+  zone.carriedTrashId = null;
+  zone.collectedUnits = 0;
+  return true;
+}
+
 export function tryStartFloodBurn(
   terrain: TerrainData,
   playerX: number,
@@ -1417,8 +1676,57 @@ export function getFloodZoneRespawnEtaSec(
   zone: FloodRecoveryZone | null | undefined,
   now = Date.now(),
 ): number {
-  if (!zone?.respawnAt || zone.active) return 0;
+  if (!zone) return 0;
+  // Mid-cycle: leave-based debris regen countdown.
+  if (zone.active && zone.phase === "active" && zone.debrisRespawnAt != null) {
+    if (isFloodDebrisFull(zone)) return 0;
+    return Math.max(0, (zone.debrisRespawnAt - now) / 1000);
+  }
+  // Post-burn: full zone respawn.
+  if (!zone.respawnAt || zone.active) return 0;
   return Math.max(0, (zone.respawnAt - now) / 1000);
+}
+
+/** Units that should still be on the field for this incinerator cycle. */
+export function floodFieldDebrisBudget(zone: FloodRecoveryZone): number {
+  const reserved =
+    zone.incineratorUnits +
+    zone.collectedUnits +
+    (zone.carriedTrashId ? FLOOD_COLLECTION_THRESHOLD : 0);
+  return Math.max(0, zone.incineratorCapacity - reserved);
+}
+
+/** True when field piles already match the remaining cycle budget and are unscraped. */
+export function isFloodDebrisFull(
+  zone: FloodRecoveryZone | null | undefined,
+): boolean {
+  if (!zone?.active || zone.phase !== "active") return true;
+  const budget = floodFieldDebrisBudget(zone);
+  if (budget <= 0) return true;
+  if (zone.sourceRemaining < budget) return false;
+  // Blade windrows / cleaved chunks should reset on leave even if unit totals match.
+  if (zone.debris.some((d) => d.cleaved || d.yaw != null)) return false;
+  return true;
+}
+
+export function isInsideFloodRecoveryCircle(
+  zone: FloodRecoveryZone,
+  wx: number,
+  wz: number,
+): boolean {
+  return Math.hypot(wx - zone.centerX, wz - zone.centerZ) <= zone.radius;
+}
+
+/** Restore scattered piles to the remaining cycle budget (leave-based regen). */
+export function respawnFloodFieldDebris(zone: FloodRecoveryZone): void {
+  const total = floodFieldDebrisBudget(zone);
+  zone.sourceRemaining = total;
+  zone.debris =
+    total > 0
+      ? createFloodDebris(zone.id, zone.centerX, zone.centerZ, total)
+      : [];
+  zone.debrisLeftAt = null;
+  zone.debrisRespawnAt = null;
 }
 
 export function isInCrashZone(
@@ -1434,6 +1742,16 @@ export function isInCrashZone(
   );
 }
 
+function crashZoneGridSize(zone: CrashZone): { cols: number; rows: number } {
+  let cols = 1;
+  let rows = 1;
+  for (const tile of zone.tiles) {
+    cols = Math.max(cols, tile.col + 1);
+    rows = Math.max(rows, tile.row + 1);
+  }
+  return { cols, rows };
+}
+
 export function getCrashTileAt(
   terrain: TerrainData,
   wx: number,
@@ -1441,10 +1759,17 @@ export function getCrashTileAt(
 ): CrashTile | null {
   const zone = terrain.crashZone;
   if (!zone || !isInCrashZone(terrain, wx, wz)) return null;
+  const { cols, rows } = crashZoneGridSize(zone);
   const localX = wx - (zone.centerX - zone.width / 2);
   const localZ = wz - (zone.centerZ - zone.depth / 2);
-  const col = Math.max(0, Math.min(2, Math.floor((localX / zone.width) * 3)));
-  const row = Math.max(0, Math.min(2, Math.floor((localZ / zone.depth) * 3)));
+  const col = Math.max(
+    0,
+    Math.min(cols - 1, Math.floor((localX / zone.width) * cols)),
+  );
+  const row = Math.max(
+    0,
+    Math.min(rows - 1, Math.floor((localZ / zone.depth) * rows)),
+  );
   return zone.tiles.find((tile) => tile.row === row && tile.col === col) ?? null;
 }
 
@@ -1463,8 +1788,9 @@ export function getCrashTileNear(
 
   let best: CrashTile | null = direct?.active ? direct : null;
   let bestDist = Number.POSITIVE_INFINITY;
-  const tileW = zone.width / 3;
-  const tileD = zone.depth / 3;
+  const { cols, rows } = crashZoneGridSize(zone);
+  const tileW = zone.width / cols;
+  const tileD = zone.depth / rows;
   for (const tile of zone.tiles) {
     if (!tile.active) continue;
     const cx = zone.centerX - zone.width / 2 + tileW * (tile.col + 0.5);
@@ -1674,6 +2000,8 @@ export function updateSpecialZones(
   const flood = terrain.floodZone;
   if (flood) {
     if (flood.phase === "completed" || !flood.active) {
+      flood.debrisLeftAt = null;
+      flood.debrisRespawnAt = null;
       if (flood.clearedAt == null) flood.clearedAt = now;
       flood.respawnAt = flood.clearedAt + FLOOD_ZONE_RESPAWN_MS;
       if (now >= flood.respawnAt) {
@@ -1684,6 +2012,30 @@ export function updateSpecialZones(
           flood.burnDurationSec,
         );
       }
+    } else if (flood.phase === "active") {
+      // Crash-style: while piles are depleted and the player stays outside the
+      // flood circle, restore all field debris after FLOOD_ZONE_RESPAWN_MS.
+      const playerInCircle =
+        playerX != null &&
+        playerZ != null &&
+        isInsideFloodRecoveryCircle(flood, playerX, playerZ);
+      if (isFloodDebrisFull(flood)) {
+        flood.debrisLeftAt = null;
+        flood.debrisRespawnAt = null;
+      } else if (playerInCircle) {
+        flood.debrisLeftAt = null;
+        flood.debrisRespawnAt = null;
+      } else {
+        if (flood.debrisLeftAt == null) flood.debrisLeftAt = now;
+        flood.debrisRespawnAt = flood.debrisLeftAt + FLOOD_ZONE_RESPAWN_MS;
+        if (now >= flood.debrisRespawnAt) {
+          respawnFloodFieldDebris(flood);
+        }
+      }
+    } else {
+      // readyToBurn / burning — field regen paused.
+      flood.debrisLeftAt = null;
+      flood.debrisRespawnAt = null;
     }
   }
 }

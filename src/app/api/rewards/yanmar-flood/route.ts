@@ -117,10 +117,11 @@ export async function POST(request: Request) {
         let score = calculateYanmarFloodScore(stats, kind, critical);
         let xpGained = rollFloodXp(kind);
         const boosted = applyMasterScoreXpBonus(
-          "hill",
+          "flood",
           score,
           xpGained,
           stats.activeMasters,
+          kind,
         );
         score = Math.round(
           applyRankerWillScore(boosted.score, buffIds) *
@@ -154,13 +155,14 @@ export async function POST(request: Request) {
           coupon: rolled.coupon,
           metadata: { eventId, kind, xpGained, score, critical },
         });
+        const floodDropTrigger = kind === "burn" ? "floodBurn" : "floodWork";
         const gearDrop = serializeWorkGearDrop(
-          await tryWorkGearDrop(tx, session.user.id, "hillDump"),
+          await tryWorkGearDrop(tx, session.user.id, floodDropTrigger),
         );
         const coreDrop = await tryWorkEnhanceCoresDrop(
           tx,
           session.user.id,
-          "hillDump",
+          floodDropTrigger,
         );
         const totalStars = granted;
         const updated = await tx.user.update({

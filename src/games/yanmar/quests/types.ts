@@ -19,6 +19,7 @@ export type QuestMetric =
   | "gearEnhance"
   | "gearDismantle"
   | "gearSynthesize"
+  | "gearGacha"
   | "sportsRankedEnter"
   /** 다른 일일 퀘스트 완료 수 (메타) */
   | "dailyAllComplete"

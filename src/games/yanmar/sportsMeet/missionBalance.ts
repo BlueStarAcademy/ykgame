@@ -6,11 +6,11 @@ export const SPORTS_MEET_MISSION_DEFAULTS = {
   drive: {
     /** Stars required per drive leg (course has multiple drive stages). */
     starCount: 12,
-    speedBuffCount: 3,
+    speedBuffCount: 4,
   },
   dig: {
-    digPileCapacity: 10_000,
-    dumpTruckCapacity: 8_000,
+    digPileCapacity: 15_000,
+    dumpTruckCapacity: 15_000,
   },
   crash: {
     asphaltTileCount: 3,
@@ -69,7 +69,7 @@ export function resolveSportsMeetMission(
 export function formatSportsMeetMissionSummaryKo(
   mission: SportsMeetMissionBalance = SPORTS_MEET_MISSION_DEFAULTS,
 ): string {
-  return `별${mission.drive.starCount}×4 · 덤프${mission.dig.dumpTruckCapacity} · 파쇄${mission.crash.asphaltTileCount} · 돌${mission.hill.successfulDumpsRequired}`;
+  return `별${mission.drive.starCount}×4 · 덤프${mission.dig.dumpTruckCapacity} · 파쇄${mission.crash.asphaltTileCount} · 돌${mission.hill.successfulDumpsRequired} · 수해소각1000`;
 }
 
 /** Idempotent reward event id for a ranked course-star pickup. */

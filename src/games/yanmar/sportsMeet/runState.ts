@@ -71,10 +71,9 @@ export function beginSportsMeetRun(
   );
   state.runId = runId;
   state = rebuildDriveStars(state, pattern, heightAt);
-  // Speed buffs once along the full corridor for the whole run.
+  // One speed booster waits at the front of each drive leg.
   state.speedBuffs = buildSpeedBuffPickups(
-    pattern.drivePath,
-    mission,
+    pattern.drivePaths,
     heightAt,
   );
   return state;
@@ -181,6 +180,12 @@ function advanceStage(
     next = { ...next, asphaltBroken: 0 };
   } else if (nextStage === "hill") {
     next = { ...next, rocksDumped: 0 };
+  } else if (nextStage === "flood") {
+    next = {
+      ...next,
+      floodIncineratorUnits: 0,
+      floodBurnStarted: false,
+    };
   }
 
   return next;
@@ -218,6 +223,7 @@ export function collectSportsMeetSpeedBuff(
   state: SportsMeetRunState,
   buffId: string,
   now = Date.now(),
+  durationMs = SPORTS_MEET_SPEED_BUFF_MS,
 ): SportsMeetRunState {
   if (state.phase !== "racing") return state;
   const speedBuffs = state.speedBuffs.map((b) =>
@@ -226,7 +232,7 @@ export function collectSportsMeetSpeedBuff(
   return {
     ...state,
     speedBuffs,
-    speedBuffUntilMs: now + SPORTS_MEET_SPEED_BUFF_MS,
+    speedBuffUntilMs: now + Math.max(1, Math.round(durationMs)),
   };
 }
 
@@ -236,6 +242,7 @@ export function tryCollectNearbySportsPickups(
   posZ: number,
   now = Date.now(),
   pattern?: SportsMeetPattern,
+  speedBuffDurationMs = SPORTS_MEET_SPEED_BUFF_MS,
 ): SportsMeetRunState {
   if (state.phase !== "racing") return state;
   let next = state;
@@ -250,7 +257,12 @@ export function tryCollectNearbySportsPickups(
   for (const buff of next.speedBuffs) {
     if (buff.collected) continue;
     if (distanceXZ(posX, posZ, buff.x, buff.z) <= SPORTS_MEET_PICKUP_RADIUS) {
-      next = collectSportsMeetSpeedBuff(next, buff.id, now);
+      next = collectSportsMeetSpeedBuff(
+        next,
+        buff.id,
+        now,
+        speedBuffDurationMs,
+      );
     }
   }
   if (pattern) {
@@ -335,6 +347,29 @@ export function noteSportsRockDump(
   return next;
 }
 
+/** Update sports flood HUD after each trash chunk reaches the incinerator. */
+export function noteSportsFloodIncineratorFill(
+  state: SportsMeetRunState,
+  units: number,
+): SportsMeetRunState {
+  if (state.phase !== "racing") return state;
+  if (state.stageOrder[state.stageIndex] !== "flood") return state;
+  const nextUnits = Math.max(0, Math.floor(units));
+  if (nextUnits === state.floodIncineratorUnits) return state;
+  return { ...state, floodIncineratorUnits: nextUnits };
+}
+
+/** The flood stage completes only after the filled incinerator is left behind. */
+export function noteSportsFloodBurnStarted(
+  state: SportsMeetRunState,
+  now = Date.now(),
+): SportsMeetRunState {
+  if (state.phase !== "racing") return state;
+  if (state.stageOrder[state.stageIndex] !== "flood") return state;
+  if (state.floodBurnStarted) return state;
+  return advanceStage({ ...state, floodBurnStarted: true }, "flood", now);
+}
+
 export function sportsMeetStageWaypoint(
   pattern: SportsMeetPattern,
   stage: SportsMeetStageKind,
@@ -367,6 +402,8 @@ export function sportsMeetStageWaypoint(
       return { x: pattern.zones.crash[0], z: pattern.zones.crash[1] };
     case "hill":
       return { x: pattern.zones.hill[0], z: pattern.zones.hill[1] };
+    case "flood":
+      return { x: pattern.zones.flood[0], z: pattern.zones.flood[1] };
   }
 }
 

@@ -66,6 +66,18 @@
     "loadingGameInfo": "Loading information",
     "loginWithDifferentAccount": "Log in with another ID"
   },
+  "siteLegendLegal": {
+    "titleAlt": "Site Legend",
+    "linksAriaLabel": "Terms and policies",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Use",
+    "email": "No Unauthorised Email Collection",
+    "close": "Close",
+    "address": "1357 Gyeongsu-daero, Manan-gu, Anyang-si, Gyeonggi-do, Republic of Korea",
+    "businessNumber": "Business registration no.: 119-81-30845",
+    "representative": "Representative: Ho-sun Chae",
+    "copyright": "Copyright © sunnyyk.co.kr. All rights reserved."
+  },
   "landing": {
     "heroTitle": "Heavy Equipment Experience Zone",
     "gameExperience": "Play games",
@@ -97,7 +109,13 @@
     "iosInstallStep3": "Confirm the name, then tap Add to create the YK Game icon",
     "addToHomeTitle": "How to add to Home",
     "addToHomeDescription": "Choose Install app or Add to Home Screen from the browser menu to add the YK Game icon to your home screen.",
-    "generatingQr": "Generating QR..."
+    "generatingQr": "Generating QR...",
+    "webExperience": {
+      "title": "Mobile QR demo",
+      "lead": "Scan with your phone to open the sign-in screen",
+      "steps": "QR → Sign in → Enter demo",
+      "description": "Scanning takes you to the machine picker. Play straight in the browser with no install. On iPhone, use Safari Share → Add to Home Screen to run it like an app."
+    }
   },
   "shell": {
     "menu": "Menu",
@@ -137,7 +155,9 @@
       "expired": "This coupon has expired",
       "noBarcode": "Unable to show barcode",
       "expiresAt": "Expires {date}",
-      "exchange": "Exchange"
+      "exchange": "Exchange",
+      "used": "Used",
+      "daysLeft": "{days} days left"
     },
     "coupons": {
       "YK_PARTS_DISCOUNT": "YK Geongi parts discount",
@@ -166,7 +186,11 @@
       "emojiPickerAriaLabel": "Choose emoji",
       "inputAvailableAfter": "Available in {seconds} seconds",
       "messagePlaceholder": "Enter a message",
-      "send": "Send"
+      "send": "Send",
+      "profileTitle": "Profile",
+      "profileChassis": "Chassis",
+      "profileLoading": "Loading profile…",
+      "profileLoadFailed": "Could not load profile."
     },
     "inquiry": {
       "title": "Support",
@@ -252,7 +276,8 @@
       "seasonTop10": "Top 10 · Season cumulative score",
       "loading": "Loading…",
       "sportsMyRank": "My rank: {rank}",
-      "reward": "Reward {stars}★"
+      "reward": "Reward {stars}★",
+      "rankValue": "Rank {rank}"
     },
     "immersive": {
       "exit": "Exit",
@@ -283,10 +308,26 @@
       "logout": "Log out",
       "admin": "Admin",
       "inquiry": "Support",
-      "language": "Language"
+      "language": "Language",
+      "detailedSettings": "Details"
     },
     "ads": {
       "rewardHint": "View reward",
+      "remainingTime": "Time remaining",
+      "rewardAfterSeconds": "Reward available in {seconds}s",
+      "oneOfRewards": "Receive one of the rewards below",
+      "count": "{count}",
+      "seconds": "{seconds}s",
+      "close": "Close",
+      "cancel": "Cancel",
+      "claim": "Claim reward",
+      "granting": "Granting…",
+      "closeWithoutReward": "Close this window without claiming the reward?",
+      "rewardDialogAria": "Ad reward",
+      "rewardAcquired": "Reward acquired!",
+      "drawingReward": "Drawing reward",
+      "stop": "Stop",
+      "confirm": "OK",
       "m15": {
         "teaserTitle": "SV10·SV11 launch!",
         "teaserSub": "Tap for a reward",
@@ -312,6 +353,20 @@
         "ariaLabel": "John Deere genuine parts 20% off ad"
       }
     },
+    "maintenanceRoulette": {
+      "stars": "Stars +{amount}",
+      "points": "{pointKind} +{amount}",
+      "enhanceCore": "Enhancement core +{amount}",
+      "standardTicketCount": "Standard draw ticket {count}",
+      "premiumTicketCount": "Premium draw ticket {count}",
+      "exchangeReward": "Exchange reward",
+      "count": "{count}",
+      "drawingReward": "Drawing reward",
+      "rewardAcquired": "Exchange reward acquired!",
+      "allRewards": "All rewards received",
+      "stop": "Stop",
+      "confirm": "OK"
+    },
     "hud": {
       "engineOn": "Engine ON",
       "engineOff": "Engine OFF",
@@ -328,7 +383,50 @@
       "game": "Game",
       "pause": "Pause",
       "resume": "Resume",
-      "exit": "Exit"
+      "exit": "Exit",
+      "quest": "Quest",
+      "gear": "Gear",
+      "shop": "Shop",
+      "tutorial": "Tutorial",
+      "questLocked": "Quest locked — level {level} required",
+      "questClose": "Close quest",
+      "questOpen": "Open quest",
+      "questOpenClaimable": "Open quest — {count} rewards to claim",
+      "gearLocked": "Gear locked — level {level} required",
+      "gearClose": "Close gear upgrade",
+      "gearOpen": "Open gear upgrade",
+      "shopClose": "Close shop",
+      "shopOpen": "Open shop",
+      "shopOpenFreeGacha": "Open shop — free draw available",
+      "rideExperience": "Ride experience · hands-on simulator",
+      "status": {
+        "currentLoad": "Current load",
+        "canDump": "Ready to unload",
+        "faceTruckBed": "Face the truck bed",
+        "moveToTruck": "Move the machine to the truck",
+        "canLoad": "Ready to load ({amount})",
+        "breakerVertical": "Keep the breaker close to vertical.",
+        "canStrike": "Ready to break",
+        "canGrab": "Ready to grab",
+        "alignGrapple": "Align the bucket with the grapple",
+        "openLeftPedal": "Left pedal: open",
+        "soilSpilling": "Soil spilling — curl the bucket",
+        "raiseBoomArm": "Raise boom and arm",
+        "haulTruckFull": "Stone truck full — move away from the unloading point",
+        "floodLeaveIncinerator": "Move away from the incinerator",
+        "floodBurning": "Burning · {percent}%",
+        "carryingTrash": "Carrying trash — feed it into the incinerator",
+        "incinerator": "Incinerator {current}/{capacity}",
+        "collection": "Collected {current}/{capacity}"
+      }
+    },
+    "gameHud": {
+      "score": "Score",
+      "cumulativeScore": "Cumulative score",
+      "camera": "Camera {mode}",
+      "cameraAria": "Camera view {mode}",
+      "respawnWait": "Respawn wait",
+      "monument": "Monument"
     },
     "toasts": {
       "inventoryFullTitle": "Not enough inventory space.",
@@ -498,9 +596,12 @@
       "dismantleConfirmTitle": "Dismantle this gear?",
       "expectedGain": "Expected gain",
       "dismantleWarn": "Dismantled gear cannot be restored.",
+      "dismantleJackpotChance": "Jackpot chance",
       "closeDismantleResult": "Close dismantle result",
       "dismantleDoneEyebrow": "Dismantle complete",
       "dismantleDoneTitle": "Gear dismantled",
+      "dismantleJackpot": "JACKPOT! +{bonus} bonus enhancement cores",
+      "bulkDismantleJackpot": "JACKPOT ×{count}! +{bonus} bonus enhancement cores",
       "gained": "Gained",
       "enhanceCore": "Enhancement core",
       "closeSellConfirm": "Close sell confirm",
@@ -568,7 +669,16 @@
       "boomSwing": "Boom swing",
       "travel": "Travel",
       "pedalBreaker": "Breaker",
-      "pedalGrapple": "Grapple"
+      "pedalGrapple": "Grapple",
+      "autoClose": "Close",
+      "autoEdit": "Edit",
+      "autoEditTitle": "Edit action names",
+      "autoEditHint": "Set action button names from {min} to {max} characters.",
+      "autoExecute": "Action {slot}",
+      "autoSave": "Save",
+      "autoSaveSlot": "Save {slot}",
+      "autoCancel": "Cancel",
+      "autoLabelValidation": "Action {slot} needs {min}–{max} characters."
     },
     "quest": {
       "title": "Quests",
@@ -576,6 +686,16 @@
       "claimed": "Done",
       "progress": "Progress",
       "empty": "No active quests",
+      "missionTasks": {
+        "soilDump": "Unload {target} soil",
+        "asphaltBreak": "Break {target} asphalt pieces",
+        "rockLoad": "Load rock successfully {target} times",
+        "horn": "Use horn {target} times",
+        "swing180": "Swing upper body 180° {target} times",
+        "travel": "Travel {target}m",
+        "dumpTruckDepart": "Send dump truck {target} times",
+        "haulTruckDepart": "Send stone truck {target} times"
+      },
       "defs": {
         "repeat-soil-dump-10000": "Dump soil {target}",
         "repeat-asphalt-10": "Break asphalt ×{target}",
@@ -589,6 +709,7 @@
         "daily-travel-3000": "Travel {target}m",
         "daily-asphalt-9": "Break asphalt ×{target}",
         "daily-rock-load-5": "Load rocks successfully ×{target}",
+        "daily-gear-gacha-5": "Gear gacha ×{target}",
         "daily-gear-enhance-3": "Attempt gear enhance ×{target}",
         "daily-gear-dismantle-5": "Dismantle gear ×{target}",
         "daily-gear-synthesize-1": "Attempt gear synthesis ×{target}",
@@ -597,6 +718,59 @@
         "daily-sports-ranked-1": "Join sports ranking ×{target}",
         "daily-all-complete": "Complete {target} daily quests",
         "daily-mission-clear-3": "Clear mission quests ×{target}"
+      },
+      "close": "Close quests",
+      "rewards": "Rewards",
+      "rewardsAwaiting": "Rewards awaiting claim",
+      "unclaimedRewards": "Unclaimed rewards {count}",
+      "reset": "Reset",
+      "resetCountdown": "Time until daily quests reset",
+      "tabs": {
+        "daily": "Daily",
+        "mission": "Mission",
+        "repeat": "Repeat"
+      },
+      "tags": {
+        "required": "Required",
+        "optional": "Optional",
+        "bonus": "Bonus"
+      },
+      "todayProgress": "Today's progress",
+      "missionProgress": "Mission progress",
+      "repeatQuests": "Repeat quests",
+      "repeatNote": "You can retry it every time you finish",
+      "claimedToday": "Claimed {count} today",
+      "loading": "Loading quest data",
+      "loadingHint": "Please check again shortly.",
+      "missionsComplete": "Mission quests complete",
+      "missionsCompleteHint": "New missions are assigned after the reset.",
+      "missionRound": "Mission {current}/{total}",
+      "missionComplete": "Missions complete",
+      "collapseMission": "Collapse mission panel",
+      "expandMission": "Expand mission panel",
+      "difficulty": "Difficulty",
+      "difficultyValue": "Difficulty {value}",
+      "clearRewards": "Clear rewards",
+      "goals": "Goals",
+      "claimMission": "Claim mission rewards",
+      "claimRewards": "Claim rewards",
+      "claiming": "Claiming",
+      "claimingShort": "Claiming",
+      "nextMissionHint": "Clear every goal to unlock the next mission.",
+      "noRewards": "No rewards",
+      "progressAria": "{title} progress",
+      "goalReached": "Goal reached",
+      "remaining": "{count} to go",
+      "done": "Complete",
+      "inProgress": "In progress",
+      "scoreUnit": "pts",
+      "rewardLabels": {
+        "xp": "XP",
+        "stars": "Stars",
+        "score": "Score",
+        "enhanceCore": "Enhancement core",
+        "standardTicket": "Standard draw ticket",
+        "premiumTicket": "Premium draw ticket"
       }
     },
     "shop": {
@@ -632,6 +806,29 @@
           "name": "Ranker's will",
           "effect": "2× score chance 35%"
         }
+      },
+      "close": "Close shop",
+      "gacha": {
+        "gearTab": "Gear",
+        "buffTab": "Buffs",
+        "standardTitle": "Standard draw",
+        "premiumTitle": "Premium draw",
+        "standardDraw": "Standard gear draw",
+        "premiumChanceUp": "Higher grade rates up",
+        "availableGrades": "Available grades",
+        "grades": {
+          "normal": "Normal",
+          "enhanced": "Enhanced",
+          "precision": "Precision",
+          "master": "Master"
+        },
+        "ownedTickets": "Owned {count}",
+        "freePulls": "{count} free",
+        "free": "Free",
+        "singlePull": "x1",
+        "tenPull": "x10",
+        "standardTicket": "Standard draw ticket",
+        "premiumTicket": "Premium draw ticket"
       }
     },
     "workshop": {
@@ -641,21 +838,22 @@
       "close": "Close workshop",
       "rewards": "Rewards",
       "rewardsAwaiting": "Awaiting claim",
-      "unclaimedRewards": "??? ?? {count}?",
+      "unclaimedRewards": "Unclaimed rewards {count}",
       "tabs": {
-        "quest": "???",
-        "upgrade": "?????",
-        "shop": "??"
+        "quest": "Quests",
+        "upgrade": "Upgrades",
+        "shop": "Shop"
       },
       "questsTitle": "Workshop quests",
       "questRewardNote": "Completed quests award workshop points.",
+      "signQuestComplete": "Quest complete",
       "oneUpgradeAtATime": "Only one upgrade can run at a time.",
       "owned": "Owned",
       "shopTitle": "Workshop shop",
-      "weeklyReset": "{limit} per item weekly ? resets Monday 00:00 KST",
+      "weeklyReset": "{limit} per item weekly · resets Monday 00:00 KST",
       "tags": {
-        "daily": "??",
-        "repeat": "??"
+        "daily": "Daily",
+        "repeat": "Repeat"
       },
       "claimed": "Claimed",
       "done": "Complete",
@@ -666,16 +864,16 @@
       "purchaseConfirmation": "Confirm purchase",
       "purchasePrompt": "Buy {item}?",
       "consume": "Cost",
-      "cancel": "??",
+      "cancel": "Cancel",
       "purchase": "Buy",
       "acquiredResult": "Acquired",
       "confirm": "OK",
       "upgradeConfirmation": "Confirm upgrade",
       "duration": "Duration",
       "instantCompleteConfirmation": "Confirm instant completion",
-      "secondsPreview": "{from}s ? {to}s",
-      "capacityPreview": "{from} ? {to} (base {base})",
-      "countPreview": "{from} ? {to} (base {base})",
+      "secondsPreview": "{from}s → {to}s",
+      "capacityPreview": "{from} → {to} (base {base})",
+      "countPreview": "{from} → {to} (base {base})",
       "catalog": {
         "workshops": {
           "dump": {
@@ -689,6 +887,10 @@
           "hill": {
             "label": "Stone unloading yard",
             "pointsLabel": "Stone unloading points"
+          },
+          "flood": {
+            "label": "Flood recovery workshop",
+            "pointsLabel": "Flood recovery points"
           }
         },
         "upgrades": {
@@ -727,6 +929,18 @@
           "rock_appraiser": {
             "label": "Rock appraiser",
             "description": "One extra rock in the stone area"
+          },
+          "cleaning_master": {
+            "label": "Cleanup master",
+            "description": "Blade collection amount +5%"
+          },
+          "incinerator_power": {
+            "label": "Incinerator power",
+            "description": "Incineration time -10s"
+          },
+          "incinerator_capacity": {
+            "label": "Incinerator expansion",
+            "description": "Incinerator capacity +500"
           }
         },
         "quests": {
@@ -738,29 +952,32 @@
           "crash-repeat-asphalt-3": "Break 3 asphalt pieces",
           "hill-daily-rock-5": "Unload 5 rocks",
           "hill-daily-haul-1": "Send haul truck once",
-          "hill-repeat-rock-2": "Unload 2 rocks"
+          "hill-repeat-rock-2": "Unload 2 rocks",
+          "flood-daily-collect-3000": "Collect 3,000 debris",
+          "flood-daily-grapple-3": "Load debris with grapple 3 times",
+          "flood-repeat-burn-1000": "Incinerate 1,000 debris"
         },
         "shop": {
           "ticket_standard": {
             "label": "Standard draw ticket",
-            "description": "Get 1?5 at random on purchase"
+            "description": "Get 1–5 at random on purchase"
           },
           "ticket_premium": {
             "label": "Premium draw ticket",
-            "description": "Get 1?3 at random on purchase"
+            "description": "Get 1–3 at random on purchase"
           },
           "enhance_core": {
             "label": "Enhancement core",
-            "description": "Get 1?10 at random on purchase"
+            "description": "Get 1–10 at random on purchase"
           }
         }
       }
     },
     "repair": {
       "title": "Maintenance",
-      "repair": "??",
-      "free": "??",
-      "durability": "???",
+      "repair": "Service",
+      "free": "Free",
+      "durability": "Durability",
       "close": "Close maintenance",
       "exchangeAvailable": "Ready to exchange",
       "expiringSoon": "Expiring soon",
@@ -774,9 +991,16 @@
       "exchangeRewards": "Exchange rewards",
       "exchange": "Exchange",
       "waiting": "Waiting",
-      "cancel": "??",
+      "cancel": "Cancel",
       "cycleHours": "Exchange cycle: {hours} hours",
       "items": " items",
+      "statusClose": "Close consumables guide",
+      "statusEyebrow": "YK Machinery Service Center",
+      "statusTitle": "Consumables exchange guide",
+      "remaining": "{time} remaining",
+      "exchangeNow": "Exchange",
+      "statusHint": "Consumables can be exchanged at the on-site service center.",
+      "confirm": "OK",
       "catalog": {
         "pointKinds": {
           "dump": "Unloading points",
@@ -817,18 +1041,18 @@
           }
         },
         "buffs": {
-          "engineOil": "Agility +5% ? 45 min",
-          "engineOilFilter": "Agility +5% ? 1 hour",
-          "hydraulicOil": "Agility +5% ? 1 hr 30 min",
-          "hydraulicFilter": "Strength & endurance +8% ? 2 hours",
-          "fuelFilter": "Strength & endurance +8% ? 4 hours",
-          "gearOil": "Strength & endurance +8% ? 8 hours"
+          "engineOil": "Agility +5% · 45 min",
+          "engineOilFilter": "Agility +5% · 1 hour",
+          "hydraulicOil": "Agility +5% · 1 hr 30 min",
+          "hydraulicFilter": "Strength & endurance +8% · 2 hours",
+          "fuelFilter": "Strength & endurance +8% · 4 hours",
+          "gearOil": "Strength & endurance +8% · 8 hours"
         }
       }
     },
     "monument": {
       "title": "YK Monument",
-      "upgrade": "?????",
+      "upgrade": "Upgrade",
       "points": "Monument points",
       "close": "Close monument",
       "rewards": "Rewards",
@@ -839,19 +1063,19 @@
       "storageFull": "Storage full",
       "claim": "Claim",
       "tabs": {
-        "quest": "???",
-        "upgrade": "?????",
-        "shop": "??"
+        "quest": "Quests",
+        "upgrade": "Upgrades",
+        "shop": "Shop"
       },
-      "unclaimedRewards": "??? ?? {count}?",
+      "unclaimedRewards": "Unclaimed rewards {count}",
       "constructionMissions": "Construction missions",
       "constructionMissionNote": "Complete the basic missions to start construction.",
       "questsTitle": "Monument quests",
       "questRewardNote": "Completed quests award monument points.",
       "tags": {
-        "build": "??",
-        "daily": "??",
-        "repeat": "??"
+        "build": "Build",
+        "daily": "Daily",
+        "repeat": "Repeat"
       },
       "done": "Complete",
       "claimed": "Claimed",
@@ -863,12 +1087,12 @@
       "levelRequirement": "Level {level} required",
       "instantComplete": "Complete now",
       "insufficient": " (insufficient)",
-      "weeklyReset": "{limit} per item weekly ? resets Monday 00:00 KST",
+      "weeklyReset": "{limit} per item weekly · resets Monday 00:00 KST",
       "thisWeek": "This week {count}/{limit}",
       "purchaseConfirmation": "Confirm purchase",
       "purchasePrompt": "Buy {item}?",
       "consume": "Cost",
-      "cancel": "??",
+      "cancel": "Cancel",
       "purchase": "Buy",
       "acquiredResult": "Acquired",
       "confirm": "OK",
@@ -891,7 +1115,8 @@
           "rockDump": "Unload {target} rocks",
           "travel": "Travel {target}m"
         }
-      }
+      },
+      "secondsPreview": "{from}s → {to}s"
     },
     "controlsGuide": {
       "title": "Controls guide",
@@ -988,6 +1213,16 @@
         "repair": "Maintenance",
         "monument": "Monument",
         "sports": "Sports meet"
+      },
+      "teleport": {
+        "eyebrow": "FAST TRAVEL",
+        "title": "Teleport to {destination}?",
+        "description": "Move instantly from your current work site to the selected location.",
+        "costAria": "Teleport cost: 10 stars",
+        "insufficient": "Not enough stars.",
+        "cancel": "Cancel",
+        "confirm": "Teleport",
+        "moving": "Teleporting…"
       }
     },
     "sportsMeet": {
@@ -1045,7 +1280,7 @@
         "heavy": "Heavy"
       },
       "weight": "{weight} kg",
-      "defaultTrait": "Standard issue · canopy",
+      "defaultTrait": "YK Heavy Industries' flagship excavator with Korea's top sales",
       "bonusPointsTitle": "Available bonus points",
       "bonus": "Bonus {points}",
       "save": "Save",
@@ -1329,6 +1564,65 @@
           }
         }
       }
+    },
+    "scene": {
+      "navGuide": {
+        "dig": "Dirt pile",
+        "dump": "Unload",
+        "crash": "Breaker",
+        "stone": "Stone"
+      },
+      "digZone": "Dirt pile",
+      "digZoneNumbered": "Dirt pile {index}",
+      "digZoneStatus": "{label} · Soil {remaining} / {capacity}",
+      "dumpZone": "Unload",
+      "soilUnload": "Soil unload",
+      "truckReturn": "Return {time}",
+      "tierExpand": "Lv.{level} site expansion",
+      "levelUpBurst": "Level {level}",
+      "crashZone": "Road breaking zone",
+      "crashZoneRespawn": "Road break · Respawn {time}",
+      "hillZone": "Stone",
+      "hillZoneCount": "Stone · {count}",
+      "hillZoneRespawn": "Stone · Respawn {time}",
+      "hillUnload": "Stone unload",
+      "floodZone": "Flood recovery",
+      "floodZoneFill": "Flood · {current}/{capacity}",
+      "floodZoneRespawn": "Flood · Respawn {time}",
+      "floodLeaveIncinerator": "Move away from the incinerator",
+      "floodBurning": "Burning · {percent}%",
+      "floodCollection": "Collect {current}/{capacity}",
+      "floodIncinerator": "Incinerator {current}/{capacity}"
+    },
+    "sitePrompt": {
+      "monument": "Monument",
+      "monumentEnter": "Enter monument",
+      "monumentEnterAria": "Enter monument, {stars} stars to claim",
+      "monumentQuest": "View mission",
+      "monumentBuilding": "Build status",
+      "monumentClaimStars": "Claim {stars} stars",
+      "monumentComplete": "Finish build",
+      "sportsMeetEnter": "Enter sports day",
+      "sportsMeetEnterAria": "Enter sports day, tickets {remaining}/{limit}",
+      "serviceBrand": "YK Machinery",
+      "serviceLabel": "Service center",
+      "serviceAria": "Open YK Machinery service center",
+      "serviceAriaClaimable": "Open YK Machinery service center, {count} exchanges available",
+      "workshopManage": "Manage",
+      "workshopOpenAria": "Open {name}",
+      "workshopOpenAriaClaimable": "Open {name}, {count} completed quests"
+    }
+  },
+  "home": {
+    "profile": {
+      "ariaLabel": "Player profile",
+      "player": "Player",
+      "logout": "Sign out",
+      "currencyStars": "Stars held (currency)",
+      "totalStars": "Total stars earned",
+      "score": "Score",
+      "scoreUnit": "pts",
+      "ranking": "Ranking"
     }
   }
 }

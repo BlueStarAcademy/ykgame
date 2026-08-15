@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
+
+/**
+ * HUD buttons open modals on pointerdown so they work during travel drag.
+ * The same press then synthesizes a click on whatever appears under the
+ * finger (e.g. gear equip BUCKET slot). Ignore panel input briefly so that
+ * trailing click cannot activate content or close via the backdrop.
+ */
+const OPEN_GHOST_CLICK_GUARD_MS = 350;
 
 interface AppModalOverlayProps {
   open: boolean;
@@ -24,6 +32,8 @@ export function AppModalOverlay({
   panelClassName = "",
   nested = false,
 }: AppModalOverlayProps) {
+  const [inputReady, setInputReady] = useState(false);
+
   useRegisterInGameBackDismiss(open, onClose);
 
   useEffect(() => {
@@ -45,6 +55,16 @@ export function AppModalOverlay({
     };
   }, [open, onClose, nested]);
 
+  useEffect(() => {
+    if (!open) {
+      setInputReady(false);
+      return;
+    }
+    setInputReady(false);
+    const id = window.setTimeout(() => setInputReady(true), OPEN_GHOST_CLICK_GUARD_MS);
+    return () => window.clearTimeout(id);
+  }, [open]);
+
   if (!open || typeof document === "undefined") {
     return null;
   }
@@ -54,10 +74,18 @@ export function AppModalOverlay({
       className={`fixed inset-0 flex items-start justify-center overflow-y-auto overscroll-contain bg-black/55 p-3 [-webkit-overflow-scrolling:touch] [touch-action:pan-y] sm:items-center sm:p-4 ${
         nested ? "z-[340]" : "z-[320]"
       }`}
-      onClick={onClose}
+      onClick={
+        inputReady
+          ? onClose
+          : (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+      }
     >
       <div
         className={`my-auto max-h-[min(92dvh,40rem)] w-full max-w-sm overflow-y-auto overscroll-contain rounded-2xl [-webkit-overflow-scrolling:touch] [touch-action:pan-y] landscape:max-h-[min(94dvh,24rem)] ${panelClassName}`.trim()}
+        style={inputReady ? undefined : { pointerEvents: "none" }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
