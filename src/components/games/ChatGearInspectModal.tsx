@@ -64,18 +64,25 @@ function parseSubOptions(raw: unknown): {
     const obj = entry as Record<string, unknown>;
     if (typeof obj.key !== "string" || typeof obj.value !== "number") continue;
     const pool = SUB_OPTION_POOL.find((s) => s.key === obj.key);
+    const isPercent =
+      typeof obj.isPercent === "boolean" ? obj.isPercent : out.length === 0;
+    const poolMin = pool
+      ? isPercent
+        ? pool.percentMin
+        : pool.flatMin
+      : 0;
+    const poolMax = pool
+      ? isPercent
+        ? pool.percentMax
+        : pool.flatMax
+      : 0;
     out.push({
       key: obj.key,
       tier: typeof obj.tier === "number" ? obj.tier : 1,
       value: obj.value,
-      rollMin:
-        typeof obj.rollMin === "number" ? obj.rollMin : (pool?.rollMin ?? 0),
-      rollMax:
-        typeof obj.rollMax === "number" ? obj.rollMax : (pool?.rollMax ?? 0),
-      isPercent:
-        typeof obj.isPercent === "boolean"
-          ? obj.isPercent
-          : pool?.isPercent,
+      rollMin: typeof obj.rollMin === "number" ? obj.rollMin : poolMin,
+      rollMax: typeof obj.rollMax === "number" ? obj.rollMax : poolMax,
+      isPercent,
     });
   }
   return out;

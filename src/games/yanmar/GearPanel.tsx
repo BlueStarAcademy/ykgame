@@ -18,6 +18,7 @@ import {
   getGearInventoryExpandCost,
   type GearSlot,
   type ItemGrade,
+  type MasterOptionKey,
 } from "./gearCatalog";
 import {
   getEnhanceCost,
@@ -622,7 +623,18 @@ export function GearPanel({
     const masters = resolveMaxMasterByKey(
       items
         .filter((item) => item.equippedSlot)
-        .map((item) => item.masterOption),
+        .map((item) => {
+          const m = item.masterOption;
+          if (!m) return null;
+          return {
+            key: m.key as MasterOptionKey,
+            value: m.value,
+            label: m.label,
+            hideValue: m.hideValue,
+            isPercent: m.isPercent,
+            isDropRateBonus: false,
+          };
+        }),
     );
     return Math.max(
       0,
