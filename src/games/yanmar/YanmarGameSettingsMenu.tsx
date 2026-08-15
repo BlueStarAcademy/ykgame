@@ -295,12 +295,14 @@ function ActionRow({
   label,
   onClick,
   disabled,
-  notify,
+  notifyCount = 0,
+  notifyDot = false,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
-  notify?: boolean;
+  notifyCount?: number;
+  notifyDot?: boolean;
 }) {
   return (
     <button
@@ -310,7 +312,11 @@ function ActionRow({
       className="relative flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10 disabled:text-white/35"
     >
       <span>{label}</span>
-      {notify ? (
+      {notifyCount > 0 ? (
+        <span className="yanmar-quest-notify-badge ml-auto shrink-0" aria-hidden>
+          {notifyCount > 9 ? "9+" : notifyCount}
+        </span>
+      ) : notifyDot ? (
         <span className="yanmar-quest-notify-badge is-dot" aria-hidden />
       ) : null}
     </button>
@@ -352,6 +358,9 @@ interface YanmarGameSettingsMenuProps {
   onResetPosition?: () => void;
   onShowGuide?: () => void;
   onShowTutorial?: () => void;
+  /** Unclaimed tutorial reward count (number badge). */
+  tutorialNotifyCount?: number;
+  /** New unlocked tutorials (dot when count is 0). */
   tutorialNotify?: boolean;
   onShowRanking?: () => void;
   onSaveAndExit?: () => void;
@@ -391,6 +400,7 @@ export function YanmarGameSettingsMenu({
   onResetPosition,
   onShowGuide,
   onShowTutorial,
+  tutorialNotifyCount = 0,
   tutorialNotify = false,
   onShowRanking,
   onSaveAndExit,
@@ -606,6 +616,24 @@ export function YanmarGameSettingsMenu({
                 }}
               />
             ) : null}
+            <ActionRow
+              label={t("tutorial")}
+              onClick={() => {
+                onOpenChange(false);
+                onShowTutorial?.();
+              }}
+              disabled={!onShowTutorial}
+              notifyCount={tutorialNotifyCount}
+              notifyDot={tutorialNotify}
+            />
+            <ActionRow
+              label={t("guide")}
+              onClick={() => {
+                onOpenChange(false);
+                onShowGuide?.();
+              }}
+              disabled={!onShowGuide}
+            />
             {canFullscreen && !inApiFullscreen && !isStandalone ? (
               <ActionRow
                 label={t("fullscreen")}
@@ -632,23 +660,6 @@ export function YanmarGameSettingsMenu({
                 onOpenChange(false);
                 setInventoryOpen(true);
               }}
-            />
-            <ActionRow
-              label={t("guide")}
-              onClick={() => {
-                onOpenChange(false);
-                onShowGuide?.();
-              }}
-              disabled={!onShowGuide}
-            />
-            <ActionRow
-              label={t("tutorial")}
-              onClick={() => {
-                onOpenChange(false);
-                onShowTutorial?.();
-              }}
-              disabled={!onShowTutorial}
-              notify={tutorialNotify}
             />
             <ActionRow
               label={t("ranking")}
@@ -755,7 +766,11 @@ export function YanmarGameSettingsMenu({
             />
           </svg>
         </span>
-        {tutorialNotify ? (
+        {tutorialNotifyCount > 0 ? (
+          <span className="yanmar-quest-notify-badge is-icon" aria-hidden>
+            {tutorialNotifyCount > 9 ? "9+" : tutorialNotifyCount}
+          </span>
+        ) : tutorialNotify ? (
           <span className="yanmar-quest-notify-badge is-dot" aria-hidden />
         ) : null}
       </button>

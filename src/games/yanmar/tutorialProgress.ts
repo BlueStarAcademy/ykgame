@@ -113,3 +113,16 @@ export function grandfatherIntroIfPlayed(
   if (state.introDone || totalXp <= 0) return state;
   return { ...state, introDone: true };
 }
+
+/** Completed steps with a reward that has not been claimed yet. */
+export function countClaimableTutorialRewards(
+  state: YanmarTutorialState,
+): number {
+  const claimed = new Set(state.claimed);
+  let count = 0;
+  for (const stepId of state.completed) {
+    if (!TUTORIAL_REWARDS[stepId] || claimed.has(stepId)) continue;
+    count += 1;
+  }
+  return count;
+}

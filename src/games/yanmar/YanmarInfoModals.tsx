@@ -1,11 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
-import { LocalizedImage } from "@/components/i18n/LocalizedImage";
-import { YANMAR_ASSETS } from "./controls";
-import { YANMAR_GUIDE_SECTIONS } from "./yanmarLobbyInfo";
+import {
+  YANMAR_GUIDE_TABS,
+  type YanmarGuideTabId,
+  type YanmarGuideVisualCard,
+} from "./yanmarLobbyInfo";
 
 function InfoModalShell({
   open,
@@ -54,6 +56,167 @@ function InfoModalShell({
   );
 }
 
+function GuideCardImage({
+  src,
+  badgeSrc,
+  alt,
+}: {
+  src: string;
+  badgeSrc?: string;
+  alt: string;
+}) {
+  return (
+    <div className="yanmar-help-card-media" aria-hidden={!alt}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className="yanmar-help-card-img"
+        draggable={false}
+      />
+      {badgeSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={badgeSrc}
+          alt=""
+          className="yanmar-help-card-badge"
+          draggable={false}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function GuideSteps({
+  cardId,
+  tabId,
+}: {
+  cardId: string;
+  tabId: YanmarGuideTabId;
+}) {
+  const t = useTranslations("yanmar.guide");
+  const steps = ["1", "2", "3"] as const;
+
+  return (
+    <ol className="yanmar-help-steps">
+      {steps.map((step, index) => (
+        <li key={step} className="yanmar-help-step">
+          <span className="yanmar-help-step-num" aria-hidden>
+            {step}
+          </span>
+          <span className="yanmar-help-step-text">
+            {t(`panels.${tabId}.cards.${cardId}.steps.${step}`)}
+          </span>
+          {index < steps.length - 1 ? (
+            <span className="yanmar-help-step-arrow" aria-hidden>
+              →
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function GuideCard({
+  card,
+  tabId,
+}: {
+  card: YanmarGuideVisualCard;
+  tabId: YanmarGuideTabId;
+}) {
+  const t = useTranslations("yanmar.guide");
+  const title = t(`panels.${tabId}.cards.${card.id}.title`);
+  const desc = t(`panels.${tabId}.cards.${card.id}.desc`);
+
+  return (
+    <article className="yanmar-help-card">
+      <GuideCardImage
+        src={card.image}
+        badgeSrc={card.badgeImage}
+        alt=""
+      />
+      <div className="yanmar-help-card-body">
+        <h4 className="yanmar-help-card-title">{title}</h4>
+        <p className="yanmar-help-card-desc">{desc}</p>
+        {card.steps ? <GuideSteps cardId={card.id} tabId={tabId} /> : null}
+      </div>
+    </article>
+  );
+}
+
+function YanmarGuideBody() {
+  const t = useTranslations("yanmar.guide");
+  const baseId = useId();
+  const [activeTab, setActiveTab] = useState<YanmarGuideTabId>("start");
+
+  const activeDef =
+    YANMAR_GUIDE_TABS.find((tab) => tab.id === activeTab) ??
+    YANMAR_GUIDE_TABS[0];
+
+  return (
+    <div className="yanmar-help">
+      <div
+        className="yanmar-help-tabs"
+        role="tablist"
+        aria-label={t("title")}
+      >
+        {YANMAR_GUIDE_TABS.map((tab) => {
+          const selected = tab.id === activeTab;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              id={`${baseId}-tab-${tab.id}`}
+              aria-selected={selected}
+              aria-controls={`${baseId}-panel-${tab.id}`}
+              tabIndex={selected ? 0 : -1}
+              className={`yanmar-help-tab${selected ? " is-active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {t(`tabs.${tab.id}`)}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        key={activeDef.id}
+        role="tabpanel"
+        id={`${baseId}-panel-${activeDef.id}`}
+        aria-labelledby={`${baseId}-tab-${activeDef.id}`}
+        className="yanmar-help-panel"
+      >
+        {activeDef.heroImage ? (
+          <div className="yanmar-help-hero">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activeDef.heroImage}
+              alt={t(`panels.${activeDef.id}.heroAlt`)}
+              className="yanmar-help-hero-img"
+              draggable={false}
+            />
+            <div className="yanmar-help-hero-shade" aria-hidden />
+          </div>
+        ) : null}
+
+        {activeDef.hasLead ? (
+          <p className="yanmar-help-lead">
+            {t(`panels.${activeDef.id}.lead`)}
+          </p>
+        ) : null}
+
+        <div className="yanmar-help-cards">
+          {activeDef.cards.map((card) => (
+            <GuideCard key={card.id} card={card} tabId={activeDef.id} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function YanmarGuideModal({
   open,
   onClose,
@@ -73,40 +236,8 @@ export function YanmarGuideModal({
       subtitle={t("subtitle")}
       closeAriaLabel={tc("close")}
     >
-      <div className="yanmar-help">
-        <LocalizedImage
-          src={YANMAR_ASSETS.controlsGuide}
-          alt={t("diagramAlt")}
-          className="mx-auto mb-2 w-full max-w-lg rounded-lg"
-          draggable={false}
-        />
-        <p className="yanmar-help-diagram-hint">{t("diagramHint")}</p>
-        <p className="yanmar-help-lead">{t("lead")}</p>
-        {YANMAR_GUIDE_SECTIONS.map((section) => (
-          <section key={section.id} className="yanmar-help-section">
-            <h3 className="yanmar-help-section-title">
-              {t(`sections.${section.id}.title`)}
-            </h3>
-            {section.hasIntro ? (
-              <p className="yanmar-help-section-intro">
-                {t(`sections.${section.id}.intro`)}
-              </p>
-            ) : null}
-            <ul className="yanmar-help-list">
-              {section.itemIds.map((itemId) => (
-                <li key={itemId} className="yanmar-help-item">
-                  <span className="yanmar-help-item-label">
-                    {t(`sections.${section.id}.items.${itemId}.label`)}
-                  </span>
-                  <span className="yanmar-help-item-desc">
-                    {t(`sections.${section.id}.items.${itemId}.desc`)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
+      {/* Remount on open so the first tab is always shown. */}
+      <YanmarGuideBody key={open ? "open" : "closed"} />
     </InfoModalShell>
   );
 }

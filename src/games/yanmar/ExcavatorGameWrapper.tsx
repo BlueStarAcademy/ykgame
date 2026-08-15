@@ -315,6 +315,7 @@ import {
   parseYanmarTutorialState,
   withCompletedStep,
   withSeenNew,
+  countClaimableTutorialRewards,
   type YanmarTutorialState,
 } from "./tutorialProgress";
 import {
@@ -7574,7 +7575,9 @@ export function ExcavatorGameWrapper({
   const playerLevelNow = getPlayerLevelProgress(totalXp).level;
   const gearCraftUnlocked = isGearCraftUnlocked(playerLevelNow);
   const questPanelUnlocked = isQuestPanelUnlocked(playerLevelNow);
+  const tutorialNotifyCount = countClaimableTutorialRewards(tutorialState);
   const tutorialNotify =
+    tutorialNotifyCount === 0 &&
     getNewTutorialStepIds(playerLevelNow, tutorialState.seenNew).length > 0;
   const tutorialGuideHud =
     mode === "tutorial" && tutorialStep ? (
@@ -7907,119 +7910,144 @@ export function ExcavatorGameWrapper({
               <>
                 <div className="pointer-events-auto flex max-w-full flex-col items-start gap-1.5">
                   <div className="flex max-w-full flex-wrap items-start gap-1.5">
-                    <button
-                      type="button"
-                      className={`yanmar-quest-button yanmar-aux-button touch-none active:scale-95${
-                        showQuestPanel ? " is-open" : ""
-                      }`}
-                      onPointerDown={activateOnPointerDown(() => {
-                        if (!questPanelUnlocked) return;
-                        setShowShopPanel(false);
-                        setShowEquipmentUpgrade(false);
-                        setShowQuestPanel((open) => !open);
-                      })}
-                      aria-expanded={showQuestPanel}
-                      aria-label={
-                        !questPanelUnlocked
-                          ? hudT("questLocked", { level: PLAYER_UNLOCKS.QUESTS })
-                          : showQuestPanel
-                          ? hudT("questClose")
-                          : questClaimableCount > 0
-                            ? hudT("questOpenClaimable", {
-                                count: questClaimableCount,
-                              })
-                            : hudT("questOpen")
-                      }
-                    >
-                      <img
-                        className="yanmar-quest-button-icon"
-                        src="/images/yanmar/2d/cockpit/quest-premium.png?v=3"
-                        alt=""
-                        draggable={false}
-                      />
-                      <span className="yanmar-quest-button-label">{hudT("quest")}</span>
-                      {questPanelUnlocked && questClaimableCount > 0 ? (
-                        <span
-                          className="yanmar-quest-notify-badge is-icon"
-                          aria-hidden
+                    <div className="flex flex-col items-start gap-1.5">
+                      <div className="flex items-start gap-1.5">
+                        <button
+                          type="button"
+                          className={`yanmar-quest-button yanmar-aux-button touch-none active:scale-95${
+                            showQuestPanel ? " is-open" : ""
+                          }`}
+                          onPointerDown={activateOnPointerDown(() => {
+                            if (!questPanelUnlocked) return;
+                            setShowShopPanel(false);
+                            setShowEquipmentUpgrade(false);
+                            setShowQuestPanel((open) => !open);
+                          })}
+                          aria-expanded={showQuestPanel}
+                          aria-label={
+                            !questPanelUnlocked
+                              ? hudT("questLocked", {
+                                  level: PLAYER_UNLOCKS.QUESTS,
+                                })
+                              : showQuestPanel
+                                ? hudT("questClose")
+                                : questClaimableCount > 0
+                                  ? hudT("questOpenClaimable", {
+                                      count: questClaimableCount,
+                                    })
+                                  : hudT("questOpen")
+                          }
                         >
-                          {questClaimableCount > 9 ? "9+" : questClaimableCount}
-                        </span>
+                          <img
+                            className="yanmar-quest-button-icon"
+                            src="/images/yanmar/2d/cockpit/quest-premium.png?v=3"
+                            alt=""
+                            draggable={false}
+                          />
+                          <span className="yanmar-quest-button-label">
+                            {hudT("quest")}
+                          </span>
+                          {questPanelUnlocked && questClaimableCount > 0 ? (
+                            <span
+                              className="yanmar-quest-notify-badge is-icon"
+                              aria-hidden
+                            >
+                              {questClaimableCount > 9
+                                ? "9+"
+                                : questClaimableCount}
+                            </span>
+                          ) : null}
+                          <HudFeatureLock
+                            locked={!questPanelUnlocked}
+                            level={PLAYER_UNLOCKS.QUESTS}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
+                            showEquipmentUpgrade ? " is-open" : ""
+                          }`}
+                          onPointerDown={activateOnPointerDown(() => {
+                            if (!gearCraftUnlocked) return;
+                            setShowQuestPanel(false);
+                            setShowShopPanel(false);
+                            setShowProfileModal(false);
+                            setShowEquipmentUpgrade((open) => !open);
+                          })}
+                          aria-expanded={showEquipmentUpgrade}
+                          aria-label={
+                            !gearCraftUnlocked
+                              ? hudT("gearLocked", {
+                                  level: PLAYER_UNLOCKS.GEAR_CRAFT,
+                                })
+                              : showEquipmentUpgrade
+                                ? hudT("gearClose")
+                                : hudT("gearOpen")
+                          }
+                        >
+                          <img
+                            className="yanmar-upgrade-hud-button-icon"
+                            src="/images/yanmar/2d/cockpit/upgrade-anvil-premium.png?v=2"
+                            alt=""
+                            draggable={false}
+                          />
+                          <span className="yanmar-upgrade-hud-button-label">
+                            {hudT("gear")}
+                          </span>
+                          <HudFeatureLock
+                            locked={!gearCraftUnlocked}
+                            level={PLAYER_UNLOCKS.GEAR_CRAFT}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          className={`yanmar-shop-button yanmar-aux-button touch-none active:scale-95${
+                            showShopPanel ? " is-open" : ""
+                          }`}
+                          onPointerDown={activateOnPointerDown(() => {
+                            setShowQuestPanel(false);
+                            setShowEquipmentUpgrade(false);
+                            setShowProfileModal(false);
+                            setShowShopPanel((open) => !open);
+                          })}
+                          aria-expanded={showShopPanel}
+                          aria-label={
+                            showShopPanel
+                              ? hudT("shopClose")
+                              : shopHasFreeGacha
+                                ? hudT("shopOpenFreeGacha")
+                                : hudT("shopOpen")
+                          }
+                        >
+                          <img
+                            className="yanmar-shop-button-icon"
+                            src="/images/yanmar/2d/cockpit/shop-premium.png?v=4"
+                            alt=""
+                            draggable={false}
+                          />
+                          <span className="yanmar-shop-button-label">
+                            {hudT("shop")}
+                          </span>
+                          {shopHasFreeGacha ? (
+                            <span
+                              className="yanmar-quest-notify-badge is-dot"
+                              aria-hidden
+                            />
+                          ) : null}
+                        </button>
+                      </div>
+                      {showMissionQuest ? (
+                        <div className="w-[9rem]">
+                          <MissionHudPanel
+                            questState={questState}
+                            claiming={questClaimingId === "mission"}
+                            onClaim={() => {
+                              void handleClaimMissionQuest();
+                            }}
+                          />
+                        </div>
                       ) : null}
-                      <HudFeatureLock
-                        locked={!questPanelUnlocked}
-                        level={PLAYER_UNLOCKS.QUESTS}
-                      />
-                    </button>
-                    <button
-                      type="button"
-                      className={`yanmar-upgrade-hud-button yanmar-aux-button touch-none active:scale-95${
-                        showEquipmentUpgrade ? " is-open" : ""
-                      }`}
-                      onPointerDown={activateOnPointerDown(() => {
-                        if (!gearCraftUnlocked) return;
-                        setShowQuestPanel(false);
-                        setShowShopPanel(false);
-                        setShowProfileModal(false);
-                        setShowEquipmentUpgrade((open) => !open);
-                      })}
-                      aria-expanded={showEquipmentUpgrade}
-                      aria-label={
-                        !gearCraftUnlocked
-                          ? hudT("gearLocked", {
-                              level: PLAYER_UNLOCKS.GEAR_CRAFT,
-                            })
-                          : showEquipmentUpgrade
-                            ? hudT("gearClose")
-                            : hudT("gearOpen")
-                      }
-                    >
-                      <img
-                        className="yanmar-upgrade-hud-button-icon"
-                        src="/images/yanmar/2d/cockpit/upgrade-anvil-premium.png?v=2"
-                        alt=""
-                        draggable={false}
-                      />
-                      <span className="yanmar-upgrade-hud-button-label">{hudT("gear")}</span>
-                      <HudFeatureLock
-                        locked={!gearCraftUnlocked}
-                        level={PLAYER_UNLOCKS.GEAR_CRAFT}
-                      />
-                    </button>
-                    <button
-                      type="button"
-                      className={`yanmar-shop-button yanmar-aux-button touch-none active:scale-95${
-                        showShopPanel ? " is-open" : ""
-                      }`}
-                      onPointerDown={activateOnPointerDown(() => {
-                        setShowQuestPanel(false);
-                        setShowEquipmentUpgrade(false);
-                        setShowProfileModal(false);
-                        setShowShopPanel((open) => !open);
-                      })}
-                      aria-expanded={showShopPanel}
-                      aria-label={
-                        showShopPanel
-                          ? hudT("shopClose")
-                          : shopHasFreeGacha
-                            ? hudT("shopOpenFreeGacha")
-                            : hudT("shopOpen")
-                      }
-                    >
-                      <img
-                        className="yanmar-shop-button-icon"
-                        src="/images/yanmar/2d/cockpit/shop-premium.png?v=4"
-                        alt=""
-                        draggable={false}
-                      />
-                      <span className="yanmar-shop-button-label">{hudT("shop")}</span>
-                      {shopHasFreeGacha ? (
-                        <span
-                          className="yanmar-quest-notify-badge is-dot"
-                          aria-hidden
-                        />
-                      ) : null}
-                    </button>
+                    </div>
                     {nearMonument &&
                     !showMonumentPanel &&
                     !nearRepairTent &&
@@ -8253,17 +8281,6 @@ export function ExcavatorGameWrapper({
                     ) : null}
                   </div>
                   {tutorialGuideHud}
-                  {showMissionQuest ? (
-                    <div className="w-[9rem]">
-                      <MissionHudPanel
-                        questState={questState}
-                        claiming={questClaimingId === "mission"}
-                        onClaim={() => {
-                          void handleClaimMissionQuest();
-                        }}
-                      />
-                    </div>
-                  ) : null}
                 </div>
                 <QuestPanel
                   open={showQuestPanel && questPanelUnlocked}
@@ -8349,9 +8366,25 @@ export function ExcavatorGameWrapper({
                       type="button"
                       onPointerDown={activateOnPointerDown(openTutorialList)}
                       className="relative h-[2.75rem] rounded-lg border border-white/20 bg-black/70 px-2.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
+                      aria-label={
+                        tutorialNotifyCount > 0
+                          ? hudT("tutorialOpenClaimable", {
+                              count: tutorialNotifyCount,
+                            })
+                          : hudT("tutorial")
+                      }
                     >
                       {hudT("tutorial")}
-                      {tutorialNotify ? (
+                      {tutorialNotifyCount > 0 ? (
+                        <span
+                          className="yanmar-quest-notify-badge is-icon"
+                          aria-hidden
+                        >
+                          {tutorialNotifyCount > 9
+                            ? "9+"
+                            : tutorialNotifyCount}
+                        </span>
+                      ) : tutorialNotify ? (
                         <span
                           className="yanmar-quest-notify-badge is-dot"
                           aria-hidden
@@ -9349,6 +9382,7 @@ export function ExcavatorGameWrapper({
           onResetPosition={resetExcavatorPosition}
           onShowGuide={onShowGuide}
           onShowTutorial={openTutorialList}
+          tutorialNotifyCount={tutorialNotifyCount}
           tutorialNotify={tutorialNotify}
           onShowRanking={onShowRanking}
           onSaveAndExit={onRequestExit}

@@ -388,6 +388,7 @@
       "gear": "Gear",
       "shop": "Shop",
       "tutorial": "Tutorial",
+      "tutorialOpenClaimable": "Open tutorial, {count} unclaimed rewards",
       "questLocked": "Quest locked — level {level} required",
       "questClose": "Close quest",
       "questOpen": "Open quest",
@@ -1356,210 +1357,133 @@
     "guide": {
       "title": "How to play",
       "eyebrow": "Operator Guide",
-      "subtitle": "Controls, work, growth, and rewards at a glance",
-      "lead": "A quick overview of controls, work, growth, and rewards in the Yanmar excavator experience.",
-      "diagramAlt": "Yanmar excavator controls diagram — joysticks, travel levers, boom/bucket/arm",
-      "diagramHint": "① Left joystick · ② Travel levers · ⑤ Right joystick — pinch to zoom",
-      "sections": {
-        "modes": {
-          "title": "Modes",
-          "intro": "Enter Game mode from Home. Learn the controls in Practice or Tutorial, then climb the rankings.",
-          "items": {
-            "game": {
-              "label": "Game",
-              "desc": "Score, stars, XP, and coupons count, and results are recorded in season rankings."
+      "subtitle": "A clear guide for first-time operators",
+      "tabs": {
+        "start": "Getting started",
+        "controls": "Controls",
+        "work": "Work methods",
+        "growth": "Growth · Rewards"
+      },
+      "panels": {
+        "start": {
+          "lead": "Learn the levers in Tutorial, practice freely, then play Game mode for score and rewards.",
+          "heroAlt": "Yanmar excavator side diagram",
+          "cards": {
+            "path": {
+              "title": "Recommended path",
+              "desc": "If you are new, follow this order.",
+              "steps": {
+                "1": "Tutorial — levers & basics",
+                "2": "Practice — free zones",
+                "3": "Game — score, stars, ranking"
+              }
             },
-            "practice": {
-              "label": "Practice",
-              "desc": "Opens every work zone on the map for free practice. Does not count toward rankings or season rewards."
+            "loop": {
+              "title": "One work loop",
+              "desc": "Equip the right attachment, complete the job, and earn rewards.",
+              "steps": {
+                "1": "Reach zone · check attachment",
+                "2": "Dig · crush · load",
+                "3": "Unload → stars · score · XP"
+              }
             },
-            "tutorial": {
-              "label": "Tutorial",
-              "desc": "Learn step by step: travel → swing → arm → boom → bucket → soil pile → dump → breaker → rock load → rock dump."
-            },
-            "ride": {
-              "label": "Ride experience",
-              "desc": "Controls-only mode. No score or rewards."
+            "modes": {
+              "title": "Modes",
+              "desc": "Game counts for ranking. Practice and Ride give no rewards. Tutorial teaches step by step."
             }
           }
         },
         "controls": {
-          "title": "Basic controls",
-          "items": {
+          "lead": "Left and right levers plus travel levers are the core. Swap attachments in the function menu.",
+          "heroAlt": "Excavator control overview",
+          "cards": {
             "leftLever": {
-              "label": "Left lever",
-              "desc": "Swing left/right; move the arm forward/back."
+              "title": "Left lever",
+              "desc": "Swing left/right; extend or retract the arm forward/back."
             },
             "rightLever": {
-              "label": "Right lever",
-              "desc": "Boom forward/back; bucket left/right."
+              "title": "Right lever",
+              "desc": "Raise/lower the boom forward/back; curl or open the bucket left/right."
             },
             "travel": {
-              "label": "Travel levers",
-              "desc": "Forward, reverse, and turn left/right."
+              "title": "Travel levers",
+              "desc": "Move forward, reverse, and turn between work sites."
             },
             "functionMenu": {
-              "label": "Function menu",
-              "desc": "Swap attachments, dozer, safety lock, hydraulic high speed, boom swing, throttle, and more."
+              "title": "Function menu",
+              "desc": "Swap bucket, breaker, or grapple; set dozer, safety lock, hydraulic high speed, boom swing, and throttle."
             },
             "pedals": {
-              "label": "Pedals & horn",
+              "title": "Pedals & horn",
               "desc": "Breaker hits, grapple open/close, boom-swing pedal, and horn."
             },
             "camera": {
-              "label": "Camera & minimap",
-              "desc": "Free-look and minimap for position. Auto-pose slots save and load machine posture."
+              "title": "Camera & minimap",
+              "desc": "Free-look and minimap to find zones. Auto-pose slots save and load posture."
             }
           }
         },
-        "attachments": {
-          "title": "Attachments & work zones",
-          "intro": "Equip the matching attachment for each zone. You cannot swap attachments while soil remains in the bucket.",
-          "items": {
+        "work": {
+          "lead": "Each zone needs the matching attachment. You cannot swap while soil remains in the bucket.",
+          "heroAlt": "Rock haul truck on site",
+          "cards": {
             "bucket": {
-              "label": "Bucket · soil / dump",
-              "desc": "Load soil in the orange pile zone and dump it into dump trucks."
+              "title": "Bucket · soil",
+              "desc": "Load soil at the orange pile and dump it into dump trucks.",
+              "steps": {
+                "1": "Enter soil zone",
+                "2": "Load with bucket",
+                "3": "Dump → rewards"
+              }
             },
             "breaker": {
-              "label": "Breaker · crushing",
-              "desc": "Break road tiles in the crushing zone. Broken tiles respawn after a while."
+              "title": "Breaker · crushing",
+              "desc": "Break road tiles in the crushing zone. Broken tiles respawn after a while.",
+              "steps": {
+                "1": "Enter crushing zone",
+                "2": "Strike tiles with pedal",
+                "3": "Score · stars per tile"
+              }
             },
             "grapple": {
-              "label": "Grapple · stone",
-              "desc": "Grip a rock, fill the grip meter, lift it, and unload onto haul trucks. Lift checks can fail."
+              "title": "Grapple · stone",
+              "desc": "Grip a rock, fill the grip meter, lift it, and unload onto haul trucks.",
+              "steps": {
+                "1": "Grip rock in stone zone",
+                "2": "Fill grip and lift",
+                "3": "Unload → high reward"
+              }
             }
           }
         },
-        "rewards": {
-          "title": "Work rewards",
-          "intro": "Working in Game mode earns score, stars, and XP, with a very low chance of coupon drops.",
-          "items": {
-            "soilDump": {
-              "label": "Soil dump",
-              "desc": "Earn score and stars (1–3) per load unit. Critical hits multiply score."
+        "growth": {
+          "lead": "Higher levels open more of the map. Work rewards fuel gear growth. Rewards apply in Game mode only.",
+          "heroAlt": "Gear enhance anvil",
+          "cards": {
+            "unlocks": {
+              "title": "Level · map unlocks",
+              "desc": "Work zones open as you level up.",
+              "steps": {
+                "1": "Lv.1 — soil · dump",
+                "2": "Lv.10 — breaker · crushing",
+                "3": "Lv.15 — grapple · stone"
+              }
             },
-            "crash": {
-              "label": "Crushing",
-              "desc": "Earn score, stars (5–15), and XP per tile."
+            "rewards": {
+              "title": "Work rewards",
+              "desc": "Dumping, crushing, and rock unload grant score, stars (1–30), and XP. Coupons drop rarely. Spend stars on enhance, gacha, and the shop."
             },
-            "rockDump": {
-              "label": "Rock dump",
-              "desc": "Unloading one rock grants high score, stars (20–30), and XP."
+            "gear": {
+              "title": "Gear · enhance · chassis",
+              "desc": "Pull arm, boom, track, and attachment gear from gacha and enhance +1 to +10. Allocate chassis stats to change performance."
             },
-            "stars": {
-              "label": "Stars",
-              "desc": "Currency for gear enhance, gacha, shop, and more. No hold limit."
+            "quests": {
+              "title": "Quests · workshop",
+              "desc": "Daily and repeat quests plus daily missions grant stars, cores, and tickets. Buy buffs and upgrades at the workshop and shop."
             },
-            "coupons": {
-              "label": "Coupons",
-              "desc": "YK parts discounts (10/15/20%), equipment rental discounts (10/20/30%), and filter-set exchange coupons. Season caps (50/50/1) and 365-day expiry apply."
-            }
-          }
-        },
-        "unlocks": {
-          "title": "Level & map unlocks",
-          "intro": "Higher levels open more of the map and quests.",
-          "items": {
-            "tier1": {
-              "label": "Tier 1 (Lv.1+)",
-              "desc": "Use the soil pile and dump zones."
-            },
-            "tier2": {
-              "label": "Tier 2 (Lv.10+)",
-              "desc": "Unlocks breaker/crushing zones and related quests."
-            },
-            "tier3": {
-              "label": "Tier 3 (Lv.15+)",
-              "desc": "Unlocks grapple/stone zones and related quests."
-            },
-            "flood": {
-              "label": "Flood recovery (Lv.23+)",
-              "desc": "Top-left on the minimap. Push debris with the blade and incinerate it with the grapple."
-            },
-            "sportsMeet": {
-              "label": "Excavator Sports Meet (Lv.25+)",
-              "desc": "Portal at the lower-left of the minimap. One ranked ticket per day, unlimited practice. Course rotates Monday 00:00 (KST) with last week’s rank star mail."
-            }
-          }
-        },
-        "quests": {
-          "title": "Quests & missions",
-          "items": {
-            "daily": {
-              "label": "Daily quests",
-              "desc": "Goals that refresh daily: login, horn, dump, crushing, travel, and more."
-            },
-            "repeat": {
-              "label": "Repeat quests",
-              "desc": "Long-term goals you can progress again after claiming."
-            },
-            "mission": {
-              "label": "Daily missions",
-              "desc": "Three per day, scaled to your level. Clears grant stars, XP, enhance cores, gacha tickets, and more."
-            }
-          }
-        },
-        "gear": {
-          "title": "Gear, enhance & chassis",
-          "items": {
-            "gacha": {
-              "label": "Gear",
-              "desc": "Obtain arm, boom, track, bucket, breaker, and grapple gear from gacha. Rarity and main/sub options change performance."
-            },
-            "enhance": {
-              "label": "Enhance",
-              "desc": "Enhance each part +1 to +10. Costs stars; higher tiers are harder, and failures build a bonus."
-            },
-            "chassis": {
-              "label": "Chassis",
-              "desc": "Allocate base chassis (ViO17-1) stats: power, agility, stamina, grit, stability, and skill."
-            }
-          }
-        },
-        "workshop": {
-          "title": "Workshop & shop",
-          "items": {
-            "facility": {
-              "label": "Workshop",
-              "desc": "Earn points at soil, crushing, and stone workshops to upgrade and buy tickets, cores, and more."
-            },
-            "shopBuff": {
-              "label": "Shop buffs",
-              "desc": "Buy 1-hour buffs such as critical, move speed, grip, truck cooldown, and double-score chance."
-            }
-          }
-        },
-        "field": {
-          "title": "Field & maintenance",
-          "items": {
-            "fieldStar": {
-              "label": "Field stars",
-              "desc": "Pick up floating map stars for 50–200 stars. One appears every hour on the hour."
-            },
-            "speedBuff": {
-              "label": "Speed buff",
-              "desc": "Field speed pickups double move speed for about 30 seconds. Spawns about every 3 minutes, up to 10 per hour."
-            },
-            "repairTent": {
-              "label": "Repair tent",
-              "desc": "Consumables expire over time. When expired or nearly expired, a red icon appears—tap to inspect. At the repair shop, check the description, time left, and reward range, then exchange for free. Rewards are drawn once within the stated range. Leaving them expired applies a stat penalty."
-            }
-          }
-        },
-        "season": {
-          "title": "Season & more",
-          "items": {
-            "ranking": {
-              "label": "Season ranking",
-              "desc": "Compete on quarterly (KST) season score. Check Ranking info in Settings/menu."
-            },
-            "mailbox": {
-              "label": "Mailbox & coupon box",
-              "desc": "Claim mailed rewards and view held coupons in the coupon box."
-            },
-            "saveExit": {
-              "label": "Save & exit",
-              "desc": "Saving and exiting from Settings keeps your progress."
+            "field": {
+              "title": "Field · repair · season",
+              "desc": "Pick up field stars and speed buffs, exchange consumables at the repair tent. Check season ranking and mailbox in the menu."
             }
           }
         }
