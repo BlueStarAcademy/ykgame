@@ -3145,6 +3145,7 @@ export function ExcavatorGameWrapper({
       setSportsResultSubmitted(false);
       // Prime AudioContext + swap track on this click before any await.
       yanmarAudio.unlock();
+      yanmarAudio.setActive(true);
       yanmarAudio.setSportsMeetBgm(true);
 
       let runId: string | null = null;
@@ -3782,8 +3783,14 @@ export function ExcavatorGameWrapper({
   }, [pushQuestProgress]);
 
   useEffect(() => {
-    yanmarAudio.setActive(mode !== "intro" && audioArmed);
-  }, [mode, audioArmed]);
+    // Arm as soon as we leave intro, or while booting straight into play from
+    // the home "게임 시작" click (initialPlayMode is already set then).
+    const bootingStraightIn =
+      initialPlayMode === "game" ||
+      initialPlayMode === "ride" ||
+      initialPlayMode === "practice";
+    yanmarAudio.setActive(mode !== "intro" || bootingStraightIn);
+  }, [mode, initialPlayMode]);
 
   useEffect(() => {
     if (!showSettingsMenu) return;

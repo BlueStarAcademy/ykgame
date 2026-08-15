@@ -19,6 +19,8 @@ import {
 } from "@/lib/siteLegendBgmRegistry";
 import {
   isWebAudioBgmPlaying,
+  preloadWebAudioBgm,
+  primeWebAudioBgmContext,
   setWebAudioBgmGain,
   startWebAudioBgm,
   stopWebAudioBgm,
@@ -47,6 +49,9 @@ function detachGestureHandler() {
   const g = bag();
   const handler = g[GLOBAL_GESTURE];
   if (!handler) return;
+  window.removeEventListener("pointerdown", handler, { capture: true });
+  window.removeEventListener("keydown", handler, { capture: true });
+  // Legacy non-capture bindings from older builds.
   window.removeEventListener("pointerdown", handler);
   window.removeEventListener("keydown", handler);
   g[GLOBAL_GESTURE] = undefined;
@@ -96,6 +101,9 @@ class SiteLegendLoginBgmController {
     } else {
       this.applySettings(getSoundSettings());
     }
+
+    void preloadWebAudioBgm("login", LOGIN_BGM_SRC);
+    this.sync();
   }
 
   private bindLifecycle() {
@@ -124,14 +132,18 @@ class SiteLegendLoginBgmController {
 
   setAllowed(allowed: boolean) {
     this.allowed = allowed;
+    if (allowed) {
+      void preloadWebAudioBgm("login", LOGIN_BGM_SRC);
+    }
     this.sync();
   }
 
+  /** Call from CTA clicks so login BGM starts on the same gesture. */
   handleGesture() {
     if (isPageAudioSealed()) return;
     this.gestureUnlocked = true;
-    // tryPlay → startWebAudioBgm invokes ctx.resume() synchronously
-    // while still on the user-gesture call stack.
+    // Resume on the gesture stack before any async decode/start.
+    primeWebAudioBgmContext("login");
     this.tryPlay();
   }
 
@@ -173,11 +185,9 @@ class SiteLegendLoginBgmController {
     }
 
     this.bindGesture();
-    // Avoid creating a suspended context on mount; wait for gesture unless
-    // we already unlocked or audio is already running.
-    if (this.gestureUnlocked || isWebAudioBgmPlaying("login")) {
-      this.tryPlay();
-    }
+    // Always attempt play: prior site engagement / already-running context can
+    // succeed without another tap; otherwise gesture handlers remain bound.
+    this.tryPlay();
   }
 
   private tryPlay() {
@@ -211,6 +221,7 @@ class SiteLegendLoginBgmController {
         }
         return;
       }
+      this.gestureUnlocked = true;
       detachGestureHandler();
       clearBrowserMediaSession();
     });
@@ -226,8 +237,8 @@ class SiteLegendLoginBgmController {
       getController().handleGesture();
     };
     g[GLOBAL_GESTURE] = handler;
-    window.addEventListener("pointerdown", handler, { passive: true });
-    window.addEventListener("keydown", handler);
+    window.addEventListener("pointerdown", handler, { capture: true, passive: true });
+    window.addEventListener("keydown", handler, { capture: true });
   }
 }
 

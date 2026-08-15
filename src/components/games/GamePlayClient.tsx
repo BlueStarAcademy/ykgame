@@ -154,9 +154,10 @@ export function GamePlayClient({
       window.cancelAnimationFrame(entryRevealRafRef.current);
       entryRevealRafRef.current = null;
     }
-    // Unlock BGM AudioContext on this click — scene-ready unlock is too late
-    // for autoplay policy (menu taps were the only later gesture that worked).
+    // Unlock + arm BGM on this click — scene-ready unlock is too late
+    // for autoplay policy, and intro-mode mount must not dispose the context.
     yanmarAudio.unlock();
+    yanmarAudio.setActive(true);
     setEntryLoading(true);
     void (async () => {
       try {

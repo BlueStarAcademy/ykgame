@@ -88,7 +88,7 @@ const TRAVEL_FADE_IN_SEC = 0.09;
 const GLOBAL_CTRL = "__ykYanmarAudioCtrl";
 const GLOBAL_CTRL_REV = "__ykYanmarAudioCtrlRev";
 /** Bump when controller public surface changes (forces HMR refresh). */
-const CTRL_REV = 12;
+const CTRL_REV = 13;
 
 type TravelRpm = 1 | 2;
 
@@ -362,7 +362,12 @@ class YanmarAudioController {
   setActive(active: boolean) {
     this.ensureStoreSubscription();
     if (this.active === active) {
-      if (active) this.syncBgm();
+      if (active) {
+        // Re-entry while already active (game start click → wrapper boot):
+        // resume + start without waiting for a second gesture.
+        primeWebAudioBgmContext("ingame");
+        this.syncBgm();
+      }
       return;
     }
     this.active = active;
@@ -372,10 +377,12 @@ class YanmarAudioController {
       this.stopBreakerImmediate();
       this.stopTravelImmediate();
       this.stopEngineStartImmediate();
+      // Soft stop only — keep the AudioContext warm for the next entry gesture.
       this.stopBgm(false);
       this.unbindBgmGesture();
       return;
     }
+    primeWebAudioBgmContext("ingame");
     this.applySettings(getSoundSettings());
     this.syncBgm();
   }
@@ -514,19 +521,30 @@ class YanmarAudioController {
     // Critical: resume AudioContexts while the gesture is still live.
     // Scene-ready / rAF unlocks cannot create an audible context on their own.
     primeWebAudioBgmContext("ingame");
-    void this.ensureAudioContext().then((ctx) => {
-      if (!ctx) return;
-      this.unlocked = true;
-      void this.ensureBreakerBuffer();
-      void this.ensureSfxBuffer(ITEM_ACQUIRE_SRC);
-      void this.ensureSfxBuffer(STAR_ACQUIRE_SRC);
-      this.syncBgm();
-    });
+    // Resume the SFX graph on the same gesture so horns / travel / UI clicks work.
+    if (this.audioCtx?.state === "suspended") {
+      void this.audioCtx.resume().catch(() => undefined);
+    } else if (!this.audioCtx) {
+      void this.ensureAudioContext().then((ctx) => {
+        if (!ctx) return;
+        this.unlocked = true;
+        void this.ensureBreakerBuffer();
+        void this.ensureSfxBuffer(ITEM_ACQUIRE_SRC);
+        void this.ensureSfxBuffer(STAR_ACQUIRE_SRC);
+      });
+    }
+    this.unlocked = true;
     void preloadWebAudioBgm("ingame", INGAME_BGM_SRC);
     void preloadWebAudioBgm("ingame", SPORTS_MEET_BGM_SRC);
     void this.ensureTravelBuffer(1);
     void this.ensureTravelBuffer(2);
-    this.syncBgm();
+    // Never syncBgm() while inactive — that used to stopBgm(true) and dispose
+    // the context we just primed on the game-start click.
+    if (this.active) {
+      this.syncBgm();
+    } else {
+      this.bindBgmGesture();
+    }
   }
 
   private syncBgm() {
@@ -543,7 +561,8 @@ class YanmarAudioController {
       this.startBgm();
       this.bindBgmGesture();
     } else {
-      this.stopBgm(true);
+      // Soft stop — keep decoded buffers / context for instant re-entry.
+      this.stopBgm(false);
       this.unbindBgmGesture();
     }
   }
@@ -1131,10 +1150,12 @@ class YanmarAudioController {
       (window as unknown as { webkitAudioContext?: typeof AudioContext })
         .webkitAudioContext;
     if (!AC) return null;
-    if (!this.audioCtx) {
+    if (!this.audioCtx || this.audioCtx.state === "closed") {
       this.audioCtx = new AC();
     }
     if (this.audioCtx.state === "suspended") {
+      // Fire resume without awaiting so a surrounding gesture stays valid.
+      void this.audioCtx.resume().catch(() => undefined);
       try {
         await this.audioCtx.resume();
       } catch {
@@ -1364,7 +1385,7 @@ class YanmarAudioController {
     this.stopBreakerImmediate();
     this.stopTravelImmediate();
     this.stopEngineStartImmediate();
-    this.stopBgm(true);
+    this.stopBgm(false);
     this.unbindBgmGesture();
   }
 

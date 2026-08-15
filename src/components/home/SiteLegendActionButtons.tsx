@@ -2,6 +2,7 @@
 
 import { forwardRef, type RefObject } from "react";
 import { useTranslations } from "next-intl";
+import { siteLegendLoginBgm } from "@/components/auth/siteLegendLoginBgm";
 
 interface SiteLegendActionButtonsProps {
   primaryLabel: string;
@@ -111,7 +112,10 @@ export function SiteLegendActionButtons({
         <button
           type="button"
           className="site-legend-switch-account"
-          onClick={onSwitchAccount}
+          onClick={() => {
+            siteLegendLoginBgm.handleGesture();
+            onSwitchAccount();
+          }}
         >
           {switchAccountLabel}
         </button>
@@ -122,7 +126,10 @@ export function SiteLegendActionButtons({
         className={`site-legend-btn site-legend-btn-primary ${
           primaryType === "login" ? "is-login" : "is-start"
         }`}
-        onClick={onPrimary}
+        onClick={() => {
+          siteLegendLoginBgm.handleGesture();
+          onPrimary();
+        }}
       >
         <span className="site-legend-btn-primary-shine" aria-hidden />
         <span className="site-legend-btn-primary-label">{primaryLabel}</span>
@@ -131,12 +138,20 @@ export function SiteLegendActionButtons({
       {secondary.type === "settings" ? (
         <SiteLegendSettingsButton
           ref={secondary.buttonRef}
-          onClick={secondary.onClick}
+          onClick={() => {
+            siteLegendLoginBgm.handleGesture();
+            secondary.onClick();
+          }}
           open={secondary.open}
           badge={secondary.badge}
         />
       ) : (
-        <SiteLegendLogoutButton onClick={secondary.onClick} />
+        <SiteLegendLogoutButton
+          onClick={() => {
+            siteLegendLoginBgm.handleGesture();
+            secondary.onClick();
+          }}
+        />
       )}
     </div>
   );
