@@ -6,6 +6,7 @@ export const PLAYER_UNLOCKS = {
   BREAKER: 10,
   GRAPPLE: 15,
   MONUMENT: 20,
+  FLOOD_RECOVERY: 23,
   SPORTS_MEET: 25,
 } as const;
 

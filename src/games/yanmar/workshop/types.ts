@@ -1,4 +1,4 @@
-export type WorkshopId = "dump" | "crash" | "hill";
+export type WorkshopId = "dump" | "crash" | "hill" | "flood";
 
 export type WorkshopUpgradeKey =
   | "truck_capacity"
@@ -9,7 +9,10 @@ export type WorkshopUpgradeKey =
   | "lucky_drop"
   | "rock_appraiser"
   | "haul_capacity"
-  | "haul_cooldown";
+  | "haul_cooldown"
+  | "cleaning_master"
+  | "incinerator_power"
+  | "incinerator_capacity";
 
 export type WorkshopShopItemId =
   | "ticket_standard"
@@ -23,7 +26,10 @@ export type WorkshopQuestMetric =
   | "dumpTruckDepart"
   | "asphaltBreak"
   | "rockDump"
-  | "haulTruckDepart";
+  | "haulTruckDepart"
+  | "trashCollect"
+  | "trashGrapple"
+  | "trashBurn";
 
 export interface WorkshopUpgradeDef {
   key: WorkshopUpgradeKey;

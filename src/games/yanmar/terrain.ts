@@ -10,6 +10,14 @@ import {
   getMapTierForLevel,
   type MapTier,
 } from "./mapTier";
+import { SITE_LAYOUT } from "./siteLayout";
+import {
+  FLOOD_BASE_BURN_SEC,
+  FLOOD_COLLECTION_THRESHOLD,
+  FLOOD_INCINERATOR_BASE_CAPACITY,
+  FLOOD_INCINERATOR_SAFE_RADIUS,
+  FLOOD_RECOVERY_UNLOCK_LEVEL,
+} from "./floodRecovery/balance";
 
 export const GRID_SIZE = 64;
 export const CELL_SIZE = 2;
@@ -43,6 +51,8 @@ export const HAUL_TRUCK_ARRIVE_SEC = 10;
 export const HILL_BOULDER_COUNT = 5;
 /** 돌 구역: 전량 반출 후 풀 리젠까지 대기 (재진입으로 타이머 초기화하지 않음). */
 export const HILL_ZONE_RESPAWN_MS = 300 * 1000;
+/** 수해복구 구역: 소각 완료 후 풀 리젠까지 대기. */
+export const FLOOD_ZONE_RESPAWN_MS = 5 * 60 * 1000;
 /** 채취량은 유지하되 화면에 보이는 지형 침하는 완만하게 제한한다. */
 const DIG_TERRAIN_DEFORMATION_SCALE = 0.16;
 const DIG_TERRAIN_MAX_DEPTH = 0.28;
@@ -135,12 +145,67 @@ export interface HillZone {
   respawnAt: number | null;
 }
 
+export type FloodPhase =
+  | "active"
+  | "readyToBurn"
+  | "burning"
+  | "completed";
+
+export interface FloodDebris {
+  id: string;
+  x: number;
+  z: number;
+  /** Remaining source debris units at this pile (visual). */
+  remaining: number;
+  active: boolean;
+}
+
+export interface FloodRecoveryZone {
+  id: string;
+  centerX: number;
+  centerZ: number;
+  /** Debris field radius. */
+  radius: number;
+  /** Collection pad at zone center. */
+  collectionX: number;
+  collectionZ: number;
+  collectionRadius: number;
+  /** Incinerator in front of the debris field (south-west of center). */
+  incineratorX: number;
+  incineratorZ: number;
+  incineratorRadius: number;
+  active: boolean;
+  phase: FloodPhase;
+  /** Remaining scattered debris units in the field. */
+  sourceRemaining: number;
+  /** Units currently on the collection pad (0..500 before grapple). */
+  collectedUnits: number;
+  /** Units deposited into incinerator this cycle. */
+  incineratorUnits: number;
+  /** Target fill for incinerator (base 3000 + capacity upgrades). */
+  incineratorCapacity: number;
+  /** Carried trash chunk id while grappling, else null. */
+  carriedTrashId: string | null;
+  /** Visual debris piles. */
+  debris: FloodDebris[];
+  /** Per-cycle reward flags so each event pays once. */
+  rewardedCollect: boolean;
+  rewardedGrapple: boolean;
+  rewardedBurn: boolean;
+  /** Burn FX progress 0..1 while phase === burning. */
+  burnProgress: number;
+  burnDurationSec: number;
+  clearedAt: number | null;
+  respawnAt: number | null;
+}
+
 export interface TerrainData {
   heights: Float32Array;
   baseHeights: Float32Array;
   digZones: DigZone[];
   crashZone: CrashZone | null;
   hillZone: HillZone | null;
+  floodZone: FloodRecoveryZone | null;
   mapTier: MapTier;
   dynamicDigZones: boolean;
   gridSizeX: number;
@@ -180,6 +245,8 @@ export function createTerrain(
   const digZones = [createDigZone("site-dig", DIG_ZONE.x, DIG_ZONE.z)];
   const crashZone = mapTier >= 2 ? createCrashZone() : null;
   const hillZone = mapTier >= 3 ? createHillZone() : null;
+  const floodZone =
+    playerLevel >= FLOOD_RECOVERY_UNLOCK_LEVEL ? createFloodRecoveryZone() : null;
   for (let gz = 0; gz < gridSizeZ; gz++) {
     for (let gx = 0; gx < gridSizeX; gx++) {
       const idx = gz * gridSizeX + gx;
@@ -217,6 +284,7 @@ export function createTerrain(
     digZones,
     crashZone,
     hillZone,
+    floodZone,
     mapTier,
     dynamicDigZones,
     gridSizeX,
@@ -233,6 +301,7 @@ export function expandTerrainForLevel(
   current: TerrainData,
   playerLevel: number,
 ): TerrainData {
+  ensureFloodZoneForLevel(current, playerLevel);
   const nextTier = getMapTierForLevel(playerLevel);
   if (nextTier <= current.mapTier) return current;
   const expanded = createTerrain(
@@ -252,9 +321,23 @@ export function expandTerrainForLevel(
       expanded.baseHeights[to] = current.baseHeights[from];
     }
   }
+  if (current.floodZone) {
+    expanded.floodZone = current.floodZone;
+  }
   rebakeSpecialSiteSurfaces(expanded);
   markTerrainMeshDirty(expanded);
   return expanded;
+}
+
+/** Unlock flood zone in-place when the player reaches Lv23 without a map-tier change. */
+export function ensureFloodZoneForLevel(
+  terrain: TerrainData,
+  playerLevel: number,
+) {
+  if (playerLevel < FLOOD_RECOVERY_UNLOCK_LEVEL) return;
+  if (terrain.floodZone) return;
+  if (terrain.mapTier < 3) return;
+  terrain.floodZone = createFloodRecoveryZone();
 }
 
 export function rebakeSpecialSiteSurfaces(terrain: TerrainData) {
@@ -470,21 +553,21 @@ export const DUMP_TRUCK = {
 } as const;
 
 /**
- * 돌트럭 주차 — 돌지역 중심(22,112)에서 남동쪽으로 약간 떨어진 하역장.
+ * 돌트럭 주차 — 돌지역 중심(6,104)에서 남동쪽으로 약간 떨어진 하역장.
  * rotation +π/2 → 모델 전방(로컬 +X)이 월드 −Z(남쪽), 퇴장로·진입로와 일치.
  */
 export const HAUL_TRUCK = {
-  groupX: 42,
-  groupZ: 100,
+  groupX: 26,
+  groupZ: 92,
   rotation: Math.PI / 2,
 } as const;
 
-/** 트럭 고체 껍데기 — 칸 내부 공동은 비움 (하역 공간) */
+/** 트럭 고체 껍데기 — 칸 내부 공동은 비움 (하역 공간). OBB는 DUMP_TRUCK_COLLIDER와 동기. */
 export const DUMP_TRUCK_SOLID = {
-  centerLocalX: -0.08,
+  centerLocalX: 0.05,
   centerLocalZ: 0,
-  halfX: 3.4,
-  halfZ: 1.85,
+  halfX: 3.58,
+  halfZ: 1.95,
   minY: DUMP_TRUCK_GROUND_Y + 0.08,
   maxY: DUMP_TRUCK_GROUP_Y + DUMP_TRUCK_BODY_LOCAL_Y + 2.55,
   cavityHalfX: DUMP_TRUCK.bedWidth / 2 - 0.18,
@@ -1029,8 +1112,8 @@ function createHillBoulders(
 }
 
 function createHillZone(
-  centerX = 22,
-  centerZ = 112,
+  centerX = SITE_LAYOUT.hill[0],
+  centerZ = SITE_LAYOUT.hill[1],
   haulTruck?: HaulTruckState,
   boulderCount = HILL_BOULDER_COUNT,
 ): HillZone {
@@ -1067,6 +1150,275 @@ export function createSportsHillZone(
   haulTruck?: HaulTruckState,
 ): HillZone {
   return createHillZone(centerX, centerZ, haulTruck, boulderCount);
+}
+
+function createFloodDebris(
+  cycleId: string,
+  centerX: number,
+  centerZ: number,
+  totalUnits: number,
+): FloodDebris[] {
+  const pileCount = 8;
+  const perPile = Math.floor(totalUnits / pileCount);
+  return Array.from({ length: pileCount }, (_, index) => {
+    const angle = (index / pileCount) * Math.PI * 2 + 0.4;
+    const ring = 7 + (index % 3) * 2.2;
+    return {
+      id: `${cycleId}-debris-${index + 1}`,
+      x: centerX + Math.cos(angle) * ring,
+      z: centerZ + Math.sin(angle) * ring,
+      remaining: perPile + (index === 0 ? totalUnits - perPile * pileCount : 0),
+      active: true,
+    };
+  });
+}
+
+export function createFloodRecoveryZone(
+  centerX = SITE_LAYOUT.flood[0],
+  centerZ = SITE_LAYOUT.flood[1],
+  incineratorCapacity = FLOOD_INCINERATOR_BASE_CAPACITY,
+  burnDurationSec = FLOOD_BASE_BURN_SEC,
+): FloodRecoveryZone {
+  const cycleId = `flood-${Date.now().toString(36)}-${Math.floor(
+    Math.random() * 1_000_000,
+  ).toString(36)}`;
+  const capacity = Math.max(
+    FLOOD_INCINERATOR_BASE_CAPACITY,
+    Math.floor(incineratorCapacity),
+  );
+  // Incinerator sits in front of the field (toward approach from SW).
+  const incineratorX = centerX - 14;
+  const incineratorZ = centerZ - 16;
+  return {
+    id: cycleId,
+    centerX,
+    centerZ,
+    radius: 22,
+    collectionX: centerX,
+    collectionZ: centerZ,
+    collectionRadius: 5.5,
+    incineratorX,
+    incineratorZ,
+    incineratorRadius: FLOOD_INCINERATOR_SAFE_RADIUS,
+    active: true,
+    phase: "active",
+    sourceRemaining: capacity,
+    collectedUnits: 0,
+    incineratorUnits: 0,
+    incineratorCapacity: capacity,
+    carriedTrashId: null,
+    debris: createFloodDebris(cycleId, centerX, centerZ, capacity),
+    rewardedCollect: false,
+    rewardedGrapple: false,
+    rewardedBurn: false,
+    burnProgress: 0,
+    burnDurationSec: Math.max(1, burnDurationSec),
+    clearedAt: null,
+    respawnAt: null,
+  };
+}
+
+export function normalizeFloodRecoveryZone(
+  zone: FloodRecoveryZone,
+): FloodRecoveryZone {
+  return {
+    ...zone,
+    debris: zone.debris.map((d) => ({ ...d })),
+  };
+}
+
+export function isInFloodZone(
+  terrain: TerrainData,
+  wx: number,
+  wz: number,
+): boolean {
+  const zone = terrain.floodZone;
+  if (!zone) return false;
+  if (
+    !zone.active &&
+    zone.phase !== "readyToBurn" &&
+    zone.phase !== "burning"
+  ) {
+    // Allow workshop access during respawn via WorkshopSign, not isInFloodZone.
+    return false;
+  }
+  return Math.hypot(wx - zone.centerX, wz - zone.centerZ) <= zone.radius + 10;
+}
+
+export function isInsideFloodCollectionPad(
+  zone: FloodRecoveryZone,
+  wx: number,
+  wz: number,
+): boolean {
+  return (
+    Math.hypot(wx - zone.collectionX, wz - zone.collectionZ) <=
+    zone.collectionRadius
+  );
+}
+
+export function isInsideFloodIncinerator(
+  zone: FloodRecoveryZone,
+  wx: number,
+  wz: number,
+): boolean {
+  return (
+    Math.hypot(wx - zone.incineratorX, wz - zone.incineratorZ) <=
+    zone.incineratorRadius
+  );
+}
+
+export function isOutsideFloodIncineratorSafe(
+  zone: FloodRecoveryZone,
+  wx: number,
+  wz: number,
+): boolean {
+  return (
+    Math.hypot(wx - zone.incineratorX, wz - zone.incineratorZ) >
+    zone.incineratorRadius + 1.5
+  );
+}
+
+/**
+ * Push source debris into the collection pad.
+ * Returns units actually moved and whether the collection threshold was newly reached.
+ */
+export function pushFloodDebrisToCollection(
+  terrain: TerrainData,
+  amount: number,
+): { moved: number; collectionFilled: boolean } {
+  const zone = terrain.floodZone;
+  if (!zone?.active || zone.phase !== "active") {
+    return { moved: 0, collectionFilled: false };
+  }
+  if (zone.collectedUnits >= FLOOD_COLLECTION_THRESHOLD) {
+    return { moved: 0, collectionFilled: false };
+  }
+  const room = FLOOD_COLLECTION_THRESHOLD - zone.collectedUnits;
+  const moved = Math.max(
+    0,
+    Math.min(Math.floor(amount), room, zone.sourceRemaining),
+  );
+  if (moved <= 0) return { moved: 0, collectionFilled: false };
+
+  zone.sourceRemaining -= moved;
+  zone.collectedUnits += moved;
+
+  // Drain visual piles proportionally.
+  let left = moved;
+  for (const pile of zone.debris) {
+    if (left <= 0 || !pile.active) continue;
+    const take = Math.min(pile.remaining, left);
+    pile.remaining -= take;
+    left -= take;
+    if (pile.remaining <= 0) {
+      pile.remaining = 0;
+      pile.active = false;
+    }
+  }
+
+  const collectionFilled =
+    zone.collectedUnits >= FLOOD_COLLECTION_THRESHOLD && !zone.rewardedCollect;
+  return { moved, collectionFilled };
+}
+
+export function beginFloodTrashCarry(
+  terrain: TerrainData,
+): { trashId: string; amount: number } | null {
+  const zone = terrain.floodZone;
+  if (!zone?.active || zone.phase !== "active") return null;
+  if (zone.carriedTrashId) return null;
+  if (zone.collectedUnits < FLOOD_COLLECTION_THRESHOLD) return null;
+  const amount = FLOOD_COLLECTION_THRESHOLD;
+  const trashId = `${zone.id}-trash-${Date.now().toString(36)}`;
+  zone.carriedTrashId = trashId;
+  zone.collectedUnits = Math.max(0, zone.collectedUnits - amount);
+  return { trashId, amount };
+}
+
+export function depositFloodTrashToIncinerator(
+  terrain: TerrainData,
+): { deposited: number; readyToBurn: boolean } | null {
+  const zone = terrain.floodZone;
+  if (!zone?.active || !zone.carriedTrashId) return null;
+  if (zone.phase !== "active") return null;
+
+  const deposited = Math.min(
+    FLOOD_COLLECTION_THRESHOLD,
+    zone.incineratorCapacity - zone.incineratorUnits,
+  );
+  zone.incineratorUnits += deposited;
+  zone.carriedTrashId = null;
+  let readyToBurn = false;
+  if (zone.incineratorUnits >= zone.incineratorCapacity) {
+    zone.incineratorUnits = zone.incineratorCapacity;
+    zone.phase = "readyToBurn";
+    readyToBurn = true;
+  }
+  return { deposited, readyToBurn };
+}
+
+export function dropFloodCarriedTrash(terrain: TerrainData) {
+  const zone = terrain.floodZone;
+  if (!zone?.carriedTrashId) return;
+  zone.collectedUnits = Math.min(
+    FLOOD_COLLECTION_THRESHOLD,
+    zone.collectedUnits + FLOOD_COLLECTION_THRESHOLD,
+  );
+  zone.carriedTrashId = null;
+}
+
+export function tryStartFloodBurn(
+  terrain: TerrainData,
+  playerX: number,
+  playerZ: number,
+): boolean {
+  const zone = terrain.floodZone;
+  if (!zone || zone.phase !== "readyToBurn") return false;
+  if (!isOutsideFloodIncineratorSafe(zone, playerX, playerZ)) return false;
+  zone.phase = "burning";
+  zone.burnProgress = 0;
+  return true;
+}
+
+export function advanceFloodBurn(
+  terrain: TerrainData,
+  dt: number,
+  now = Date.now(),
+): boolean {
+  const zone = terrain.floodZone;
+  if (!zone || zone.phase !== "burning") return false;
+  const duration = Math.max(1, zone.burnDurationSec);
+  zone.burnProgress = Math.min(1, zone.burnProgress + dt / duration);
+  if (zone.burnProgress < 1) return false;
+  zone.phase = "completed";
+  zone.active = false;
+  zone.clearedAt = now;
+  zone.respawnAt = now + FLOOD_ZONE_RESPAWN_MS;
+  zone.incineratorUnits = 0;
+  return true;
+}
+
+export function applyFloodZoneUpgradeStats(
+  zone: FloodRecoveryZone | null | undefined,
+  incineratorCapacity: number,
+  burnDurationSec: number,
+) {
+  if (!zone) return;
+  if (zone.phase === "active" || zone.phase === "readyToBurn") {
+    zone.incineratorCapacity = Math.max(
+      zone.incineratorUnits,
+      Math.floor(incineratorCapacity),
+    );
+  }
+  zone.burnDurationSec = Math.max(1, burnDurationSec);
+}
+
+export function getFloodZoneRespawnEtaSec(
+  zone: FloodRecoveryZone | null | undefined,
+  now = Date.now(),
+): number {
+  if (!zone?.respawnAt || zone.active) return 0;
+  return Math.max(0, (zone.respawnAt - now) / 1000);
 }
 
 export function isInCrashZone(
@@ -1315,8 +1667,25 @@ export function updateSpecialZones(
   }
 
   const truck = terrain.hillZone?.haulTruck;
-  if (!truck || truck.phase === "ready") return;
-  advanceHaulTruckState(truck, dt, haulTruckCooldownSec);
+  if (truck && truck.phase !== "ready") {
+    advanceHaulTruckState(truck, dt, haulTruckCooldownSec);
+  }
+
+  const flood = terrain.floodZone;
+  if (flood) {
+    if (flood.phase === "completed" || !flood.active) {
+      if (flood.clearedAt == null) flood.clearedAt = now;
+      flood.respawnAt = flood.clearedAt + FLOOD_ZONE_RESPAWN_MS;
+      if (now >= flood.respawnAt) {
+        terrain.floodZone = createFloodRecoveryZone(
+          flood.centerX,
+          flood.centerZ,
+          flood.incineratorCapacity,
+          flood.burnDurationSec,
+        );
+      }
+    }
+  }
 }
 
 /** 한 틱만큼 돌트럭 상태 머신 진행 (phase 경계에서 멈춤). */

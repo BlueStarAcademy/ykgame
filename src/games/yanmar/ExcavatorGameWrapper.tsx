@@ -186,6 +186,8 @@ import {
   type DumpTruckRuntimeState,
 } from "./dumpTruckState";
 import {
+  applyFloodZoneUpgradeStats,
+  ensureFloodZoneForLevel,
   expandTerrainForLevel,
   fastForwardHaulTruckState,
   type TerrainData,
@@ -194,12 +196,17 @@ import {
   YANMAR_REWARD_CONFIG,
   YANMAR_CRASH_REWARD_CONFIG,
   YANMAR_HILL_REWARD_CONFIG,
+  YANMAR_FLOOD_REWARD_CONFIG,
   calculateYanmarCrashScore,
   calculateYanmarHillScore,
+  calculateYanmarFloodScore,
   getLoadUnits,
   rollYanmarHillXp,
+  rollFloodXp,
   type YanmarEquipmentStats,
 } from "./equipment";
+import { FLOOD_RECOVERY_UNLOCK_LEVEL } from "./floodRecovery/balance";
+import { applyWorkshopTruckStats } from "./workshop/effects";
 import { defaultFinalStats, type RepairBuffKind } from "./gearStats";
 import { GearPanel, type GearPanelItem } from "./GearPanel";
 import { PlayerProfileModal } from "./PlayerProfileModal";
@@ -641,6 +648,20 @@ function rollLocalHillReward(stats: YanmarEquipmentStats) {
       YANMAR_HILL_REWARD_CONFIG.minStarReward,
       YANMAR_HILL_REWARD_CONFIG.maxStarReward,
     ),
+  };
+}
+
+function rollLocalFloodReward(
+  stats: YanmarEquipmentStats,
+  kind: "collect" | "grapple" | "burn",
+) {
+  const critical = Math.random() < stats.criticalChance;
+  const cfg = YANMAR_FLOOD_REWARD_CONFIG[kind];
+  return {
+    score: calculateYanmarFloodScore(stats, kind, critical),
+    critical,
+    stars: rollOptimisticStarReward(cfg.minStarReward, cfg.maxStarReward),
+    xp: rollFloodXp(kind),
   };
 }
 
@@ -1102,6 +1123,66 @@ function AttachmentUnlockOverlay({
               onClick={onClose}
             >
               {t("monument.cta")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (unlock === "FLOOD_RECOVERY") {
+    return (
+      <div className="yanmar-unlock-overlay" role="presentation">
+        <div
+          className="yanmar-unlock-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("flood.ariaLabel")}
+        >
+          <div className="yanmar-unlock-panel-glow" aria-hidden />
+          <div className="yanmar-unlock-panel-frame" aria-hidden />
+          <header className="yanmar-unlock-brand">
+            <span className="yanmar-unlock-brand-mark">YANMAR</span>
+            <span className="yanmar-unlock-brand-rule" aria-hidden />
+            <span className="yanmar-unlock-brand-sub">
+              SV08-1 · FLOOD RECOVERY UNLOCK
+            </span>
+          </header>
+          <div className="yanmar-unlock-body">
+            <p className="yanmar-unlock-level">
+              <span>LEVEL</span> {PLAYER_UNLOCKS.FLOOD_RECOVERY}
+            </p>
+            <h2 className="yanmar-unlock-title">{t("flood.title")}</h2>
+            <p className="yanmar-unlock-lead">{t("flood.lead")}</p>
+            <ul className="yanmar-unlock-perks">
+              <li>
+                <span className="yanmar-unlock-perk-index">01</span>
+                <div>
+                  <strong>{t("flood.perk1Title")}</strong>
+                  <span>{t("flood.perk1Desc")}</span>
+                </div>
+              </li>
+              <li>
+                <span className="yanmar-unlock-perk-index">02</span>
+                <div>
+                  <strong>{t("flood.perk2Title")}</strong>
+                  <span>{t("flood.perk2Desc")}</span>
+                </div>
+              </li>
+              <li>
+                <span className="yanmar-unlock-perk-index">03</span>
+                <div>
+                  <strong>{t("flood.perk3Title")}</strong>
+                  <span>{t("flood.perk3Desc")}</span>
+                </div>
+              </li>
+            </ul>
+            <button
+              type="button"
+              className="yanmar-unlock-cta"
+              onClick={onClose}
+            >
+              {t("flood.cta")}
             </button>
           </div>
         </div>
@@ -1700,6 +1781,7 @@ export function ExcavatorGameWrapper({
         digZones: terrain.digZones,
         crashZone: terrain.crashZone,
         hillZone: terrain.hillZone,
+        floodZone: terrain.floodZone,
         mapTier: terrain.mapTier,
         gridSizeX: terrain.gridSizeX,
         gridSizeZ: terrain.gridSizeZ,
@@ -2452,8 +2534,12 @@ export function ExcavatorGameWrapper({
       setTotalXp(nextXp);
       xpHydratedRef.current = true;
       const previousTier = terrainRef.current.mapTier;
+      const hadFlood = !!terrainRef.current.floodZone;
       terrainRef.current = expandTerrainForLevel(terrainRef.current, nextLevel);
-      if (terrainRef.current.mapTier !== previousTier) {
+      if (
+        terrainRef.current.mapTier !== previousTier ||
+        (!hadFlood && !!terrainRef.current.floodZone)
+      ) {
         setTerrainRevision((key) => key + 1);
       }
       // Only celebrate real in-session gains — not 0→savedXp hydration on connect.
@@ -2502,13 +2588,18 @@ export function ExcavatorGameWrapper({
     (metric: QuestMetric, amount: number) => {
       if (amount <= 0) return;
       const modeNow = modeRef.current;
+      // Ranking participation is recorded from inside sportsRanked after a
+      // successful score submit; other sports/practice metrics stay paused.
+      const allowDuringSports =
+        metric === "sportsRankedEnter" && modeNow === "sportsRanked";
       if (
-        modeNow === "intro" ||
-        modeNow === "ride" ||
-        modeNow === "practice" ||
-        modeNow === "tutorial" ||
-        modeNow === "sportsRanked" ||
-        modeNow === "sportsPractice"
+        !allowDuringSports &&
+        (modeNow === "intro" ||
+          modeNow === "ride" ||
+          modeNow === "practice" ||
+          modeNow === "tutorial" ||
+          modeNow === "sportsRanked" ||
+          modeNow === "sportsPractice")
       ) {
         return;
       }
@@ -2528,7 +2619,10 @@ export function ExcavatorGameWrapper({
         workshopMetric === "dumpTruckDepart" ||
         workshopMetric === "asphaltBreak" ||
         workshopMetric === "rockDump" ||
-        workshopMetric === "haulTruckDepart"
+        workshopMetric === "haulTruckDepart" ||
+        workshopMetric === "trashCollect" ||
+        workshopMetric === "trashGrapple" ||
+        workshopMetric === "trashBurn"
       ) {
         const wq = workshopQuestStateRef.current;
         if (wq) {
@@ -2621,6 +2715,18 @@ export function ExcavatorGameWrapper({
         totalXp: data.totalXp,
         currency: data.currency,
       });
+      if (data.levels?.flood) {
+        const floodEffects = applyWorkshopTruckStats({
+          incinerator_power: data.levels.flood.incinerator_power ?? 0,
+          incinerator_capacity: data.levels.flood.incinerator_capacity ?? 0,
+          cleaning_master: data.levels.flood.cleaning_master ?? 0,
+        });
+        applyFloodZoneUpgradeStats(
+          terrainRef.current.floodZone,
+          floodEffects.floodIncineratorCapacity,
+          floodEffects.floodBurnDurationSec,
+        );
+      }
       if (typeof data.totalXp === "number") {
         if (data.totalXp !== totalXpRef.current) {
           applyTotalXp(data.totalXp, { announceLevelUp: false });
@@ -2661,6 +2767,23 @@ export function ExcavatorGameWrapper({
     sim.posX = SITE_LAYOUT.sportsPortal[0] - 6;
     sim.posZ = SITE_LAYOUT.sportsPortal[1];
     sim.heading = Math.PI * 0.5;
+    const velocity = velRef.current;
+    if (velocity) velocity.travel = 0;
+  }, []);
+
+  const warpToFloodRecovery = useCallback(() => {
+    const sim = simRef.current;
+    if (!sim) return;
+    ensureFloodZoneForLevel(
+      terrainRef.current,
+      getPlayerLevelProgress(totalXpRef.current).level,
+    );
+    if (terrainRef.current.floodZone) {
+      setTerrainRevision((key) => key + 1);
+    }
+    sim.posX = SITE_LAYOUT.flood[0] - 18;
+    sim.posZ = SITE_LAYOUT.flood[1] - 10;
+    sim.heading = Math.atan2(18, 10);
     const velocity = velRef.current;
     if (velocity) velocity.travel = 0;
   }, []);
@@ -3288,7 +3411,8 @@ export function ExcavatorGameWrapper({
       if (
         typeof result.dumpWorkshopPoints === "number" ||
         typeof result.crashWorkshopPoints === "number" ||
-        typeof result.hillWorkshopPoints === "number"
+        typeof result.hillWorkshopPoints === "number" ||
+        typeof result.floodWorkshopPoints === "number"
       ) {
         setWorkshopPanelState((prev) => {
           if (!prev) return prev;
@@ -3304,6 +3428,9 @@ export function ExcavatorGameWrapper({
                 : {}),
               ...(typeof result.hillWorkshopPoints === "number"
                 ? { hill: result.hillWorkshopPoints }
+                : {}),
+              ...(typeof result.floodWorkshopPoints === "number"
+                ? { flood: result.floodWorkshopPoints }
                 : {}),
             },
           };
@@ -3726,6 +3853,11 @@ export function ExcavatorGameWrapper({
         });
         const data = await res.json();
         if (!res.ok) return null;
+        if (action === "enhance") {
+          pushQuestProgress("gearEnhance", 1);
+        } else if (action === "dismantle") {
+          pushQuestProgress("gearDismantle", 1);
+        }
         if (!opts?.deferApply) {
           if (data.stats) {
             publishEquipmentStats(data.stats);
@@ -3745,7 +3877,7 @@ export function ExcavatorGameWrapper({
         setGearBusy(false);
       }
     },
-    [loadEquipment, publishEquipmentStats],
+    [loadEquipment, publishEquipmentStats, pushQuestProgress],
   );
 
   const applyGearActionResult = useCallback(
@@ -3792,6 +3924,10 @@ export function ExcavatorGameWrapper({
         }
         await loadEquipment();
         if (typeof data.cores !== "number") return null;
+        pushQuestProgress(
+          "gearDismantle",
+          typeof data.count === "number" ? data.count : itemIds.length,
+        );
         return {
           cores: data.cores as number,
           count:
@@ -3801,7 +3937,7 @@ export function ExcavatorGameWrapper({
         setGearBusy(false);
       }
     },
-    [loadEquipment, publishEquipmentStats],
+    [loadEquipment, publishEquipmentStats, pushQuestProgress],
   );
 
   const runGearSellMany = useCallback(
@@ -3816,6 +3952,7 @@ export function ExcavatorGameWrapper({
         });
         const data = await res.json();
         if (!res.ok) return null;
+        pushQuestProgress("gearSynthesize", 1);
         if (data.stats) {
           publishEquipmentStats(data.stats);
         }
@@ -3838,7 +3975,7 @@ export function ExcavatorGameWrapper({
         setGearBusy(false);
       }
     },
-    [loadEquipment, publishEquipmentStats],
+    [loadEquipment, publishEquipmentStats, pushQuestProgress],
   );
 
   const runGearSynthesize = useCallback(
@@ -4221,8 +4358,8 @@ export function ExcavatorGameWrapper({
               ? { ...prev, points: nextPoints }
               : {
                   points: nextPoints,
-                  levels: { dump: {}, crash: {}, hill: {} },
-                  shopPurchases: { dump: {}, crash: {}, hill: {} },
+                  levels: { dump: {}, crash: {}, hill: {}, flood: {} },
+                  shopPurchases: { dump: {}, crash: {}, hill: {}, flood: {} },
                   weekKey: "",
                 },
           );
@@ -4597,6 +4734,13 @@ export function ExcavatorGameWrapper({
       let found: WorkshopId | null = null;
       for (const wid of WORKSHOP_IDS) {
         if (mapTier < WORKSHOP_DEFS[wid].minMapTier) continue;
+        if (
+          wid === "flood" &&
+          getPlayerLevelProgress(totalXpRef.current).level <
+            FLOOD_RECOVERY_UNLOCK_LEVEL
+        ) {
+          continue;
+        }
         if (isInWorkshopSignRange(wid, sim.posX, sim.posZ, terrain)) {
           found = wid;
           break;
@@ -5440,6 +5584,15 @@ export function ExcavatorGameWrapper({
     resetDumpTruckState(dumpTruckStateRef.current);
     dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
     tutorialGearOpenedRef.current = false;
+    if (!step?.gearAction) {
+      const running = {
+        ...auxiliaryRef.current,
+        engineOn: true,
+        safetyLocked: false,
+      };
+      auxiliaryRef.current = running;
+      setAuxiliary(running);
+    }
     if (step?.gearAction) {
       setShowEquipmentUpgrade(true);
     } else {
@@ -5637,7 +5790,7 @@ export function ExcavatorGameWrapper({
             void (async () => {
               if (run.playMode === "ranked") {
                 try {
-                  await fetch("/api/sports-meet/yanmar/score", {
+                  const scoreRes = await fetch("/api/sports-meet/yanmar/score", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -5648,6 +5801,9 @@ export function ExcavatorGameWrapper({
                       mode: "ranked",
                     }),
                   });
+                  if (scoreRes.ok) {
+                    pushQuestProgress("sportsRankedEnter", 1);
+                  }
                 } finally {
                   setSportsResultSubmitted(true);
                 }
@@ -5779,6 +5935,7 @@ export function ExcavatorGameWrapper({
       canDump: fb.canDump,
       grappleOpen: auxiliaryRef.current.grappleOpen,
       gearActionOpened: tutorialGearOpenedRef.current,
+      tipTouchingGround: fb.groundDepth >= -0.15,
     });
 
     const wp = getTutorialWaypoint(step, phase) ?? null;
@@ -6683,8 +6840,20 @@ export function ExcavatorGameWrapper({
   }, [mode, session?.user?.id]);
 
   const claimSpecialReward = useCallback(
-    async (kind: "crash" | "hill", eventId: string) => {
+    async (
+      kind: "crash" | "hill" | "flood-collect" | "flood-grapple" | "flood-burn",
+      eventId: string,
+    ) => {
       if (modeRef.current === "ride") return;
+
+      const floodKind =
+        kind === "flood-collect"
+          ? "collect"
+          : kind === "flood-grapple"
+            ? "grapple"
+            : kind === "flood-burn"
+              ? "burn"
+              : null;
 
       if (modeRef.current !== "game") {
         if (kind === "crash" || kind === "hill") {
@@ -6713,19 +6882,39 @@ export function ExcavatorGameWrapper({
               local.stars,
             );
           }
+        } else if (floodKind) {
+          const local = rollLocalFloodReward(
+            equipmentStatsRef.current,
+            floodKind,
+          );
+          setPreviewStars((value) => value + local.stars);
+          accumulateDumpScore(
+            local.score,
+            local.critical,
+            "",
+            local.xp,
+            local.stars,
+          );
         }
         return;
       }
 
       try {
+        const apiKind = floodKind
+          ? "flood"
+          : kind === "crash"
+            ? "crash"
+            : "hill";
         const requestReward = () =>
-          fetch(`/api/rewards/yanmar-${kind}`, {
+          fetch(`/api/rewards/yanmar-${apiKind}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ eventId }),
+            body: JSON.stringify(
+              floodKind ? { eventId, kind: floodKind } : { eventId },
+            ),
           });
         let res = await requestReward();
-        if (kind === "crash" && res.status === 429) {
+        if ((kind === "crash" || floodKind) && res.status === 429) {
           await new Promise((resolve) => window.setTimeout(resolve, 1100));
           res = await requestReward();
         }
@@ -6737,7 +6926,9 @@ export function ExcavatorGameWrapper({
           }
           if (res.status === 403) {
             showAttachmentWarning(
-              `${kind === "crash" ? "브레이커" : "운반"} 보상 레벨 조건을 확인하세요.`,
+              floodKind
+                ? "수해복구 보상 레벨 조건을 확인하세요."
+                : `${kind === "crash" ? "브레이커" : "운반"} 보상 레벨 조건을 확인하세요.`,
             );
             return;
           }
@@ -6903,6 +7094,39 @@ export function ExcavatorGameWrapper({
       finalizeSportsMeetStageAdvance,
       pushQuestProgress,
     ],
+  );
+
+  const handleFloodDebrisPushed = useCallback(
+    (amount: number) => {
+      pushQuestProgress("trashCollect", amount);
+    },
+    [pushQuestProgress],
+  );
+
+  const handleFloodCollectFilled = useCallback(
+    (eventId: string, _amount: number) => {
+      void claimSpecialReward("flood-collect", eventId);
+    },
+    [claimSpecialReward],
+  );
+
+  const handleFloodTrashGrapple = useCallback(
+    (eventId: string, awardCycleReward: boolean) => {
+      pushQuestProgress("trashGrapple", 1);
+      if (awardCycleReward) {
+        void claimSpecialReward("flood-grapple", eventId);
+      }
+    },
+    [claimSpecialReward, pushQuestProgress],
+  );
+
+  const handleFloodBurnComplete = useCallback(
+    (eventId: string, burnedUnits: number) => {
+      pushQuestProgress("trashBurn", burnedUnits);
+      pushQuestProgress("trashBurnComplete", 1);
+      void claimSpecialReward("flood-burn", eventId);
+    },
+    [claimSpecialReward, pushQuestProgress],
   );
 
   const claimTruckFullReward = useCallback(
@@ -8249,6 +8473,45 @@ export function ExcavatorGameWrapper({
               <div className="whitespace-nowrap rounded-xl border border-amber-200/50 bg-amber-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 돌트럭 만차 — 하역 위치에서 벗어나세요
               </div>
+            ) : digFeedback.floodPhase === "readyToBurn" ? (
+              <div className="whitespace-nowrap rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                소각장 밖으로 이동하세요
+              </div>
+            ) : digFeedback.floodPhase === "burning" ? (
+              <div className="whitespace-nowrap rounded-xl border border-orange-200/50 bg-orange-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                소각 중 · {Math.round(digFeedback.floodBurnProgress * 100)}%
+              </div>
+            ) : digFeedback.carryingTrash ? (
+              <div className="whitespace-nowrap rounded-xl border border-cyan-200/50 bg-cyan-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+                쓰레기 운반 중 — 소각장에 투입하세요
+              </div>
+            ) : null}
+            {digFeedback.floodActive &&
+            digFeedback.floodPhase === "active" &&
+            digFeedback.floodIncineratorCapacity > 0 ? (
+              <div className="min-w-[8.5rem] rounded-xl border border-sky-200/40 bg-black/65 px-2.5 py-1.5 text-center text-white shadow-lg backdrop-blur-sm">
+                <div className="text-[10px] font-black text-sky-100">
+                  소각 {digFeedback.floodIncineratorUnits}/
+                  {digFeedback.floodIncineratorCapacity}
+                </div>
+                <div className="mt-0.5 text-[9px] font-bold text-white/75">
+                  집결 {digFeedback.floodCollectedUnits}/
+                  {digFeedback.floodCollectionThreshold}
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/20">
+                  <span
+                    className="block h-full rounded-full bg-gradient-to-r from-sky-400 to-cyan-200"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (digFeedback.floodIncineratorUnits /
+                          digFeedback.floodIncineratorCapacity) *
+                          100,
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
             ) : null}
             {digFeedback.crashTileMaxHp > 0 ? (
               <CrashAsphaltHpPanel
@@ -8476,6 +8739,7 @@ export function ExcavatorGameWrapper({
               digFeedback.digCooldowns.length > 0 ||
               digFeedback.crashCooldownEtaSec > 0 ||
               digFeedback.hillCooldownEtaSec > 0 ||
+              digFeedback.floodCooldownEtaSec > 0 ||
               showMonumentMinimapProgress ? (
                 <ul
                   className="flex w-full flex-col gap-0.5 border-t border-white/10 px-1 py-0.5"
@@ -8542,6 +8806,16 @@ export function ExcavatorGameWrapper({
                       <span className="shrink-0 tabular-nums text-sky-200">
                         {formatDumpTruckReturnTime(
                           digFeedback.hillCooldownEtaSec,
+                        )}
+                      </span>
+                    </li>
+                  ) : null}
+                  {digFeedback.floodCooldownEtaSec > 0 ? (
+                    <li className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85">
+                      <span className="truncate">{hudT("flood")}</span>
+                      <span className="shrink-0 tabular-nums text-cyan-200">
+                        {formatDumpTruckReturnTime(
+                          digFeedback.floodCooldownEtaSec,
                         )}
                       </span>
                     </li>
@@ -8743,6 +9017,9 @@ export function ExcavatorGameWrapper({
               if (closed === "SPORTS_MEET") {
                 warpToSportsMeetPortal();
               }
+              if (closed === "FLOOD_RECOVERY") {
+                warpToFloodRecovery();
+              }
             }
             setUnlockQueue((queue) => queue.slice(1));
           }}
@@ -8897,6 +9174,10 @@ export function ExcavatorGameWrapper({
               onDumpScore={handleDumpScore}
               onCrashTileDestroyed={handleCrashTileDestroyed}
               onHillRockDelivered={handleHillRockDelivered}
+              onFloodDebrisPushed={handleFloodDebrisPushed}
+              onFloodCollectFilled={handleFloodCollectFilled}
+              onFloodTrashGrapple={handleFloodTrashGrapple}
+              onFloodBurnComplete={handleFloodBurnComplete}
               onAttachmentWarning={showAttachmentWarning}
               onDumpTruckFull={handleDumpTruckFull}
               onHaulTruckFull={handleHaulTruckFull}
@@ -8918,6 +9199,7 @@ export function ExcavatorGameWrapper({
                   ? getClaimableWorkshopIds(workshopQuestState)
                   : []
               }
+              playerLevel={getPlayerLevelProgress(totalXp).level}
               monumentPhase={
                 monumentPanelState?.phase ??
                 monumentPhaseRef.current ??

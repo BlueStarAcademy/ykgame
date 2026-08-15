@@ -1,7 +1,7 @@
 export type SitePoint = readonly [x: number, z: number];
 
 export interface SiteRoad {
-  id: "entry" | "dump" | "crash" | "hill";
+  id: "entry" | "dump" | "crash" | "hill" | "flood";
   from: SitePoint;
   to: SitePoint;
   width: number;
@@ -15,7 +15,13 @@ export const SITE_LAYOUT = {
   dig: [18, 2] as SitePoint,
   dump: [33.27, -12.68] as SitePoint,
   crash: [108, 12] as SitePoint,
-  hill: [22, 112] as SitePoint,
+  /** West of monument on minimap (lower world X) so labels/zones don't overlap. */
+  hill: [6, 104] as SitePoint,
+  /**
+   * Minimap top-left = world NE. East of monument, north of crash —
+   * flood debris field center.
+   */
+  flood: [120, 125] as SitePoint,
   /** North edge (minimap 12 o'clock) — Yanmar pylon monument */
   monument: [48, 132] as SitePoint,
   /** Minimap bottom-left (world SE) — excavator sports meet portal */
@@ -48,10 +54,20 @@ export const SITE_LAYOUT = {
       surface: "compacted",
     },
     {
+      // Dig northbound → stone haul pad (keeps clear of monument at 48,132).
       id: "hill",
-      from: [10, 34],
-      to: [42, 100],
-      width: 6.2,
+      from: [12, 22],
+      to: [26, 92],
+      width: 6.4,
+      unlockTier: 3,
+      surface: "gravel",
+    },
+    {
+      // East approach toward flood recovery (world NE / minimap NW).
+      id: "flood",
+      from: [90, 40],
+      to: [112, 110],
+      width: 6.0,
       unlockTier: 3,
       surface: "gravel",
     },

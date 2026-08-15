@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import type { ExcavatorSimState } from "./ExcavatorScene";
 import type { TerrainData } from "./terrain";
 import { DUMP_ZONE, getActiveDigZones, getMapWorldBounds } from "./terrain";
@@ -173,6 +174,74 @@ function drawMinimapBooster(
   ctx.strokeStyle = prevStroke;
 }
 
+/**
+ * Expanded maps have room for a small map-callout. Keeping these in the
+ * canvas means labels stay precisely attached to their moving/active regions
+ * without introducing a second coordinate system in the HUD.
+ */
+function drawMinimapRegionLabel(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  label: string,
+  tone: string,
+  displaySize: number,
+) {
+  if (displaySize < 180) return;
+
+  const scale = displaySize / DEFAULT_DISPLAY_SIZE;
+  const fontSize = Math.max(8.5, 9.5 * scale);
+  const padX = Math.max(4, 4.5 * scale);
+  const chipH = Math.max(16, 17 * scale);
+  const gap = Math.max(5, 6 * scale);
+  const maxX = displaySize - 8 * scale;
+
+  ctx.save();
+  ctx.font = `800 ${fontSize}px "Noto Sans KR", "Malgun Gothic", sans-serif`;
+  const chipW = Math.ceil(ctx.measureText(label).width + padX * 2 + 7 * scale);
+  const placeLeft = x > displaySize * 0.57;
+  const rawChipX = placeLeft ? x - gap - chipW : x + gap;
+  const chipX = Math.min(maxX - chipW, Math.max(8 * scale, rawChipX));
+  const chipY = Math.min(
+    displaySize - 8 * scale - chipH,
+    Math.max(8 * scale, y - chipH / 2),
+  );
+  const connectorEndX = placeLeft ? chipX + chipW : chipX;
+  const connectorY = chipY + chipH / 2;
+  const dotR = Math.max(1.5, 1.9 * scale);
+
+  ctx.strokeStyle = tone;
+  ctx.globalAlpha = 0.7;
+  ctx.lineWidth = Math.max(0.8, scale);
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(connectorEndX, connectorY);
+  ctx.stroke();
+
+  const background = ctx.createLinearGradient(chipX, chipY, chipX, chipY + chipH);
+  background.addColorStop(0, "rgba(31, 38, 49, 0.94)");
+  background.addColorStop(1, "rgba(6, 9, 14, 0.94)");
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = background;
+  ctx.beginPath();
+  ctx.roundRect(chipX, chipY, chipW, chipH, chipH / 2);
+  ctx.fill();
+  ctx.strokeStyle = tone;
+  ctx.globalAlpha = 0.72;
+  ctx.lineWidth = Math.max(0.75, 0.85 * scale);
+  ctx.stroke();
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = tone;
+  ctx.beginPath();
+  ctx.arc(chipX + padX, connectorY, dotR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#f8fafc";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, chipX + padX + dotR * 2.6, connectorY + 0.25 * scale);
+  ctx.restore();
+}
+
 export function ExcavatorMinimap({
   simRef,
   terrainRef,
@@ -187,6 +256,7 @@ export function ExcavatorMinimap({
   onExpand,
   sportsMeetUnlocked = false,
 }: ExcavatorMinimapProps) {
+  const t = useTranslations("yanmar.map");
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -263,9 +333,25 @@ export function ExcavatorMinimap({
       for (const zone of digZones) {
         const dig = worldToMinimap(zone.x, zone.z, bounds, size, pad);
         const digR = (zone.radius / (bounds.maxX - bounds.minX)) * inner;
-        context.fillStyle = "rgba(255,143,0,0.32)";
+        const zoneRadius = Math.max(digR, 4.5 * (size / DEFAULT_DISPLAY_SIZE));
+        const digGlow = context.createRadialGradient(
+          dig.px,
+          dig.py,
+          1,
+          dig.px,
+          dig.py,
+          zoneRadius * 1.4,
+        );
+        digGlow.addColorStop(0, "rgba(255, 245, 199, 0.62)");
+        digGlow.addColorStop(0.35, "rgba(255, 179, 0, 0.38)");
+        digGlow.addColorStop(1, "rgba(255, 143, 0, 0)");
+        context.fillStyle = digGlow;
         context.beginPath();
-        context.arc(dig.px, dig.py, Math.max(digR, 4.5 * (size / DEFAULT_DISPLAY_SIZE)), 0, Math.PI * 2);
+        context.arc(dig.px, dig.py, zoneRadius * 1.4, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "rgba(255,143,0,0.26)";
+        context.beginPath();
+        context.arc(dig.px, dig.py, zoneRadius, 0, Math.PI * 2);
         context.fill();
         context.strokeStyle = "#ffb300";
         context.lineWidth = 2;
@@ -274,6 +360,7 @@ export function ExcavatorMinimap({
         context.beginPath();
         context.arc(dig.px, dig.py, 3.5 * (size / DEFAULT_DISPLAY_SIZE), 0, Math.PI * 2);
         context.fill();
+        drawMinimapRegionLabel(context, dig.px, dig.py, t("world.dig"), "#ffd166", size);
       }
 
       if (terrain.crashZone?.active) {
@@ -302,6 +389,15 @@ export function ExcavatorMinimap({
           width,
           depth,
         );
+        context.strokeStyle = "rgba(255, 248, 214, 0.55)";
+        context.lineWidth = Math.max(0.6, size / 200);
+        for (let stripe = -depth; stripe < width; stripe += 5 * (size / DEFAULT_DISPLAY_SIZE)) {
+          context.beginPath();
+          context.moveTo(crash.px - width / 2 + stripe, crash.py + depth / 2);
+          context.lineTo(crash.px - width / 2 + stripe + depth, crash.py - depth / 2);
+          context.stroke();
+        }
+        drawMinimapRegionLabel(context, crash.px, crash.py, t("world.crash"), "#fbbf24", size);
       }
 
       if (terrain.hillZone?.active) {
@@ -320,6 +416,52 @@ export function ExcavatorMinimap({
         context.fill();
         context.strokeStyle = "#cbd5e1";
         context.stroke();
+        context.fillStyle = "rgba(248, 250, 252, 0.9)";
+        context.beginPath();
+        context.moveTo(hill.px - radius * 0.42, hill.py + radius * 0.22);
+        context.lineTo(hill.px, hill.py - radius * 0.34);
+        context.lineTo(hill.px + radius * 0.42, hill.py + radius * 0.22);
+        context.closePath();
+        context.fill();
+        drawMinimapRegionLabel(context, hill.px, hill.py, t("world.hill"), "#dbeafe", size);
+      }
+
+      if (terrain.floodZone) {
+        const flood = worldToMinimap(
+          terrain.floodZone.centerX,
+          terrain.floodZone.centerZ,
+          bounds,
+          size,
+          pad,
+        );
+        const radius =
+          (terrain.floodZone.radius / (bounds.maxX - bounds.minX)) * inner;
+        const floodR = Math.max(radius * 0.55, 5);
+        context.fillStyle = "rgba(14,165,233,0.28)";
+        context.beginPath();
+        context.arc(flood.px, flood.py, floodR, 0, Math.PI * 2);
+        context.fill();
+        context.strokeStyle = "#38bdf8";
+        context.lineWidth = 2;
+        context.stroke();
+        // Incinerator mark
+        const incinerator = worldToMinimap(
+          terrain.floodZone.incineratorX,
+          terrain.floodZone.incineratorZ,
+          bounds,
+          size,
+          pad,
+        );
+        context.fillStyle = "#f97316";
+        context.fillRect(incinerator.px - 2.5, incinerator.py - 3.5, 5, 7);
+        drawMinimapRegionLabel(
+          context,
+          flood.px,
+          flood.py,
+          t("world.flood"),
+          "#7dd3fc",
+          size,
+        );
       }
 
       const dump = worldToMinimap(DUMP_ZONE.x, DUMP_ZONE.z, bounds, size, pad);
@@ -333,7 +475,12 @@ export function ExcavatorMinimap({
       context.stroke();
       const dumpMark = 3.5 * (size / DEFAULT_DISPLAY_SIZE);
       context.fillStyle = "#c8e6c9";
-      context.fillRect(dump.px - dumpMark, dump.py - dumpMark, dumpMark * 2, dumpMark * 2);
+      context.save();
+      context.translate(dump.px, dump.py);
+      context.rotate(Math.PI / 4);
+      context.fillRect(-dumpMark, -dumpMark, dumpMark * 2, dumpMark * 2);
+      context.restore();
+      drawMinimapRegionLabel(context, dump.px, dump.py, t("world.dump"), "#a7f3d0", size);
 
       const repair = worldToMinimap(REPAIR_TENT.x, REPAIR_TENT.z, bounds, size, pad);
       const repairR =
@@ -364,6 +511,7 @@ export function ExcavatorMinimap({
       context.strokeStyle = "#8b1e1e";
       context.lineWidth = Math.max(1, 1.2 * repairScale);
       context.stroke();
+      drawMinimapRegionLabel(context, repair.px, repair.py, t("world.repair"), "#f5d78e", size);
 
       if (sportsMeetUnlocked) {
         const portal = worldToMinimap(
@@ -385,6 +533,7 @@ export function ExcavatorMinimap({
         context.arc(portal.px, portal.py, pr * 0.45, 0, Math.PI * 2);
         context.fillStyle = "#fbbf24";
         context.fill();
+        drawMinimapRegionLabel(context, portal.px, portal.py, t("world.sports"), "#7dd3fc", size);
       }
 
       if (monumentPhase !== "locked") {
@@ -447,6 +596,7 @@ export function ExcavatorMinimap({
           Math.PI * 2,
         );
         context.fill();
+        drawMinimapRegionLabel(context, monPx, monPy, t("world.monument"), "#ffe082", size);
       }
 
       const pickups = worldPickupsRef?.current?.active;
@@ -576,19 +726,20 @@ export function ExcavatorMinimap({
         dprQuery.removeListener(onDprChange);
       }
     };
-  }, [visible, displaySize, monumentPhase, sportsMeetUnlocked, simRef, terrainRef, tutorialStepRef, tutorialWaypointRef, worldPickupsRef]);
+  }, [visible, displaySize, monumentPhase, sportsMeetUnlocked, simRef, terrainRef, tutorialStepRef, tutorialWaypointRef, worldPickupsRef, t]);
 
   if (!visible) return null;
 
   const legendItems = [
-    { label: "흙더미", swatch: "bg-amber-400 ring-1 ring-amber-200/80" },
-    { label: "하역", swatch: "bg-emerald-400 ring-1 ring-emerald-200/70" },
-    { label: "파쇄", swatch: "bg-amber-500 ring-1 ring-yellow-300/70" },
-    { label: "석재", swatch: "bg-slate-300 ring-1 ring-slate-100/70" },
-    { label: "정비", swatch: "bg-amber-200 ring-1 ring-yellow-100/80" },
-    { label: "조형", swatch: "bg-amber-200 ring-1 ring-yellow-100/90" },
+    { label: t("legend.dig"), tone: "dig" },
+    { label: t("legend.dump"), tone: "dump" },
+    { label: t("legend.crash"), tone: "crash" },
+    { label: t("legend.hill"), tone: "hill" },
+    { label: t("legend.flood"), tone: "flood" },
+    { label: t("legend.repair"), tone: "repair" },
+    { label: t("legend.monument"), tone: "monument" },
     ...(sportsMeetUnlocked
-      ? [{ label: "운동회", swatch: "bg-sky-400 ring-1 ring-sky-200/80" }]
+      ? [{ label: t("legend.sports"), tone: "sports" }]
       : []),
   ] as const;
 
@@ -596,8 +747,8 @@ export function ExcavatorMinimap({
     <div
       className={
         embedded
-          ? "pointer-events-none flex w-full flex-col items-stretch"
-          : "pointer-events-none absolute right-1.5 top-1.5 z-20 flex flex-col items-stretch overflow-hidden rounded-xl border border-white/15 bg-black/60 shadow-lg backdrop-blur-sm"
+          ? "yanmar-minimap-hud pointer-events-none flex w-full flex-col items-stretch"
+          : "yanmar-minimap-hud pointer-events-none absolute right-1.5 top-1.5 z-20 flex flex-col items-stretch"
       }
     >
       {onExpand ? (
@@ -630,19 +781,18 @@ export function ExcavatorMinimap({
       )}
       {showLegend ? (
         <ul
-          className="grid w-full grid-cols-2 gap-x-1 gap-y-0.5 border-t border-white/10 px-1 py-0.5"
+          className="yanmar-minimap-legend"
           aria-label="미니맵 범례"
         >
           {legendItems.map((item) => (
             <li
               key={item.label}
-              className="flex min-w-0 items-center justify-center gap-0.5 text-[7px] font-bold leading-none text-white/85"
+              className={`yanmar-minimap-legend-item is-${item.tone}`}
             >
-              <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.swatch}`}
-                aria-hidden
-              />
-              <span className="truncate">{item.label}</span>
+              <span className="yanmar-minimap-legend-mark" aria-hidden>
+                <span />
+              </span>
+              <span className="yanmar-minimap-legend-label">{item.label}</span>
             </li>
           ))}
         </ul>

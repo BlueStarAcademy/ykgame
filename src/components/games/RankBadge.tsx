@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 type RankPlace = 1 | 2 | 3;
 
 const MEDAL_META: Record<
@@ -115,6 +117,7 @@ export function RankBadge({
   /** light = ranking modal on white; dark = in-game result panel */
   tone?: "light" | "dark";
 }) {
+  const t = useTranslations("games.ranking");
   const px = size === "sm" ? 22 : 28;
   const box = size === "sm" ? "h-7 w-7" : "h-8 w-8";
 
@@ -134,8 +137,8 @@ export function RankBadge({
     return (
       <span
         className={`flex ${box} shrink-0 items-center justify-center`}
-        title={`${rank}위`}
-        aria-label={`${rank}위`}
+        title={t("rankValue", { rank })}
+        aria-label={t("rankValue", { rank })}
       >
         <MedalGlyph place={rank} size={px} />
       </span>
@@ -149,7 +152,7 @@ export function RankBadge({
           ? "bg-white/8 text-white/65"
           : "bg-slate-100 text-slate-600"
       }`}
-      aria-label={`${rank}위`}
+      aria-label={t("rankValue", { rank })}
     >
       {rank}
     </span>

@@ -21,18 +21,24 @@ export const BREAKER_TIP_PROBE_RADIUS = 0.65;
 export const BREAKER_TRAVEL_LOCK_CLEARANCE = 0.28;
 export const EXCAVATOR_MAP_WALL_MARGIN = 4.6;
 /**
- * 차체(궤도 포함) 충돌 원 반경.
- * 대형 차체 궤도 폭(~1.5m)이 트럭 측면에 파고들지 않도록 시각보다 약간 여유 있게.
+ * Default undercarriage collision radius (ViO17-class footprint + skin).
+ * Prefer {@link getExcavatorCollisionRadius} when the active chassis scale is known.
  */
 export const EXCAVATOR_COLLISION_RADIUS = 1.68;
+
+/** Extra gap kept between excavator circle and truck OBB after resolve. */
+export const TRUCK_BODY_SEPARATION_PAD = 0.24;
 
 /** 붐·암·버킷 vs 덤프트럭 고체 — 구(sphere) 근사 반경 */
 export const DUMP_TRUCK_ARM_PROBE_RADIUS = 0.32;
 
-/** 덤프트럭 차체 OBB (모델 측판·캡 외곽에 맞춤) */
+/**
+ * 덤프트럭 차체 OBB — DumpTruckModel 외곽에 맞춤.
+ * 캡 전면(~3.51)·적재함 후면(~-3.16)·측판/휠(~±1.66).
+ */
 export const DUMP_TRUCK_COLLIDER = {
-  centerOffsetX: -0.08,
+  centerOffsetX: 0.05,
   centerOffsetZ: 0,
-  halfX: 3.4,
-  halfZ: 1.85,
+  halfX: 3.58,
+  halfZ: 1.95,
 } as const;

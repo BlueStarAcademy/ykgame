@@ -62,6 +62,7 @@ export async function POST(request: Request) {
               dumpWorkshopPoints: true,
               crashWorkshopPoints: true,
               hillWorkshopPoints: true,
+        floodWorkshopPoints: true,
             },
           });
 
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
               dump: user.dumpWorkshopPoints,
               crash: user.crashWorkshopPoints,
               hill: user.hillWorkshopPoints,
+    flood: user.floodWorkshopPoints,
             },
           };
         },

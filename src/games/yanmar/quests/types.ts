@@ -12,6 +12,14 @@ export type QuestMetric =
   | "rockDump"
   | "swing180"
   | "haulTruckDepart"
+  | "trashCollect"
+  | "trashGrapple"
+  | "trashBurn"
+  | "trashBurnComplete"
+  | "gearEnhance"
+  | "gearDismantle"
+  | "gearSynthesize"
+  | "sportsRankedEnter"
   /** 다른 일일 퀘스트 완료 수 (메타) */
   | "dailyAllComplete"
   /** 미션 퀘스트 클리어 수 (메타) */

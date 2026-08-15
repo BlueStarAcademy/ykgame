@@ -4,6 +4,7 @@ import {
   formatXpProgress,
   getPlayerLevelProgress,
 } from "@/lib/playerLevel";
+import { useTranslations } from "next-intl";
 
 interface HomeProfilePanelProps {
   nickname: string;
@@ -30,13 +31,14 @@ export function HomeProfilePanel({
   rank,
   seasonScore = 0,
 }: HomeProfilePanelProps) {
+  const t = useTranslations("home.profile");
   const progress = getPlayerLevelProgress(totalXp);
   const initial = nickname.trim().charAt(0) || "?";
 
   return (
     <section
       className="home-profile-panel relative overflow-hidden rounded-2xl border border-slate-200/70 bg-[#f7f6f4] shadow-[0_10px_28px_rgba(15,23,42,0.06)]"
-      aria-label="플레이어 프로필"
+      aria-label={t("ariaLabel")}
     >
       <div
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_0%_0%,rgba(198,40,40,0.10),transparent_55%),linear-gradient(145deg,#fbfaf8_0%,#f3f1ed_48%,#eceae5_100%)]"
@@ -92,18 +94,20 @@ export function HomeProfilePanel({
         <div className="flex shrink-0 items-stretch gap-0 border-l border-slate-200/90 pl-2.5">
           <div className="px-1.5 text-center">
             <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-slate-500">
-              점수
+              {t("score")}
             </p>
             <p className="mt-0.5 text-[12px] font-bold tabular-nums leading-none text-slate-900">
               {formatSeasonScore(seasonScore)}
               {seasonScore > 0 ? (
-                <span className="ml-0.5 text-[8px] font-semibold text-slate-400">점</span>
+                <span className="ml-0.5 text-[8px] font-semibold text-slate-400">
+                  {t("scoreUnit")}
+                </span>
               ) : null}
             </p>
           </div>
           <div className="border-l border-slate-200/90 px-1.5 text-center">
             <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-slate-500">
-              랭킹
+              {t("ranking")}
             </p>
             <p className="mt-0.5 text-[12px] font-bold tabular-nums leading-none text-slate-900">
               {formatRank(rank)}

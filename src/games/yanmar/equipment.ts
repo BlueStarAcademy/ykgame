@@ -1,3 +1,8 @@
+import {
+  rollFloodScore as rollFloodScoreInternal,
+  type FloodRewardKind as FloodRewardKindInternal,
+} from "./floodRecovery/balance";
+
 export const YANMAR_REWARD_CONFIG = {
   baseMaxLoadUnits: 1000,
   baseTruckCapacityUnits: 3000,
@@ -189,6 +194,8 @@ export interface YanmarEquipmentStats {
   breakerEvery3HitMult?: number;
   /** 블레이드 주옵션 효율 (기본 1) */
   bladeEfficiency?: number;
+  /** Flood recovery blade push units per valid stroke (default 500). */
+  floodPushUnits?: number;
   /** 작업 반경/도달 (기본 1). 능력치 파생으로 확장 가능 */
   reachMultiplier?: number;
 }
@@ -458,6 +465,26 @@ export function calculateYanmarHillScore(
 export function rollYanmarHillXp(): number {
   const { xpMin, xpMax } = YANMAR_HILL_REWARD_CONFIG;
   return Math.floor(Math.random() * (xpMax - xpMin + 1)) + xpMin;
+}
+
+export {
+  YANMAR_FLOOD_REWARD_CONFIG,
+  calculateFloodPushUnits,
+  rollFloodScore,
+  rollFloodXp,
+  type FloodRewardKind,
+} from "./floodRecovery/balance";
+
+export function calculateYanmarFloodScore(
+  stats: YanmarEquipmentStats,
+  kind: FloodRewardKindInternal,
+  critical: boolean,
+): number {
+  const scoreMult = stats.scoreMult ?? 1;
+  return Math.round(
+    rollFloodScoreInternal(kind, critical, stats.criticalMultiplier) *
+      scoreMult,
+  );
 }
 
 export function calculateYanmarEquipmentStats(

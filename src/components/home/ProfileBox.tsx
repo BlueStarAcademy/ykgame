@@ -1,6 +1,7 @@
 "use client";
 
 import { clientLogout } from "@/lib/client-logout";
+import { useTranslations } from "next-intl";
 
 interface ProfileBoxProps {
   nickname: string;
@@ -9,6 +10,7 @@ interface ProfileBoxProps {
 }
 
 export function ProfileBox({ nickname, currency, totalStars }: ProfileBoxProps) {
+  const t = useTranslations("home.profile");
   return (
     <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 p-4 text-white shadow-lg">
       <div className="flex items-center justify-between">
@@ -17,7 +19,7 @@ export function ProfileBox({ nickname, currency, totalStars }: ProfileBoxProps) 
             {nickname.charAt(0)}
           </div>
           <div>
-            <p className="text-sm text-blue-100">플레이어</p>
+            <p className="text-sm text-blue-100">{t("player")}</p>
             <p className="text-lg font-bold">{nickname}</p>
           </div>
         </div>
@@ -25,16 +27,16 @@ export function ProfileBox({ nickname, currency, totalStars }: ProfileBoxProps) 
           onClick={() => clientLogout()}
           className="rounded-lg bg-white/20 px-3 py-1.5 text-sm hover:bg-white/30"
         >
-          로그아웃
+          {t("logout")}
         </button>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-xl bg-white/15 p-3 text-center">
-          <p className="text-xs text-blue-100">보유 별 (재화)</p>
+          <p className="text-xs text-blue-100">{t("currencyStars")}</p>
           <p className="text-2xl font-bold">⭐ {currency}</p>
         </div>
         <div className="rounded-xl bg-white/15 p-3 text-center">
-          <p className="text-xs text-blue-100">획득 별 합계</p>
+          <p className="text-xs text-blue-100">{t("totalStars")}</p>
           <p className="text-2xl font-bold">★ {totalStars}</p>
         </div>
       </div>

@@ -45,6 +45,7 @@ import {
   getDigZoneRespawnEtaSec,
   getCrashZoneRespawnEtaSec,
   getHillZoneRespawnEtaSec,
+  getFloodZoneRespawnEtaSec,
   sampleBreakerContactHeight,
   sampleCrashContactHeight,
   sampleHeight,
@@ -54,11 +55,21 @@ import {
   worldToDumpTruckLocal,
   dumpTruckLocalToWorld,
   hillBoulderVisualScale,
+  pushFloodDebrisToCollection,
+  beginFloodTrashCarry,
+  depositFloodTrashToIncinerator,
+  dropFloodCarriedTrash,
+  tryStartFloodBurn,
+  advanceFloodBurn,
+  isInsideFloodCollectionPad,
+  isInsideFloodIncinerator,
+  isInFloodZone,
   type TerrainData,
   type HillBoulder,
   DUMP_ZONE,
   DUMP_TRUCK,
 } from "./terrain";
+import { FLOOD_BASE_PUSH_UNITS, FLOOD_COLLECTION_THRESHOLD } from "./floodRecovery/balance";
 import {
   constrainArmFromHaulTruck,
   constrainExcavatorToTruckTarget,
@@ -122,6 +133,7 @@ import {
   MIN_BUCKET_DIG_ZONE_CLEARANCE,
   MIN_BUCKET_GROUND_CLEARANCE,
   MIN_GRAPPLE_GROUND_CLEARANCE,
+  TRUCK_BODY_SEPARATION_PAD,
 } from "./simConstants";
 import {
   isWorldSpeedBuffActive,
@@ -158,6 +170,7 @@ import {
   clampGrappleOpenAgainstArm,
   grappleOpenEnoughToGrab,
 } from "./grappleArmClearance";
+import { yanmarAudio } from "./yanmarAudio";
 
 export interface DumpSoilVisual {
   active: boolean;
@@ -190,6 +203,8 @@ export interface SimLoopRuntime {
   digDust: DigDustVisual;
   bladeSpray: BladeSprayVisual;
   attachmentActionCooldown: number;
+  /** Throttles granular soil one-shots while the load is changing every frame. */
+  soilSoundCooldown: number;
   breakerHitCount: number;
   warningCooldown: number;
   /** Latches zone/use warnings until the triggering condition clears. */
@@ -230,6 +245,7 @@ export function createSimLoopRuntime(): SimLoopRuntime {
       intensity: 0,
     },
     attachmentActionCooldown: 0,
+    soilSoundCooldown: 0,
     breakerHitCount: 0,
     warningCooldown: 0,
     warningLatchKey: null,
@@ -238,6 +254,17 @@ export function createSimLoopRuntime(): SimLoopRuntime {
     grappleGrabArmed: false,
     lastSystemsWallMs: 0,
   };
+}
+
+function playSoilSound(runtime: SimLoopRuntime, kind: "load" | "dump") {
+  if (runtime.soilSoundCooldown > 0) return;
+  if (kind === "load") {
+    yanmarAudio.playSoilLoad();
+    runtime.soilSoundCooldown = 0.17;
+  } else {
+    yanmarAudio.playSoilDump();
+    runtime.soilSoundCooldown = 0.13;
+  }
 }
 
 export interface SimTickParams {
@@ -261,6 +288,14 @@ export interface SimTickParams {
   onDumpScore: (popup: Omit<DumpScorePopup, "id">) => void;
   onCrashTileDestroyed: (tileId: string) => void;
   onHillRockDelivered: (rockId: string) => void;
+  /** Flood: units pushed into the collection pad (quest progress). */
+  onFloodDebrisPushed?: (amount: number) => void;
+  /** Flood: collection pad first filled to threshold this cycle (score/XP reward). */
+  onFloodCollectFilled?: (eventId: string, amount: number) => void;
+  /** Flood: grapple pickup. awardCycleReward is true once per cycle. */
+  onFloodTrashGrapple?: (eventId: string, awardCycleReward: boolean) => void;
+  /** Flood: incinerator burn completed. */
+  onFloodBurnComplete?: (eventId: string, burnedUnits: number) => void;
   onAttachmentWarning: (message: string) => void;
   /** 덤프트럭 만재→출발 전환 시 1회 */
   onDumpTruckFull?: () => void;
@@ -271,6 +306,8 @@ export interface SimTickParams {
   endedRef?: { current: boolean };
   /** 차체 스케일에 맞춘 도저 전방 reach (미지정 시 기본값). */
   dozerBladeReach?: number;
+  /** Active chassis undercarriage collision radius (tracks + skin). */
+  excavatorCollisionRadius?: number;
   /** Arcade world pickups (stars / speed). Game mode + logged-in only. */
   worldPickups?: WorldPickupsState | null;
   onWorldPickup?: (pickup: WorldPickup) => void;
@@ -543,14 +580,19 @@ function applyTruckDump(
   }
 }
 
-function isExcavatorCollidingWithDumpTruck(x: number, z: number, pose?: DumpTruckPose) {
+function isExcavatorCollidingWithDumpTruck(
+  x: number,
+  z: number,
+  pose: DumpTruckPose | undefined,
+  excavatorRadius: number,
+) {
   if (pose && !pose.present) return false;
   const local = worldToDumpTruckLocal(x, z, pose?.groupX, pose?.groupZ);
   const localX = local.x - DUMP_TRUCK_COLLIDER.centerOffsetX;
   const localZ = local.z - DUMP_TRUCK_COLLIDER.centerOffsetZ;
   const outsideX = Math.max(Math.abs(localX) - DUMP_TRUCK_COLLIDER.halfX, 0);
   const outsideZ = Math.max(Math.abs(localZ) - DUMP_TRUCK_COLLIDER.halfZ, 0);
-  return outsideX * outsideX + outsideZ * outsideZ <= EXCAVATOR_COLLISION_RADIUS ** 2;
+  return outsideX * outsideX + outsideZ * outsideZ <= excavatorRadius * excavatorRadius;
 }
 
 /** 트럭 OBB + 굴착기 반경 원 겹침을 최단면으로 밀어낸다. */
@@ -558,6 +600,7 @@ function resolveExcavatorDumpTruckOverlap(
   x: number,
   z: number,
   pose: DumpTruckPose,
+  excavatorRadius: number,
 ): { x: number; z: number } | null {
   if (!pose.present) return null;
   const local = worldToDumpTruckLocal(x, z, pose.groupX, pose.groupZ);
@@ -565,8 +608,8 @@ function resolveExcavatorDumpTruckOverlap(
   const lz = local.z - DUMP_TRUCK_COLLIDER.centerOffsetZ;
   const hx = DUMP_TRUCK_COLLIDER.halfX;
   const hz = DUMP_TRUCK_COLLIDER.halfZ;
-  const radius = EXCAVATOR_COLLISION_RADIUS;
-  const pad = 0.18;
+  const radius = excavatorRadius;
+  const pad = TRUCK_BODY_SEPARATION_PAD;
 
   const closestX = Math.max(-hx, Math.min(hx, lx));
   const closestZ = Math.max(-hz, Math.min(hz, lz));
@@ -615,20 +658,29 @@ function resolveExcavatorDumpTruckOverlap(
 function constrainExcavatorToDumpTruck(
   sim: ExcavatorSimState,
   previous: { x: number; z: number; heading: number; swing: number },
-  pose?: DumpTruckPose,
+  pose: DumpTruckPose | undefined,
+  excavatorRadius: number,
 ) {
-  if (!pose || !isExcavatorCollidingWithDumpTruck(sim.posX, sim.posZ, pose)) {
+  if (
+    !pose ||
+    !isExcavatorCollidingWithDumpTruck(sim.posX, sim.posZ, pose, excavatorRadius)
+  ) {
     return false;
   }
   // 진입 직전 자세로 되돌림(선회로 궤도가 파고드는 것 포함). 이미 겹치면 밀어낸다.
-  if (!isExcavatorCollidingWithDumpTruck(previous.x, previous.z, pose)) {
+  if (!isExcavatorCollidingWithDumpTruck(previous.x, previous.z, pose, excavatorRadius)) {
     sim.posX = previous.x;
     sim.posZ = previous.z;
     sim.heading = previous.heading;
     sim.swing = previous.swing;
     return true;
   }
-  const resolved = resolveExcavatorDumpTruckOverlap(sim.posX, sim.posZ, pose);
+  const resolved = resolveExcavatorDumpTruckOverlap(
+    sim.posX,
+    sim.posZ,
+    pose,
+    excavatorRadius,
+  );
   if (resolved) {
     sim.posX = resolved.x;
     sim.posZ = resolved.z;
@@ -657,12 +709,17 @@ export function tickExcavatorSim(params: SimTickParams) {
     onDumpScore,
     onCrashTileDestroyed,
     onHillRockDelivered,
+    onFloodDebrisPushed,
+    onFloodCollectFilled,
+    onFloodTrashGrapple,
+    onFloodBurnComplete,
     onAttachmentWarning,
     onDumpTruckFull,
     onHaulTruckFull,
     onSimTick,
     endedRef,
     dozerBladeReach = YANMAR_MACHINE_RIG.dozerBladeReach,
+    excavatorCollisionRadius = EXCAVATOR_COLLISION_RADIUS,
   } = params;
 
   const systemsFrozen = endedRef?.current === true;
@@ -707,6 +764,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     runtime.lastSystemsWallMs = Date.now();
   }
   runtime.attachmentActionCooldown = Math.max(0, runtime.attachmentActionCooldown - dt);
+  runtime.soilSoundCooldown = Math.max(0, runtime.soilSoundCooldown - dt);
   runtime.warningCooldown = Math.max(0, runtime.warningCooldown - dt);
   const truckPose = getDumpTruckPose(truckState);
   params.dumpTruckPose.groupX = truckPose.groupX;
@@ -846,7 +904,13 @@ export function tickExcavatorSim(params: SimTickParams) {
     truckPose.present,
   );
   const dumpBodyTouchingForArm = dumpAlignForArmCollision
-    ? isBodyTouchingTruck(sim.posX, sim.posZ, dumpAlignForArmCollision)
+    ? isBodyTouchingTruck(
+        sim.posX,
+        sim.posZ,
+        dumpAlignForArmCollision,
+        undefined,
+        excavatorCollisionRadius,
+      )
     : false;
   const truckArmCollisionActive =
     (truckPose.present &&
@@ -990,7 +1054,7 @@ export function tickExcavatorSim(params: SimTickParams) {
   // Cap both rise and drop so sharp pivots over height samples cannot fling the body.
   const maxStep = dt * 1.2;
   sim.posY += Math.max(-maxStep, Math.min(maxStep, verticalFollow));
-  if (constrainExcavatorToDumpTruck(sim, beforeTravel, truckPose)) {
+  if (constrainExcavatorToDumpTruck(sim, beforeTravel, truckPose, excavatorCollisionRadius)) {
     vel.travel = 0;
     vel.trackTurn = 0;
     vel.trackLeft = 0;
@@ -1000,7 +1064,14 @@ export function tickExcavatorSim(params: SimTickParams) {
       constrainSportsMeetStartPaddock(sim, params.sportsMeetStartPaddock);
     }
   }
-  if (constrainExcavatorToTruckTarget(sim, beforeTravel, haulAlignForCollision)) {
+  if (
+    constrainExcavatorToTruckTarget(
+      sim,
+      beforeTravel,
+      haulAlignForCollision,
+      excavatorCollisionRadius,
+    )
+  ) {
     vel.travel = 0;
     vel.trackTurn = 0;
     vel.trackLeft = 0;
@@ -1617,6 +1688,72 @@ export function tickExcavatorSim(params: SimTickParams) {
       resetGrappleGrip(runtime.grappleGrip);
     }
   }
+
+  // Flood recovery trash grapple: collection pad → incinerator.
+  const floodForGrapple = terrain.floodZone;
+  if (
+    sim.attachmentType === "grapple" &&
+    floodForGrapple &&
+    (floodForGrapple.phase === "active" ||
+      floodForGrapple.phase === "readyToBurn") &&
+    !sim.carriedBoulderId &&
+    runtime.attachmentActionCooldown <= 0
+  ) {
+    const floodClosing = grapplePedal > 0;
+    const floodOpening = grapplePedal < 0;
+    const nearPad = isInsideFloodCollectionPad(
+      floodForGrapple,
+      grappleClamp.x,
+      grappleClamp.z,
+    );
+    const nearIncinerator = isInsideFloodIncinerator(
+      floodForGrapple,
+      grappleClamp.x,
+      grappleClamp.z,
+    );
+    const tipNearGround =
+      grappleClamp.y - sampleHeight(terrain, grappleClamp.x, grappleClamp.z) <
+      0.85;
+
+    if (
+      !sim.carriedTrashId &&
+      floodForGrapple.phase === "active" &&
+      floodClosing &&
+      nearPad &&
+      tipNearGround &&
+      floodForGrapple.collectedUnits >= FLOOD_COLLECTION_THRESHOLD
+    ) {
+      if (!angleReady) {
+        warnAttachment("버켓 각도를 집게와 맞춰주세요.");
+        runtime.attachmentActionCooldown = 0.35;
+      } else {
+        const carried = beginFloodTrashCarry(terrain);
+        if (carried) {
+          sim.carriedTrashId = carried.trashId;
+          runtime.attachmentActionCooldown = 0.25;
+          const awardCycleReward = !floodForGrapple.rewardedGrapple;
+          if (awardCycleReward) floodForGrapple.rewardedGrapple = true;
+          onFloodTrashGrapple?.(carried.trashId, awardCycleReward);
+        }
+      }
+    } else if (sim.carriedTrashId && floodOpening && nearIncinerator) {
+      depositFloodTrashToIncinerator(terrain);
+      sim.carriedTrashId = null;
+      runtime.attachmentActionCooldown = 0.3;
+    } else if (
+      sim.carriedTrashId &&
+      !isInFloodZone(terrain, sim.posX, sim.posZ)
+    ) {
+      dropFloodCarriedTrash(terrain);
+      sim.carriedTrashId = null;
+    }
+  }
+
+  if (sim.attachmentType !== "grapple" && sim.carriedTrashId) {
+    dropFloodCarriedTrash(terrain);
+    sim.carriedTrashId = null;
+  }
+
   const isInDumpTruckRearBox = (wx: number, wz: number) => {
     const local = worldToDumpTruckLocal(wx, wz, truckPose.groupX, truckPose.groupZ);
     const relX = local.x - DUMP_TRUCK.bedLocalX;
@@ -1640,7 +1777,13 @@ export function tickExcavatorSim(params: SimTickParams) {
     truckPose.present,
   );
   const dumpBodyTouching = dumpAlignTarget
-    ? isBodyTouchingTruck(sim.posX, sim.posZ, dumpAlignTarget)
+    ? isBodyTouchingTruck(
+        sim.posX,
+        sim.posZ,
+        dumpAlignTarget,
+        undefined,
+        excavatorCollisionRadius,
+      )
     : false;
   const dumpFacingBed = dumpAlignTarget
     ? isFacingTruckBedCenter(
@@ -1661,7 +1804,13 @@ export function tickExcavatorSim(params: SimTickParams) {
   );
   const haulAlignTarget = haulAlignForCollision;
   const haulBodyTouching = haulAlignTarget
-    ? isBodyTouchingTruck(sim.posX, sim.posZ, haulAlignTarget)
+    ? isBodyTouchingTruck(
+        sim.posX,
+        sim.posZ,
+        haulAlignTarget,
+        undefined,
+        excavatorCollisionRadius,
+      )
     : false;
   // 방향만 맞으면 맵 전역에서 true가 되므로, 안내·정렬은 트럭 근처에서만 본다.
   const HAUL_GUIDE_RADIUS = 8;
@@ -1902,6 +2051,18 @@ export function tickExcavatorSim(params: SimTickParams) {
     : [];
   fb.crashCooldownEtaSec = getCrashZoneRespawnEtaSec(terrain.crashZone);
   fb.hillCooldownEtaSec = getHillZoneRespawnEtaSec(terrain.hillZone);
+  {
+    const fz = terrain.floodZone;
+    fb.floodCooldownEtaSec = getFloodZoneRespawnEtaSec(fz);
+    fb.floodActive = !!fz && (fz.active || fz.phase === "readyToBurn" || fz.phase === "burning");
+    fb.floodPhase = fz?.phase ?? "idle";
+    fb.floodCollectedUnits = fz?.collectedUnits ?? 0;
+    fb.floodCollectionThreshold = FLOOD_COLLECTION_THRESHOLD;
+    fb.floodIncineratorUnits = fz?.incineratorUnits ?? 0;
+    fb.floodIncineratorCapacity = fz?.incineratorCapacity ?? 0;
+    fb.floodBurnProgress = fz?.burnProgress ?? 0;
+    fb.carryingTrash = !!sim.carriedTrashId;
+  }
   fb.canDump = inTruckDumpTarget && sim.bucketLoad > 0.02 && truckCanAccept;
   fb.dumpBodyTouching =
     sim.attachmentType === "grapple" ? haulBodyTouching : dumpBodyTouching;
@@ -1998,6 +2159,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       sim.bucketLoad = Math.min(1, soilRetention, sim.bucketLoad + loadDelta);
       const gainedUnits = (sim.bucketLoad - prevLoad) * stats.maxLoadUnits;
       if (gainedUnits > 0) {
+        playSoilSound(runtime, "load");
         consumeDigZoneUnits(terrain, digX, digZ, gainedUnits);
         fb.digZoneRemainingUnits =
           getActiveDigZoneAt(terrain, digX, digZ)?.remainingUnits ?? 0;
@@ -2058,6 +2220,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       excess < 0.02 ? excess : Math.min(excess, Math.max(excess * spillRate * dt, 0.35 * dt));
     sim.bucketLoad = Math.max(0, sim.bucketLoad - spillAmount);
     fb.soilSpilling = spillAmount > 0.001;
+    if (fb.soilSpilling) playSoilSound(runtime, "dump");
 
     if (fb.soilSpilling && inTruckDumpTarget && truckCanAccept) {
       applyTruckDump(spillAmount, dumpParams);
@@ -2111,6 +2274,7 @@ export function tickExcavatorSim(params: SimTickParams) {
       const allowTruckFill = sportsWorkAllowed("dump");
       sim.bucketLoad = Math.max(0, sim.bucketLoad - dumpAmount);
       fb.soilSpilling = dumpAmount > 0.001;
+      if (fb.soilSpilling) playSoilSound(runtime, "dump");
 
       if (inTruckDumpTarget && truckCanAccept && allowTruckFill) {
         applyTruckDump(dumpAmount, dumpParams);
@@ -2160,11 +2324,37 @@ export function tickExcavatorSim(params: SimTickParams) {
   const bladeClearance = bladeContact.y - bladeGroundY;
   const forwardTravel = Math.max(0, vel.travel);
   const bladeInSoilField = isInDigZone(bladeContact.x, bladeContact.z, terrain);
+  const floodZone = terrain.floodZone;
+  const bladeInFloodField =
+    !!floodZone?.active &&
+    floodZone.phase === "active" &&
+    isInFloodZone(terrain, bladeContact.x, bladeContact.z) &&
+    !isInsideFloodCollectionPad(floodZone, bladeContact.x, bladeContact.z);
+  // Straight push toward collection pad: travel heading within ~35° of pad direction.
+  let floodStraightPush = false;
+  if (bladeInFloodField && floodZone) {
+    const toPadX = floodZone.collectionX - sim.posX;
+    const toPadZ = floodZone.collectionZ - sim.posZ;
+    const toPadLen = Math.hypot(toPadX, toPadZ) || 1;
+    const travelDirX = Math.sin(sim.heading);
+    const travelDirZ = Math.cos(sim.heading);
+    const align =
+      (travelDirX * toPadX + travelDirZ * toPadZ) / toPadLen;
+    floodStraightPush = align > 0.82;
+  }
   const bladeScraping =
     effectiveBlade > 0.55 &&
     bladeClearance < 0.12 &&
     forwardTravel > 0.35 &&
     bladeInSoilField;
+  const bladeFloodPush =
+    effectiveBlade > 0.55 &&
+    bladeClearance < 0.12 &&
+    forwardTravel > 0.35 &&
+    bladeInFloodField &&
+    floodStraightPush &&
+    !sim.carriedTrashId &&
+    !sim.carriedBoulderId;
   if (bladeScraping) {
     const bladeEff = Math.max(0.5, stats.bladeEfficiency ?? 1);
     digAt(
@@ -2184,10 +2374,65 @@ export function tickExcavatorSim(params: SimTickParams) {
     runtime.bladeSpray.y = bladeGroundY + 0.06;
     runtime.bladeSpray.z = bladeContact.z;
     runtime.bladeSpray.heading = sim.heading + sim.swing;
+  } else if (bladeFloodPush && floodZone) {
+    // Accumulate push until one "stroke" worth of travel (~2.2m) then apply push units.
+    const rt = runtime as SimLoopRuntime & {
+      floodBladeStrokeDist?: number;
+    };
+    rt.floodBladeStrokeDist = (rt.floodBladeStrokeDist ?? 0) + forwardTravel * dt;
+    fb.bladeWorking = true;
+    runtime.bladeSpray.active = true;
+    runtime.bladeSpray.intensity = Math.min(
+      1.35,
+      runtime.bladeSpray.intensity + forwardTravel * dt * 1.6,
+    );
+    runtime.bladeSpray.x = bladeContact.x;
+    runtime.bladeSpray.y = bladeGroundY + 0.06;
+    runtime.bladeSpray.z = bladeContact.z;
+    runtime.bladeSpray.heading = sim.heading + sim.swing;
+    if (rt.floodBladeStrokeDist >= 2.2) {
+      rt.floodBladeStrokeDist = 0;
+      const pushUnits = Math.max(
+        FLOOD_BASE_PUSH_UNITS,
+        Math.floor(stats.floodPushUnits ?? FLOOD_BASE_PUSH_UNITS),
+      );
+      const { moved, collectionFilled } = pushFloodDebrisToCollection(
+        terrain,
+        pushUnits,
+      );
+      if (moved > 0) {
+        onFloodDebrisPushed?.(moved);
+      }
+      if (moved > 0 && collectionFilled && floodZone && onFloodCollectFilled) {
+        floodZone.rewardedCollect = true;
+        onFloodCollectFilled(
+          `${floodZone.id}-collect`,
+          FLOOD_COLLECTION_THRESHOLD,
+        );
+      }
+    }
   } else {
+    const rt = runtime as SimLoopRuntime & { floodBladeStrokeDist?: number };
+    rt.floodBladeStrokeDist = 0;
     runtime.bladeSpray.intensity = Math.max(0, runtime.bladeSpray.intensity - dt * 3.2);
     if (runtime.bladeSpray.intensity <= 0.03) {
       runtime.bladeSpray.active = false;
+    }
+  }
+
+  // Flood burn sequence: wait for player to leave, then play burn FX.
+  if (floodZone?.phase === "readyToBurn") {
+    tryStartFloodBurn(terrain, sim.posX, sim.posZ);
+  }
+  if (floodZone?.phase === "burning") {
+    const capacity = floodZone.incineratorCapacity;
+    const finished = advanceFloodBurn(terrain, dt);
+    if (finished && onFloodBurnComplete) {
+      const eventId = `${floodZone.id}-burn`;
+      if (!floodZone.rewardedBurn) {
+        floodZone.rewardedBurn = true;
+        onFloodBurnComplete(eventId, capacity);
+      }
     }
   }
 

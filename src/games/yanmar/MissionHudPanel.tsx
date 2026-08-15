@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { MISSION_DIFFICULTY_REWARDS, QUEST_MISSIONS_PER_DAY } from "./quests/config";
 import { getCurrentMission, type YanmarQuestState } from "./quests/questState";
 import type { QuestReward } from "./quests/types";
@@ -12,9 +13,9 @@ interface MissionHudPanelProps {
   onClaim: () => void;
 }
 
-function DifficultyStars({ count }: { count: number }) {
+function DifficultyStars({ count, label }: { count: number; label: string }) {
   return (
-    <span className="inline-flex shrink-0 items-center gap-px" aria-label={`난이도 ${count}`}>
+    <span className="inline-flex shrink-0 items-center gap-px" aria-label={label}>
       {Array.from({ length: 5 }, (_, i) => (
         <span
           key={i}
@@ -29,7 +30,13 @@ function DifficultyStars({ count }: { count: number }) {
   );
 }
 
-function CompactQuestReward({ reward }: { reward: QuestReward }) {
+function CompactQuestReward({
+  reward,
+  scoreLabel,
+}: {
+  reward: QuestReward;
+  scoreLabel: string;
+}) {
   const parts: ReactNode[] = [];
   if (reward.xp > 0) {
     parts.push(
@@ -59,7 +66,8 @@ function CompactQuestReward({ reward }: { reward: QuestReward }) {
   if ((reward.score ?? 0) > 0) {
     parts.push(
       <span key="score" className="whitespace-nowrap tabular-nums">
-        {reward.score!.toLocaleString()}점
+        {reward.score!.toLocaleString()}
+        {scoreLabel}
       </span>,
     );
   }
@@ -143,14 +151,18 @@ function TaskProgressBar({ value, max }: { value: number; max: number }) {
 }
 
 export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPanelProps) {
+  const t = useTranslations("yanmar.quest");
   const [expanded, setExpanded] = useState(true);
 
   if (!questState) return null;
 
   const mission = getCurrentMission(questState);
   const headerLabel = mission
-    ? `미션 ${mission.index + 1}/${QUEST_MISSIONS_PER_DAY}`
-    : "미션 완료";
+    ? t("missionRound", {
+        current: mission.index + 1,
+        total: QUEST_MISSIONS_PER_DAY,
+      })
+    : t("missionComplete");
 
   return (
     <div className="yanmar-mission-hud-panel relative w-full overflow-hidden rounded-xl border border-white/8 bg-black/15 text-white shadow-none backdrop-blur-[1px]">
@@ -159,13 +171,18 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
         className="flex min-h-6 w-full items-center justify-between gap-1 px-1.5 py-1 text-left hover:bg-white/8"
         onClick={() => setExpanded((open) => !open)}
         aria-expanded={expanded}
-        aria-label={expanded ? "미션 패널 접기" : "미션 패널 펼치기"}
+        aria-label={expanded ? t("collapseMission") : t("expandMission")}
       >
         <span className="min-w-0 text-[9px] font-black tabular-nums leading-tight">
           {headerLabel}
         </span>
         <span className="inline-flex shrink-0 items-center gap-0.5">
-          {mission ? <DifficultyStars count={mission.difficulty} /> : null}
+          {mission ? (
+            <DifficultyStars
+              count={mission.difficulty}
+              label={t("difficultyValue", { value: mission.difficulty })}
+            />
+          ) : null}
           {mission?.completed && !mission.claimed ? (
             <span className="h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden />
           ) : null}
@@ -184,7 +201,7 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
         <div className="border-t border-white/10 px-1.5 pb-1.5 pt-1">
           {!mission ? (
             <p className="text-center text-[8px] font-black leading-tight text-emerald-200">
-              미션 퀘스트 완료
+              {t("missionsComplete")}
             </p>
           ) : (
             <>
@@ -198,7 +215,7 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
                         <p className="min-w-0 flex-1 text-[8px] font-bold leading-snug text-white/90">
                           {task.required ? (
                             <span className="mr-0.5 text-[7px] font-black text-orange-300">
-                              필수
+                              {t("tags.required")}
                             </span>
                           ) : null}
                           {task.label}
@@ -233,12 +250,13 @@ export function MissionHudPanel({ questState, claiming, onClaim }: MissionHudPan
                   className="mt-1.5 flex w-full flex-col items-center gap-0.5 rounded border border-amber-300/40 bg-amber-500/90 px-1 py-1 text-white disabled:opacity-60"
                 >
                   <span className="text-[8px] font-black leading-none">
-                    {claiming ? "받는 중" : "보상 받기"}
+                    {claiming ? t("claiming") : t("claimRewards")}
                   </span>
                   {!claiming ? (
                     <span className="text-[7px] font-semibold leading-tight text-white/95">
                       <CompactQuestReward
                         reward={MISSION_DIFFICULTY_REWARDS[mission.difficulty]}
+                        scoreLabel={t("scoreUnit")}
                       />
                     </span>
                   ) : null}

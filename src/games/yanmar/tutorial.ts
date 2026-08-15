@@ -94,6 +94,8 @@ export interface TutorialTickExtras {
   canDump: boolean;
   grappleOpen: number;
   gearActionOpened: boolean;
+  /** Bucket/tool is on or in the ground (boom cannot lower further). */
+  tipTouchingGround: boolean;
 }
 
 const TRAVEL_METERS = 5;
@@ -310,7 +312,7 @@ function travelMeterLabel(dist: number) {
   return `${shown.toFixed(1)} / ${TRAVEL_METERS}m`;
 }
 
-/** raise (min) then lower (max), 3 full cycles. */
+/** Fold (min) then extend (max), 3 full cycles. */
 function advanceJointCycles(
   progress: TutorialPhaseProgress,
   atMin: boolean,
@@ -336,6 +338,37 @@ function advanceJointCycles(
   return false;
 }
 
+/**
+ * Boom lower first (stick up / joint max, or ground stop), then raise (stick
+ * down / joint min). Ground blocks boom.max, so tip contact counts as lowered.
+ */
+function advanceBoomCycles(
+  progress: TutorialPhaseProgress,
+  sim: ExcavatorSimState,
+  extras: TutorialTickExtras,
+): boolean {
+  const stickLower = extras.input.right.y > LEVER_ON;
+  const stickRaise = extras.input.right.y < -LEVER_ON;
+  const atLower =
+    atJointMax(sim.boom, JOINT_LIMITS.boom.max) || extras.tipTouchingGround;
+  const atRaise = atJointMin(sim.boom, JOINT_LIMITS.boom.min);
+
+  if (!progress.cycleSeekingHigh) {
+    if (stickLower && atLower) {
+      progress.cycleSeekingHigh = true;
+      progress.cycleArmed = false;
+      advancePhase(progress);
+    }
+  } else if (stickRaise && atRaise) {
+    progress.cycleCount += 1;
+    progress.cycleSeekingHigh = false;
+    progress.cycleArmed = false;
+    if (progress.cycleCount >= 3) return true;
+    advancePhase(progress);
+  }
+  return false;
+}
+
 export function getTutorialInstruction(
   step: TutorialStep,
   progress: TutorialPhaseProgress,
@@ -355,8 +388,8 @@ export function getTutorialInstruction(
     case "boom":
       if (progress.cycleCount >= 3) return "붐 3회 완료!";
       return progress.cycleSeekingHigh
-        ? `우 조이스틱 앞 — 붐을 최대로 내리세요 (${progress.cycleCount + 1}/3)`
-        : `우 조이스틱 뒤 — 붐을 최대로 올리세요 (${progress.cycleCount + 1}/3)`;
+        ? `우 조이스틱을 아래로 당겨 붐을 최대로 올리세요 (${progress.cycleCount + 1}/3)`
+        : `우 조이스틱을 위로 밀어 붐을 최대로 내리세요 (${progress.cycleCount + 1}/3)`;
     case "arm":
       if (progress.cycleCount >= 3) return "암 3회 완료!";
       return progress.cycleSeekingHigh
@@ -445,7 +478,7 @@ export function getTutorialPhaseSuccessLabel(
         ] ?? "성공!"
       );
     case "boom":
-      return completedPhase % 2 === 0 ? "붐 상승 성공!" : "붐 하강 성공!";
+      return completedPhase % 2 === 0 ? "붐 하강 성공!" : "붐 상승 성공!";
     case "arm":
       return completedPhase % 2 === 0 ? "암 접기 성공!" : "암 뻗기 성공!";
     case "bucket":
@@ -530,11 +563,7 @@ export function advanceTutorialProgress(
       return false;
     }
     case "boom":
-      return advanceJointCycles(
-        progress,
-        atJointMin(sim.boom, JOINT_LIMITS.boom.min),
-        atJointMax(sim.boom, JOINT_LIMITS.boom.max),
-      );
+      return advanceBoomCycles(progress, sim, extras);
     case "arm":
       return advanceJointCycles(
         progress,

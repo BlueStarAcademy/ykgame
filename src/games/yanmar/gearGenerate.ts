@@ -266,12 +266,7 @@ export function buildItemName(
 
 export function rollMasterOption(): MasterOptionInst {
   const def = MASTER_OPTION_POOL[Math.floor(rand() * MASTER_OPTION_POOL.length)]!;
-  const value =
-    def.min === def.max
-      ? def.min
-      : def.key === "breakerEvery3HitMult"
-        ? rollFloat(def.min, def.max)
-        : rollInt(def.min, def.max);
+  const value = def.min === def.max ? def.min : rollInt(def.min, def.max);
   return {
     key: def.key,
     value,
@@ -491,7 +486,7 @@ export function applyEnhanceSuccess(item: GearItemData): GearItemData {
         value: m.isDropRateBonus
           ? m.value + 10
           : m.key === "breakerEvery3HitMult"
-            ? Math.round((m.value + 0.25) * 100) / 100
+            ? m.value + 1
             : Math.round(m.value * 1.25),
       },
     };

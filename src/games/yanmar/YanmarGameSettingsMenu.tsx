@@ -582,7 +582,7 @@ export function YanmarGameSettingsMenu({
                   onClick={() => setSfxSettingsOpen(true)}
                   className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-bold text-white/75 hover:bg-white/10"
                 >
-                  상세 설정
+                  {t("detailedSettings")}
                 </button>
               }
             >

@@ -33,16 +33,18 @@ import {
 
 function QuestNotifyBadge({
   count,
+  label,
   className = "",
 }: {
   count: number;
+  label: string;
   className?: string;
 }) {
   if (count <= 0) return null;
   return (
     <span
       className={`yanmar-quest-notify-badge ${className}`.trim()}
-      aria-label={`미수령 보상 ${count}개`}
+      aria-label={label}
     >
       {count > 9 ? "9+" : count}
     </span>
@@ -76,12 +78,6 @@ function CloseGlyph() {
   );
 }
 
-const TABS: { id: QuestTab; label: string }[] = [
-  { id: "daily", label: "일일" },
-  { id: "mission", label: "미션" },
-  { id: "repeat", label: "반복" },
-];
-
 interface QuestPanelProps {
   open: boolean;
   onClose: () => void;
@@ -104,6 +100,11 @@ export function QuestPanel({
   onClaimRepeat,
 }: QuestPanelProps) {
   const t = useTranslations("yanmar.quest");
+  const tabs: { id: QuestTab; label: string }[] = [
+    { id: "daily", label: t("tabs.daily") },
+    { id: "mission", label: t("tabs.mission") },
+    { id: "repeat", label: t("tabs.repeat") },
+  ];
   const [tab, setTab] = useState<QuestTab>("daily");
   const [resetCountdown, setResetCountdown] = useState(() =>
     formatQuestResetCountdown(getMsUntilNextQuestReset()),
@@ -193,23 +194,23 @@ export function QuestPanel({
             {totalClaimable > 0 ? (
               <span
                 className="yanmar-quest-modal-chip is-alert"
-                title="수령 대기 중인 보상"
+                title={t("rewardsAwaiting")}
               >
-                보상 <b className="tabular-nums">{totalClaimable}</b>
+                {t("rewards")} <b className="tabular-nums">{totalClaimable}</b>
               </span>
             ) : null}
             <span
               className="yanmar-quest-modal-chip"
-              title="일일 퀘스트 초기화까지 남은 시간"
+              title={t("resetCountdown")}
             >
               <ClockGlyph />
-              초기화 <b className="tabular-nums">{resetCountdown}</b>
+              {t("reset")} <b className="tabular-nums">{resetCountdown}</b>
             </span>
             <button
               type="button"
               className="yanmar-quest-modal-close"
               onClick={onClose}
-              aria-label="퀘스트 닫기"
+              aria-label={t("close")}
             >
               <CloseGlyph />
             </button>
@@ -217,7 +218,7 @@ export function QuestPanel({
         </header>
 
         <div className="yanmar-quest-modal-tabs" role="tablist">
-          {TABS.map((item) => {
+          {tabs.map((item) => {
             const active = tab === item.id;
             return (
               <button
@@ -229,7 +230,11 @@ export function QuestPanel({
                 className={`yanmar-quest-tab${active ? " is-active" : ""}`}
               >
                 <span>{item.label}</span>
-                <QuestNotifyBadge count={claimable[item.id]} className="is-tab" />
+                <QuestNotifyBadge
+                  count={claimable[item.id]}
+                  label={t("unclaimedRewards", { count: claimable[item.id] })}
+                  className="is-tab"
+                />
               </button>
             );
           })}
@@ -237,7 +242,7 @@ export function QuestPanel({
 
         {tab === "daily" ? (
           <div className="yanmar-quest-modal-rail">
-            <span className="yanmar-quest-modal-rail-label">오늘 달성</span>
+            <span className="yanmar-quest-modal-rail-label">{t("todayProgress")}</span>
             <span className="yanmar-quest-pips" aria-hidden>
               {dailyRows.map((row) => (
                 <span
@@ -254,7 +259,7 @@ export function QuestPanel({
 
         {tab === "mission" ? (
           <div className="yanmar-quest-modal-rail">
-            <span className="yanmar-quest-modal-rail-label">미션 진행</span>
+            <span className="yanmar-quest-modal-rail-label">{t("missionProgress")}</span>
             <span className="yanmar-quest-pips" aria-hidden>
               {Array.from({ length: QUEST_MISSIONS_PER_DAY }, (_, i) => (
                 <span
@@ -271,12 +276,12 @@ export function QuestPanel({
 
         {tab === "repeat" ? (
           <div className="yanmar-quest-modal-rail">
-            <span className="yanmar-quest-modal-rail-label">반복 퀘스트</span>
+            <span className="yanmar-quest-modal-rail-label">{t("repeatQuests")}</span>
             <span className="yanmar-quest-modal-rail-note">
-              완료할 때마다 다시 도전할 수 있습니다
+              {t("repeatNote")}
             </span>
             <span className="yanmar-quest-modal-rail-value tabular-nums">
-              오늘 <b>{repeatClaimedToday}</b>회 수령
+              {t("claimedToday", { count: repeatClaimedToday })}
             </span>
           </div>
         ) : null}
@@ -285,10 +290,10 @@ export function QuestPanel({
           {!questState ? (
             <div className="yanmar-quest-empty">
               <p className="yanmar-quest-empty-title">
-                퀘스트 정보를 불러오는 중입니다
+                {t("loading")}
               </p>
               <p className="yanmar-quest-empty-sub">
-                잠시 후 다시 확인해 주세요.
+                {t("loadingHint")}
               </p>
             </div>
           ) : null}
@@ -309,7 +314,7 @@ export function QuestPanel({
                       title={title}
                       tag={
                         isMetaDailyQuest(def)
-                          ? { label: "보너스", tone: "bonus" }
+                          ? { label: t("tags.bonus"), tone: "bonus" }
                           : undefined
                       }
                       reward={def.reward}
@@ -340,20 +345,22 @@ export function QuestPanel({
             !currentMission ? (
               <div className="yanmar-quest-empty is-clear">
                 <p className="yanmar-quest-empty-title">
-                  오늘의 미션 퀘스트를 모두 완료했습니다
+                  {t("missionsComplete")}
                 </p>
                 <p className="yanmar-quest-empty-sub">
-                  초기화 후 새로운 미션이 배정됩니다.
+                  {t("missionsCompleteHint")}
                 </p>
               </div>
             ) : (
               <div className="yanmar-quest-mission">
                 <div className="yanmar-quest-mission-head">
                   <span className="yanmar-quest-mission-difficulty">
-                    <span className="yanmar-quest-mission-label">난이도</span>
+                    <span className="yanmar-quest-mission-label">{t("difficulty")}</span>
                     <span
                       className="yanmar-quest-mission-stars"
-                      aria-label={`난이도 ${currentMission.difficulty}`}
+                      aria-label={t("difficultyValue", {
+                        value: currentMission.difficulty,
+                      })}
                     >
                       {Array.from({ length: 5 }, (_, i) => (
                         <span
@@ -373,12 +380,12 @@ export function QuestPanel({
                   </span>
                 </div>
 
-                <p className="yanmar-quest-section-label">클리어 보상</p>
+                <p className="yanmar-quest-section-label">{t("clearRewards")}</p>
                 <QuestRewardTiles
                   reward={MISSION_DIFFICULTY_REWARDS[currentMission.difficulty]}
                 />
 
-                <p className="yanmar-quest-section-label">목표</p>
+                <p className="yanmar-quest-section-label">{t("goals")}</p>
                 <ul className="yanmar-quest-list">
                   {currentMission.tasks.map((task) => {
                     const value = currentMission.progress[task.id] ?? 0;
@@ -389,8 +396,8 @@ export function QuestPanel({
                         title={task.label}
                         tag={
                           task.required
-                            ? { label: "필수", tone: "required" }
-                            : { label: "선택", tone: "bonus" }
+                            ? { label: t("tags.required"), tone: "required" }
+                            : { label: t("tags.optional"), tone: "bonus" }
                         }
                         value={value}
                         target={task.target}
@@ -409,12 +416,12 @@ export function QuestPanel({
                     onClick={onClaimMission}
                   >
                     {claimingId === "mission"
-                      ? "보상 수령 중..."
-                      : "미션 보상 받기"}
+                      ? t("claiming")
+                      : t("claimMission")}
                   </button>
                 ) : (
                   <p className="yanmar-quest-mission-footer">
-                    모든 목표를 달성하면 다음 미션이 열립니다.
+                    {t("nextMissionHint")}
                   </p>
                 )}
               </div>
@@ -431,7 +438,7 @@ export function QuestPanel({
                     title={title}
                     reward={def.reward}
                     meta={
-                      claimCount > 0 ? `오늘 ${claimCount}회 수령` : undefined
+                      claimCount > 0 ? t("claimedToday", { count: claimCount }) : undefined
                     }
                     value={progress}
                     target={def.target}

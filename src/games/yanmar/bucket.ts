@@ -337,6 +337,16 @@ export interface DigFeedback {
   crashCooldownEtaSec: number;
   /** 돌(석재) 구역 재생성까지 남은 초 (0이면 표시 안 함). */
   hillCooldownEtaSec: number;
+  /** 수해복구 구역 HUD / 리젠. */
+  floodActive: boolean;
+  floodPhase: string;
+  floodCollectedUnits: number;
+  floodCollectionThreshold: number;
+  floodIncineratorUnits: number;
+  floodIncineratorCapacity: number;
+  floodBurnProgress: number;
+  floodCooldownEtaSec: number;
+  carryingTrash: boolean;
 }
 
 export function createDigFeedback(): DigFeedback {
@@ -392,6 +402,15 @@ export function createDigFeedback(): DigFeedback {
     digCooldowns: [],
     crashCooldownEtaSec: 0,
     hillCooldownEtaSec: 0,
+    floodActive: false,
+    floodPhase: "idle",
+    floodCollectedUnits: 0,
+    floodCollectionThreshold: 500,
+    floodIncineratorUnits: 0,
+    floodIncineratorCapacity: 0,
+    floodBurnProgress: 0,
+    floodCooldownEtaSec: 0,
+    carryingTrash: false,
   };
 }
 
@@ -456,6 +475,15 @@ export function isDigFeedbackHudEqual(prev: DigFeedback, next: DigFeedback) {
         Math.abs(item.etaSec - (next.digCooldowns[i]?.etaSec ?? 0)) < 0.15,
     ) &&
     Math.abs(prev.crashCooldownEtaSec - next.crashCooldownEtaSec) < 0.15 &&
-    Math.abs(prev.hillCooldownEtaSec - next.hillCooldownEtaSec) < 0.15
+    Math.abs(prev.hillCooldownEtaSec - next.hillCooldownEtaSec) < 0.15 &&
+    prev.floodActive === next.floodActive &&
+    prev.floodPhase === next.floodPhase &&
+    Math.abs(prev.floodCollectedUnits - next.floodCollectedUnits) < 1 &&
+    prev.floodCollectionThreshold === next.floodCollectionThreshold &&
+    Math.abs(prev.floodIncineratorUnits - next.floodIncineratorUnits) < 1 &&
+    prev.floodIncineratorCapacity === next.floodIncineratorCapacity &&
+    Math.abs(prev.floodBurnProgress - next.floodBurnProgress) < 0.05 &&
+    Math.abs(prev.floodCooldownEtaSec - next.floodCooldownEtaSec) < 0.15 &&
+    prev.carryingTrash === next.carryingTrash
   );
 }

@@ -15,7 +15,7 @@ import {
 export const MONUMENT_SIGN = {
   x: SITE_LAYOUT.monument[0],
   z: SITE_LAYOUT.monument[1],
-  // Keep clear of the haul truck drop (42,100) — was 28 and overlapped dump work.
+  // Keep clear of the haul truck drop (26,92) and stone pad (6,104).
   radius: 22,
   rotationY: Math.PI,
 } as const;

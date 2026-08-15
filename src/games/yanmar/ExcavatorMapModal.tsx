@@ -15,6 +15,7 @@ const LEGEND = [
   { labelKey: "legend.dump", tone: "dump" },
   { labelKey: "legend.crash", tone: "crash" },
   { labelKey: "legend.hill", tone: "hill" },
+  { labelKey: "legend.flood", tone: "flood" },
   { labelKey: "legend.repair", tone: "repair" },
   { labelKey: "legend.monument", tone: "monument" },
   { labelKey: "legend.sports", tone: "sports" },

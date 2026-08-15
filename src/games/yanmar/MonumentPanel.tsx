@@ -625,7 +625,10 @@ export function MonumentPanel({
                 const nextPreview =
                   u.key === "storage_cap"
                     ? `${monumentStorageCap(level)} → ${monumentStorageCap(targetLevel)}`
-                    : `${Math.round(monumentIntervalMs(level) / 1000)}초 → ${Math.round(monumentIntervalMs(targetLevel) / 1000)}초`;
+                    : t("secondsPreview", {
+                        from: Math.round(monumentIntervalMs(level) / 1000),
+                        to: Math.round(monumentIntervalMs(targetLevel) / 1000),
+                      });
                 return (
                   <li
                     key={u.key}

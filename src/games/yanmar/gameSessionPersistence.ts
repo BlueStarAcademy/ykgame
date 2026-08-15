@@ -14,9 +14,11 @@ import {
   fastForwardHaulTruckState,
   HAUL_TRUCK_COOLDOWN_SEC,
   normalizeCrashZone,
+  normalizeFloodRecoveryZone,
   type DigZone,
   type CrashZone,
   type HillZone,
+  type FloodRecoveryZone,
   type TerrainData,
 } from "./terrain";
 import type { MapTier } from "./mapTier";
@@ -74,6 +76,7 @@ export interface YanmarGameSessionSnapshot {
   digZones: DigZone[];
   crashZone: CrashZone | null;
   hillZone: HillZone | null;
+  floodZone?: FloodRecoveryZone | null;
   mapTier: MapTier;
   gridSizeX: number;
   gridSizeZ: number;
@@ -116,7 +119,10 @@ function isValidSim(value: unknown): value is ExcavatorSimState {
     (sim.attachmentType === "bucket" ||
       sim.attachmentType === "breaker" ||
       sim.attachmentType === "grapple") &&
-    (sim.carriedBoulderId === null || typeof sim.carriedBoulderId === "string")
+    (sim.carriedBoulderId === null || typeof sim.carriedBoulderId === "string") &&
+    (sim.carriedTrashId === null ||
+      sim.carriedTrashId === undefined ||
+      typeof sim.carriedTrashId === "string")
   );
 }
 
@@ -237,6 +243,9 @@ export function saveYanmarGameSession(
           })
         : null,
       hillZone: snapshot.hillZone ? normalizeHillZone(snapshot.hillZone) : null,
+      floodZone: snapshot.floodZone
+        ? normalizeFloodRecoveryZone(snapshot.floodZone)
+        : null,
       mapTier: snapshot.mapTier,
       gridSizeX: snapshot.gridSizeX,
       gridSizeZ: snapshot.gridSizeZ,
@@ -306,6 +315,9 @@ export function loadYanmarGameSession(
           })
         : null,
       hillZone,
+      floodZone: parsed.floodZone
+        ? normalizeFloodRecoveryZone(parsed.floodZone)
+        : null,
       heights: [...parsed.heights],
       baseHeights: [...parsed.baseHeights],
     };
@@ -322,6 +334,7 @@ export function applyGameSessionTerrain(
     | "baseHeights"
     | "crashZone"
     | "hillZone"
+    | "floodZone"
     | "mapTier"
     | "gridSizeX"
     | "gridSizeZ"
@@ -339,6 +352,9 @@ export function applyGameSessionTerrain(
     : null;
   terrain.hillZone = snapshot.hillZone
     ? normalizeHillZone(snapshot.hillZone)
+    : null;
+  terrain.floodZone = snapshot.floodZone
+    ? normalizeFloodRecoveryZone(snapshot.floodZone)
     : null;
   if (
     snapshot.heights.length === terrain.heights.length &&

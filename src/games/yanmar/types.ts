@@ -56,6 +56,8 @@ export interface ExcavatorSimState {
   bucketLoad: number;
   attachmentType: AttachmentType;
   carriedBoulderId: string | null;
+  /** Flood recovery trash chunk id while carrying to incinerator. */
+  carriedTrashId: string | null;
 }
 
 export interface AttachmentWarning {

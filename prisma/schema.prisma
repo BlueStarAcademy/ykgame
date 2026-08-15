@@ -131,6 +131,7 @@ model User {
   dumpWorkshopPoints   Int                    @default(0)
   crashWorkshopPoints  Int                    @default(0)
   hillWorkshopPoints   Int                    @default(0)
+  floodWorkshopPoints  Int                    @default(0)
   /** Yanmar north pylon monument currency */
   monumentPoints              Int       @default(0)
   /** locked | quest | building | claimable | active */

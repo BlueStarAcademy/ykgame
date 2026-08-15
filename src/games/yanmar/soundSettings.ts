@@ -24,6 +24,7 @@ export const SFX_DETAIL_OPTIONS = [
   { id: "engine", label: "엔진 시동·정지" },
   { id: "travel", label: "주행" },
   { id: "breaker", label: "브레이커" },
+  { id: "soil", label: "흙 적재·하역" },
   { id: "service", label: "정비소 진입" },
   { id: "monument", label: "기념비 진입" },
   { id: "star", label: "스타 획득" },

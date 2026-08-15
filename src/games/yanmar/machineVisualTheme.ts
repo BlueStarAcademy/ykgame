@@ -99,6 +99,20 @@ export function getDozerBladeReach(scale = 1, trackWidth = 1): number {
   return trackFront + overhang * s;
 }
 
+/**
+ * Undercarriage circle that covers the track rectangle at any heading.
+ * Matches ExcavatorModel: TRACK_FRONT+RADIUS (2.08), track center Z 0.72,
+ * carcass half-Z 0.3, trackScaleX 0.58 / trackScaleZ 0.82.
+ */
+export function getExcavatorCollisionRadius(scale = 1, trackWidth = 1): number {
+  const s = Math.max(0.85, scale);
+  const tw = Math.max(0.85, trackWidth);
+  const halfLength = 2.08 * 0.58 * tw * s;
+  const halfWidth = (0.72 + 0.3) * 0.82 * tw * s;
+  // Skin so steel pads / rubber lugs do not visually kiss through the hull.
+  return Math.hypot(halfLength, halfWidth) + 0.16;
+}
+
 /** Center-carbody width between tracks (matches UndercarriageAssembly). */
 export function getCarbodyWidth(trackWidth = 1): number {
   const tw = Math.max(0.85, trackWidth);

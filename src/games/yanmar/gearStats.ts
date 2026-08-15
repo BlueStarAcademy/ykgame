@@ -34,12 +34,15 @@ import {
   parseAbilityAlloc,
   type AbilityAlloc,
 } from "./abilityAlloc";
+import { calculateFloodPushUnits } from "./floodRecovery/balance";
 
 export type RepairBuffKind = "NONE" | "SMALL" | "LARGE";
 
 export interface FinalYanmarStats extends YanmarEquipmentStats {
   workSpeedMultiplier: number;
   bladeEfficiency: number;
+  /** Blade push units for flood recovery (base 500 + ability deltas + cleaning_master). */
+  floodPushUnits: number;
   reachMultiplier: number;
   durabilityMaxPerPiece: number;
   durabilityDrainMult: number;
@@ -209,7 +212,23 @@ export function calculateFinalYanmarStats(input: {
   );
   const activeMasters: Partial<Record<MasterOptionKey, MasterOptionInst>> = {};
   for (const [k, v] of masters) activeMasters[k] = v;
-  const breakerEvery3 = activeMasters.breakerEvery3HitMult?.value ?? 1;
+  const breakerEvery3 = Math.round(
+    activeMasters.breakerEvery3HitMult?.value ?? 1,
+  );
+
+  const chassisStatsRounded: ChassisBaseStats = {
+    strength: Math.round(stats.strength),
+    agility: Math.round(stats.agility),
+    stamina: Math.round(stats.stamina),
+    endurance: Math.round(stats.endurance),
+    balance: Math.round(stats.balance),
+    technique: Math.round(stats.technique),
+  };
+  const floodPushUnits = calculateFloodPushUnits({
+    chassisStats: chassisStatsRounded,
+    baseChassisStats: chassis.stats,
+    cleaningMasterLevel: input.workshopLevels?.cleaning_master ?? 0,
+  });
 
   return {
     maxLoadUnits: Math.round(maxLoadUnits),
@@ -231,19 +250,13 @@ export function calculateFinalYanmarStats(input: {
     hillSafeLoadChance,
     breakerEvery3HitMult: breakerEvery3,
     bladeEfficiency,
+    floodPushUnits,
     reachMultiplier,
     durabilityMaxPerPiece: base.durabilityMaxPerPiece,
     durabilityDrainMult,
     workExpGainBonus: 0,
     chassisId: chassis.id,
-    chassisStats: {
-      strength: Math.round(stats.strength),
-      agility: Math.round(stats.agility),
-      stamina: Math.round(stats.stamina),
-      endurance: Math.round(stats.endurance),
-      balance: Math.round(stats.balance),
-      technique: Math.round(stats.technique),
-    },
+    chassisStats: chassisStatsRounded,
     activeMasters,
     repairBuff,
     maintenance,

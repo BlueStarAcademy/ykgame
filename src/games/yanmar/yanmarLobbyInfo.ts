@@ -33,7 +33,7 @@ export const YANMAR_GUIDE_SECTIONS: readonly YanmarGuideSectionDef[] = [
   {
     id: "unlocks",
     hasIntro: true,
-    itemIds: ["tier1", "tier2", "tier3", "sportsMeet"],
+    itemIds: ["tier1", "tier2", "tier3", "flood", "sportsMeet"],
   },
   {
     id: "quests",

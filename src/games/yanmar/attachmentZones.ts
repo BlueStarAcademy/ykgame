@@ -3,11 +3,18 @@ import {
   getActiveDigZoneAt,
   isInCrashZone,
   isInDumpZone,
+  isInFloodZone,
   isInHillZone,
   type TerrainData,
 } from "./terrain";
 
-export type SiteZoneKind = "dig" | "crash" | "hill" | "dump" | "neutral";
+export type SiteZoneKind =
+  | "dig"
+  | "crash"
+  | "hill"
+  | "flood"
+  | "dump"
+  | "neutral";
 export type AttachmentAction = "dig" | "strike" | "grab" | "dump";
 
 export function getZoneAt(
@@ -16,6 +23,7 @@ export function getZoneAt(
   terrain: TerrainData,
 ): SiteZoneKind {
   if (isInCrashZone(terrain, wx, wz)) return "crash";
+  if (isInFloodZone(terrain, wx, wz)) return "flood";
   if (isInHillZone(terrain, wx, wz)) return "hill";
   if (getActiveDigZoneAt(terrain, wx, wz)) return "dig";
   if (isInDumpZone(wx, wz)) return "dump";
@@ -24,7 +32,7 @@ export function getZoneAt(
 
 function expectedAttachment(zone: SiteZoneKind): AttachmentType | null {
   if (zone === "crash") return "breaker";
-  if (zone === "hill") return "grapple";
+  if (zone === "hill" || zone === "flood") return "grapple";
   if (zone === "dig" || zone === "dump") return "bucket";
   return null;
 }
@@ -51,6 +59,7 @@ const ZONE_LABELS: Record<Exclude<SiteZoneKind, "neutral">, string> = {
   dig: "흙더미",
   crash: "파쇄",
   hill: "석재",
+  flood: "수해복구",
   dump: "하역",
 };
 
@@ -68,6 +77,7 @@ export function checkAttachmentUse(
 ): { allowed: boolean; message?: string } {
   if (action === "dump") {
     if (attachment === "bucket" && zone === "dump") return { allowed: true };
+    if (attachment === "grapple" && zone === "flood") return { allowed: true };
     return {
       allowed: false,
       message:

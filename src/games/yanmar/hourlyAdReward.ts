@@ -326,6 +326,7 @@ export function saveHourlyAdGrantLocally(
         dumpWorkshopPoints: result.dumpWorkshopPoints,
         crashWorkshopPoints: result.crashWorkshopPoints,
         hillWorkshopPoints: result.hillWorkshopPoints,
+        floodWorkshopPoints: result.floodWorkshopPoints,
         monumentPoints: result.monumentPoints,
         savedAtMs: Date.now(),
       }),
@@ -406,5 +407,6 @@ export type HourlyAdClaimResult = {
   dumpWorkshopPoints?: number;
   crashWorkshopPoints?: number;
   hillWorkshopPoints?: number;
+  floodWorkshopPoints?: number;
   monumentPoints?: number;
 };

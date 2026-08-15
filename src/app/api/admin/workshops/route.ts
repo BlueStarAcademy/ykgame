@@ -57,7 +57,22 @@ const WORKSHOP_DEFINITIONS = [
     accent: "emerald",
     task: "바위 5개를 집어 정상의 운반 트럭에 적재",
     rewardRule: "바위당 점수 90~120(크리티컬 적용) · 스타 7~15 · 쿠폰 추첨",
-    operationRule: "트럭 10개 적재 시 출발 · 돌 전부 반출 시 구역 소멸 · 5분 후 재생성",
+    operationRule: "트럭 10개 적재 시 출발 · 돌 현장 반출 시 구역 소멸 · 5분 후 재생성",
+  },
+  {
+    id: "flood",
+    gameId: "yanmar-flood",
+    label: "수해복구 작업장",
+    shortLabel: "수해",
+    code: "FLOOD",
+    unlockLevel: 23,
+    attachment: "블레이드·집게",
+    mapArea: "북동 수해복구 구역",
+    accent: "sky",
+    task: "블레이드로 쓰레기 집결 후 집게로 소각장 투입",
+    rewardRule: "집결·집게·소각 완료 시 점수·XP·스타",
+    operationRule:
+      "소각장 가득 채운 뒤 안전 반경 이탈 → 소각 연출 → 쿨다운 후 재생성",
   },
 ] as const;
 
@@ -117,7 +132,7 @@ export async function GET() {
           END
         ), 0)::bigint AS "scoreGranted"
       FROM "UserRewardInventory"
-      WHERE "gameId" IN ('yanmar', 'yanmar-crash', 'yanmar-hill')
+      WHERE "gameId" IN ('yanmar', 'yanmar-crash', 'yanmar-hill', 'yanmar-flood')
       GROUP BY "gameId"
     `,
     Promise.all(

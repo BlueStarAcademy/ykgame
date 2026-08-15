@@ -5,6 +5,11 @@ import {
   YANMAR_BASE_HAUL_TRUCK_CAPACITY,
   YANMAR_BASE_HILL_BOULDER_COUNT,
 } from "../equipment";
+import {
+  floodBurnDurationSec,
+  floodCleaningMasterMult,
+  floodIncineratorCapacity,
+} from "../floodRecovery/balance";
 import type { WorkshopId, WorkshopUpgradeKey } from "./types";
 
 export type WorkshopUpgradeLevels = Partial<Record<WorkshopUpgradeKey, number>>;
@@ -12,7 +17,7 @@ export type WorkshopUpgradeLevels = Partial<Record<WorkshopUpgradeKey, number>>;
 export type WorkshopLevelsById = Record<WorkshopId, WorkshopUpgradeLevels>;
 
 export function emptyWorkshopLevelsById(): WorkshopLevelsById {
-  return { dump: {}, crash: {}, hill: {} };
+  return { dump: {}, crash: {}, hill: {}, flood: {} };
 }
 
 export function levelsByWorkshopFromRows(
@@ -23,7 +28,8 @@ export function levelsByWorkshopFromRows(
     if (
       row.workshopId !== "dump" &&
       row.workshopId !== "crash" &&
-      row.workshopId !== "hill"
+      row.workshopId !== "hill" &&
+      row.workshopId !== "flood"
     ) {
       continue;
     }
@@ -41,6 +47,7 @@ export function flattenWorkshopLevels(
     ...byId.dump,
     ...byId.crash,
     ...byId.hill,
+    ...byId.flood,
   };
 }
 
@@ -82,6 +89,9 @@ export function applyWorkshopTruckStats(levels: WorkshopUpgradeLevels) {
   const haulCd = levels.haul_cooldown ?? 0;
   const breakerPower = levels.breaker_power ?? 0;
   const rockAppraiser = levels.rock_appraiser ?? 0;
+  const cleaningMaster = levels.cleaning_master ?? 0;
+  const incineratorPower = levels.incinerator_power ?? 0;
+  const incineratorCapacity = levels.incinerator_capacity ?? 0;
 
   return {
     truckCapacityUnits: getYanmarTruckCapacityUnits(truckCap),
@@ -90,5 +100,8 @@ export function applyWorkshopTruckStats(levels: WorkshopUpgradeLevels) {
     haulTruckCooldownSec: getYanmarHaulTruckCooldownSec(haulCd),
     hillBoulderCount: workshopHillBoulderCount(rockAppraiser),
     breakerPowerMult: workshopBreakerPowerMult(breakerPower),
+    floodCleaningMasterMult: floodCleaningMasterMult(cleaningMaster),
+    floodBurnDurationSec: floodBurnDurationSec(incineratorPower),
+    floodIncineratorCapacity: floodIncineratorCapacity(incineratorCapacity),
   };
 }

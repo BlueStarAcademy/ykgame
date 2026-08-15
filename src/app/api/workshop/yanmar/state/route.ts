@@ -39,6 +39,7 @@ export async function GET() {
         dumpWorkshopPoints: true,
         crashWorkshopPoints: true,
         hillWorkshopPoints: true,
+        floodWorkshopPoints: true,
         gachaTicketsStandard: true,
         gachaTicketsPremium: true,
         enhanceCores: true,
@@ -69,12 +70,14 @@ export async function GET() {
     dump: user.dumpWorkshopPoints,
     crash: user.crashWorkshopPoints,
     hill: user.hillWorkshopPoints,
+    flood: user.floodWorkshopPoints,
   };
 
   const levels: Record<WorkshopId, Record<string, number>> = {
     dump: {},
     crash: {},
     hill: {},
+    flood: {},
   };
   for (const id of WORKSHOP_IDS) {
     for (const def of WORKSHOP_DEFS[id].upgrades) {
@@ -85,7 +88,8 @@ export async function GET() {
     if (
       row.workshopId === "dump" ||
       row.workshopId === "crash" ||
-      row.workshopId === "hill"
+      row.workshopId === "hill" ||
+      row.workshopId === "flood"
     ) {
       levels[row.workshopId][row.upgradeKey] = row.level;
     }
@@ -100,6 +104,7 @@ export async function GET() {
     dump: {},
     crash: {},
     hill: {},
+    flood: {},
   };
   for (const id of WORKSHOP_IDS) {
     for (const item of WORKSHOP_SHOP_ITEMS) {

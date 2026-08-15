@@ -45,6 +45,7 @@ export function createWorkshopQuestState(
       dump: createItems("dump"),
       crash: createItems("crash"),
       hill: createItems("hill"),
+      flood: createItems("flood"),
     },
   };
 }

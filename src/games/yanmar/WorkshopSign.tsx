@@ -5,6 +5,7 @@ import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import type { WorkshopId } from "./workshop/types";
 import { WORKSHOP_DEFS } from "./workshop/catalog";
 import { isInDumpZone, isInsideDigZoneBounds, type TerrainData } from "./terrain";
+import { FLOOD_RECOVERY_UNLOCK_LEVEL } from "./floodRecovery/balance";
 
 const POST_COLOR = "#6b4f2e";
 const BOARD_COLOR = "#c4a574";
@@ -78,12 +79,10 @@ export function WorkshopSign({
 
   return (
     <group position={[x, 0, z]} rotation={[0, rotationY, 0]}>
-      {/* post */}
       <mesh position={[0, 1.35, 0]} castShadow>
         <boxGeometry args={[0.18, 2.7, 0.18]} />
         <meshStandardMaterial color={POST_COLOR} roughness={0.85} />
       </mesh>
-      {/* board */}
       <mesh position={[0, 2.55, 0.08]} castShadow>
         <boxGeometry args={[2.4, 1.15, 0.12]} />
         <meshStandardMaterial color={BOARD_COLOR} roughness={0.7} />
@@ -92,7 +91,6 @@ export function WorkshopSign({
         <boxGeometry args={[2.2, 0.95, 0.02]} />
         <meshStandardMaterial color="#efe2c6" roughness={0.9} />
       </mesh>
-      {/* trim bar */}
       <mesh position={[0, 3.05, 0.16]}>
         <boxGeometry args={[2.25, 0.08, 0.04]} />
         <meshStandardMaterial color={TRIM} metalness={0.3} roughness={0.45} />
@@ -106,7 +104,7 @@ export function WorkshopSign({
   );
 }
 
-/** 팻말 근접 또는 해당 작업 지역(흙/아스팔트/돌) 안이면 관리 입장 가능. */
+/** 팻말 근접 또는 해당 작업 지역(흙/아스팔트/돌/수해) 안이면 관리 입장 가능. */
 export function isInWorkshopSignRange(
   workshopId: WorkshopId,
   posX: number,
@@ -129,11 +127,16 @@ export function isInWorkshopSignRange(
   if (workshopId === "crash") {
     const zone = terrain.crashZone;
     if (!zone) return false;
-    // 리스폰 중에도 지역 경계 안이면 관리 가능 (active 무시)
     return (
       Math.abs(posX - zone.centerX) <= zone.width / 2 &&
       Math.abs(posZ - zone.centerZ) <= zone.depth / 2
     );
+  }
+
+  if (workshopId === "flood") {
+    const zone = terrain.floodZone;
+    if (!zone) return false;
+    return Math.hypot(posX - zone.centerX, posZ - zone.centerZ) <= zone.radius + 10;
   }
 
   const zone = terrain.hillZone;
@@ -143,9 +146,11 @@ export function isInWorkshopSignRange(
 
 export function WorkshopSigns({
   mapTier,
+  playerLevel = 1,
   claimableIds,
 }: {
   mapTier: number;
+  playerLevel?: number;
   claimableIds: ReadonlySet<WorkshopId> | readonly WorkshopId[];
 }) {
   const claimable =
@@ -169,6 +174,11 @@ export function WorkshopSigns({
         workshopId="hill"
         claimable={claimable.has("hill")}
         visible={mapTier >= 3}
+      />
+      <WorkshopSign
+        workshopId="flood"
+        claimable={claimable.has("flood")}
+        visible={mapTier >= 3 && playerLevel >= FLOOD_RECOVERY_UNLOCK_LEVEL}
       />
     </>
   );

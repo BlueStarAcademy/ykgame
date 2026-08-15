@@ -125,6 +125,45 @@ const HILL_UPGRADES = [
   },
 ];
 
+const FLOOD_UPGRADES = [
+  {
+    key: "cleaning_master" as const,
+    label: "청소의 달인",
+    description: "블레이드 집결량 +5%",
+    maxLevel: 10,
+  },
+  {
+    key: "incinerator_power" as const,
+    label: "소각장 화력",
+    description: "소각 시간 감소",
+    maxLevel: 10,
+  },
+  {
+    key: "incinerator_capacity" as const,
+    label: "소각장 확장",
+    description: "소각장 총량 +500",
+    maxLevel: 5,
+  },
+  {
+    key: "score_rank" as const,
+    label: "수해복구 랭커",
+    description: "수해복구 점수 +10%",
+    maxLevel: 10,
+  },
+  {
+    key: "xp_expert" as const,
+    label: "수해복구 숙련자",
+    description: "수해복구 경험치 +5%",
+    maxLevel: 10,
+  },
+  {
+    key: "lucky_drop" as const,
+    label: "행운의 작업자",
+    description: "장비 획득 확률 +1%p",
+    maxLevel: 10,
+  },
+];
+
 export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
   dump: {
     id: "dump",
@@ -217,11 +256,11 @@ export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
     pointsIcon: "/images/yanmar/2d/workshop-coin-hill.svg",
     minMapTier: 3,
     sign: {
-      // Hill road (10,34)→(42,100): inner (west) side toward stone zone (22,112).
-      x: 26,
-      z: 78,
+      // Hill road (12,22)→(26,92): inner (west) side toward stone zone (6,104).
+      x: 14,
+      z: 68,
       radius: 18,
-      rotationY: Math.PI * 0.35,
+      rotationY: Math.PI * 0.28,
     },
     promptTitle: "돌 하역장",
     promptAction: "관리하기",
@@ -253,16 +292,63 @@ export const WORKSHOP_DEFS: Record<WorkshopId, WorkshopDef> = {
       },
     ],
   },
+  flood: {
+    id: "flood",
+    label: "수해복구 작업장",
+    pointsLabel: "수해복구 포인트",
+    pointsIcon: "/images/yanmar/2d/workshop-coin-hill.svg",
+    minMapTier: 3,
+    sign: {
+      x: SITE_LAYOUT.flood[0] - 16,
+      z: SITE_LAYOUT.flood[1] - 8,
+      radius: 18,
+      rotationY: Math.PI * 0.55,
+    },
+    promptTitle: "수해복구 작업장",
+    promptAction: "관리하기",
+    upgrades: FLOOD_UPGRADES,
+    quests: [
+      {
+        id: "flood-daily-collect-3000",
+        kind: "daily",
+        title: "쓰레기 집결 3,000",
+        metric: "trashCollect",
+        target: 3000,
+        rewardPoints: 45,
+      },
+      {
+        id: "flood-daily-grapple-3",
+        kind: "daily",
+        title: "집게 적재 성공 3회",
+        metric: "trashGrapple",
+        target: 3,
+        rewardPoints: 35,
+      },
+      {
+        id: "flood-repeat-burn-1000",
+        kind: "repeat",
+        title: "쓰레기 소각 1,000",
+        metric: "trashBurn",
+        target: 1000,
+        rewardPoints: 18,
+      },
+    ],
+  },
 };
 
-export const WORKSHOP_IDS: WorkshopId[] = ["dump", "crash", "hill"];
+export const WORKSHOP_IDS: WorkshopId[] = ["dump", "crash", "hill", "flood"];
 
 export function getWorkshopDef(id: WorkshopId): WorkshopDef {
   return WORKSHOP_DEFS[id];
 }
 
 export function isWorkshopId(value: unknown): value is WorkshopId {
-  return value === "dump" || value === "crash" || value === "hill";
+  return (
+    value === "dump" ||
+    value === "crash" ||
+    value === "hill" ||
+    value === "flood"
+  );
 }
 
 export function isValidUpgradeKey(
@@ -274,8 +360,13 @@ export function isValidUpgradeKey(
 
 export function workshopPointsField(
   workshopId: WorkshopId,
-): "dumpWorkshopPoints" | "crashWorkshopPoints" | "hillWorkshopPoints" {
+):
+  | "dumpWorkshopPoints"
+  | "crashWorkshopPoints"
+  | "hillWorkshopPoints"
+  | "floodWorkshopPoints" {
   if (workshopId === "dump") return "dumpWorkshopPoints";
   if (workshopId === "crash") return "crashWorkshopPoints";
-  return "hillWorkshopPoints";
+  if (workshopId === "hill") return "hillWorkshopPoints";
+  return "floodWorkshopPoints";
 }

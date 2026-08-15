@@ -1,4 +1,8 @@
-import { EXCAVATOR_COLLISION_RADIUS, DUMP_TRUCK_COLLIDER } from "./simConstants";
+import {
+  DUMP_TRUCK_COLLIDER,
+  EXCAVATOR_COLLISION_RADIUS,
+  TRUCK_BODY_SEPARATION_PAD,
+} from "./simConstants";
 import { DUMP_TRUCK, dumpTruckBedCenterWorld, HAUL_TRUCK } from "./terrain";
 import type { ExcavatorSimState } from "./types";
 import type { HydraulicVelocity } from "./controls";
@@ -44,9 +48,9 @@ export const HAUL_TRUCK_ALIGN = {
   collider: {
     centerOffsetX: 0,
     centerOffsetZ: -0.05,
-    /** 짐칸 측판·캡 폭(시각 ~3.3)보다 여유 */
-    halfX: 1.85,
-    halfZ: 3.55,
+    /** 짐칸 측판·캡 폭(시각 ~3.3) + 궤도 침투 방지 여유 */
+    halfX: 1.95,
+    halfZ: 3.65,
   },
   /** 붐·암 충돌용 높이·짐칸 공동 (휠 바닥=그룹 원점 기준) */
   solidMinY: 0.4,
@@ -99,6 +103,7 @@ export function isBodyTouchingTruck(
   posZ: number,
   target: TruckAlignTarget,
   touchMargin = TRUCK_BODY_TOUCH_MARGIN,
+  excavatorRadius = EXCAVATOR_COLLISION_RADIUS,
 ): boolean {
   const local = worldToTruckLocal(
     posX,
@@ -111,7 +116,7 @@ export function isBodyTouchingTruck(
   const localZ = local.z - target.collider.centerOffsetZ;
   const outsideX = Math.max(Math.abs(localX) - target.collider.halfX, 0);
   const outsideZ = Math.max(Math.abs(localZ) - target.collider.halfZ, 0);
-  const touchRadius = EXCAVATOR_COLLISION_RADIUS + touchMargin;
+  const touchRadius = excavatorRadius + touchMargin;
   return outsideX * outsideX + outsideZ * outsideZ <= touchRadius * touchRadius;
 }
 
@@ -209,6 +214,7 @@ export function isExcavatorCollidingWithTruckTarget(
   x: number,
   z: number,
   target: TruckAlignTarget | null,
+  excavatorRadius = EXCAVATOR_COLLISION_RADIUS,
 ): boolean {
   if (!target) return false;
   const local = worldToTruckLocal(
@@ -223,7 +229,7 @@ export function isExcavatorCollidingWithTruckTarget(
   const outsideX = Math.max(Math.abs(localX) - target.collider.halfX, 0);
   const outsideZ = Math.max(Math.abs(localZ) - target.collider.halfZ, 0);
   return (
-    outsideX * outsideX + outsideZ * outsideZ <= EXCAVATOR_COLLISION_RADIUS ** 2
+    outsideX * outsideX + outsideZ * outsideZ <= excavatorRadius * excavatorRadius
   );
 }
 
@@ -232,6 +238,7 @@ export function resolveExcavatorTruckOverlap(
   x: number,
   z: number,
   target: TruckAlignTarget,
+  excavatorRadius = EXCAVATOR_COLLISION_RADIUS,
 ): { x: number; z: number } | null {
   const local = worldToTruckLocal(
     x,
@@ -244,8 +251,8 @@ export function resolveExcavatorTruckOverlap(
   const lz = local.z - target.collider.centerOffsetZ;
   const hx = target.collider.halfX;
   const hz = target.collider.halfZ;
-  const radius = EXCAVATOR_COLLISION_RADIUS;
-  const pad = 0.18;
+  const radius = excavatorRadius;
+  const pad = TRUCK_BODY_SEPARATION_PAD;
 
   const closestX = Math.max(-hx, Math.min(hx, lx));
   const closestZ = Math.max(-hz, Math.min(hz, lz));
@@ -314,16 +321,37 @@ export function constrainExcavatorToTruckTarget(
   sim: ExcavatorSimState,
   previous: ExcavatorTravelSnapshot,
   target: TruckAlignTarget | null,
+  excavatorRadius = EXCAVATOR_COLLISION_RADIUS,
 ): boolean {
-  if (!target || !isExcavatorCollidingWithTruckTarget(sim.posX, sim.posZ, target)) {
+  if (
+    !target ||
+    !isExcavatorCollidingWithTruckTarget(
+      sim.posX,
+      sim.posZ,
+      target,
+      excavatorRadius,
+    )
+  ) {
     return false;
   }
   // 진입 직전으로 되돌릴 때 heading도 복구 — 선회로 궤도가 파고드는 것 방지
-  if (!isExcavatorCollidingWithTruckTarget(previous.x, previous.z, target)) {
+  if (
+    !isExcavatorCollidingWithTruckTarget(
+      previous.x,
+      previous.z,
+      target,
+      excavatorRadius,
+    )
+  ) {
     restoreExcavatorTravel(sim, previous);
     return true;
   }
-  const resolved = resolveExcavatorTruckOverlap(sim.posX, sim.posZ, target);
+  const resolved = resolveExcavatorTruckOverlap(
+    sim.posX,
+    sim.posZ,
+    target,
+    excavatorRadius,
+  );
   if (resolved) {
     sim.posX = resolved.x;
     sim.posZ = resolved.z;

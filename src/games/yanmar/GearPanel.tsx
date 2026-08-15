@@ -233,13 +233,14 @@ function EquipLevelText({
   grade: ItemGrade;
   playerLevel: number;
 }) {
+  const t = useTranslations("yanmar.gear");
   const required = EQUIP_LEVEL_BY_GRADE[grade];
   const locked = !canEquipGearAtLevel(grade, playerLevel);
   return (
     <span
       className={`yanmar-gear-equip-level${locked ? " is-locked" : ""}`}
     >
-      레벨제한 {required}
+      {t("levelLimit", { level: required })}
     </span>
   );
 }
@@ -254,6 +255,7 @@ function formatMain(item: GearPanelItem, catalogT: (key: string) => string) {
 function formatSub(
   sub: GearPanelItem["subOptions"][number],
   catalogT: (key: string) => string,
+  t: (key: string, values?: Record<string, string | number>) => string,
 ) {
   const def = SUB_OPTION_POOL.find((s) => s.key === sub.key);
   const label = gearStatLabel(catalogT, sub.key) || def?.label || sub.key;
@@ -263,7 +265,7 @@ function formatSub(
   const rangeMax = Math.round(sub.rollMax) * tier;
   return {
     text: `${label} +${Math.round(sub.value)}${unit}`,
-    range: `[${rangeMin}~${rangeMax}][티어${tier}]`,
+    range: t("tierRange", { min: rangeMin, max: rangeMax, tier }),
   };
 }
 
@@ -296,13 +298,14 @@ function GearBubbleCard({
   onZoom?: (item: GearPanelItem) => void;
   catalogT: (key: string) => string;
 }) {
+  const t = useTranslations("yanmar.gear");
   if (!item) {
     return (
       <div className="yanmar-gear-bubble-card is-empty">
         <div className="yanmar-gear-bubble-card-head">
           <p className="yanmar-gear-bubble-card-title">{title}</p>
         </div>
-        <p className="yanmar-gear-muted">{emptyLabel ?? "Empty"}</p>
+        <p className="yanmar-gear-muted">{emptyLabel ?? t("empty")}</p>
       </div>
     );
   }
@@ -330,7 +333,7 @@ function GearBubbleCard({
               className="yanmar-gear-zoom-btn"
               onClick={() => onZoom(item)}
             >
-              크게보기
+              {t("zoom")}
             </button>
           ) : null}
         </div>
@@ -352,7 +355,7 @@ function GearBubbleCard({
             {gearSlotLabel(catalogT, item.slot)}
             {" · "}
             <EquipLevelText grade={item.grade} playerLevel={playerLevel} />
-            {item.equippedSlot ? " · 장착중" : ""}
+            {item.equippedSlot ? t("equippedSuffix") : ""}
           </p>
           <p className="yanmar-gear-mgr-main">
             <span className="yanmar-gear-mgr-attr-main">{formatMain(item, catalogT)}</span>
@@ -375,7 +378,7 @@ function GearBubbleCard({
       </div>
       <ul className="yanmar-gear-mgr-attr-list">
         {item.subOptions.map((sub) => {
-          const row = formatSub(sub, catalogT);
+          const row = formatSub(sub, catalogT, t);
           return (
             <li key={`${sub.key}-${sub.tier}-${sub.value}`}>
               <span className="yanmar-gear-mgr-attr-stat">{row.text}</span>
@@ -387,11 +390,11 @@ function GearBubbleCard({
         })}
         {item.masterOption ? (
           <li className="is-master-opt">
-            <span className="yanmar-gear-master-marker">마스터</span>
+            <span className="yanmar-gear-master-marker">{t("master")}</span>
             <span className="yanmar-gear-master-body">
               {item.masterOption.label}
               {!item.masterOption.hideValue
-                ? ` ${item.masterOption.value}${
+                ? ` ${Math.round(item.masterOption.value)}${
                     item.masterOption.isPercent ? "%" : ""
                   }`
                 : ""}
@@ -1226,7 +1229,7 @@ export function GearPanel({
         disabled={busy || levelLocked}
         title={
           levelLocked
-            ? `레벨 ${EQUIP_LEVEL_BY_GRADE[item.grade]} 이상부터 장착 가능`
+            ? t("equipLevelLocked", { level: EQUIP_LEVEL_BY_GRADE[item.grade] })
             : undefined
         }
         onClick={() => {
@@ -1266,7 +1269,7 @@ export function GearPanel({
           onTutorialGearAction?.("synthesize");
         }}
       >
-        합성
+        {t("synthesize")}
       </button>
       <button
         type="button"
@@ -1280,7 +1283,7 @@ export function GearPanel({
           onTutorialGearAction?.("dismantle");
         }}
       >
-        분해
+        {t("dismantle")}
       </button>
       <button
         type="button"
@@ -1291,7 +1294,7 @@ export function GearPanel({
           closeBubble();
         }}
       >
-        판매
+        {t("sell")}
       </button>
     </div>
   );
@@ -1312,7 +1315,7 @@ export function GearPanel({
         <div className="yanmar-gear-mgr-header">
           <h2>{t("title")}</h2>
           <div className="yanmar-gear-mgr-header-trailing">
-            <span className="yanmar-gear-core-chip" title="보유 강화코어">
+            <span className="yanmar-gear-core-chip" title={t("ownedCores")}>
               <img
                 src="/images/yanmar/2d/enhance-core.png?v=3"
                 alt=""
@@ -1377,14 +1380,14 @@ export function GearPanel({
               })}
             </div>
           </div>
-          <aside className="yanmar-gear-mgr-compact-stats" aria-label="능력치">
+          <aside className="yanmar-gear-mgr-compact-stats" aria-label={t("stats")}>
             <header className="yanmar-gear-mgr-pane-head">
-              <h3>능력치</h3>
+              <h3>{t("stats")}</h3>
             </header>
             <div className="yanmar-gear-mgr-stats-stack">
               <div
                 className="yanmar-gear-mgr-stat-grid yanmar-gear-mgr-stat-grid--2x3"
-                aria-label="기본 능력치"
+                aria-label={t("baseStats")}
               >
                 {chassisLines.map((line) => (
                   <p key={line.label} className="yanmar-gear-mgr-stat-cell">
@@ -1395,7 +1398,7 @@ export function GearPanel({
               </div>
               <div
                 className="yanmar-gear-mgr-stat-derived"
-                aria-label="전투·작업 능력"
+                aria-label={t("combatWorkStats")}
               >
                 {derivedLines.map((line) => (
                   <p key={line.label} className="yanmar-gear-mgr-stat-cell">
@@ -1437,7 +1440,7 @@ export function GearPanel({
                           );
                         }}
                       />
-                      전체
+                      {t("filterAll")}
                     </label>
                     {GEAR_SLOTS.map((slot) => (
                       <label key={slot} className="yanmar-gear-filter-dd-item">
@@ -1470,7 +1473,7 @@ export function GearPanel({
                       onTutorialGearAction?.("dismantle");
                     }}
                   >
-                    선택분해
+                    {t("bulkDismantle")}
                   </button>
                   <button
                     type="button"
@@ -1478,7 +1481,7 @@ export function GearPanel({
                     disabled={busy}
                     onClick={() => enterBulkMode("sell")}
                   >
-                    선택판매
+                    {t("bulkSell")}
                   </button>
                   <button
                     type="button"
@@ -1491,7 +1494,7 @@ export function GearPanel({
                       onTutorialGearAction?.("synthesize");
                     }}
                   >
-                    선택합성
+                    {t("bulkSynth")}
                   </button>
                 </>
               ) : (
@@ -1503,7 +1506,7 @@ export function GearPanel({
                       disabled={busy}
                       onClick={() => setBulkGradeSelectOpen(true)}
                     >
-                      일괄 선택
+                      {t("bulkSelectByGrade")}
                     </button>
                   ) : null}
                   <button
@@ -1512,7 +1515,7 @@ export function GearPanel({
                     disabled={busy}
                     onClick={selectAllBulkVisible}
                   >
-                    전체선택
+                    {t("selectAll")}
                   </button>
                   <button
                     type="button"
@@ -1520,7 +1523,7 @@ export function GearPanel({
                     disabled={busy}
                     onClick={exitBulkMode}
                   >
-                    취소
+                    {t("cancel")}
                   </button>
                   <button
                     type="button"
@@ -1540,10 +1543,10 @@ export function GearPanel({
                     onClick={() => setBulkConfirmOpen(true)}
                   >
                     {bulkMode === "dismantle"
-                      ? "분해하기"
+                      ? t("doDismantle")
                       : bulkMode === "sell"
-                        ? "판매하기"
-                        : "합성하기"}
+                        ? t("doSell")
+                        : t("doSynthesize")}
                   </button>
                 </>
               )}
@@ -1612,11 +1615,11 @@ export function GearPanel({
                   }}
                   title={
                     bulkMode && item.equippedSlot
-                      ? "장착 중 — 선택 불가"
+                      ? t("equippedNotSelectable")
                       : bulkMode === "synth" &&
                           bulkSynthGrade &&
                           item.grade !== bulkSynthGrade
-                        ? "같은 등급만 선택 가능"
+                        ? t("sameGradeOnly")
                         : `${item.nameSnapshot}${
                             item.enhanceLevel > 0
                               ? ` +${item.enhanceLevel}`
@@ -1641,7 +1644,7 @@ export function GearPanel({
                   purchase
                   size="md"
                   className="yanmar-gear-mgr-inv-cell"
-                  title={`슬롯 ${GEAR_INVENTORY_EXPAND_STEP}칸 확장`}
+                  title={t("expandSlotsTitle", { count: GEAR_INVENTORY_EXPAND_STEP })}
                   onClick={() => {
                     if (busy) return;
                     setExpandConfirmOpen(true);
@@ -1658,7 +1661,7 @@ export function GearPanel({
           <button
             type="button"
             className="yanmar-gear-bubble-backdrop"
-            aria-label="말풍선 닫기"
+            aria-label={t("closeBubble")}
             onClick={closeBubble}
           />
           <div
@@ -1673,7 +1676,7 @@ export function GearPanel({
                 {bubble.kind === "compare" ? (
                   <>
                     <span className="yanmar-gear-mgr-compare-badge">
-                      장비 비교
+                      {t("compare")}
                     </span>
                     <p className="yanmar-gear-bubble-compare-sub">
                       {gearSlotLabel(catalogT, bubble.slot)}
@@ -1681,7 +1684,7 @@ export function GearPanel({
                   </>
                 ) : (
                   <span className="yanmar-gear-mgr-compare-badge">
-                    현재 장착
+                    {t("currentlyEquipped")}
                   </span>
                 )}
               </div>
@@ -1689,7 +1692,7 @@ export function GearPanel({
                 type="button"
                 className="yanmar-gear-bubble-close"
                 onClick={closeBubble}
-                aria-label="닫기"
+                aria-label={t("close")}
               >
                 ×
               </button>
@@ -1697,7 +1700,7 @@ export function GearPanel({
             {bubble.kind === "equipped" ? (
               <>
                 <GearBubbleCard
-                  title="장비 정보"
+                  title={t("gearInfo")}
                   item={bubbleItem}
                   highlight
                   playerLevel={playerLevel}
@@ -1711,7 +1714,7 @@ export function GearPanel({
               <>
                 <div className="yanmar-gear-bubble-compare-row">
                   <GearBubbleCard
-                    title="장착 중"
+                    title={t("equippedTitle")}
                     item={bubbleEquipped}
                     emptyLabel={`${gearSlotLabel(catalogT, bubble.slot)} ${t("empty")}`}
                     catalogT={catalogT}
@@ -1722,7 +1725,7 @@ export function GearPanel({
                     }
                   />
                   <GearBubbleCard
-                    title="선택"
+                    title={t("selected")}
                     item={bubbleItem}
                     highlight
                     playerLevel={playerLevel}
@@ -1750,12 +1753,12 @@ export function GearPanel({
           className="yanmar-gear-art-preview-layer"
           role="dialog"
           aria-modal="true"
-          aria-label="장비 이미지 크게보기"
+          aria-label={t("zoomAria")}
         >
           <button
             type="button"
             className="yanmar-gear-art-preview-backdrop"
-            aria-label="크게보기 닫기"
+            aria-label={t("closeZoom")}
             onClick={() => setArtPreview(null)}
           />
           <div className="yanmar-gear-art-preview-card">
@@ -1788,7 +1791,7 @@ export function GearPanel({
               className="yanmar-gear-btn yanmar-gear-btn--unequip"
               onClick={() => setArtPreview(null)}
             >
-              닫기
+              {t("close")}
             </button>
           </div>
         </div>
@@ -1799,7 +1802,7 @@ export function GearPanel({
           <button
             type="button"
             className="yanmar-gear-enhance-backdrop"
-            aria-label="강화 모달 닫기"
+            aria-label={t("closeEnhanceModal")}
             disabled={enhancePhase === "progress"}
             onClick={closeEnhance}
           />
@@ -1807,12 +1810,12 @@ export function GearPanel({
             className="yanmar-gear-enhance-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="장비 강화"
+            aria-label={t("enhanceTitle")}
           >
             <div className="yanmar-gear-enhance-header">
-              <h3>장비 강화</h3>
+              <h3>{t("enhanceTitle")}</h3>
               <div className="yanmar-gear-mgr-header-trailing">
-                <span className="yanmar-gear-core-chip" title="보유 강화코어">
+                <span className="yanmar-gear-core-chip" title={t("ownedCores")}>
                   <img
                     src="/images/yanmar/2d/enhance-core.png?v=3"
                     alt=""
@@ -1825,7 +1828,7 @@ export function GearPanel({
                 <button
                   type="button"
                   onClick={closeEnhance}
-                  aria-label="닫기"
+                  aria-label={t("close")}
                   disabled={enhancePhase === "progress"}
                 >
                   ×
@@ -1889,7 +1892,7 @@ export function GearPanel({
                       : "yanmar-gear-enhance-result-title is-fail"
                   }
                 >
-                  {enhanceResult.success ? "강화 성공" : "강화 실패"}
+                  {enhanceResult.success ? t("enhanceSuccess") : t("enhanceFail")}
                 </p>
                 {enhanceResult.success && enhanceResult.before && enhanceResult.after ? (
                   <>
@@ -1928,8 +1931,11 @@ export function GearPanel({
                               <li key={`new-${after.key}-${i}`}>
                                 <strong>{label}</strong>
                                 <span className="is-new">
-                                  신규 +{Math.round(after.value)}
-                                  {unit} [티어{after.tier}]
+                                  {t("newSubStat", {
+                                    value: Math.round(after.value),
+                                    unit,
+                                    tier: after.tier,
+                                  })}
                                 </span>
                               </li>,
                             );
@@ -1942,9 +1948,14 @@ export function GearPanel({
                               <li key={`up-${after.key}-${i}`}>
                                 <strong>{label}</strong>
                                 <span>
-                                  +{Math.round(before.value)}
-                                  {beforeUnit} → +{Math.round(after.value)}
-                                  {unit} [티어{before.tier}→티어{after.tier}]
+                                  {t("subStatTierChange", {
+                                    before: Math.round(before.value),
+                                    beforeUnit,
+                                    after: Math.round(after.value),
+                                    unit,
+                                    beforeTier: before.tier,
+                                    afterTier: after.tier,
+                                  })}
                                 </span>
                               </li>,
                             );
@@ -1953,8 +1964,11 @@ export function GearPanel({
                               <li key={`same-${after.key}-${i}`}>
                                 <strong>{label}</strong>
                                 <span className="is-muted">
-                                  +{Math.round(after.value)}
-                                  {unit} [티어{after.tier}]
+                                  {t("subStatSame", {
+                                    value: Math.round(after.value),
+                                    unit,
+                                    tier: after.tier,
+                                  })}
                                 </span>
                               </li>,
                             );
@@ -1963,8 +1977,8 @@ export function GearPanel({
                         if (afterSubs.length === 0) {
                           lines.push(
                             <li key="sub-none">
-                              <strong>부옵션</strong>
-                              <span className="is-muted">없음</span>
+                              <strong>{t("subOptions")}</strong>
+                              <span className="is-muted">{t("none")}</span>
                             </li>,
                           );
                         }
@@ -1975,20 +1989,23 @@ export function GearPanel({
                 ) : (
                   <>
                     <p className="yanmar-gear-muted yanmar-gear-enhance-result-note">
-                      능력치 변화 없음
+                      {t("noStatChange")}
                     </p>
                     {(enhanceResult.failBonusAdd ?? 0) > 0 ? (
                       <p className="yanmar-gear-enhance-result-note">
-                        실패 가산 +
-                        {Math.round((enhanceResult.failBonusAdd ?? 0) * 1000) /
-                          10}
-                        %p
+                        {t("failBonusAdd", {
+                          value:
+                            Math.round(
+                              (enhanceResult.failBonusAdd ?? 0) * 1000,
+                            ) / 10,
+                        })}
                       </p>
                     ) : null}
                     {typeof enhanceResult.nextSuccessRate === "number" ? (
                       <p className="yanmar-gear-enhance-result-note">
-                        다음 성공률{" "}
-                        {Math.round(enhanceResult.nextSuccessRate * 100)}%
+                        {t("nextSuccessRate", {
+                          rate: Math.round(enhanceResult.nextSuccessRate * 100),
+                        })}
                       </p>
                     ) : null}
                   </>
@@ -1999,13 +2016,13 @@ export function GearPanel({
                     className="yanmar-gear-btn yanmar-gear-btn--enhance"
                     onClick={dismissEnhanceResult}
                   >
-                    확인
+                    {t("confirm")}
                   </button>
                 </div>
               </div>
             ) : enhancePhase === "progress" ? (
               <div className="yanmar-gear-enhance-progress">
-                <p>강화 중…</p>
+                <p>{t("enhancing")}</p>
                 <div
                   className="yanmar-gear-enhance-progress-track"
                   role="progressbar"
@@ -2020,11 +2037,11 @@ export function GearPanel({
                 </div>
               </div>
             ) : !enhanceItem || enhanceNextCost == null ? (
-              <p className="yanmar-gear-enhance-max">최대 강화에 도달했습니다.</p>
+              <p className="yanmar-gear-enhance-max">{t("maxEnhanceReached")}</p>
             ) : (
               <div className="yanmar-gear-enhance-panels">
                 <section className="yanmar-gear-enhance-panel is-emphasis">
-                  <p className="yanmar-gear-enhance-panel-label">강화 재료</p>
+                  <p className="yanmar-gear-enhance-panel-label">{t("enhanceMaterials")}</p>
                   <div className="yanmar-gear-enhance-cost-row">
                     <div className="yanmar-gear-enhance-cost-item">
                       <img
@@ -2066,14 +2083,14 @@ export function GearPanel({
                 <section className="yanmar-gear-enhance-panel is-emphasis">
                   <div className="yanmar-gear-enhance-meta-grid">
                     <div>
-                      <p className="yanmar-gear-enhance-panel-label">다음 강화</p>
+                      <p className="yanmar-gear-enhance-panel-label">{t("nextEnhance")}</p>
                       <p className="yanmar-gear-enhance-meta-value">
                         +{enhanceItem.enhanceLevel}
                         <span>→</span>+{enhanceItem.enhanceLevel + 1}
                       </p>
                     </div>
                     <div>
-                      <p className="yanmar-gear-enhance-panel-label">성공 확률</p>
+                      <p className="yanmar-gear-enhance-panel-label">{t("successRate")}</p>
                       <p className="yanmar-gear-enhance-meta-value is-rate">
                         {Math.round(enhanceRate * 100)}
                         <span className="is-unit">%</span>
@@ -2096,13 +2113,13 @@ export function GearPanel({
                       </div>
                     ) : null}
                     <div className="yanmar-gear-enhance-option-row">
-                      <strong>부옵션</strong>
+                      <strong>{t("subOptions")}</strong>
                       <span>
                         {milestonePreview.kind === "newSubs"
-                          ? `신규 생성 (최대 ${milestonePreview.count}개)`
+                          ? t("newSubsPreview", { count: milestonePreview.count })
                           : milestonePreview.kind === "tierUp"
-                            ? `기존 중 ${milestonePreview.count}개 강화`
-                            : "변화 없음"}
+                            ? t("tierUpPreview", { count: milestonePreview.count })
+                            : t("noChange")}
                       </span>
                     </div>
                   </div>
@@ -2117,7 +2134,7 @@ export function GearPanel({
                   className="yanmar-gear-btn yanmar-gear-btn--unequip"
                   onClick={closeEnhance}
                 >
-                  닫기
+                  {t("close")}
                 </button>
                 <button
                   type="button"
@@ -2129,7 +2146,7 @@ export function GearPanel({
                     void runEnhanceAttempt();
                   }}
                 >
-                  강화하기
+                  {t("doEnhance")}
                 </button>
               </div>
             ) : null}
@@ -2147,13 +2164,13 @@ export function GearPanel({
           <button
             type="button"
             className="yanmar-gear-confirm-backdrop"
-            aria-label="분해 확인 닫기"
+            aria-label={t("closeDismantleConfirm")}
             disabled={busy}
             onClick={closeDismantleConfirm}
           />
           <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--dismantle">
-            <p className="yanmar-gear-confirm-eyebrow">장비 분해</p>
-            <h3 id="yanmar-gear-dismantle-title">정말 분해할까요?</h3>
+            <p className="yanmar-gear-confirm-eyebrow">{t("dismantleEyebrow")}</p>
+            <h3 id="yanmar-gear-dismantle-title">{t("dismantleConfirmTitle")}</h3>
             <div className="yanmar-gear-confirm-item">
               <GearIconCell
                 slot={pendingDismantle.slot}
@@ -2184,7 +2201,7 @@ export function GearPanel({
             </div>
             <div className="yanmar-gear-confirm-reward">
               <span className="yanmar-gear-confirm-reward-label">
-                예상 획득
+                {t("expectedGain")}
               </span>
               <span className="yanmar-gear-confirm-reward-value">
                 <img
@@ -2198,7 +2215,7 @@ export function GearPanel({
               </span>
             </div>
             <p className="yanmar-gear-confirm-warn">
-              분해한 장비는 되돌릴 수 없습니다.
+              {t("dismantleWarn")}
             </p>
             <div className="yanmar-gear-confirm-actions">
               <button
@@ -2207,7 +2224,7 @@ export function GearPanel({
                 disabled={busy}
                 onClick={closeDismantleConfirm}
               >
-                취소
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -2215,7 +2232,7 @@ export function GearPanel({
                 disabled={busy}
                 onClick={() => void confirmDismantle()}
               >
-                분해하기
+                {t("doDismantle")}
               </button>
             </div>
           </div>
@@ -2232,12 +2249,12 @@ export function GearPanel({
           <button
             type="button"
             className="yanmar-gear-confirm-backdrop"
-            aria-label="분해 결과 닫기"
+            aria-label={t("closeDismantleResult")}
             onClick={closeDismantleResult}
           />
           <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--done">
-            <p className="yanmar-gear-confirm-eyebrow">분해 완료</p>
-            <h3 id="yanmar-gear-dismantle-done-title">장비를 분해했습니다</h3>
+            <p className="yanmar-gear-confirm-eyebrow">{t("dismantleDoneEyebrow")}</p>
+            <h3 id="yanmar-gear-dismantle-done-title">{t("dismantleDoneTitle")}</h3>
             <div className="yanmar-gear-confirm-item">
               <GearIconCell
                 slot={dismantleResult.slot}
@@ -2267,7 +2284,7 @@ export function GearPanel({
               </div>
             </div>
             <div className="yanmar-gear-confirm-reward">
-              <span className="yanmar-gear-confirm-reward-label">획득</span>
+              <span className="yanmar-gear-confirm-reward-label">{t("gained")}</span>
               <span className="yanmar-gear-confirm-reward-value">
                 <img
                   src="/images/yanmar/2d/enhance-core.png?v=3"
@@ -2287,7 +2304,7 @@ export function GearPanel({
                 className="yanmar-gear-btn yanmar-gear-btn--enhance"
                 onClick={closeDismantleResult}
               >
-                확인
+                {t("confirm")}
               </button>
             </div>
           </div>
@@ -2304,13 +2321,13 @@ export function GearPanel({
           <button
             type="button"
             className="yanmar-gear-confirm-backdrop"
-            aria-label="판매 확인 닫기"
+            aria-label={t("closeSellConfirm")}
             disabled={busy}
             onClick={closeSellConfirm}
           />
           <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--dismantle">
-            <p className="yanmar-gear-confirm-eyebrow">장비 판매</p>
-            <h3 id="yanmar-gear-sell-title">정말 판매할까요?</h3>
+            <p className="yanmar-gear-confirm-eyebrow">{t("sellEyebrow")}</p>
+            <h3 id="yanmar-gear-sell-title">{t("sellConfirmTitle")}</h3>
             <div className="yanmar-gear-confirm-item">
               <GearIconCell
                 slot={pendingSell.slot}
@@ -2341,14 +2358,14 @@ export function GearPanel({
             </div>
             <div className="yanmar-gear-confirm-reward">
               <span className="yanmar-gear-confirm-reward-label">
-                예상 획득
+                {t("expectedGain")}
               </span>
               <span className="yanmar-gear-confirm-reward-value">
                 <StarAmount value={sellStars} />
               </span>
             </div>
             <p className="yanmar-gear-confirm-warn">
-              판매한 장비는 되돌릴 수 없습니다.
+              {t("sellWarn")}
             </p>
             <div className="yanmar-gear-confirm-actions">
               <button
@@ -2357,7 +2374,7 @@ export function GearPanel({
                 disabled={busy}
                 onClick={closeSellConfirm}
               >
-                취소
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -2365,7 +2382,7 @@ export function GearPanel({
                 disabled={busy}
                 onClick={() => void confirmSell()}
               >
-                판매하기
+                {t("doSell")}
               </button>
             </div>
           </div>
@@ -2382,12 +2399,12 @@ export function GearPanel({
           <button
             type="button"
             className="yanmar-gear-confirm-backdrop"
-            aria-label="판매 결과 닫기"
+            aria-label={t("closeSellResult")}
             onClick={closeSellResult}
           />
           <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--done">
-            <p className="yanmar-gear-confirm-eyebrow">판매 완료</p>
-            <h3 id="yanmar-gear-sell-done-title">장비를 판매했습니다</h3>
+            <p className="yanmar-gear-confirm-eyebrow">{t("sellDoneEyebrow")}</p>
+            <h3 id="yanmar-gear-sell-done-title">{t("sellDoneTitle")}</h3>
             <div className="yanmar-gear-confirm-item">
               <GearIconCell
                 slot={sellResult.slot}
@@ -2417,7 +2434,7 @@ export function GearPanel({
               </div>
             </div>
             <div className="yanmar-gear-confirm-reward">
-              <span className="yanmar-gear-confirm-reward-label">획득</span>
+              <span className="yanmar-gear-confirm-reward-label">{t("gained")}</span>
               <span className="yanmar-gear-confirm-reward-value">
                 <StarAmount value={sellResult.stars} />
               </span>
@@ -2428,7 +2445,7 @@ export function GearPanel({
                 className="yanmar-gear-btn yanmar-gear-btn--enhance"
                 onClick={closeSellResult}
               >
-                확인
+                {t("confirm")}
               </button>
             </div>
           </div>
@@ -2446,7 +2463,7 @@ export function GearPanel({
           <button
             type="button"
             className="yanmar-gear-confirm-backdrop"
-            aria-label="일괄 선택 닫기"
+            aria-label={t("closeBulkGradeSelect")}
             disabled={busy}
             onClick={() => setBulkGradeSelectOpen(false)}
           />
@@ -2458,9 +2475,9 @@ export function GearPanel({
             }`}
           >
             <p className="yanmar-gear-confirm-eyebrow">
-              {bulkMode === "sell" ? "선택 판매" : "선택 분해"}
+              {bulkMode === "sell" ? t("bulkSelectSell") : t("bulkSelectDismantle")}
             </p>
-            <h3 id="yanmar-gear-bulk-grade-title">등급으로 일괄 선택</h3>
+            <h3 id="yanmar-gear-bulk-grade-title">{t("bulkGradeTitle")}</h3>
             <div className="yanmar-gear-bulk-grade-list" role="group">
               {BULK_GRADE_OPTIONS.map((grade) => (
                 <label key={grade} className="yanmar-gear-bulk-grade-item">
@@ -2484,14 +2501,13 @@ export function GearPanel({
                         (item) => !item.equippedSlot && item.grade === grade,
                       ).length
                     }
-                    개
+                    {t("countUnit")}
                   </span>
                 </label>
               ))}
             </div>
             <p className="yanmar-gear-confirm-warn">
-              장착 중인 장비는 선택되지 않습니다. 현재 필터에 보이는 장비만
-              대상입니다.
+              {t("bulkGradeHint")}
             </p>
             <div className="yanmar-gear-confirm-actions">
               <button
@@ -2500,7 +2516,7 @@ export function GearPanel({
                 disabled={busy}
                 onClick={() => setBulkGradeSelectOpen(false)}
               >
-                취소
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -2508,7 +2524,7 @@ export function GearPanel({
                 disabled={busy}
                 onClick={applyBulkGradeSelection}
               >
-                선택 적용
+                {t("applySelection")}
               </button>
             </div>
           </div>
@@ -2525,28 +2541,31 @@ export function GearPanel({
           <button
             type="button"
             className="yanmar-gear-confirm-backdrop"
-            aria-label="일괄 확인 닫기"
+            aria-label={t("closeBulkConfirm")}
             disabled={busy}
             onClick={() => setBulkConfirmOpen(false)}
           />
           <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--dismantle">
             <p className="yanmar-gear-confirm-eyebrow">
               {bulkMode === "dismantle"
-                ? "선택 분해"
+                ? t("bulkSelectDismantle")
                 : bulkMode === "sell"
-                  ? "선택 판매"
-                  : "선택 합성"}
+                  ? t("bulkSelectSell")
+                  : t("bulkSelectSynth")}
             </p>
             <h3 id="yanmar-gear-bulk-title">
               {bulkMode === "dismantle"
-                ? `${bulkItems.length}개 장비를 분해할까요?`
+                ? t("bulkDismantleConfirm", { count: bulkItems.length })
                 : bulkMode === "sell"
-                  ? `${bulkItems.length}개 장비를 판매할까요?`
-                  : `${bulkItems.length}개 장비를 ${bulkSynthBatches}회 합성할까요?`}
+                  ? t("bulkSellConfirm", { count: bulkItems.length })
+                  : t("bulkSynthConfirm", {
+                      count: bulkItems.length,
+                      batches: bulkSynthBatches,
+                    })}
             </h3>
             {bulkMode === "synth" ? (
               <div className="yanmar-gear-confirm-reward">
-                <span className="yanmar-gear-confirm-reward-label">합성 정보</span>
+                <span className="yanmar-gear-confirm-reward-label">{t("synthInfo")}</span>
                 <span className="yanmar-gear-confirm-reward-value">
                   <strong>
                     {bulkSynthGrade
@@ -2560,14 +2579,14 @@ export function GearPanel({
                       {bulkSynthUpgradeChance}%
                     </span>
                   ) : (
-                    <span>동일 등급 100%</span>
+                    <span>{t("sameGrade100")}</span>
                   )}
                 </span>
               </div>
             ) : (
               <div className="yanmar-gear-confirm-reward">
                 <span className="yanmar-gear-confirm-reward-label">
-                  예상 획득
+                  {t("expectedGain")}
                 </span>
                 {bulkMode === "dismantle" ? (
                   <span className="yanmar-gear-confirm-reward-value">
@@ -2579,7 +2598,7 @@ export function GearPanel({
                       draggable={false}
                     />
                     <strong className="tabular-nums">+{bulkCoresPreview}</strong>
-                    <span>강화코어</span>
+                    <span>{t("enhanceCore")}</span>
                   </span>
                 ) : (
                   <span className="yanmar-gear-confirm-reward-value">
@@ -2590,10 +2609,10 @@ export function GearPanel({
             )}
             <p className="yanmar-gear-confirm-warn">
               {bulkMode === "dismantle"
-                ? "분해한 장비는 되돌릴 수 없습니다."
+                ? t("dismantleWarn")
                 : bulkMode === "sell"
-                  ? "판매한 장비는 되돌릴 수 없습니다."
-                  : "재료 장비는 소모되며 되돌릴 수 없습니다. 3개 단위로 합성됩니다."}
+                  ? t("sellWarn")
+                  : t("synthWarn")}
             </p>
             <div className="yanmar-gear-confirm-actions">
               <button
@@ -2602,7 +2621,7 @@ export function GearPanel({
                 disabled={busy}
                 onClick={() => setBulkConfirmOpen(false)}
               >
-                취소
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -2622,10 +2641,10 @@ export function GearPanel({
                 onClick={() => void confirmBulkAction()}
               >
                 {bulkMode === "dismantle"
-                  ? "분해하기"
+                  ? t("doDismantle")
                   : bulkMode === "sell"
-                    ? "판매하기"
-                    : "합성하기"}
+                    ? t("doSell")
+                    : t("doSynthesize")}
               </button>
             </div>
           </div>
@@ -2642,20 +2661,22 @@ export function GearPanel({
           <button
             type="button"
             className="yanmar-gear-confirm-backdrop"
-            aria-label="일괄 결과 닫기"
+            aria-label={t("closeBulkResult")}
             onClick={() => setBulkDone(null)}
           />
           <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--done">
             <p className="yanmar-gear-confirm-eyebrow">
-              {bulkDone.kind === "dismantle" ? "분해 완료" : "판매 완료"}
+              {bulkDone.kind === "dismantle"
+                ? t("dismantleDoneEyebrow")
+                : t("sellDoneEyebrow")}
             </p>
             <h3 id="yanmar-gear-bulk-done-title">
               {bulkDone.kind === "dismantle"
-                ? `${bulkDone.count}개 장비를 분해했습니다`
-                : `${bulkDone.count}개 장비를 판매했습니다`}
+                ? t("bulkDismantleDone", { count: bulkDone.count })
+                : t("bulkSellDone", { count: bulkDone.count })}
             </h3>
             <div className="yanmar-gear-confirm-reward">
-              <span className="yanmar-gear-confirm-reward-label">획득</span>
+              <span className="yanmar-gear-confirm-reward-label">{t("gained")}</span>
               {bulkDone.kind === "dismantle" ? (
                 <span className="yanmar-gear-confirm-reward-value">
                   <img
@@ -2666,7 +2687,7 @@ export function GearPanel({
                     draggable={false}
                   />
                   <strong className="tabular-nums">+{bulkDone.cores}</strong>
-                  <span>강화코어</span>
+                  <span>{t("enhanceCore")}</span>
                 </span>
               ) : (
                 <span className="yanmar-gear-confirm-reward-value">
@@ -2680,7 +2701,7 @@ export function GearPanel({
                 className="yanmar-gear-btn yanmar-gear-btn--enhance"
                 onClick={() => setBulkDone(null)}
               >
-                확인
+                {t("confirm")}
               </button>
             </div>
           </div>
@@ -2696,11 +2717,17 @@ export function GearPanel({
         >
           <div className="yanmar-gear-confirm-backdrop" aria-hidden />
           <div className="yanmar-gear-confirm-card yanmar-gear-synth-card">
-            <p className="yanmar-gear-confirm-eyebrow">선택 합성</p>
+            <p className="yanmar-gear-confirm-eyebrow">{t("bulkSelectSynth")}</p>
             <h3 id="yanmar-gear-bulk-synth-title">
               {bulkSynthRun.reveal
-                ? `${bulkSynthRun.batchIndex}/${bulkSynthRun.total}회 합성 완료`
-                : `${bulkSynthRun.batchIndex}/${bulkSynthRun.total}회 합성 중…`}
+                ? t("bulkSynthBatchDone", {
+                    current: bulkSynthRun.batchIndex,
+                    total: bulkSynthRun.total,
+                  })
+                : t("bulkSynthBatchProgress", {
+                    current: bulkSynthRun.batchIndex,
+                    total: bulkSynthRun.total,
+                  })}
             </h3>
             <div
               className={`yanmar-gear-synth-fuse${
@@ -2741,9 +2768,9 @@ export function GearPanel({
               <p className="yanmar-gear-synth-fuse-label">
                 {bulkSynthRun.reveal
                   ? bulkSynthRun.lastResult?.upgraded
-                    ? "등급 상승!"
-                    : "합성 완료"
-                  : "재료를 모으는 중…"}
+                    ? t("gradeUp")
+                    : t("synthDone")
+                  : t("gatheringMaterials")}
               </p>
             </div>
           </div>
@@ -2771,18 +2798,20 @@ export function GearPanel({
           <button
             type="button"
             className="yanmar-gear-confirm-backdrop"
-            aria-label="합성 모달 닫기"
+            aria-label={t("closeSynthModal")}
             disabled={busy || synthPhase === "fusing"}
             onClick={closeSynth}
           />
           <div className="yanmar-gear-confirm-card yanmar-gear-synth-card">
-            <p className="yanmar-gear-confirm-eyebrow">장비 합성</p>
+            <p className="yanmar-gear-confirm-eyebrow">{t("synthEyebrow")}</p>
             <h3 id="yanmar-gear-synth-title">
               {synthPhase === "result"
-                ? "합성 완료"
+                ? t("synthDone")
                 : synthPhase === "fusing"
-                  ? "합성 중…"
-                  : `${synthGrade ? gearGradeLabel(catalogT, synthGrade) : ""} 장비 3개 합성`}
+                  ? t("synthesizing")
+                  : t("synthThreeItems", {
+                      grade: synthGrade ? gearGradeLabel(catalogT, synthGrade) : "",
+                    })}
             </h3>
 
             {synthPhase === "result" && synthResult ? (
@@ -2811,7 +2840,7 @@ export function GearPanel({
                   {gearSlotLabel(catalogT, synthResult.item.slot)}
                     </p>
                     {synthResult.upgraded ? (
-                      <p className="yanmar-gear-synth-upgraded">등급 상승!</p>
+                      <p className="yanmar-gear-synth-upgraded">{t("gradeUp")}</p>
                     ) : null}
                   </div>
                 </div>
@@ -2821,7 +2850,7 @@ export function GearPanel({
                     className="yanmar-gear-btn yanmar-gear-btn--enhance"
                     onClick={closeSynth}
                   >
-                    확인
+                    {t("confirm")}
                   </button>
                 </div>
               </>
@@ -2863,9 +2892,9 @@ export function GearPanel({
                 <p className="yanmar-gear-synth-fuse-label">
                   {synthFuseReveal
                     ? synthResult?.upgraded
-                      ? "등급 상승!"
-                      : "합성 완료"
-                    : "재료 장비가 하나로 모이는 중…"}
+                      ? t("gradeUp")
+                      : t("synthDone")
+                    : t("fusingMaterials")}
                 </p>
               </div>
             ) : (
@@ -2894,8 +2923,8 @@ export function GearPanel({
                       }}
                       title={
                         slotItem
-                          ? "탭하여 슬롯 비우기"
-                          : "아래 인벤에서 동일 등급 장비 선택"
+                          ? t("tapToClearSlot")
+                          : t("selectSameGradeBelow")
                       }
                     >
                       {slotItem ? (
@@ -2912,7 +2941,7 @@ export function GearPanel({
                     </button>
                   ))}
                 </div>
-                <div className="yanmar-gear-synth-odds" aria-label="합성 확률">
+                <div className="yanmar-gear-synth-odds" aria-label={t("synthOddsAria")}>
                   {synthGrade && synthNextGrade ? (
                     <>
                       <span
@@ -2939,7 +2968,7 @@ export function GearPanel({
                         "MASTER",
                       )}`}
                     >
-                      마스터 100%
+                      {t("master100")}
                     </span>
                   ) : null}
                 </div>
@@ -2954,7 +2983,7 @@ export function GearPanel({
                         checked={synthSlots.includes(synthFocusItem.id)}
                       />
                       <div className="yanmar-gear-synth-viewer-meta">
-                        <p className="yanmar-gear-synth-viewer-label">선택 장비</p>
+                        <p className="yanmar-gear-synth-viewer-label">{t("selectedGear")}</p>
                         <p
                           className={`yanmar-gear-mgr-name ${gradeTextClass(
                             synthFocusItem.grade,
@@ -2981,7 +3010,7 @@ export function GearPanel({
                         {synthFocusItem.subOptions.length > 0 ? (
                           <ul className="yanmar-gear-synth-viewer-subs">
                             {synthFocusItem.subOptions.map((sub) => {
-                              const row = formatSub(sub, catalogT);
+                              const row = formatSub(sub, catalogT, t);
                               return (
                                 <li key={`${sub.key}-${sub.tier}-${sub.value}`}>
                                   {row.text}
@@ -2992,11 +3021,11 @@ export function GearPanel({
                         ) : null}
                         {synthFocusItem.masterOption ? (
                           <p className="yanmar-gear-synth-viewer-master">
-                            <span className="yanmar-gear-master-marker">마스터</span>
+                            <span className="yanmar-gear-master-marker">{t("master")}</span>
                             <span className="yanmar-gear-master-body">
                               {synthFocusItem.masterOption.label}
                               {!synthFocusItem.masterOption.hideValue
-                                ? ` ${synthFocusItem.masterOption.value}${
+                                ? ` ${Math.round(synthFocusItem.masterOption.value)}${
                                     synthFocusItem.masterOption.isPercent
                                       ? "%"
                                       : ""
@@ -3009,24 +3038,26 @@ export function GearPanel({
                     </div>
                   ) : (
                     <p className="yanmar-gear-synth-viewer-empty">
-                      장비를 선택하면 정보가 표시됩니다
+                      {t("selectGearHint")}
                     </p>
                   )}
                 </div>
                 <div className="yanmar-gear-synth-inv">
                   <div className="yanmar-gear-synth-inv-bar">
                     <span>
-                      {gearGradeLabel(catalogT, synthGrade ?? "NORMAL")} 인벤
+                      {t("gradeInventory", {
+                        grade: gearGradeLabel(catalogT, synthGrade ?? "NORMAL"),
+                      })}
                     </span>
                     <span className="yanmar-gear-mgr-cap">
-                      {synthReadyCount} / 3 선택
+                      {t("selectedCount", { count: synthReadyCount })}
                     </span>
                   </div>
                   <div className="yanmar-gear-synth-inv-scroll">
                     <div className="yanmar-gear-mgr-inv-grid yanmar-gear-mgr-inv-grid--5 yanmar-gear-synth-inv-grid">
                       {synthInventoryItems.length === 0 ? (
                         <p className="yanmar-gear-synth-inv-empty">
-                          합성 가능한 장비가 없습니다.
+                          {t("noSynthableGear")}
                         </p>
                       ) : (
                         synthInventoryItems.map((item) => {
@@ -3049,7 +3080,7 @@ export function GearPanel({
                                 item.enhanceLevel > 0
                                   ? ` +${item.enhanceLevel}`
                                   : ""
-                              }${inSlot ? " (선택됨 · 다시 탭하면 해제)" : ""}`}
+                              }${inSlot ? t("selectedTapToDeselect") : ""}`}
                             />
                           );
                         })
@@ -3064,7 +3095,7 @@ export function GearPanel({
                     disabled={busy}
                     onClick={closeSynth}
                   >
-                    닫기
+                    {t("close")}
                   </button>
                   <button
                     type="button"
@@ -3072,7 +3103,7 @@ export function GearPanel({
                     disabled={busy || synthReadyCount !== 3}
                     onClick={() => void confirmSynthesize()}
                   >
-                    합성하기
+                    {t("doSynthesize")}
                   </button>
                 </div>
               </>
@@ -3091,26 +3122,28 @@ export function GearPanel({
           <button
             type="button"
             className="yanmar-gear-confirm-backdrop"
-            aria-label="슬롯 확장 닫기"
+            aria-label={t("closeExpand")}
             disabled={busy}
             onClick={() => setExpandConfirmOpen(false)}
           />
           <div className="yanmar-gear-confirm-card yanmar-gear-confirm-card--expand">
-            <p className="yanmar-gear-confirm-eyebrow">인벤토리 확장</p>
-            <h3 id="yanmar-gear-expand-title">슬롯을 확장할까요?</h3>
+            <p className="yanmar-gear-confirm-eyebrow">{t("expandEyebrow")}</p>
+            <h3 id="yanmar-gear-expand-title">{t("expandConfirmTitle")}</h3>
             <ul className="yanmar-gear-expand-facts">
               <li>
-                <span>추가 슬롯</span>
-                <strong>+{GEAR_INVENTORY_EXPAND_STEP}칸</strong>
+                <span>{t("additionalSlots")}</span>
+                <strong>
+                  {t("slotsAdded", { count: GEAR_INVENTORY_EXPAND_STEP })}
+                </strong>
               </li>
               <li>
-                <span>확장 후</span>
+                <span>{t("afterExpand")}</span>
                 <strong>
                   {inventorySlots} → {inventorySlots + GEAR_INVENTORY_EXPAND_STEP}
                 </strong>
               </li>
               <li className="yanmar-gear-expand-cost">
-                <span>필요 비용</span>
+                <span>{t("requiredCost")}</span>
                 <strong>
                   <StarAmount
                     value={expandCost}
@@ -3121,7 +3154,7 @@ export function GearPanel({
               </li>
             </ul>
             {currency < expandCost ? (
-              <p className="yanmar-gear-confirm-warn">스타가 부족합니다.</p>
+              <p className="yanmar-gear-confirm-warn">{t("insufficientStars")}</p>
             ) : null}
             <div className="yanmar-gear-confirm-actions">
               <button
@@ -3130,7 +3163,7 @@ export function GearPanel({
                 disabled={busy}
                 onClick={() => setExpandConfirmOpen(false)}
               >
-                취소
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -3142,7 +3175,7 @@ export function GearPanel({
                   void onExpandInventory?.();
                 }}
               >
-                확장하기
+                {t("doExpand")}
               </button>
             </div>
           </div>

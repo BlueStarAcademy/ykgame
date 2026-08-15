@@ -27,6 +27,7 @@ import {
   configureYkGeongiLogoTexture,
   createYkGeongiBoomDecalTexture,
   getDozerBladeReach,
+  getExcavatorCollisionRadius,
   YANMAR_MACHINE_RIG,
 } from "./machineVisualTheme";
 import { poseWorkEquipmentCylinders } from "./workEquipment/hydraulicPose";
@@ -114,11 +115,15 @@ import { SportsMeetCourseDecor } from "./SportsMeetCourseDecor";
 import { SportsMeetFinishGate } from "./SportsMeetFinishGate";
 import { SportsMeetStartGrid } from "./SportsMeetStartGrid";
 import {
+  getSportsMeetFinishGate,
   getSportsMeetPatternById,
   getSportsMeetStartPaddock,
   isSportsMeetStartLocked,
+  isSportsMeetFinishDriveStage,
   currentSportsStage,
+  sportsMeetStageWaypoint,
 } from "./sportsMeet";
+import type { SportsMeetPattern, SportsMeetRunState } from "./sportsMeet";
 import { RepairTent } from "./RepairTent";
 import { REPAIR_TENT } from "./gearCatalog";
 import { WorkshopSigns } from "./WorkshopSign";
@@ -126,6 +131,7 @@ import { MonumentPylon } from "./MonumentPylon";
 import type { WorkshopId } from "./workshop/types";
 import { CrashZoneDecor } from "./CrashZoneDecor";
 import { HillZoneDecor } from "./HillZoneDecor";
+import { FloodRecoveryDecor } from "./FloodRecoveryDecor";
 import { hillBoulderVisualScale } from "./terrain";
 import type {
   CameraLookOffset,
@@ -170,6 +176,10 @@ interface ExcavatorSceneProps {
   onDumpScore: (popup: Omit<DumpScorePopup, "id">) => void;
   onCrashTileDestroyed: (tileId: string) => void;
   onHillRockDelivered: (rockId: string) => void;
+  onFloodDebrisPushed?: (amount: number) => void;
+  onFloodCollectFilled?: (eventId: string, amount: number) => void;
+  onFloodTrashGrapple?: (eventId: string, awardCycleReward: boolean) => void;
+  onFloodBurnComplete?: (eventId: string, burnedUnits: number) => void;
   onAttachmentWarning: (message: string) => void;
   onDumpTruckFull?: () => void;
   onHaulTruckFull?: () => void;
@@ -185,6 +195,8 @@ interface ExcavatorSceneProps {
   worldPickupRevision?: number;
   onWorldPickup?: (pickup: WorldPickup) => void;
   workshopClaimableIds?: ReadonlySet<WorkshopId> | readonly WorkshopId[];
+  /** Used to gate flood workshop sign visibility (Lv23). */
+  playerLevel?: number;
   monumentPhase?: import("./monument/types").MonumentPhase;
   monumentStarsStored?: number;
   monumentStorageCap?: number;
@@ -1583,7 +1595,7 @@ function ExcavatorArm({
   const breakerChiselRef = useRef<THREE.Group>(null);
   const grappleVisualRef = useRef<THREE.Group>(null);
   const carriedRockRef = useRef<THREE.Mesh>(null);
-  const dirtRef = useRef<THREE.Mesh>(null);
+  const dirtRef = useRef<THREE.Group>(null);
   const tipRef = useRef<THREE.Mesh>(null);
   const bladeRef = useRef<THREE.Group>(null);
   const yanmarLogo = useLoader(THREE.TextureLoader, "/images/yanmar/yanmar-logo-white.png");
@@ -2338,6 +2350,10 @@ function SimLoop({
   onDumpScore,
   onCrashTileDestroyed,
   onHillRockDelivered,
+  onFloodDebrisPushed,
+  onFloodCollectFilled,
+  onFloodTrashGrapple,
+  onFloodBurnComplete,
   onAttachmentWarning,
   onDumpTruckFull,
   onHaulTruckFull,
@@ -2353,6 +2369,10 @@ function SimLoop({
   const dumpSoilVisualRef = useRef<DumpSoilVisualState>(runtimeRef.current.dumpSoilVisual);
   const bladeSprayVisualRef = useRef<BladeSprayVisualState>(runtimeRef.current.bladeSpray);
   const dozerBladeReach = getDozerBladeReach(
+    getChassisVisualProfile(activeChassisId).scale,
+    getChassisVisualProfile(activeChassisId).trackWidth,
+  );
+  const excavatorCollisionRadius = getExcavatorCollisionRadius(
     getChassisVisualProfile(activeChassisId).scale,
     getChassisVisualProfile(activeChassisId).trackWidth,
   );
@@ -2395,12 +2415,17 @@ function SimLoop({
       onDumpScore,
       onCrashTileDestroyed,
       onHillRockDelivered,
+      onFloodDebrisPushed,
+      onFloodCollectFilled,
+      onFloodTrashGrapple,
+      onFloodBurnComplete,
       onAttachmentWarning,
       onDumpTruckFull,
       onHaulTruckFull,
       onSimTick,
       endedRef,
       dozerBladeReach,
+      excavatorCollisionRadius,
       worldPickups: worldPickupsRef?.current ?? null,
       onWorldPickup,
       sportsMeetStartPaddock,
@@ -2788,6 +2813,9 @@ function ZoneMarkers({
           highlightBoulders={inHillZone && hill.active}
         />
       ) : null}
+      {terrainRef.current.floodZone ? (
+        <FloodRecoveryDecor terrainRef={terrainRef} showZonePaint />
+      ) : null}
       <HaulTruckWorldHud terrainRef={terrainRef} statsRef={equipmentStatsRef} />
       <group ref={dumpGroupRef} position={[DUMP_ZONE.x, dumpPaintY, DUMP_ZONE.z]}>
         <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={0}>
@@ -2933,22 +2961,66 @@ function TierBoundaryBarriers({
 }
 
 interface NavigationTarget {
-  label: NavGuideLabel;
+  label?: NavGuideLabel;
   x: number;
   z: number;
   color: string;
   outline: string;
   distance: number;
+  /** Sports-meet guide uses the arrow and distance only. */
+  meterOnly?: boolean;
+}
+
+function getSportsMeetNavigationTarget(
+  run: SportsMeetRunState,
+  pattern: SportsMeetPattern,
+) {
+  if (run.phase === "finished") return null;
+  const stage = run.stageOrder[run.stageIndex];
+  if (!stage) return null;
+
+  if (stage === "drive") {
+    const nextStar = run.courseStars.find((star) => !star.collected);
+    if (nextStar) {
+      return {
+        x: nextStar.x,
+        z: nextStar.z,
+        color: "#facc15",
+        outline: "#713f12",
+      };
+    }
+    if (isSportsMeetFinishDriveStage(run.stageOrder, run.stageIndex)) {
+      const finish = getSportsMeetFinishGate(pattern);
+      return {
+        x: finish.x,
+        z: finish.z,
+        color: "#f8fafc",
+        outline: "#1e3a8a",
+      };
+    }
+  }
+
+  const waypoint = sportsMeetStageWaypoint(pattern, stage, run.stageIndex);
+  return {
+    x: waypoint.x,
+    z: waypoint.z,
+    color: "#38bdf8",
+    outline: "#0c4a6e",
+  };
 }
 
 function NavigationGuide({
   simRef,
   terrainRef,
   cameraMode,
+  sportsMeetRunRef,
+  sportsMeetPattern,
 }: {
   simRef: React.MutableRefObject<ExcavatorSimState>;
   terrainRef: React.MutableRefObject<TerrainData>;
   cameraMode: CameraMode;
+  sportsMeetRunRef?: React.RefObject<SportsMeetRunState | null>;
+  sportsMeetPattern?: SportsMeetPattern | null;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const targetRef = useRef<NavigationTarget | null>(null);
@@ -2964,6 +3036,32 @@ function NavigationGuide({
 
       const sim = simRef.current;
       const terrain = terrainRef.current;
+      const sportsTarget =
+        sportsMeetRunRef?.current && sportsMeetPattern
+          ? getSportsMeetNavigationTarget(
+              sportsMeetRunRef.current,
+              sportsMeetPattern,
+            )
+          : null;
+      if (sportsMeetRunRef?.current) {
+        if (!sportsTarget) {
+          setTarget((current) => (current == null ? current : null));
+          return;
+        }
+        const distance = Math.max(
+          0,
+          Math.hypot(sportsTarget.x - sim.posX, sportsTarget.z - sim.posZ),
+        );
+        setTarget((current) =>
+          current?.meterOnly &&
+          Math.abs(current.x - sportsTarget.x) < 0.1 &&
+          Math.abs(current.z - sportsTarget.z) < 0.1 &&
+          Math.abs(current.distance - distance) < 0.5
+            ? current
+            : { ...sportsTarget, distance, meterOnly: true },
+        );
+        return;
+      }
       const zones = getActiveDigZones(terrain);
       const nearestDig =
         zones
@@ -3086,7 +3184,9 @@ function NavigationGuide({
 
   if (!target) return null;
 
-  const meterText = `${NAV_GUIDE_LABELS[target.label]} ${Math.round(target.distance)}m`;
+  const meterText = target.meterOnly
+    ? `${Math.round(target.distance)}m`
+    : `${NAV_GUIDE_LABELS[target.label ?? "DIG"]} ${Math.round(target.distance)}m`;
 
   return (
     <group ref={groupRef} renderOrder={0}>
@@ -4047,6 +4147,7 @@ function SceneContent(props: ExcavatorSceneProps) {
         <WorkshopSigns
           key={`workshop-signs-${terrainRevision}`}
           mapTier={props.terrainRef.current.mapTier}
+          playerLevel={props.playerLevel}
           claimableIds={props.workshopClaimableIds ?? []}
         />
       ) : null}
@@ -4120,6 +4221,8 @@ function SceneContent(props: ExcavatorSceneProps) {
         simRef={props.simRef}
         terrainRef={props.terrainRef}
         cameraMode={props.cameraMode}
+        sportsMeetRunRef={props.sportsMeetRunRef}
+        sportsMeetPattern={props.sportsMeetPattern}
       />
       <WaypointMarker
         tutorialStepRef={props.tutorialStepRef}
@@ -4229,6 +4332,7 @@ export function createInitialSim(): ExcavatorSimState {
     bucketLoad: 0,
     attachmentType: "bucket",
     carriedBoulderId: null,
+    carriedTrashId: null,
   };
 }
 

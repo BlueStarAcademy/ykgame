@@ -83,10 +83,10 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
     reward: { stars: 10, xp: 1000, enhanceCores: 2 },
   },
   {
-    id: "daily-travel-3000",
+    id: "daily-travel-2000",
     title: (t) => `주행거리 ${t}m`,
     metric: "travel",
-    target: 3000,
+    target: 2000,
     minLevel: 1,
     reward: { stars: 10, xp: 1000, enhanceCores: 1 },
   },
@@ -107,11 +107,58 @@ export const DAILY_QUEST_DEFS: readonly DailyQuestDef[] = [
     reward: { stars: 10, xp: 2000, enhanceCores: 2 },
   },
   {
-    id: DAILY_ALL_COMPLETE_QUEST_ID,
-    title: () => "일일 퀘스트 모두 완료하기",
-    metric: "dailyAllComplete",
-    /** 실제 목표는 노출 중인 비메타 일일 수로 동기화된다 */
+    id: "daily-gear-enhance-3",
+    title: (t) => `장비 강화 시도하기 ${t}회`,
+    metric: "gearEnhance",
+    target: 3,
+    minLevel: 6,
+    reward: { stars: 10, xp: 1000, enhanceCores: 2 },
+  },
+  {
+    id: "daily-gear-dismantle-5",
+    title: (t) => `장비 분해하기 ${t}개`,
+    metric: "gearDismantle",
+    target: 5,
+    minLevel: 6,
+    reward: { stars: 10, xp: 1000, enhanceCores: 2 },
+  },
+  {
+    id: "daily-gear-synthesize-1",
+    title: (t) => `장비 합성 시도하기 ${t}회`,
+    metric: "gearSynthesize",
     target: 1,
+    minLevel: 6,
+    reward: { stars: 10, xp: 1500, enhanceCores: 2 },
+  },
+  {
+    id: "daily-trash-collect-3000",
+    title: (t) => `쓰레기 집결 ${t.toLocaleString()}`,
+    metric: "trashCollect",
+    target: 3000,
+    minLevel: 23,
+    reward: { stars: 10, xp: 2000, enhanceCores: 2 },
+  },
+  {
+    id: "daily-trash-burn-1",
+    title: (t) => `쓰레기 소각 ${t}회`,
+    metric: "trashBurnComplete",
+    target: 1,
+    minLevel: 23,
+    reward: { stars: 10, xp: 2000, enhanceCores: 2 },
+  },
+  {
+    id: "daily-sports-ranked-1",
+    title: (t) => `운동회 랭킹전 참여하기 ${t}회`,
+    metric: "sportsRankedEnter",
+    target: 1,
+    minLevel: 25,
+    reward: { stars: 10, xp: 2500, enhanceCores: 2 },
+  },
+  {
+    id: DAILY_ALL_COMPLETE_QUEST_ID,
+    title: (t) => `일일 퀘스트 ${t}개 완료하기`,
+    metric: "dailyAllComplete",
+    target: 8,
     minLevel: 1,
     reward: { stars: 50, xp: 0, gachaTicketsPremium: 2 },
     meta: true,
@@ -417,7 +464,11 @@ export function metricUnitLabel(metric: QuestMetric) {
       return "m";
     case "soilLoad":
     case "soilDump":
+    case "trashCollect":
+    case "trashBurn":
       return "";
+    case "gearDismantle":
+      return "개";
     case "dailyAllComplete":
       return "개";
     default:

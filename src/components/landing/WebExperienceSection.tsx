@@ -35,9 +35,9 @@ export function WebExperienceSection({ compact = false }: WebExperienceSectionPr
   return (
     <section className="landing-qr-card overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-100 bg-gray-50 px-5 py-4">
-        <h2 className="text-base font-bold text-gray-900">모바일 QR 체험</h2>
+        <h2 className="text-base font-bold text-gray-900">{t("webExperience.title")}</h2>
         <p className="mt-1 text-xs text-gray-500">
-          스마트폰으로 스캔하면 로그인 화면이 열립니다
+          {t("webExperience.lead")}
         </p>
       </div>
 
@@ -54,12 +54,9 @@ export function WebExperienceSection({ compact = false }: WebExperienceSectionPr
         </div>
 
         <div className="max-w-xs space-y-2 text-center sm:text-left">
-          <p className="text-sm font-semibold text-gray-900">QR → 로그인 → 체험 입장</p>
+          <p className="text-sm font-semibold text-gray-900">{t("webExperience.steps")}</p>
           <p className="text-xs leading-relaxed text-gray-500">
-            스캔 후 장비 선택 화면으로 이동합니다. 별도 설치 없이 브라우저에서 바로
-            체험합니다. iPhone은 Safari{" "}
-            <strong className="text-gray-700">공유 → 홈 화면에 추가</strong> 후 앱처럼
-            이용할 수 있습니다.
+            {t("webExperience.description")}
           </p>
         </div>
       </div>

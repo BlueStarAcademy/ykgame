@@ -115,13 +115,13 @@ function createMissionRounds(band: MissionLevelBand): MissionRound[] {
   });
 }
 
-/** 메타 일일(모두 완료·미션 N회) 진행도를 현재 상태에서 다시 맞춘다 */
+/** 메타 일일(일일 8개·미션 N회) 진행도를 현재 상태에서 다시 맞춘다 */
 function syncMetaDailyQuests(state: YanmarQuestState): YanmarQuestState {
   const nonMeta = state.daily.filter((item) => {
     const def = DAILY_QUEST_DEFS.find((entry) => entry.id === item.id);
     return def ? !isMetaDailyQuest(def) : !isMetaDailyQuest({ id: item.id });
   });
-  const allTarget = Math.max(1, nonMeta.length);
+  const allTarget = 8;
   const allProgress = nonMeta.filter((item) => item.completed).length;
   const missionProgress = Math.max(
     0,
@@ -134,7 +134,7 @@ function syncMetaDailyQuests(state: YanmarQuestState): YanmarQuestState {
 
     if (item.id === DAILY_ALL_COMPLETE_QUEST_ID) {
       const progress = Math.min(allTarget, allProgress);
-      const completed = nonMeta.length > 0 && allProgress >= nonMeta.length;
+      const completed = allProgress >= allTarget;
       if (
         item.target === allTarget &&
         item.progress === progress &&

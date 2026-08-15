@@ -42,6 +42,7 @@ export async function POST(request: Request) {
         dumpWorkshopPoints: true,
         crashWorkshopPoints: true,
         hillWorkshopPoints: true,
+        floodWorkshopPoints: true,
       } as const;
 
       if (!pending) {
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
             dump: refreshed.dumpWorkshopPoints,
             crash: refreshed.crashWorkshopPoints,
             hill: refreshed.hillWorkshopPoints,
+          flood: refreshed.floodWorkshopPoints,
           },
         };
       }
@@ -118,6 +120,7 @@ export async function POST(request: Request) {
           dump: refreshed?.dumpWorkshopPoints ?? 0,
           crash: refreshed?.crashWorkshopPoints ?? 0,
           hill: refreshed?.hillWorkshopPoints ?? 0,
+          flood: refreshed?.floodWorkshopPoints ?? 0,
         },
       };
     });

@@ -1,10 +1,10 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { getXpRequiredForLevel } from "@/lib/playerLevel";
 
-/** 관리자 테스트용 조형물·팻말(워크샵) 포인트 목표치 */
+/** ??? ???? ???�?? ??? ??? */
 export const ADMIN_TEST_POINTS = 999_999;
 
-/** 기념비 만랩(+10) 레벨 게이트(40)까지 포함해 모든 기능 개방 */
+/** ?? ??(+10) ??(??? 40)?? ??? ?? ?? ?? */
 export const ADMIN_TEST_MIN_LEVEL = 40;
 
 type Tx = Omit<
@@ -27,12 +27,13 @@ export type AdminTestBoostSnapshot = {
   dumpWorkshopPoints: number;
   crashWorkshopPoints: number;
   hillWorkshopPoints: number;
+  floodWorkshopPoints: number;
   monumentPhase: string;
 };
 
 /**
- * ADMIN 계정에 테스트용 XP·조형물/팻말 포인트를 채우고 조형물을 active로 연다.
- * 이미 목표치 이상이면 건드리지 않는다.
+ * ADMIN ??? ???? XP�???�?? ???? ??? ???? active? ??.
+ * ?? ??? ???? ???? ???.
  */
 export async function ensureAdminYanmarTestBoost(
   db: Tx | PrismaClient,
@@ -49,6 +50,7 @@ export async function ensureAdminYanmarTestBoost(
       dumpWorkshopPoints: true,
       crashWorkshopPoints: true,
       hillWorkshopPoints: true,
+      floodWorkshopPoints: true,
       monumentPhase: true,
       monumentTutorialDone: true,
       monumentProdUpdatedAt: true,
@@ -62,6 +64,7 @@ export async function ensureAdminYanmarTestBoost(
     dumpWorkshopPoints: Math.max(user.dumpWorkshopPoints, ADMIN_TEST_POINTS),
     crashWorkshopPoints: Math.max(user.crashWorkshopPoints, ADMIN_TEST_POINTS),
     hillWorkshopPoints: Math.max(user.hillWorkshopPoints, ADMIN_TEST_POINTS),
+    floodWorkshopPoints: Math.max(user.floodWorkshopPoints, ADMIN_TEST_POINTS),
     monumentPhase:
       user.monumentPhase === "active" ? user.monumentPhase : "active",
   };
@@ -73,6 +76,7 @@ export async function ensureAdminYanmarTestBoost(
     next.dumpWorkshopPoints !== user.dumpWorkshopPoints ||
     next.crashWorkshopPoints !== user.crashWorkshopPoints ||
     next.hillWorkshopPoints !== user.hillWorkshopPoints ||
+    next.floodWorkshopPoints !== user.floodWorkshopPoints ||
     needsPhase;
 
   if (!needsUpdate) {
@@ -82,6 +86,7 @@ export async function ensureAdminYanmarTestBoost(
       dumpWorkshopPoints: user.dumpWorkshopPoints,
       crashWorkshopPoints: user.crashWorkshopPoints,
       hillWorkshopPoints: user.hillWorkshopPoints,
+      floodWorkshopPoints: user.floodWorkshopPoints,
       monumentPhase: user.monumentPhase,
     };
   }
@@ -94,6 +99,7 @@ export async function ensureAdminYanmarTestBoost(
       dumpWorkshopPoints: next.dumpWorkshopPoints,
       crashWorkshopPoints: next.crashWorkshopPoints,
       hillWorkshopPoints: next.hillWorkshopPoints,
+      floodWorkshopPoints: next.floodWorkshopPoints,
       monumentPhase: next.monumentPhase,
       ...(needsPhase
         ? {
@@ -108,6 +114,7 @@ export async function ensureAdminYanmarTestBoost(
       dumpWorkshopPoints: true,
       crashWorkshopPoints: true,
       hillWorkshopPoints: true,
+      floodWorkshopPoints: true,
       monumentPhase: true,
     },
   });

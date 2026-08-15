@@ -77,6 +77,9 @@ const MASTER_ITEM_ACQUIRE_BASE_VOLUME = 0.92;
 const SPORTS_COUNTDOWN_BASE_VOLUME = 0.9;
 const SPIN_WHOOSH_BASE_VOLUME = 0.82;
 const ATTACHMENT_UNLOCK_BASE_VOLUME = 0.9;
+/** Subtle granular sounds; keep them well below the hydraulic and travel loops. */
+const SOIL_LOAD_BASE_GAIN = 0.16;
+const SOIL_DUMP_BASE_GAIN = 0.22;
 /** Keep under horns / breaker so travel drone does not dominate. */
 const TRAVEL_BASE_GAIN = 0.48;
 const UI_CLICK_POOL_SIZE = 4;
@@ -88,7 +91,7 @@ const TRAVEL_FADE_IN_SEC = 0.09;
 const GLOBAL_CTRL = "__ykYanmarAudioCtrl";
 const GLOBAL_CTRL_REV = "__ykYanmarAudioCtrlRev";
 /** Bump when controller public surface changes (forces HMR refresh). */
-const CTRL_REV = 9;
+const CTRL_REV = 10;
 
 type TravelRpm = 1 | 2;
 
@@ -888,6 +891,71 @@ class YanmarAudioController {
       this.attachmentUnlockAudio,
       ATTACHMENT_UNLOCK_BASE_VOLUME * this.effectGain("attachment"),
     );
+  }
+
+  /** Short granular scrape while the bucket is taking on soil. */
+  playSoilLoad() {
+    this.playSoilSound("load");
+  }
+
+  /** A slightly fuller cascade as soil leaves the bucket. */
+  playSoilDump() {
+    this.playSoilSound("dump");
+  }
+
+  private playSoilSound(kind: "load" | "dump") {
+    if (typeof window === "undefined") return;
+    if (!this.canPlayEffect("soil")) return;
+    this.ensureStoreSubscription();
+    void this.startSoilSound(kind);
+  }
+
+  private async startSoilSound(kind: "load" | "dump") {
+    const ctx = await this.ensureAudioContext();
+    if (!ctx || !this.canPlayEffect("soil")) return;
+
+    const duration = kind === "load" ? 0.13 : 0.19;
+    const frames = Math.max(1, Math.floor(ctx.sampleRate * duration));
+    const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
+    const samples = buffer.getChannelData(0);
+    // Brown-ish noise sounds like loose earth, unlike the white-noise hiss of sand.
+    let brown = 0;
+    for (let i = 0; i < frames; i++) {
+      brown = (brown + (Math.random() * 2 - 1) * 0.12) * 0.985;
+      const grain = Math.random() * 2 - 1;
+      samples[i] = brown * 0.82 + grain * 0.18;
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = kind === "load" ? 520 : 350;
+    filter.Q.value = kind === "load" ? 0.65 : 0.48;
+    const gain = ctx.createGain();
+    const now = ctx.currentTime;
+    const peak =
+      (kind === "load" ? SOIL_LOAD_BASE_GAIN : SOIL_DUMP_BASE_GAIN) *
+      this.effectGain("soil");
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak), now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    source.onended = () => {
+      source.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    };
+    try {
+      source.start(now);
+      this.unlocked = true;
+    } catch {
+      source.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    }
   }
 
   /**

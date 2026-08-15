@@ -246,11 +246,54 @@ function createBucketBowlGeometry(width = 0.84, wall = 0.045): THREE.BufferGeome
   return geo;
 }
 
+const SOIL_CLODS = [
+  { position: [-0.23, 0.05, -0.16], scale: [0.2, 0.13, 0.17], rotation: [0.3, 0.9, 0.2] },
+  { position: [0.08, 0.09, -0.18], scale: [0.18, 0.16, 0.15], rotation: [0.6, 0.2, 0.8] },
+  { position: [0.25, 0.02, 0.13], scale: [0.2, 0.12, 0.17], rotation: [0.4, 1.1, 0.5] },
+  { position: [-0.04, 0.14, 0.08], scale: [0.23, 0.14, 0.18], rotation: [0.8, 0.5, 0.3] },
+] as const;
+
+/** Uneven soil heap: a packed mound with visible clods rather than a rectangular block. */
+function BucketSoil({
+  dirtRef,
+  texture,
+}: {
+  dirtRef: RefObject<THREE.Group | null>;
+  texture: THREE.Texture;
+}) {
+  return (
+    <group ref={dirtRef} visible={false}>
+      <mesh position={[0, -0.025, 0]} scale={[0.56, 0.3, 0.43]} castShadow receiveShadow>
+        <sphereGeometry args={[1, 16, 10]} />
+        <meshStandardMaterial map={texture} color="#76502d" roughness={1} metalness={0} />
+      </mesh>
+      {SOIL_CLODS.map((clod, index) => (
+        <mesh
+          key={index}
+          position={clod.position}
+          scale={clod.scale}
+          rotation={clod.rotation}
+          castShadow
+          receiveShadow
+        >
+          <dodecahedronGeometry args={[1, 1]} />
+          <meshStandardMaterial
+            map={texture}
+            color={index % 2 === 0 ? "#6f4928" : "#835b34"}
+            roughness={1}
+            metalness={0}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 /** One-piece backhoe scoop — sealed bowl, 5 teeth, power link. */
 export function ExcavatorBucket({
   dirtRef,
 }: {
-  dirtRef: RefObject<THREE.Mesh | null>;
+  dirtRef: RefObject<THREE.Group | null>;
 }) {
   const dirtTexture = useMemo(() => createBucketDirtTexture(), []);
   const bowl = useMemo(() => createBucketBowlGeometry(), []);
@@ -287,15 +330,7 @@ export function ExcavatorBucket({
       {[-0.32, -0.16, 0, 0.16, 0.32].map((z) => (
         <Tooth key={z} z={z} shape={toothShape} />
       ))}
-      <mesh ref={dirtRef} position={[-0.5, -0.32, 0]} visible={false}>
-        <boxGeometry args={[0.68, 0.28, 0.58]} />
-        <meshStandardMaterial
-          map={dirtTexture}
-          color="#8f6438"
-          roughness={0.98}
-          metalness={0}
-        />
-      </mesh>
+      <BucketSoil dirtRef={dirtRef} texture={dirtTexture} />
     </group>
   );
 }

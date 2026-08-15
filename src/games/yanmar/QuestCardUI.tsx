@@ -4,6 +4,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { useTranslations } from "next-intl";
 import type { QuestMetric, QuestReward } from "./quests/types";
 import { formatQuestProgressCurrent } from "./quests/formatProgress";
 
@@ -30,6 +31,11 @@ type RewardEntry = {
   tile: ReactNode;
 };
 
+type Translate = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
+
 function rewardImage(src: string, alt: string, extraClass = "") {
   return (
     <img
@@ -41,13 +47,16 @@ function rewardImage(src: string, alt: string, extraClass = "") {
   );
 }
 
-function buildRewardEntries(reward: QuestReward): RewardEntry[] {
+function buildRewardEntries(
+  reward: QuestReward,
+  t: Translate,
+): RewardEntry[] {
   const entries: RewardEntry[] = [];
   if (reward.xp > 0) {
     entries.push({
       key: "xp",
       tone: "is-xp",
-      label: "경험치",
+      label: t("rewardLabels.xp"),
       amount: reward.xp.toLocaleString(),
       icon: <span className="yanmar-quest-chip-glyph">XP</span>,
       tile: <span className="yanmar-quest-reward-tile-glyph">XP</span>,
@@ -57,7 +66,7 @@ function buildRewardEntries(reward: QuestReward): RewardEntry[] {
     entries.push({
       key: "stars",
       tone: "is-star",
-      label: "스타",
+      label: t("rewardLabels.stars"),
       amount: reward.stars.toLocaleString(),
       icon: rewardImage("/images/star-currency.svg", "", "yanmar-score-panel-star"),
       tile: rewardImage(
@@ -71,7 +80,7 @@ function buildRewardEntries(reward: QuestReward): RewardEntry[] {
     entries.push({
       key: "score",
       tone: "is-score",
-      label: "점수",
+      label: t("rewardLabels.score"),
       amount: reward.score!.toLocaleString(),
       icon: <span className="yanmar-quest-chip-glyph">PT</span>,
       tile: <span className="yanmar-quest-reward-tile-glyph">PT</span>,
@@ -81,7 +90,7 @@ function buildRewardEntries(reward: QuestReward): RewardEntry[] {
     entries.push({
       key: "cores",
       tone: "is-core",
-      label: "강화코어",
+      label: t("rewardLabels.enhanceCore"),
       amount: reward.enhanceCores!.toLocaleString(),
       icon: rewardImage("/images/yanmar/2d/enhance-core.png?v=3", ""),
       tile: rewardImage("/images/yanmar/2d/enhance-core.png?v=3", "", "is-lg"),
@@ -91,7 +100,7 @@ function buildRewardEntries(reward: QuestReward): RewardEntry[] {
     entries.push({
       key: "ticket-std",
       tone: "is-ticket",
-      label: "일반 뽑기권",
+      label: t("rewardLabels.standardTicket"),
       amount: reward.gachaTicketsStandard!.toLocaleString(),
       icon: rewardImage("/images/yanmar/2d/gacha-ticket-standard.svg", ""),
       tile: rewardImage("/images/yanmar/2d/gacha-ticket-standard.svg", "", "is-lg"),
@@ -101,7 +110,7 @@ function buildRewardEntries(reward: QuestReward): RewardEntry[] {
     entries.push({
       key: "ticket-prem",
       tone: "is-ticket",
-      label: "고급 뽑기권",
+      label: t("rewardLabels.premiumTicket"),
       amount: reward.gachaTicketsPremium!.toLocaleString(),
       icon: rewardImage("/images/yanmar/2d/gacha-ticket-premium.svg", ""),
       tile: rewardImage("/images/yanmar/2d/gacha-ticket-premium.svg", "", "is-lg"),
@@ -111,9 +120,10 @@ function buildRewardEntries(reward: QuestReward): RewardEntry[] {
 }
 
 export function QuestRewardChips({ reward }: { reward: QuestReward }) {
-  const entries = buildRewardEntries(reward);
+  const t = useTranslations("yanmar.quest");
+  const entries = buildRewardEntries(reward, t);
   if (entries.length === 0) {
-    return <span className="yanmar-quest-chip is-empty">보상 없음</span>;
+    return <span className="yanmar-quest-chip is-empty">{t("noRewards")}</span>;
   }
   return (
     <span className="yanmar-quest-chips">
@@ -132,7 +142,8 @@ export function QuestRewardChips({ reward }: { reward: QuestReward }) {
 }
 
 export function QuestRewardTiles({ reward }: { reward: QuestReward }) {
-  const entries = buildRewardEntries(reward);
+  const t = useTranslations("yanmar.quest");
+  const entries = buildRewardEntries(reward, t);
   if (entries.length === 0) return null;
   return (
     <div className="yanmar-quest-reward-tiles">
@@ -205,6 +216,7 @@ export function QuestCard({
   state: QuestCardState;
   action?: ReactNode;
 }) {
+  const t = useTranslations("yanmar.quest");
   const reached = state === "done" || state === "claimable";
   const shown = reached ? Math.max(value, target) : value;
   const pct =
@@ -262,7 +274,7 @@ export function QuestCard({
           aria-valuemin={0}
           aria-valuemax={target}
           aria-valuenow={current}
-          aria-label={`${title} 진행도`}
+        aria-label={t("progressAria", { title })}
         >
           <span
             className={`yanmar-quest-track-fill${state === "done" ? " is-done" : ""}`}
@@ -273,8 +285,10 @@ export function QuestCard({
               className={`yanmar-quest-track-note${pct >= 26 ? " is-on-fill" : ""}`}
             >
               {reached
-                ? "목표 달성"
-                : `남은 ${Math.max(0, target - current).toLocaleString()}`}
+                ? t("goalReached")
+                : t("remaining", {
+                    count: Math.max(0, target - current).toLocaleString(),
+                  })}
             </span>
             <span
               className={`yanmar-quest-track-count tabular-nums${
@@ -295,12 +309,13 @@ export function QuestCard({
 export function ClaimButton({
   claiming,
   onClaim,
-  label = "보상 받기",
+  label,
 }: {
   claiming: boolean;
   onClaim: () => void;
   label?: string;
 }) {
+  const t = useTranslations("yanmar.quest");
   return (
     <button
       type="button"
@@ -308,20 +323,22 @@ export function ClaimButton({
       disabled={claiming}
       onClick={onClaim}
     >
-      {claiming ? "수령 중" : label}
+      {claiming ? t("claimingShort") : (label ?? t("claimRewards"))}
     </button>
   );
 }
 
-export function DoneStamp({ label = "완료" }: { label?: string }) {
+export function DoneStamp({ label }: { label?: string }) {
+  const t = useTranslations("yanmar.quest");
   return (
     <span className="yanmar-quest-stamp">
       <CheckGlyph />
-      {label}
+      {label ?? t("done")}
     </span>
   );
 }
 
 export function PendingStamp() {
-  return <span className="yanmar-quest-stamp is-pending">진행 중</span>;
+  const t = useTranslations("yanmar.quest");
+  return <span className="yanmar-quest-stamp is-pending">{t("inProgress")}</span>;
 }

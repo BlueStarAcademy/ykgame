@@ -249,6 +249,7 @@ export function applySportsMeetTerrain(
     terrain.hillZone.dropX = hillX + 10;
     terrain.hillZone.dropZ = hillZ + 2;
   }
+  terrain.floodZone = null;
 }
 
 export function applySportsMeetEquipmentOverrides(
