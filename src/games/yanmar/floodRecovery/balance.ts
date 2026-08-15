@@ -34,6 +34,13 @@ export const FLOOD_MIN_BURN_SEC = 30;
 /** Safety radius around incinerator — player must leave before burn starts. */
 export const FLOOD_INCINERATOR_SAFE_RADIUS = 10;
 
+/**
+ * Grapple deposit reach from incinerator center (XZ).
+ * Matches the hopper shell (~3.7 body) with a small boom-overhang allowance —
+ * not the leave-safe radius used for burn start.
+ */
+export const FLOOD_INCINERATOR_DEPOSIT_RADIUS = 4.2;
+
 /** Per-ability weights applied to chassis-stat deltas vs base chassis. */
 export const FLOOD_PUSH_STAT_WEIGHTS = {
   strength: 0.008,

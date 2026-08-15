@@ -15,6 +15,7 @@ import {
   FLOOD_BASE_BURN_SEC,
   FLOOD_COLLECTION_THRESHOLD,
   FLOOD_INCINERATOR_BASE_CAPACITY,
+  FLOOD_INCINERATOR_DEPOSIT_RADIUS,
   FLOOD_INCINERATOR_SAFE_RADIUS,
   FLOOD_RECOVERY_UNLOCK_LEVEL,
 } from "./floodRecovery/balance";
@@ -1330,7 +1331,7 @@ export function isInsideFloodIncinerator(
 ): boolean {
   return (
     Math.hypot(wx - zone.incineratorX, wz - zone.incineratorZ) <=
-    zone.incineratorRadius
+    FLOOD_INCINERATOR_DEPOSIT_RADIUS
   );
 }
 
@@ -1514,7 +1515,6 @@ export function advanceFloodDebrisBladePush(
 export function pushFloodDebrisToCollection(
   terrain: TerrainData,
   amount: number,
-  preferNear?: { x: number; z: number },
 ): { moved: number; collectionFilled: boolean } {
   const zone = terrain.floodZone;
   if (!zone?.active || zone.phase !== "active") {
@@ -1524,40 +1524,36 @@ export function pushFloodDebrisToCollection(
     return { moved: 0, collectionFilled: false };
   }
   const room = FLOOD_COLLECTION_THRESHOLD - zone.collectedUnits;
+  // A blade stroke only scores trash that it has actually delivered onto the
+  // collection pad. This keeps the visual windrow and the transferred units in
+  // sync instead of removing a distant pile as soon as the player starts moving.
+  const collectable = zone.debris
+    .filter(
+      (pile) =>
+        pile.active &&
+        pile.remaining > 0 &&
+        Math.hypot(pile.x - zone.collectionX, pile.z - zone.collectionZ) <=
+          zone.collectionRadius + 0.5,
+    )
+    .sort((a, b) => {
+      const da = Math.hypot(a.x - zone.collectionX, a.z - zone.collectionZ);
+      const db = Math.hypot(b.x - zone.collectionX, b.z - zone.collectionZ);
+      return da - db;
+    });
+  const available = collectable.reduce((total, pile) => total + pile.remaining, 0);
   const moved = Math.max(
     0,
-    Math.min(Math.floor(amount), room, zone.sourceRemaining),
+    Math.min(Math.floor(amount), room, zone.sourceRemaining, available),
   );
   if (moved <= 0) return { moved: 0, collectionFilled: false };
 
   zone.sourceRemaining -= moved;
   zone.collectedUnits += moved;
 
-  // Drain piles nearest the blade (or collection pad) first so pushed windrows
-  // disappear into the pad instead of remote untouched mounds.
-  const anchorX = preferNear?.x ?? zone.collectionX;
-  const anchorZ = preferNear?.z ?? zone.collectionZ;
-  const ordered = zone.debris
-    .filter((pile) => pile.active && pile.remaining > 0)
-    .sort((a, b) => {
-      const da = Math.hypot(a.x - anchorX, a.z - anchorZ);
-      const db = Math.hypot(b.x - anchorX, b.z - anchorZ);
-      return da - db;
-    });
-
   let left = moved;
-  for (const pile of ordered) {
+  for (const pile of collectable) {
     if (left <= 0) break;
     const take = Math.min(pile.remaining, left);
-    const toCollectionX = zone.collectionX - pile.x;
-    const toCollectionZ = zone.collectionZ - pile.z;
-    const distance = Math.hypot(toCollectionX, toCollectionZ);
-    if (distance > 0.75) {
-      const pushDistance =
-        Math.min(2.2, distance - 0.75) * (take / Math.max(1, pile.remaining));
-      pile.x += (toCollectionX / distance) * pushDistance;
-      pile.z += (toCollectionZ / distance) * pushDistance;
-    }
     pile.remaining -= take;
     left -= take;
     if (pile.remaining <= 0) {

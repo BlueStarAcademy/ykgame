@@ -430,7 +430,8 @@
       "camera": "Camera {mode}",
       "cameraAria": "Camera view {mode}",
       "respawnWait": "Respawn wait",
-      "monument": "Monument"
+      "monument": "Monument",
+      "floodBurn": "Burn"
     },
     "toasts": {
       "inventoryFullTitle": "Not enough inventory space.",
@@ -1142,6 +1143,8 @@
       "completionReward": "Completion reward",
       "claim": "Claim",
       "exit": "Exit",
+      "exitToGame": "Exit tutorial",
+      "exitToGameAria": "Exit tutorial and return to game",
       "skipToGame": "SKIP · Go to game",
       "goalDistance": "{meters}m to goal",
       "steps": {

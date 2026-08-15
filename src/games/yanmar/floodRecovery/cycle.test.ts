@@ -9,6 +9,7 @@ import {
   failFloodTrashCarry,
   floodFieldDebrisBudget,
   isFloodDebrisFull,
+  isInsideFloodIncinerator,
   isInsideFloodRecoveryCircle,
   pushFloodDebrisToCollection,
   respawnFloodFieldDebris,
@@ -21,6 +22,7 @@ import {
   FLOOD_COLLECTION_GRAB_RADIUS,
   FLOOD_COLLECTION_THRESHOLD,
   FLOOD_INCINERATOR_BASE_CAPACITY,
+  FLOOD_INCINERATOR_DEPOSIT_RADIUS,
   FLOOD_RECOVERY_UNLOCK_LEVEL,
 } from "./balance";
 import { hillBoulderGripEnvelope } from "../grappleGrip";
@@ -35,24 +37,20 @@ describe("floodRecovery/cycle", () => {
   it("fills collection at 500 and awards collect only once per cycle", () => {
     const terrain = withFloodTerrain();
     const zone = terrain.floodZone!;
-    const nearestPile = [...zone.debris].sort((a, b) => {
-      const da = Math.hypot(a.x - zone.collectionX, a.z - zone.collectionZ);
-      const db = Math.hypot(b.x - zone.collectionX, b.z - zone.collectionZ);
-      return da - db;
-    })[0]!;
-    const startDistance = Math.hypot(
-      nearestPile.x - zone.collectionX,
-      nearestPile.z - zone.collectionZ,
+    // A blade must physically push a windrow over the pad rim before it is
+    // accepted into the collection load.
+    assert.equal(
+      pushFloodDebrisToCollection(terrain, FLOOD_COLLECTION_THRESHOLD).moved,
+      0,
     );
+    for (const pile of zone.debris) {
+      pile.x = zone.collectionX;
+      pile.z = zone.collectionZ;
+    }
+
     const first = pushFloodDebrisToCollection(terrain, FLOOD_COLLECTION_THRESHOLD);
     assert.equal(first.moved, FLOOD_COLLECTION_THRESHOLD);
     assert.equal(first.collectionFilled, true);
-    assert.ok(
-      Math.hypot(
-        nearestPile.x - zone.collectionX,
-        nearestPile.z - zone.collectionZ,
-      ) < startDistance,
-    );
     zone.rewardedCollect = true;
 
     beginFloodTrashCarry(terrain);
@@ -153,6 +151,26 @@ describe("floodRecovery/cycle", () => {
     assert.ok(
       Math.abs(poseRadius - FLOOD_COLLECTION_GRAB_RADIUS) < 0.15,
       `hint radius ${FLOOD_COLLECTION_GRAB_RADIUS} drifted from pose ${poseRadius}`,
+    );
+  });
+
+  it("requires the grapple near the hopper to deposit, not the burn-safe radius", () => {
+    const zone = createFloodRecoveryZone();
+    assert.ok(zone.incineratorRadius > FLOOD_INCINERATOR_DEPOSIT_RADIUS);
+
+    // Midway into the leave-safe ring must not count as a deposit.
+    const farX = zone.incineratorX + FLOOD_INCINERATOR_DEPOSIT_RADIUS + 1.5;
+    assert.equal(
+      isInsideFloodIncinerator(zone, farX, zone.incineratorZ),
+      false,
+    );
+    assert.equal(
+      isInsideFloodIncinerator(
+        zone,
+        zone.incineratorX + FLOOD_INCINERATOR_DEPOSIT_RADIUS * 0.5,
+        zone.incineratorZ,
+      ),
+      true,
     );
   });
 

@@ -172,11 +172,7 @@ function floodLabelText(
     });
   }
   if (zone.phase === "readyToBurn") return t("floodLeaveIncinerator");
-  if (zone.phase === "burning") {
-    return t("floodBurning", {
-      percent: Math.round(zone.burnProgress * 100),
-    });
-  }
+  if (zone.phase === "burning") return t("floodZone");
   if (zone.active) {
     return t("floodZoneFill", {
       current: zone.incineratorUnits,
@@ -342,6 +338,7 @@ export function FloodRecoveryDecor({
   const incineratorY = sampleHeight(terrain, zone.incineratorX, zone.incineratorZ);
   const showActive =
     zone.active || zone.phase === "readyToBurn" || zone.phase === "burning";
+  const showRespawnPaint = getFloodZoneRespawnEtaSec(zone) > 0;
   const collectionPct = Math.min(
     1,
     zone.collectedUnits / FLOOD_COLLECTION_THRESHOLD,
@@ -353,7 +350,7 @@ export function FloodRecoveryDecor({
 
   return (
     <group>
-      {showActive && showZonePaint ? (
+      {(showActive || showRespawnPaint) && showZonePaint ? (
         <group position={[zone.centerX, groundY + GROUND_PAINT_LIFT, zone.centerZ]}>
           <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={0}>
             <circleGeometry args={[zone.radius * 0.55, 48]} />
@@ -560,6 +557,23 @@ export function FloodRecoveryDecor({
           }
           distance={18}
         />
+        {zone.phase === "burning" ? (
+          <Text
+            font={YANMAR_SCENE_FONT}
+            position={[0, 8.4, 0]}
+            rotation={[0, zone.incineratorYaw, 0]}
+            fontSize={1.4}
+            color="#fed7aa"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.07}
+            outlineColor="#7c2d12"
+          >
+            {t("floodBurning", {
+              percent: Math.round(zone.burnProgress * 100),
+            })}
+          </Text>
+        ) : null}
         <Text
           font={YANMAR_SCENE_FONT}
           position={[0, 0.1, 4.2]}

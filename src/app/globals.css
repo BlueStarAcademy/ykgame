@@ -3010,6 +3010,76 @@ body {
   transform: scale(0.95);
 }
 
+.yanmar-tutorial-exit-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  height: 2rem;
+  max-width: 100%;
+  padding: 0 0.72rem;
+  border-radius: 0.72rem;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 40%),
+    linear-gradient(165deg, rgba(127, 29, 29, 0.92), rgba(40, 12, 12, 0.96));
+  color: #fff;
+  box-shadow:
+    0 0.25rem 0.7rem rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition:
+    border-color 0.14s ease,
+    background 0.14s ease,
+    transform 0.12s ease;
+}
+
+.yanmar-tutorial-exit-chip:hover {
+  border-color: rgba(252, 165, 165, 0.85);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 40%),
+    linear-gradient(165deg, rgba(153, 27, 27, 0.96), rgba(55, 16, 16, 0.98));
+}
+
+.yanmar-tutorial-exit-chip:active {
+  transform: scale(0.96);
+}
+
+.yanmar-tutorial-exit-chip-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+.yanmar-tutorial-exit-chip-label {
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.yanmar-tutorial-exit-chip.is-fallback {
+  position: absolute;
+  left: 0.35rem;
+  top: 0.35rem;
+  z-index: 120;
+}
+
+.yanmar-center-status-stack {
+  box-sizing: border-box;
+}
+
+.yanmar-center-status-chip {
+  box-sizing: border-box;
+  width: max-content;
+  max-width: none;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
 .yanmar-tutorial-guide-body {
   position: relative;
   z-index: 1;

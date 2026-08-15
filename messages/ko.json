@@ -430,7 +430,8 @@
       "camera": "카메라{mode}",
       "cameraAria": "카메라 {mode}번 시점",
       "respawnWait": "리젠 대기",
-      "monument": "조형물"
+      "monument": "조형물",
+      "floodBurn": "소각"
     },
     "toasts": {
       "inventoryFullTitle": "인벤토리 공간이 부족합니다.",
@@ -1142,6 +1143,8 @@
       "completionReward": "완료 보상",
       "claim": "수령",
       "exit": "종료",
+      "exitToGame": "튜토리얼 종료",
+      "exitToGameAria": "튜토리얼 종료하고 게임으로 돌아가기",
       "skipToGame": "SKIP · 게임으로",
       "goalDistance": "목표까지 {meters}m",
       "steps": {

@@ -693,7 +693,7 @@ function CrashAsphaltHpPanel({
   const bounceSide = hitTick % 2 === 0 ? "is-bounce-left" : "is-bounce-right";
 
   return (
-    <div className="relative w-[8.25rem] rounded-xl border border-white/20 bg-black/55 px-2 py-1.5 shadow-lg backdrop-blur-sm">
+    <div className="relative w-full max-w-[8.25rem] rounded-xl border border-white/20 bg-black/55 px-2 py-1.5 shadow-lg backdrop-blur-sm">
       <div className="flex items-center justify-between gap-1">
         <span className="text-[8px] font-black uppercase tracking-[0.12em] text-white/70">
           {t("crash")}
@@ -1465,6 +1465,7 @@ export function ExcavatorGameWrapper({
   const { data: session, status: sessionStatus, update } = useSession();
   const hudT = useTranslations("yanmar.hud");
   const gameHudT = useTranslations("yanmar.gameHud");
+  const tutorialT = useTranslations("yanmar.tutorial");
   const sitePromptT = useTranslations("yanmar.sitePrompt");
   const workshopCatalogT = useTranslations("yanmar.workshop.catalog");
   const repairT = useTranslations("yanmar.repair");
@@ -5925,6 +5926,40 @@ export function ExcavatorGameWrapper({
     startGameDirect,
   ]);
 
+  const renderTutorialExitChip = (extraClassName?: string) => (
+    <button
+      type="button"
+      className={
+        extraClassName
+          ? `yanmar-tutorial-exit-chip ${extraClassName}`
+          : "yanmar-tutorial-exit-chip"
+      }
+      onPointerDown={activateOnPointerDown(() => {
+        exitTutorial();
+      })}
+      aria-label={tutorialT("exitToGameAria")}
+    >
+      <svg
+        className="yanmar-tutorial-exit-chip-icon"
+        viewBox="0 0 16 16"
+        width="11"
+        height="11"
+        fill="none"
+        aria-hidden
+      >
+        <path
+          d="M4.2 4.2l7.6 7.6M11.8 4.2L4.2 11.8"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
+      </svg>
+      <span className="yanmar-tutorial-exit-chip-label">
+        {tutorialT("exitToGame")}
+      </span>
+    </button>
+  );
+
   useRegisterInGameBackDismiss(
     showTutorialMenu && tutorialState.introDone,
     () => setShowTutorialMenu(false),
@@ -8165,35 +8200,6 @@ export function ExcavatorGameWrapper({
           onTeleport={handleMapTeleport}
         />
 
-        {mode !== "intro" && mode !== "gameReady" && travelRaiseWarn ? (
-          <div
-            key={travelRaiseWarn.key}
-            className={`yanmar-travel-raise-warn pointer-events-none absolute left-1/2 top-[3.25rem] z-[60] w-max max-w-[calc(100%_-_1rem)] -translate-x-1/2 whitespace-nowrap rounded-xl border border-amber-300/45 bg-amber-500/90 px-3 py-2 text-center text-[11px] font-black text-white shadow-xl backdrop-blur-sm${
-              travelRaiseWarn.phase === "fade" ? " is-fading" : ""
-            }`}
-          >
-            ⚠️{" "}
-            {attachmentType === "breaker"
-              ? "브레이커가 땅에 닿아있어 주행이 불가능합니다."
-              : attachmentType === "grapple"
-                ? "집게가 땅에 닿아있어 주행이 불가능합니다."
-                : "버켓이 땅에 닿아있어 주행이 불가능합니다."}
-          </div>
-        ) : null}
-
-        {mode !== "intro" && mode !== "gameReady" && digFeedback.showGripGauge ? (
-          <div
-            className={`pointer-events-none absolute left-1/2 z-[55] -translate-x-1/2 ${
-              travelRaiseWarn ? "top-[5.75rem]" : "top-[3.25rem]"
-            }`}
-          >
-            <GrappleGripGauge
-              adhesion={digFeedback.gripAdhesion}
-              pressure={digFeedback.gripPressure}
-            />
-          </div>
-        ) : null}
-
         {mode === "ride" ? (
           <div className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 whitespace-nowrap rounded-xl border border-sky-200/35 bg-sky-950/75 px-3 py-1.5 text-[11px] font-black text-sky-100 shadow-lg backdrop-blur-sm">
             {hudT("rideExperience")}
@@ -8572,7 +8578,6 @@ export function ExcavatorGameWrapper({
                             </span>
                           ) : null}
                         </button>
-                        {nearWorkshopId === "flood" ? floodStatusHud : null}
                       </div>
                     ) : null}
                   </div>
@@ -8829,7 +8834,6 @@ export function ExcavatorGameWrapper({
                         </span>
                       ) : null}
                     </button>
-                    {nearWorkshopId === "flood" ? floodStatusHud : null}
                   </div>
                 ) : null}
                 </div>
@@ -8902,12 +8906,14 @@ export function ExcavatorGameWrapper({
 
         {mode !== "intro" && mode !== "ride" && (
           <div
-            className={`pointer-events-none absolute left-1/2 top-14 flex -translate-x-1/2 flex-col items-center gap-1 ${
-              mode === "tutorial" ? "z-[98]" : "z-50"
-            }`}
+            className={`yanmar-center-status-stack pointer-events-none absolute left-1/2 top-14 flex -translate-x-1/2 flex-col items-center gap-1.5 ${
+              showMissionQuest && !questsDisabled
+                ? "w-[min(9.25rem,calc(100%_-_12rem))] max-w-[calc(100%_-_12rem)]"
+                : "w-[min(11rem,calc(100%_-_8rem))] max-w-[calc(100%_-_8rem)]"
+            } ${mode === "tutorial" ? "z-[98]" : "z-[60]"}`}
           >
             {!(immersive && headerHudReady) ? (
-              <div className="flex min-w-[5.5rem] flex-col items-center rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-white shadow-lg backdrop-blur-sm">
+              <div className="flex w-full min-w-0 flex-col items-center rounded-xl border border-white/15 bg-black/45 px-2.5 py-1.5 text-white shadow-lg backdrop-blur-sm">
                 <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/70">
                   {mode === "game" ||
                   mode === "sportsRanked" ||
@@ -8915,7 +8921,7 @@ export function ExcavatorGameWrapper({
                     ? gameHudT("cumulativeScore")
                     : gameHudT("score")}
                 </span>
-                <span className="mt-0.5 text-sm font-black tabular-nums text-yellow-100">
+                <span className="mt-0.5 max-w-full truncate text-sm font-black tabular-nums text-yellow-100">
                   {(
                     mode === "game" ||
                     mode === "sportsRanked" ||
@@ -8926,9 +8932,32 @@ export function ExcavatorGameWrapper({
                 </span>
               </div>
             ) : null}
+            {mode !== "gameReady" && travelRaiseWarn ? (
+              <div
+                key={travelRaiseWarn.key}
+                className={`yanmar-travel-raise-warn yanmar-center-status-chip whitespace-nowrap rounded-xl border border-amber-300/45 bg-amber-500/90 px-3 py-2 text-center text-[11px] font-black text-white shadow-xl backdrop-blur-sm${
+                  travelRaiseWarn.phase === "fade" ? " is-fading" : ""
+                }`}
+              >
+                ⚠️{" "}
+                {attachmentType === "breaker"
+                  ? "브레이커가 땅에 닿아있어 주행이 불가능합니다."
+                  : attachmentType === "grapple"
+                    ? "집게가 땅에 닿아있어 주행이 불가능합니다."
+                    : "버켓이 땅에 닿아있어 주행이 불가능합니다."}
+              </div>
+            ) : null}
+            {mode !== "gameReady" && digFeedback.showGripGauge ? (
+              <div className="w-full min-w-0">
+                <GrappleGripGauge
+                  adhesion={digFeedback.gripAdhesion}
+                  pressure={digFeedback.gripPressure}
+                />
+              </div>
+            ) : null}
             {showBucketLoad ? (
-              <div className="min-w-[7.5rem] rounded-xl border border-orange-200/45 bg-black/65 px-2.5 py-1.5 text-center text-white shadow-lg backdrop-blur-sm">
-                <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-orange-100">
+              <div className="w-full min-w-0 rounded-xl border border-orange-200/45 bg-black/65 px-2 py-1.5 text-center text-white shadow-lg backdrop-blur-sm">
+                <div className="flex items-center justify-center gap-1 text-[10px] font-black text-orange-100">
                   <span>{hudT("status.currentLoad")}</span>
                   <span className="tabular-nums">
                     {loadOverlayUnits}/{equipmentStats.maxLoadUnits}
@@ -8942,48 +8971,49 @@ export function ExcavatorGameWrapper({
                 </div>
               </div>
             ) : null}
+            {floodStatusHud}
             {digFeedback.canDump && hud.bucketLoad > 0.02 ? (
-              <div className="rounded-xl border border-emerald-200/50 bg-emerald-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-emerald-200/50 bg-emerald-500/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.canDump")}
               </div>
             ) : hud.bucketLoad > 0.02 &&
               digFeedback.truckPresent &&
               digFeedback.dumpBodyTouching &&
               !digFeedback.dumpFacingBed ? (
-              <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-sky-200/50 bg-sky-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.faceTruckBed")}
               </div>
             ) : hud.bucketLoad > 0.02 &&
               digFeedback.truckPresent &&
               digFeedback.inDumpZone &&
               !digFeedback.dumpBodyTouching ? (
-              <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-sky-200/50 bg-sky-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.moveToTruck")}
               </div>
             ) : digFeedback.canLoad ? (
-              <div className="rounded-xl border border-orange-200/50 bg-orange-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-orange-200/50 bg-orange-500/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.canLoad", {
                   amount: Math.round(digFeedback.digZoneRemainingUnits),
                 })}
               </div>
             ) : digFeedback.breakerNeedsVertical ? (
-              <div className="rounded-xl border border-orange-200/50 bg-orange-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-orange-200/50 bg-orange-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.breakerVertical")}
               </div>
             ) : digFeedback.canStrike ? (
-              <div className="rounded-xl border border-amber-200/50 bg-amber-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-amber-200/50 bg-amber-500/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.canStrike")}
               </div>
             ) : digFeedback.canGrab ? (
-              <div className="rounded-xl border border-sky-200/50 bg-sky-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-sky-200/50 bg-sky-500/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.canGrab")}
               </div>
             ) : digFeedback.grappleNeedsAlignment ? (
-              <div className="whitespace-nowrap rounded-xl border border-orange-200/50 bg-orange-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip whitespace-nowrap rounded-xl border border-orange-200/50 bg-orange-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.alignGrapple")}
               </div>
             ) : digFeedback.canDropRock ? (
-              <div className="rounded-xl border border-violet-200/50 bg-violet-500/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-violet-200/50 bg-violet-500/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.openLeftPedal")}
               </div>
             ) : attachmentType === "grapple" &&
@@ -8994,7 +9024,7 @@ export function ExcavatorGameWrapper({
               !digFeedback.dumpFacingBed &&
               !digFeedback.showGripGauge &&
               !digFeedback.canGrab ? (
-              <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-sky-200/50 bg-sky-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.faceTruckBed")}
               </div>
             ) : attachmentType === "grapple" &&
@@ -9004,37 +9034,37 @@ export function ExcavatorGameWrapper({
               !digFeedback.dumpBodyTouching &&
               !digFeedback.showGripGauge &&
               !digFeedback.canGrab ? (
-              <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-sky-200/50 bg-sky-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.moveToTruck")}
               </div>
             ) : digFeedback.soilSpilling && hud.bucketLoad > 0.02 ? (
-              <div className="rounded-xl border border-amber-200/50 bg-amber-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-amber-200/50 bg-amber-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.soilSpilling")}
               </div>
             ) : digFeedback.raiseArmForDump &&
               digFeedback.truckPresent &&
               hud.bucketLoad > 0.02 ? (
-              <div className="rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip rounded-xl border border-sky-200/50 bg-sky-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.raiseBoomArm")}
               </div>
             ) : digFeedback.haulTruckPresent &&
               !digFeedback.haulTruckCanAccept &&
               digFeedback.haulTruckCooldownRemaining <= 0 ? (
-              <div className="whitespace-nowrap rounded-xl border border-amber-200/50 bg-amber-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip whitespace-nowrap rounded-xl border border-amber-200/50 bg-amber-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.haulTruckFull")}
               </div>
             ) : digFeedback.floodPhase === "readyToBurn" ? (
-              <div className="whitespace-nowrap rounded-xl border border-sky-200/50 bg-sky-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip whitespace-nowrap rounded-xl border border-sky-200/50 bg-sky-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.floodLeaveIncinerator")}
               </div>
             ) : digFeedback.floodPhase === "burning" ? (
-              <div className="whitespace-nowrap rounded-xl border border-orange-200/50 bg-orange-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip whitespace-nowrap rounded-xl border border-orange-200/50 bg-orange-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.floodBurning", {
                   percent: Math.round(digFeedback.floodBurnProgress * 100),
                 })}
               </div>
             ) : digFeedback.carryingTrash ? (
-              <div className="whitespace-nowrap rounded-xl border border-cyan-200/50 bg-cyan-600/90 px-3 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
+              <div className="yanmar-center-status-chip whitespace-nowrap rounded-xl border border-cyan-200/50 bg-cyan-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.carryingTrash")}
               </div>
             ) : null}
@@ -9085,7 +9115,9 @@ export function ExcavatorGameWrapper({
               );
               return (
                 <>
-                  {leftTarget && headerLikeGame
+                  {leftTarget && mode === "tutorial"
+                    ? createPortal(renderTutorialExitChip(), leftTarget)
+                    : leftTarget && headerLikeGame
                     ? createPortal(
                         <button
                           type="button"
@@ -9192,6 +9224,15 @@ export function ExcavatorGameWrapper({
             })()
           : null}
 
+        {mode === "tutorial" &&
+        !(
+          headerHudReady &&
+          typeof document !== "undefined" &&
+          document.getElementById(GAME_IMMERSIVE_HEADER_LEFT_ID)
+        )
+          ? renderTutorialExitChip("is-fallback")
+          : null}
+
         {mode !== "intro" && (mode !== "gameReady" || showMinimap) && (
           <div className="absolute right-1.5 top-1.5 z-[90] flex items-start gap-1 pointer-events-auto">
             <ActiveShopBuffIcons
@@ -9267,6 +9308,7 @@ export function ExcavatorGameWrapper({
               digFeedback.crashCooldownEtaSec > 0 ||
               digFeedback.hillCooldownEtaSec > 0 ||
               digFeedback.floodCooldownEtaSec > 0 ||
+              digFeedback.floodBurnEtaSec > 0 ||
               showMonumentMinimapProgress ? (
                 <ul
                   className="flex w-full flex-col gap-0.5 border-t border-white/10 px-1 py-0.5"
@@ -9333,6 +9375,16 @@ export function ExcavatorGameWrapper({
                       <span className="shrink-0 tabular-nums text-sky-200">
                         {formatDumpTruckReturnTime(
                           digFeedback.hillCooldownEtaSec,
+                        )}
+                      </span>
+                    </li>
+                  ) : null}
+                  {digFeedback.floodBurnEtaSec > 0 ? (
+                    <li className="flex min-w-0 items-center justify-between gap-0.5 text-[7px] font-bold leading-none text-white/85">
+                      <span className="truncate">{gameHudT("floodBurn")}</span>
+                      <span className="shrink-0 tabular-nums text-orange-200">
+                        {formatDumpTruckReturnTime(
+                          digFeedback.floodBurnEtaSec,
                         )}
                       </span>
                     </li>

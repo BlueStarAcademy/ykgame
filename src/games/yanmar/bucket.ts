@@ -345,6 +345,8 @@ export interface DigFeedback {
   floodIncineratorUnits: number;
   floodIncineratorCapacity: number;
   floodBurnProgress: number;
+  /** Remaining burn seconds while phase === burning (0 when not burning). */
+  floodBurnEtaSec: number;
   floodCooldownEtaSec: number;
   carryingTrash: boolean;
 }
@@ -409,6 +411,7 @@ export function createDigFeedback(): DigFeedback {
     floodIncineratorUnits: 0,
     floodIncineratorCapacity: 0,
     floodBurnProgress: 0,
+    floodBurnEtaSec: 0,
     floodCooldownEtaSec: 0,
     carryingTrash: false,
   };
@@ -483,6 +486,7 @@ export function isDigFeedbackHudEqual(prev: DigFeedback, next: DigFeedback) {
     Math.abs(prev.floodIncineratorUnits - next.floodIncineratorUnits) < 1 &&
     prev.floodIncineratorCapacity === next.floodIncineratorCapacity &&
     Math.abs(prev.floodBurnProgress - next.floodBurnProgress) < 0.05 &&
+    Math.abs(prev.floodBurnEtaSec - next.floodBurnEtaSec) < 0.15 &&
     Math.abs(prev.floodCooldownEtaSec - next.floodCooldownEtaSec) < 0.15 &&
     prev.carryingTrash === next.carryingTrash
   );

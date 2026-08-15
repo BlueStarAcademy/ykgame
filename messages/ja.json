@@ -430,7 +430,8 @@
       "camera": "カメラ{mode}",
       "cameraAria": "カメラ視点 {mode}",
       "respawnWait": "再出現待ち",
-      "monument": "モニュメント"
+      "monument": "モニュメント",
+      "floodBurn": "焼却"
     },
     "toasts": {
       "inventoryFullTitle": "インベントリの空きがありません。",
@@ -1142,6 +1143,8 @@
       "completionReward": "完了報酬",
       "claim": "受取",
       "exit": "終了",
+      "exitToGame": "チュートリアル終了",
+      "exitToGameAria": "チュートリアルを終了してゲームに戻る",
       "skipToGame": "SKIP · ゲームへ",
       "goalDistance": "目標まで {meters}m",
       "steps": {

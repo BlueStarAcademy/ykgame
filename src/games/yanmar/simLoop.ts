@@ -63,7 +63,6 @@ import {
   failFloodTrashCarry,
   tryStartFloodBurn,
   advanceFloodBurn,
-  isInsideFloodCollectionPad,
   isInsideFloodIncinerator,
   isInFloodZone,
   type TerrainData,
@@ -2352,6 +2351,10 @@ export function tickExcavatorSim(params: SimTickParams) {
     fb.floodIncineratorUnits = fz?.incineratorUnits ?? 0;
     fb.floodIncineratorCapacity = fz?.incineratorCapacity ?? 0;
     fb.floodBurnProgress = fz?.burnProgress ?? 0;
+    fb.floodBurnEtaSec =
+      fz?.phase === "burning"
+        ? Math.max(0, (1 - fz.burnProgress) * Math.max(1, fz.burnDurationSec))
+        : 0;
     fb.carryingTrash = !!sim.carriedTrashId;
   }
   fb.canDump = inTruckDumpTarget && sim.bucketLoad > 0.02 && truckCanAccept;
@@ -2619,9 +2622,8 @@ export function tickExcavatorSim(params: SimTickParams) {
   const bladeInFloodField =
     !!floodZone?.active &&
     floodZone.phase === "active" &&
-    isInFloodZone(terrain, bladeContact.x, bladeContact.z) &&
-    !isInsideFloodCollectionPad(floodZone, bladeContact.x, bladeContact.z);
-  // Straight push toward collection pad: travel heading within ~35° of pad direction.
+    isInFloodZone(terrain, bladeContact.x, bladeContact.z);
+  // Keep the blade engaged as the windrow crosses the collection-pad rim.
   let floodStraightPush = false;
   if (bladeInFloodField && floodZone) {
     const toPadX = floodZone.collectionX - sim.posX;
@@ -2631,7 +2633,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     const travelDirZ = Math.cos(sim.heading);
     const align =
       (travelDirX * toPadX + travelDirZ * toPadZ) / toPadLen;
-    floodStraightPush = align > 0.82;
+    floodStraightPush = align > 0.65;
   }
   const bladeScraping =
     effectiveBlade > 0.55 &&
@@ -2699,7 +2701,6 @@ export function tickExcavatorSim(params: SimTickParams) {
       const { moved, collectionFilled } = pushFloodDebrisToCollection(
         terrain,
         pushUnits,
-        { x: bladeContact.x, z: bladeContact.z },
       );
       if (moved > 0) {
         onFloodDebrisPushed?.(moved);
