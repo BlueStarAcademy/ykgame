@@ -4286,6 +4286,84 @@ export function ExcavatorGameWrapper({
     [loadEquipment, publishEquipmentStats],
   );
 
+  const runGearSynthesizeMany = useCallback(
+    async (itemIds: string[]) => {
+      if (itemIds.length < 3 || itemIds.length % 3 !== 0) return null;
+      setGearBusy(true);
+      try {
+        const res = await fetch("/api/gear/yanmar/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "synthesizeMany", itemIds }),
+        });
+        const data = await res.json();
+        if (!res.ok || !Array.isArray(data.items)) return null;
+        if (data.stats) {
+          publishEquipmentStats(data.stats);
+        }
+        if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
+          setCurrency(data.currency);
+          setPreviewStars(data.currency);
+        }
+        if (typeof data.enhanceCores === "number") {
+          setEnhanceCores(data.enhanceCores);
+        }
+        await loadEquipment();
+        return (data.items as unknown[]).flatMap((rawResult) => {
+          const result = rawResult as {
+            item?: unknown;
+            resultGrade?: unknown;
+            inputGrade?: unknown;
+            upgraded?: unknown;
+          };
+          const created = result.item as {
+            id?: string;
+            slot?: GearSlot;
+            grade?: ItemGrade;
+            enhanceLevel?: number;
+            failBonus?: number;
+            mainOption?: GearPanelItem["mainOption"];
+            subOptions?: GearPanelItem["subOptions"];
+            masterOption?: GearPanelItem["masterOption"];
+            nameSnapshot?: string;
+            durability?: number;
+            durabilityMax?: number;
+          } | null;
+          if (!created?.id || !created.slot || !created.grade || !created.nameSnapshot) {
+            return [];
+          }
+          const slot = created.slot;
+          const grade = created.grade;
+          return [{
+            item: {
+              id: created.id,
+              slot,
+              slotLabel: GEAR_SLOT_LABEL[slot],
+              grade,
+              gradeLabel: ITEM_GRADE_LABEL[grade],
+              enhanceLevel: created.enhanceLevel ?? 0,
+              failBonus: created.failBonus ?? 0,
+              mainOption: created.mainOption ?? { key: "strength", value: 0 },
+              subOptions: Array.isArray(created.subOptions) ? created.subOptions : [],
+              masterOption: created.masterOption ?? null,
+              nameSnapshot: created.nameSnapshot,
+              durability: created.durability ?? 0,
+              durabilityMax: created.durabilityMax ?? 0,
+              equippedSlot: null,
+            } satisfies GearPanelItem,
+            resultGrade: (result.resultGrade as ItemGrade) ?? grade,
+            inputGrade: (result.inputGrade as ItemGrade) ?? grade,
+            upgraded: Boolean(result.upgraded),
+          }];
+        });
+      } finally {
+        setGearBusy(false);
+      }
+    },
+    [loadEquipment, publishEquipmentStats],
+  );
+
   const handleExpandInventory = useCallback(async () => {
     setGearBusy(true);
     try {
@@ -7404,6 +7482,16 @@ export function ExcavatorGameWrapper({
           data.coresDropped,
           data.enhanceCores,
         );
+        const burnCapacityCoreBonus =
+          kind === "flood-burn" &&
+          typeof data.burnCapacityCoreBonus === "number" &&
+          data.burnCapacityCoreBonus > 0
+            ? Math.floor(data.burnCapacityCoreBonus)
+            : 0;
+        const floodBurnRewardText =
+          burnCapacityCoreBonus > 0
+            ? gameHudT("floodBurnCoreBonus", { amount: burnCapacityCoreBonus })
+            : "";
 
         if (kind === "crash") {
           if (stars > 0) {
@@ -7433,7 +7521,8 @@ export function ExcavatorGameWrapper({
           xpGained > 0 ||
           stars > 0 ||
           coresDropped > 0 ||
-          couponEvent
+          couponEvent ||
+          floodBurnRewardText
         ) {
           if (stars > 0) {
             rewardStarsRef.current += stars;
@@ -7441,7 +7530,9 @@ export function ExcavatorGameWrapper({
           accumulateDumpScore(
             score,
             critical || Boolean(couponEvent),
-            couponEvent ? "쿠폰 획득!" : "",
+            couponEvent
+              ? "쿠폰 획득!"
+              : floodBurnRewardText,
             xpGained,
             stars,
             coresDropped,
@@ -7453,6 +7544,7 @@ export function ExcavatorGameWrapper({
     },
     [
       accumulateDumpScore,
+      gameHudT,
       notifyGearDrop,
       notifyCoresDrop,
       showAttachmentWarning,
@@ -7569,31 +7661,33 @@ export function ExcavatorGameWrapper({
     setSportsMeetRun(next);
   }, []);
 
-  const handleFloodBurnStarted = useCallback(() => {
-    const isSports =
-      modeRef.current === "sportsRanked" ||
-      modeRef.current === "sportsPractice";
-    if (!isSports || !sportsMeetRunRef.current) return;
-    const before = sportsMeetRunRef.current;
-    let next = noteSportsFloodBurnStarted(before, Date.now());
-    next = finalizeSportsMeetStageAdvance(before, next);
-    sportsMeetRunRef.current = next;
-    setSportsMeetRun(next);
-  }, [finalizeSportsMeetStageAdvance]);
-
-  const handleFloodBurnComplete = useCallback(
+  const handleFloodBurnStarted = useCallback(
     (eventId: string, burnedUnits: number) => {
-      if (
+      const isSports =
         modeRef.current === "sportsRanked" ||
-        modeRef.current === "sportsPractice"
-      ) {
+        modeRef.current === "sportsPractice";
+      if (isSports) {
+        if (!sportsMeetRunRef.current) return;
+        const before = sportsMeetRunRef.current;
+        let next = noteSportsFloodBurnStarted(before, Date.now());
+        next = finalizeSportsMeetStageAdvance(before, next);
+        sportsMeetRunRef.current = next;
+        setSportsMeetRun(next);
         return;
       }
       pushQuestProgress("trashBurn", burnedUnits);
       pushQuestProgress("trashBurnComplete", 1);
       void claimSpecialReward("flood-burn", eventId);
     },
-    [claimSpecialReward, pushQuestProgress],
+    [claimSpecialReward, finalizeSportsMeetStageAdvance, pushQuestProgress],
+  );
+
+  const handleFloodBurnComplete = useCallback(
+    (_eventId: string, _burnedUnits: number) => {
+      // Burn rewards are claimed when the incinerator starts. Completion only
+      // advances terrain respawn / FX state inside the sim loop.
+    },
+    [],
   );
 
   const claimTruckFullReward = useCallback(
@@ -7829,10 +7923,11 @@ export function ExcavatorGameWrapper({
       ? countClaimableWorkshopQuests(workshopQuestState, nearWorkshopId)
       : 0;
   const floodStatusHud =
+    digFeedback.inFloodZone &&
     digFeedback.floodActive &&
     digFeedback.floodPhase === "active" &&
     digFeedback.floodIncineratorCapacity > 0 ? (
-      <div className="yanmar-flood-status-hud w-full rounded-xl border border-sky-200/40 bg-black/65 px-2 py-1.5 text-center text-white shadow-lg backdrop-blur-sm">
+      <div className="yanmar-flood-status-hud w-max max-w-full min-w-[7.5rem] rounded-xl border border-sky-200/40 bg-black/65 px-2.5 py-1.5 text-center text-white shadow-lg backdrop-blur-sm">
         <div className="truncate text-[10px] font-black text-sky-100">
           {hudT("status.incinerator", {
             current: digFeedback.floodIncineratorUnits,
@@ -8024,6 +8119,7 @@ export function ExcavatorGameWrapper({
           }}
           onSellMany={async (ids) => runGearSellMany(ids)}
           onSynthesize={(itemIds) => runGearSynthesize(itemIds)}
+          onSynthesizeMany={(itemIds) => runGearSynthesizeMany(itemIds)}
           onExpandInventory={() => void handleExpandInventory()}
         />
         <PlayerProfileModal
@@ -9053,11 +9149,13 @@ export function ExcavatorGameWrapper({
               <div className="yanmar-center-status-chip whitespace-nowrap rounded-xl border border-amber-200/50 bg-amber-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.haulTruckFull")}
               </div>
-            ) : digFeedback.floodPhase === "readyToBurn" ? (
+            ) : digFeedback.inFloodZone &&
+              digFeedback.floodPhase === "readyToBurn" ? (
               <div className="yanmar-center-status-chip whitespace-nowrap rounded-xl border border-sky-200/50 bg-sky-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.floodLeaveIncinerator")}
               </div>
-            ) : digFeedback.floodPhase === "burning" ? (
+            ) : digFeedback.inFloodZone &&
+              digFeedback.floodPhase === "burning" ? (
               <div className="yanmar-center-status-chip whitespace-nowrap rounded-xl border border-orange-200/50 bg-orange-600/90 px-2.5 py-1 text-[10px] font-black text-white shadow-lg backdrop-blur-sm">
                 {hudT("status.floodBurning", {
                   percent: Math.round(digFeedback.floodBurnProgress * 100),

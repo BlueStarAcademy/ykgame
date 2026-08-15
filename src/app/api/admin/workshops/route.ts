@@ -70,7 +70,7 @@ const WORKSHOP_DEFINITIONS = [
     mapArea: "북동 수해복구 구역",
     accent: "sky",
     task: "블레이드로 쓰레기 집결 후 집게로 소각장 투입",
-    rewardRule: "집결·집게·소각 완료 시 점수·XP·스타",
+    rewardRule: "집결·집게·소각 시작 시 점수·XP·스타·강화코어",
     operationRule:
       "소각장 가득 채운 뒤 안전 반경 이탈 → 소각 연출 → 쿨다운 후 재생성",
   },

@@ -431,7 +431,8 @@
       "cameraAria": "Camera view {mode}",
       "respawnWait": "Respawn wait",
       "monument": "Monument",
-      "floodBurn": "Burn"
+      "floodBurn": "Burn",
+      "floodBurnCoreBonus": "Burn bonus cores +{amount}"
     },
     "toasts": {
       "inventoryFullTitle": "Not enough inventory space.",
@@ -490,8 +491,8 @@
         "perk1Desc": "Push trash in a straight line into the collection pad",
         "perk2Title": "Grapple haul",
         "perk2Desc": "When 500 is collected, grab it and drop it in the incinerator",
-        "perk3Title": "Burn sequence",
-        "perk3Desc": "Leave the incinerator area after it is full to start the burn",
+        "perk3Title": "Burn rewards",
+        "perk3Desc": "Leave the full incinerator to start the burn and claim enhance-core rewards",
         "cta": "Go to flood recovery"
       },
       "sportsMeet": {
@@ -606,7 +607,7 @@
       "dismantleDoneEyebrow": "Dismantle complete",
       "dismantleDoneTitle": "Gear dismantled",
       "dismantleJackpot": "JACKPOT! +{bonus} bonus enhancement cores",
-      "bulkDismantleJackpot": "JACKPOT ×{count}! +{bonus} bonus enhancement cores",
+      "bulkDismantleJackpot": "JACKPOT! Double total selected enhancement cores · +{bonus} bonus",
       "gained": "Gained",
       "enhanceCore": "Enhancement core",
       "closeSellConfirm": "Close sell confirm",
@@ -945,7 +946,7 @@
           },
           "incinerator_capacity": {
             "label": "Incinerator expansion",
-            "description": "Incinerator capacity +500"
+            "description": "Incinerator capacity +500 · +2 enhance cores on burn start"
           }
         },
         "quests": {

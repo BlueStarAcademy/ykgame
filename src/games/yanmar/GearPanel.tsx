@@ -219,6 +219,14 @@ interface GearPanelProps {
     | SynthesizeActionResult
     | null
     | void;
+  /** Batch synthesis in one request and one combined result reveal. */
+  onSynthesizeMany?: (
+    itemIds: string[],
+  ) =>
+    | Promise<SynthesizeActionResult[] | null | void>
+    | SynthesizeActionResult[]
+    | null
+    | void;
   onExpandInventory?: () => void | Promise<void>;
 }
 
@@ -445,6 +453,7 @@ export function GearPanel({
   onSell,
   onSellMany,
   onSynthesize,
+  onSynthesizeMany,
   onExpandInventory,
 }: GearPanelProps) {
   const t = useTranslations("yanmar.gear");
@@ -1028,73 +1037,38 @@ export function GearPanel({
       return;
     }
 
-    const reducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const gatherMs = reducedMotion ? 120 : 720;
-    const revealMs = reducedMotion ? 60 : 380;
-    const wait = (ms: number) =>
-      new Promise<void>((resolve) => {
-        window.setTimeout(resolve, ms);
-      });
-
-    const pullResults: GachaResultItem[] = [];
-    const totalBatches = Math.floor(targets.length / 3);
-    const itemById = new Map(bulkItems.map((item) => [item.id, item]));
-
-    // 선택 UI는 닫고 합성 연출만 보여 준다.
+    // 선택한 재료를 한 요청으로 모두 소모하고, 결과도 한 번에 공개한다.
     exitBulkMode();
-
-    for (let i = 0; i + 2 < targets.length; i += 3) {
-      const trio: [string, string, string] = [
-        targets[i]!.id,
-        targets[i + 1]!.id,
-        targets[i + 2]!.id,
-      ];
-      const materials = trio
-        .map((id) => itemById.get(id))
-        .filter((item): item is GearPanelItem => !!item);
-      if (materials.length !== 3) continue;
-
-      const batchIndex = i / 3 + 1;
-      setBulkSynthRun({
-        materials,
-        batchIndex,
-        total: totalBatches,
-        reveal: false,
-        lastResult: null,
-      });
-
-      const apiPromise = (async (): Promise<SynthesizeActionResult | null> => {
-        try {
-          const raw = await onSynthesize(trio);
-          return (raw as SynthesizeActionResult | null | undefined) ?? null;
-        } catch {
-          return null;
-        }
-      })();
-
-      const [, result] = await Promise.all([wait(gatherMs), apiPromise]);
-      if (!result?.item) continue;
-
-      setBulkSynthRun({
-        materials,
-        batchIndex,
-        total: totalBatches,
-        reveal: true,
-        lastResult: result,
-      });
-      await wait(revealMs);
-
-      pullResults.push({
-        nameSnapshot: result.item.nameSnapshot,
-        grade: result.item.grade,
-        slot: result.item.slot,
-        upgraded: result.upgraded,
-      });
+    let results: SynthesizeActionResult[] = [];
+    try {
+      if (onSynthesizeMany) {
+        const raw = await onSynthesizeMany(targets.map((target) => target.id));
+        results = Array.isArray(raw) ? raw.filter((result) => !!result?.item) : [];
+      } else {
+        const batches = Array.from(
+          { length: Math.floor(targets.length / 3) },
+          (_, index) =>
+            [
+              targets[index * 3]!.id,
+              targets[index * 3 + 1]!.id,
+              targets[index * 3 + 2]!.id,
+            ] as [string, string, string],
+        );
+        const raw = await Promise.all(batches.map((itemIds) => onSynthesize(itemIds)));
+        results = raw.filter(
+          (result): result is SynthesizeActionResult => !!result?.item,
+        );
+      }
+    } catch {
+      results = [];
     }
 
-    setBulkSynthRun(null);
+    const pullResults: GachaResultItem[] = results.map((result) => ({
+      nameSnapshot: result.item.nameSnapshot,
+      grade: result.item.grade,
+      slot: result.item.slot,
+      upgraded: result.upgraded,
+    }));
     if (pullResults.length > 0) {
       if (pullResults.length === 1 && pullResults[0]?.grade === "MASTER") {
         yanmarAudio.playMasterItemAcquire();
@@ -2679,7 +2653,6 @@ export function GearPanel({
             (bulkDone.jackpotCount ?? 0) > 0 ? (
               <p className="yanmar-gear-confirm-eyebrow text-amber-300">
                 {t("bulkDismantleJackpot", {
-                  count: bulkDone.jackpotCount ?? 0,
                   bonus: bulkDone.bonusCores ?? 0,
                 })}
               </p>
@@ -2775,6 +2748,7 @@ export function GearPanel({
         results={synthPullResults}
         titleKey="synthesisTitle"
         perRevealSfx
+        revealAll
       />
 
       {synthOpen ? (

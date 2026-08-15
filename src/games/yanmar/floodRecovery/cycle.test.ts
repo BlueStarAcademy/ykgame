@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   advanceFloodBurn,
+  advanceFloodDebrisBladePush,
   beginFloodTrashCarry,
   createFloodRecoveryZone,
   createTerrain,
@@ -19,6 +20,7 @@ import {
   type TerrainData,
 } from "../terrain";
 import {
+  FLOOD_COLLECTION_ACCEPT_MARGIN,
   FLOOD_COLLECTION_GRAB_RADIUS,
   FLOOD_COLLECTION_THRESHOLD,
   FLOOD_INCINERATOR_BASE_CAPACITY,
@@ -31,6 +33,26 @@ function withFloodTerrain(): TerrainData {
   const terrain = createTerrain(-48, -48, false, FLOOD_RECOVERY_UNLOCK_LEVEL);
   assert.ok(terrain.floodZone);
   return terrain;
+}
+
+function placeSingleDebris(
+  terrain: TerrainData,
+  x: number,
+  z: number,
+  remaining = 500,
+) {
+  const zone = terrain.floodZone!;
+  zone.debris = [
+    {
+      id: `${zone.id}-probe`,
+      x,
+      z,
+      remaining,
+      active: true,
+    },
+  ];
+  zone.sourceRemaining = remaining;
+  return zone.debris[0]!;
 }
 
 describe("floodRecovery/cycle", () => {
@@ -61,6 +83,87 @@ describe("floodRecovery/cycle", () => {
     assert.equal(second.collectionFilled, false);
   });
 
+  it("accepts debris just outside the painted pad rim within the transfer margin", () => {
+    const terrain = withFloodTerrain();
+    const zone = terrain.floodZone!;
+    const pile = placeSingleDebris(
+      terrain,
+      zone.collectionX + zone.collectionRadius + FLOOD_COLLECTION_ACCEPT_MARGIN * 0.7,
+      zone.collectionZ,
+      400,
+    );
+    const result = pushFloodDebrisToCollection(terrain, 400);
+    assert.equal(result.moved, 400);
+    assert.equal(pile.active, false);
+  });
+
+  it("drags debris in the blade sweep and ignores piles outside it", () => {
+    const terrain = withFloodTerrain();
+    const zone = terrain.floodZone!;
+    const heading = 0;
+    const bladeX = zone.collectionX;
+    const bladeZ = zone.collectionZ - 8;
+    const hit = placeSingleDebris(terrain, bladeX, bladeZ + 1.2, 300);
+    zone.debris.push({
+      id: `${zone.id}-miss`,
+      x: bladeX + 4.5,
+      z: bladeZ + 1.2,
+      remaining: 300,
+      active: true,
+    });
+    zone.sourceRemaining = 600;
+    const miss = zone.debris[1]!;
+    const beforeHitZ = hit.z;
+    const beforeMiss = { x: miss.x, z: miss.z };
+
+    advanceFloodDebrisBladePush(terrain, bladeX, bladeZ, heading, 0.8);
+
+    assert.ok(hit.z > beforeHitZ);
+    assert.ok(hit.yaw != null);
+    assert.equal(miss.x, beforeMiss.x);
+    assert.equal(miss.z, beforeMiss.z);
+  });
+
+  it("cleaves a large pile and still pushes the original fragment next frame", () => {
+    const terrain = withFloodTerrain();
+    const zone = terrain.floodZone!;
+    const heading = Math.PI / 2;
+    const bladeX = zone.collectionX - 6;
+    const bladeZ = zone.collectionZ;
+    placeSingleDebris(terrain, bladeX + 1.0, bladeZ, 500);
+    const beforeCount = zone.debris.length;
+
+    advanceFloodDebrisBladePush(terrain, bladeX, bladeZ, heading, 0.6);
+    assert.ok(zone.debris.length > beforeCount);
+    assert.ok(zone.debris.every((d) => d.cleaved || !d.active || d.remaining < 100));
+
+    const movedIds = new Set(
+      zone.debris.filter((d) => d.active && d.remaining > 0).map((d) => d.id),
+    );
+    advanceFloodDebrisBladePush(terrain, bladeX + 0.65, bladeZ, heading, 0.6);
+    const after = zone.debris.filter((d) => d.active && d.remaining > 0);
+    assert.ok(after.some((d) => movedIds.has(d.id) && d.x > bladeX + 1.0));
+  });
+
+  it("can blade-push a windrow across the pad rim into a scored collection", () => {
+    const terrain = withFloodTerrain();
+    const zone = terrain.floodZone!;
+    const heading = 0;
+    const startZ =
+      zone.collectionZ - (zone.collectionRadius + FLOOD_COLLECTION_ACCEPT_MARGIN + 2.2);
+    placeSingleDebris(terrain, zone.collectionX, startZ, 500);
+
+    let bladeZ = startZ - 0.4;
+    for (let step = 0; step < 18; step += 1) {
+      bladeZ += 0.7;
+      advanceFloodDebrisBladePush(terrain, zone.collectionX, bladeZ, heading, 0.7);
+    }
+
+    const result = pushFloodDebrisToCollection(terrain, FLOOD_COLLECTION_THRESHOLD);
+    assert.ok(result.moved > 0, "expected pad-delivered debris after a blade stroke");
+    assert.ok(zone.collectedUnits > 0);
+  });
+
   it("requires leaving incinerator before burn starts", () => {
     const terrain = withFloodTerrain();
     const zone = terrain.floodZone!;
@@ -82,6 +185,51 @@ describe("floodRecovery/cycle", () => {
       true,
     );
     assert.equal(zone.phase, "burning");
+  });
+
+  it("awards the burn cycle once at start and keeps the latch through completion", () => {
+    const terrain = withFloodTerrain();
+    const zone = terrain.floodZone!;
+    zone.incineratorUnits = zone.incineratorCapacity;
+    zone.phase = "readyToBurn";
+    zone.burnDurationSec = 1;
+
+    const rewardStarts: Array<{ eventId: string; burnedUnits: number }> = [];
+    assert.equal(
+      tryStartFloodBurn(
+        terrain,
+        zone.incineratorX + zone.incineratorRadius + 3,
+        zone.incineratorZ,
+      ),
+      true,
+    );
+    // Mirrors simLoop: reward is latched when burn begins.
+    if (!zone.rewardedBurn) {
+      zone.rewardedBurn = true;
+      rewardStarts.push({
+        eventId: `${zone.id}-burn`,
+        burnedUnits: zone.incineratorCapacity,
+      });
+    }
+    assert.equal(rewardStarts.length, 1);
+    assert.equal(zone.rewardedBurn, true);
+
+    // A second start cannot fire while already burning.
+    assert.equal(
+      tryStartFloodBurn(
+        terrain,
+        zone.incineratorX + zone.incineratorRadius + 3,
+        zone.incineratorZ,
+      ),
+      false,
+    );
+    assert.equal(rewardStarts.length, 1);
+
+    assert.equal(advanceFloodBurn(terrain, 1.1), true);
+    assert.equal(zone.phase, "completed");
+    // Completion must not reopen the cycle reward latch.
+    assert.equal(zone.rewardedBurn, true);
+    assert.equal(rewardStarts.length, 1);
   });
 
   it("completes burn and schedules respawn", () => {

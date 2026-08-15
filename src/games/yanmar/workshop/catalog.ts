@@ -141,7 +141,7 @@ const FLOOD_UPGRADES = [
   {
     key: "incinerator_capacity" as const,
     label: "소각장 확장",
-    description: "소각장 총량 +500",
+    description: "소각장 총량 +500 · 소각 시작 시 강화코어 +2",
     maxLevel: 5,
   },
   {

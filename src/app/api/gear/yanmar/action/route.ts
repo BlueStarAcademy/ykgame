@@ -81,6 +81,7 @@ const ACTIONS = [
   "dismantle",
   "expandInventory",
   "synthesize",
+  "synthesizeMany",
   "sell",
 ] as const;
 
@@ -114,7 +115,8 @@ export async function POST(req: Request) {
       if (
         action === "enhance" ||
         action === "dismantle" ||
-        action === "synthesize"
+        action === "synthesize" ||
+        action === "synthesizeMany"
       ) {
         const craftUser = await tx.user.findUnique({
           where: { id: session.user.id },
@@ -161,10 +163,17 @@ export async function POST(req: Request) {
         };
       }
 
-      if (action === "synthesize") {
+      if (action === "synthesize" || action === "synthesizeMany") {
         const rawIds = Array.isArray(body.itemIds) ? body.itemIds : [];
         const itemIds = [...new Set(rawIds.filter((id) => typeof id === "string" && id))];
-        if (itemIds.length !== 3) throw new Error("NEED_THREE");
+        const isBatch = action === "synthesizeMany";
+        if (
+          (isBatch && (itemIds.length < 3 || itemIds.length % 3 !== 0)) ||
+          (!isBatch && itemIds.length !== 3)
+        ) {
+          throw new Error("NEED_THREE");
+        }
+        if (itemIds.length > 180) throw new Error("TOO_MANY");
 
         const items = await tx.gearItem.findMany({
           where: {
@@ -189,46 +198,55 @@ export async function POST(req: Request) {
           },
         });
 
-        const resultGrade = rollSynthesizeResultGrade(grade);
-        const slot = pickSlot();
         const loadedBefore = await loadUserFinalStats(tx, session.user.id);
         const durabilityMax = loadedBefore.stats.durabilityMaxPerPiece;
-        const data = createGearItem(slot, resultGrade, durabilityMax);
-        const created = await tx.gearItem.create({
-          data: {
-            userId: session.user.id,
-            gameId: "yanmar",
-            slot: data.slot,
-            grade: data.grade,
-            enhanceLevel: 0,
-            failBonus: 0,
-            mainOption: asJson(data.mainOption),
-            subOptions: asJson(data.subOptions),
-            masterOption: data.masterOption ? asJson(data.masterOption) : undefined,
-            nameSnapshot: data.nameSnapshot,
-            durability: data.durability,
-            durabilityMax: data.durabilityMax,
-            equippedSlot: null,
-          },
-        });
+        const createdResults = [];
+        for (let index = 0; index < itemIds.length; index += 3) {
+          const resultGrade = rollSynthesizeResultGrade(grade);
+          const data = createGearItem(pickSlot(), resultGrade, durabilityMax);
+          const created = await tx.gearItem.create({
+            data: {
+              userId: session.user.id,
+              gameId: "yanmar",
+              slot: data.slot,
+              grade: data.grade,
+              enhanceLevel: 0,
+              failBonus: 0,
+              mainOption: asJson(data.mainOption),
+              subOptions: asJson(data.subOptions),
+              masterOption: data.masterOption ? asJson(data.masterOption) : undefined,
+              nameSnapshot: data.nameSnapshot,
+              durability: data.durability,
+              durabilityMax: data.durabilityMax,
+              equippedSlot: null,
+            },
+          });
+          createdResults.push({
+            item: {
+              ...created,
+              gradeLabel: ITEM_GRADE_LABEL[created.grade as ItemGrade],
+            },
+            resultGrade,
+            inputGrade: grade,
+            upgraded: resultGrade !== grade,
+          });
+        }
         const user = await tx.user.findUnique({
           where: { id: session.user.id },
           select: { currency: true, enhanceCores: true },
         });
         const loaded = await loadUserFinalStats(tx, session.user.id);
-        return {
+        const response = {
           ok: true,
-          item: {
-            ...created,
-            gradeLabel: ITEM_GRADE_LABEL[created.grade as ItemGrade],
-          },
           consumedIds: itemIds,
-          resultGrade,
-          inputGrade: grade,
-          upgraded: resultGrade !== grade,
           currency: user?.currency ?? 0,
           enhanceCores: user?.enhanceCores ?? 0,
           stats: loaded.stats,
+        };
+        if (isBatch) return { ...response, items: createdResults };
+        return {
+          ...response,
+          ...createdResults[0]!,
         };
       }
 
@@ -257,22 +275,25 @@ export async function POST(req: Request) {
         if (items.some((item) => item.equippedSlot)) throw new Error("EQUIPPED");
 
         const dismantleStats = (await loadUserFinalStats(tx, session.user.id)).stats;
-        let baseCores = 0;
-        let cores = 0;
-        let jackpotCount = 0;
-        for (const item of items) {
-          const reward = rollDismantleCoreReward(
+        const baseCores = items.reduce(
+          (total, item) =>
+            total +
             getDismantleEnhanceCores(
               item.grade as ItemGrade,
               item.enhanceLevel,
             ),
-            dismantleStats.dismantleJackpotChanceBonusPct,
-            dismantleStats.dismantleJackpotCoreBonusPct,
-          );
-          baseCores += reward.baseCores;
-          cores += reward.cores;
-          if (reward.jackpot) jackpotCount += 1;
-        }
+          0,
+        );
+        // Bulk dismantle rolls once for the entire selection. On a jackpot,
+        // double the aggregate core reward rather than independently rolling
+        // and doubling only a subset of individual items.
+        const reward = rollDismantleCoreReward(
+          baseCores,
+          dismantleStats.dismantleJackpotChanceBonusPct,
+          dismantleStats.dismantleJackpotCoreBonusPct,
+        );
+        const cores = reward.cores;
+        const jackpotCount = reward.jackpot ? 1 : 0;
 
         await tx.gearItem.deleteMany({
           where: {

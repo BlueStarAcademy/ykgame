@@ -50,11 +50,11 @@ test("chat redis keys stay namespaced", () => {
   assert.equal(chatPubSubChannel("ykgame"), "ykgame:v1:chat:pubsub");
 });
 
-test("chat retention cutoff is seven days before now", () => {
+test("chat retention cutoff is three days before now", () => {
   const now = Date.UTC(2026, 7, 15, 6, 0, 0);
   const cutoff = chatRetentionCutoff(now);
   assert.equal(cutoff.getTime(), now - CHAT_RETENTION_MS);
-  assert.equal(CHAT_RETENTION_MS, 7 * 24 * 60 * 60 * 1000);
+  assert.equal(CHAT_RETENTION_MS, 3 * 24 * 60 * 60 * 1000);
 });
 
 test("master enhance announce condition helpers", () => {

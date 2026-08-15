@@ -431,7 +431,8 @@
       "cameraAria": "カメラ視点 {mode}",
       "respawnWait": "再出現待ち",
       "monument": "モニュメント",
-      "floodBurn": "焼却"
+      "floodBurn": "焼却",
+      "floodBurnCoreBonus": "焼却ボーナス強化コア +{amount}"
     },
     "toasts": {
       "inventoryFullTitle": "インベントリの空きがありません。",
@@ -490,8 +491,8 @@
         "perk1Desc": "ゴミを直線で押し、集積場に集めます",
         "perk2Title": "グラップル運搬",
         "perk2Desc": "500集まるとグラップルで掴み焼却炉へ入れます",
-        "perk3Title": "焼却演出",
-        "perk3Desc": "満杯後にエリアを離れると焼却が始まります",
+        "perk3Title": "焼却報酬",
+        "perk3Desc": "満杯後にエリアを離れると焼却が始まり、強化コア報酬を受け取ります",
         "cta": "水害復旧へ移動"
       },
       "sportsMeet": {
@@ -606,7 +607,7 @@
       "dismantleDoneEyebrow": "分解完了",
       "dismantleDoneTitle": "装備を分解しました",
       "dismantleJackpot": "大当たり！強化コア追加 +{bonus}",
-      "bulkDismantleJackpot": "大当たり ×{count}！強化コア追加 +{bonus}",
+      "bulkDismantleJackpot": "大当たり！選択装備の強化コア合計が2倍 · 追加 +{bonus}",
       "gained": "獲得",
       "enhanceCore": "強化コア",
       "closeSellConfirm": "売却確認を閉じる",
@@ -945,7 +946,7 @@
           },
           "incinerator_capacity": {
             "label": "焼却炉拡張",
-            "description": "焼却炉の総量 +500"
+            "description": "焼却炉の総量 +500 · 焼却開始時に強化コア +2"
           }
         },
         "quests": {

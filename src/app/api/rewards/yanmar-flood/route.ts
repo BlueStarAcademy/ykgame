@@ -10,7 +10,7 @@ import {
   rollFloodXp,
   type FloodRewardKind,
 } from "@/games/yanmar/equipment";
-import { FLOOD_RECOVERY_UNLOCK_LEVEL } from "@/games/yanmar/floodRecovery/balance";
+import { FLOOD_RECOVERY_UNLOCK_LEVEL, floodBurnCapacityCoreBonus } from "@/games/yanmar/floodRecovery/balance";
 import {
   isYanmarRewardRateLimited,
   parseRewardEventId,
@@ -164,6 +164,23 @@ export async function POST(request: Request) {
           session.user.id,
           floodDropTrigger,
         );
+        const capacityLevel =
+          kind === "burn"
+            ? (loaded.workshopById.flood.incinerator_capacity ?? 0)
+            : 0;
+        const burnCapacityCoreBonus =
+          kind === "burn" ? floodBurnCapacityCoreBonus(capacityLevel) : 0;
+        let coresDropped = coreDrop.dropped ? coreDrop.amount : 0;
+        let enhanceCoresAfter = coreDrop.enhanceCores;
+        if (burnCapacityCoreBonus > 0) {
+          const bumped = await tx.user.update({
+            where: { id: session.user.id },
+            data: { enhanceCores: { increment: burnCapacityCoreBonus } },
+            select: { enhanceCores: true },
+          });
+          coresDropped += burnCapacityCoreBonus;
+          enhanceCoresAfter = bumped.enhanceCores;
+        }
         const totalStars = granted;
         const updated = await tx.user.update({
           where: { id: session.user.id },
@@ -192,8 +209,9 @@ export async function POST(request: Request) {
           totalXp: updated.totalXp,
           level: getPlayerLevelProgress(updated.totalXp).level,
           gearDrop,
-          coresDropped: coreDrop.dropped ? coreDrop.amount : 0,
-          enhanceCores: coreDrop.enhanceCores ?? updated.enhanceCores,
+          coresDropped,
+          burnCapacityCoreBonus,
+          enhanceCores: enhanceCoresAfter ?? updated.enhanceCores,
         };
       },
     );

@@ -341,7 +341,7 @@ export function GameChatBoard() {
     return () => clearInterval(id);
   }, [cooldownUntil]);
 
-  // Drop messages as they age past the 7-day retention window.
+  // Drop messages as they age past the 3-day retention window.
   useEffect(() => {
     const id = setInterval(() => {
       setMessages((prev) => {

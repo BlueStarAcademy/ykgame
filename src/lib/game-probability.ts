@@ -202,7 +202,7 @@ export function getGameProbabilityReport() {
           label: "분해 대박",
           value: pct(DISMANTLE_JACKPOT_BASE_CHANCE, 0),
           detail:
-            "장비마다 독립 판정 · 대박 시 기본코어×2 · 장착 마스터 옵션으로 대박확률 +10~20%p / 대박 시 코어 추가 +20~50% (2배 후 적용, 서버 RNG)",
+            "개별 분해는 장비마다 독립 판정 · 일괄 선택 분해는 선택 장비 전체로 1회 판정, 대박 시 전체 기본코어×2 · 장착 마스터 옵션으로 대박확률 +10~20%p / 대박 시 코어 추가 +20~50% (2배 후 적용, 서버 RNG)",
         },
         {
           label: "마일스톤",

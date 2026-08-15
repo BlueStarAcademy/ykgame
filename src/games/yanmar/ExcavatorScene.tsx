@@ -181,7 +181,7 @@ interface ExcavatorSceneProps {
   onFloodCollectFilled?: (eventId: string, amount: number) => void;
   onFloodTrashGrapple?: (eventId: string, awardCycleReward: boolean) => void;
   onFloodIncineratorFilled?: (units: number) => void;
-  onFloodBurnStarted?: () => void;
+  onFloodBurnStarted?: (eventId: string, burnedUnits: number) => void;
   onFloodBurnComplete?: (eventId: string, burnedUnits: number) => void;
   onAttachmentWarning: (message: string) => void;
   onDumpTruckFull?: () => void;

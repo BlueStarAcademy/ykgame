@@ -11,6 +11,12 @@ export const FLOOD_INCINERATOR_BASE_CAPACITY = 3000;
 export const FLOOD_COLLECTION_THRESHOLD = 500;
 
 /**
+ * Extra XZ margin outside the painted pad rim for blade→collection transfer.
+ * Scraped windrows often sit just past the visible ring after a pass.
+ */
+export const FLOOD_COLLECTION_ACCEPT_MARGIN = 1.35;
+
+/**
  * XZ radius for grapple pickup of the central collection pile.
  * Matches `isGrappleGroundPickupPose` for FLOOD_TRASH_GRIP_PROFILE (size 0.52)
  * in simLoop — much tighter than the painted pad (`collectionRadius` ≈ 5.5).
@@ -83,14 +89,18 @@ export const YANMAR_FLOOD_REWARD_CONFIG = {
   burn: {
     baseScoreMin: 2000,
     baseScoreMax: 2500,
-    minStarReward: 30,
-    maxStarReward: 50,
+    /** Stars are intentionally lean so flood recovery pays in enhance cores. */
+    minStarReward: 8,
+    maxStarReward: 15,
     xpMin: 3000,
     xpMax: 4000,
   },
 } as const;
 
 export type FloodRewardKind = keyof typeof YANMAR_FLOOD_REWARD_CONFIG;
+
+/** Guaranteed enhance cores per incinerator_capacity workshop level on burn start. */
+export const FLOOD_BURN_CAPACITY_CORE_BONUS_PER_LEVEL = 2;
 
 export function floodIncineratorCapacity(capacityLevel = 0): number {
   const level = Math.max(
@@ -101,6 +111,15 @@ export function floodIncineratorCapacity(capacityLevel = 0): number {
     FLOOD_INCINERATOR_BASE_CAPACITY +
     level * FLOOD_INCINERATOR_CAPACITY_PER_LEVEL
   );
+}
+
+/** Confirmed cores granted when a full incinerator begins burning. */
+export function floodBurnCapacityCoreBonus(capacityLevel = 0): number {
+  const level = Math.max(
+    0,
+    Math.min(FLOOD_INCINERATOR_CAPACITY_MAX_LEVEL, Math.floor(capacityLevel)),
+  );
+  return level * FLOOD_BURN_CAPACITY_CORE_BONUS_PER_LEVEL;
 }
 
 export function floodBurnDurationSec(powerLevel = 0): number {

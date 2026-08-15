@@ -348,9 +348,12 @@ export interface SimTickParams {
   onFloodTrashGrapple?: (eventId: string, awardCycleReward: boolean) => void;
   /** Flood: one trash chunk was deposited in the incinerator. */
   onFloodIncineratorFilled?: (units: number) => void;
-  /** Flood: player left the filled incinerator and the burn began. */
-  onFloodBurnStarted?: () => void;
-  /** Flood: incinerator burn completed. */
+  /**
+   * Flood: player left the filled incinerator and the burn began.
+   * Cycle burn reward is claimed here (not on completion).
+   */
+  onFloodBurnStarted?: (eventId: string, burnedUnits: number) => void;
+  /** Flood: incinerator burn FX finished (no reward). */
   onFloodBurnComplete?: (eventId: string, burnedUnits: number) => void;
   onAttachmentWarning: (message: string) => void;
   /** 덤프트럭 만재→출발 전환 시 1회 */
@@ -2345,6 +2348,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     const fz = terrain.floodZone;
     fb.floodCooldownEtaSec = getFloodZoneRespawnEtaSec(fz);
     fb.floodActive = !!fz && (fz.active || fz.phase === "readyToBurn" || fz.phase === "burning");
+    fb.inFloodZone = isInFloodZone(terrain, sim.posX, sim.posZ);
     fb.floodPhase = fz?.phase ?? "idle";
     fb.floodCollectedUnits = fz?.collectedUnits ?? 0;
     fb.floodCollectionThreshold = FLOOD_COLLECTION_THRESHOLD;
@@ -2626,14 +2630,20 @@ export function tickExcavatorSim(params: SimTickParams) {
   // Keep the blade engaged as the windrow crosses the collection-pad rim.
   let floodStraightPush = false;
   if (bladeInFloodField && floodZone) {
-    const toPadX = floodZone.collectionX - sim.posX;
-    const toPadZ = floodZone.collectionZ - sim.posZ;
-    const toPadLen = Math.hypot(toPadX, toPadZ) || 1;
+    // Judge the push from the blade itself, not the excavator's turn centre:
+    // a fully lowered blade can be several metres ahead while the body is
+    // already past the collection pad. A moderate angle is still a valid
+    // cleanup stroke; only obviously sideways/backward travel should fail.
+    const toPadX = floodZone.collectionX - bladeContact.x;
+    const toPadZ = floodZone.collectionZ - bladeContact.z;
+    const toPadDistance = Math.hypot(toPadX, toPadZ);
+    const toPadLen = toPadDistance || 1;
     const travelDirX = Math.sin(sim.heading);
     const travelDirZ = Math.cos(sim.heading);
     const align =
       (travelDirX * toPadX + travelDirZ * toPadZ) / toPadLen;
-    floodStraightPush = align > 0.65;
+    floodStraightPush =
+      toPadDistance <= floodZone.collectionRadius || align > 0.2;
   }
   const bladeScraping =
     effectiveBlade > 0.55 &&
@@ -2668,7 +2678,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     runtime.bladeSpray.z = bladeContact.z;
     runtime.bladeSpray.heading = sim.heading + sim.swing;
   } else if (bladeFloodPush && floodZone) {
-    // Accumulate push until one "stroke" worth of travel (~2.2m) then apply push units.
+    // A short, continuous stroke must be enough to transfer debris. Waiting
+    // for 2.2m made a valid push across the pad look like it only left a
+    // thin windrow, especially when the player slowed at the pad rim.
     const rt = runtime as SimLoopRuntime & {
       floodBladeStrokeDist?: number;
     };
@@ -2692,8 +2704,8 @@ export function tickExcavatorSim(params: SimTickParams) {
     runtime.bladeSpray.y = bladeGroundY + 0.06;
     runtime.bladeSpray.z = bladeContact.z;
     runtime.bladeSpray.heading = sim.heading + sim.swing;
-    if (rt.floodBladeStrokeDist >= 2.2) {
-      rt.floodBladeStrokeDist = 0;
+    if (rt.floodBladeStrokeDist >= 0.75) {
+      rt.floodBladeStrokeDist -= 0.75;
       const pushUnits = Math.max(
         FLOOD_BASE_PUSH_UNITS,
         Math.floor(stats.floodPushUnits ?? FLOOD_BASE_PUSH_UNITS),
@@ -2723,20 +2735,22 @@ export function tickExcavatorSim(params: SimTickParams) {
   }
 
   // Flood burn sequence: wait for player to leave, then play burn FX.
+  // Rewards are granted once when burn starts — not when the timer finishes.
   if (floodZone?.phase === "readyToBurn") {
     if (tryStartFloodBurn(terrain, sim.posX, sim.posZ)) {
-      onFloodBurnStarted?.();
+      const capacity = floodZone.incineratorCapacity;
+      const eventId = `${floodZone.id}-burn`;
+      if (!floodZone.rewardedBurn) {
+        floodZone.rewardedBurn = true;
+        onFloodBurnStarted?.(eventId, capacity);
+      }
     }
   }
   if (floodZone?.phase === "burning") {
     const capacity = floodZone.incineratorCapacity;
     const finished = advanceFloodBurn(terrain, dt);
-    if (finished && onFloodBurnComplete) {
-      const eventId = `${floodZone.id}-burn`;
-      if (!floodZone.rewardedBurn) {
-        floodZone.rewardedBurn = true;
-        onFloodBurnComplete(eventId, capacity);
-      }
+    if (finished) {
+      onFloodBurnComplete?.(`${floodZone.id}-burn`, capacity);
     }
   }
 

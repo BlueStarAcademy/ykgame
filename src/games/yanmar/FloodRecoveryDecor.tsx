@@ -9,6 +9,7 @@ import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
 import type { FloodRecoveryZone, TerrainData } from "./terrain";
 import { getFloodZoneRespawnEtaSec, sampleHeight } from "./terrain";
 import {
+  FLOOD_COLLECTION_ACCEPT_MARGIN,
   FLOOD_COLLECTION_GRAB_RADIUS,
   FLOOD_COLLECTION_THRESHOLD,
 } from "./floodRecovery/balance";
@@ -58,14 +59,15 @@ function FloodTrashPile({
     <group
       scale={
         scraped
-          ? [fullness * 1.45, 0.42 + fullness * 0.18, fullness * 0.72]
+          ? [fullness * 1.18, 0.62 + fullness * 0.22, fullness * 0.92]
           : [fullness * 1.15, 0.55 + fullness * 0.2, fullness * 1.15]
       }
     >
-      {/* Flat mound base — wide and low; scraped piles stretch along the blade. */}
+      {/* A scraped windrow remains visibly chunky, rather than reading as a
+          stray line left on the ground after a valid blade pass. */}
       <mesh
         position={[0, 0.08, 0]}
-        scale={scraped ? [1.55, 0.18, 0.85] : [1.35, 0.22, 1.15]}
+        scale={scraped ? [1.25, 0.3, 0.98] : [1.35, 0.22, 1.15]}
         castShadow
         receiveShadow
       >
@@ -74,7 +76,7 @@ function FloodTrashPile({
       </mesh>
       <mesh
         position={scraped ? [0.15, 0.09, -0.08] : [0.2, 0.1, -0.15]}
-        scale={scraped ? [1.2, 0.15, 0.7] : [0.95, 0.18, 0.85]}
+        scale={scraped ? [1.05, 0.24, 0.82] : [0.95, 0.18, 0.85]}
         castShadow
         receiveShadow
       >
@@ -231,8 +233,8 @@ function FloodDebrisPiles({
       group.rotation.set(0, d.yaw ?? group.rotation.y, 0);
       group.scale.set(
         scraped ? scale * 1.15 : scale,
-        scale * (scraped ? 0.38 : 0.45),
-        scraped ? scale * 0.75 : scale,
+        scale * (scraped ? 0.62 : 0.45),
+        scraped ? scale * 0.9 : scale,
       );
     }
 
@@ -269,8 +271,8 @@ function FloodDebrisPiles({
               rotation={[0, d.yaw ?? index * 0.7, 0]}
               scale={[
                 scraped ? scale * 1.15 : scale,
-                scale * (scraped ? 0.38 : 0.45),
-                scraped ? scale * 0.75 : scale,
+                scale * (scraped ? 0.62 : 0.45),
+                scraped ? scale * 0.9 : scale,
               ]}
             >
               <FloodTrashPile
@@ -403,6 +405,25 @@ export function FloodRecoveryDecor({
               emissiveIntensity={0.35}
             />
           </mesh>
+          {/* Blade transfer accepts a little past the painted pad rim. */}
+          {collectionPct < 1 ? (
+            <mesh position={[0, 0.045, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry
+                args={[
+                  zone.collectionRadius + FLOOD_COLLECTION_ACCEPT_MARGIN - 0.18,
+                  zone.collectionRadius + FLOOD_COLLECTION_ACCEPT_MARGIN,
+                  48,
+                ]}
+              />
+              <meshStandardMaterial
+                color="#38bdf8"
+                emissive="#0ea5e9"
+                emissiveIntensity={0.25}
+                transparent
+                opacity={0.55}
+              />
+            </mesh>
+          ) : null}
           {/* Grab range hugs the pile — pad rim is only for blade collection. */}
           {collectionPct >= 1 ? (
             <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>

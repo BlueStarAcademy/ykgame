@@ -431,7 +431,8 @@
       "cameraAria": "카메라 {mode}번 시점",
       "respawnWait": "리젠 대기",
       "monument": "조형물",
-      "floodBurn": "소각"
+      "floodBurn": "소각",
+      "floodBurnCoreBonus": "소각 보너스 강화코어 +{amount}"
     },
     "toasts": {
       "inventoryFullTitle": "인벤토리 공간이 부족합니다.",
@@ -490,8 +491,8 @@
         "perk1Desc": "쓰레기를 직선으로 밀어 집결장에 모읍니다",
         "perk2Title": "집게 운반",
         "perk2Desc": "500이 모이면 집게로 집어 소각장에 넣습니다",
-        "perk3Title": "소각 연출",
-        "perk3Desc": "가득 채운 뒤 구역을 벗어나면 소각이 시작됩니다",
+        "perk3Title": "소각 보상",
+        "perk3Desc": "가득 채운 뒤 구역을 벗어나면 소각이 시작되며 강화코어 보상을 받습니다",
         "cta": "수해복구로 이동"
       },
       "sportsMeet": {
@@ -606,7 +607,7 @@
       "dismantleDoneEyebrow": "분해 완료",
       "dismantleDoneTitle": "장비를 분해했습니다",
       "dismantleJackpot": "대박! 강화코어 추가 +{bonus}",
-      "bulkDismantleJackpot": "대박 ×{count}! 강화코어 추가 +{bonus}",
+      "bulkDismantleJackpot": "대박! 선택한 장비의 전체 강화코어 2배 적용 · 추가 +{bonus}",
       "gained": "획득",
       "enhanceCore": "강화코어",
       "closeSellConfirm": "판매 확인 닫기",
@@ -669,7 +670,7 @@
       "safety": "안전레버",
       "throttle": "스로틀",
       "blade": "블레이드",
-      "auto": "오토",
+      "auto": "자동",
       "function": "기능",
       "boomSwing": "붐스윙",
       "travel": "주행",
@@ -945,7 +946,7 @@
           },
           "incinerator_capacity": {
             "label": "소각장 확장",
-            "description": "소각장 총량 +500"
+            "description": "소각장 총량 +500 · 소각 시작 시 강화코어 +2"
           }
         },
         "quests": {

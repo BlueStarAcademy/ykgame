@@ -3,12 +3,16 @@ import { describe, it } from "node:test";
 import {
   calculateFloodPushUnits,
   FLOOD_BASE_PUSH_UNITS,
+  FLOOD_BURN_CAPACITY_CORE_BONUS_PER_LEVEL,
   FLOOD_INCINERATOR_BASE_CAPACITY,
+  FLOOD_INCINERATOR_CAPACITY_MAX_LEVEL,
+  floodBurnCapacityCoreBonus,
   floodBurnDurationSec,
   floodCleaningMasterMult,
   floodIncineratorCapacity,
   FLOOD_MIN_BURN_SEC,
   FLOOD_RECOVERY_UNLOCK_LEVEL,
+  YANMAR_FLOOD_REWARD_CONFIG,
 } from "./balance";
 
 describe("floodRecovery/balance", () => {
@@ -96,6 +100,26 @@ describe("floodRecovery/balance", () => {
     assert.equal(
       floodIncineratorCapacity(99),
       FLOOD_INCINERATOR_BASE_CAPACITY + 2500,
+    );
+  });
+
+  it("keeps burn star rewards lean and grants capacity-scaled core bonuses", () => {
+    assert.equal(YANMAR_FLOOD_REWARD_CONFIG.burn.minStarReward, 8);
+    assert.equal(YANMAR_FLOOD_REWARD_CONFIG.burn.maxStarReward, 15);
+    assert.equal(floodBurnCapacityCoreBonus(0), 0);
+    assert.equal(
+      floodBurnCapacityCoreBonus(1),
+      FLOOD_BURN_CAPACITY_CORE_BONUS_PER_LEVEL,
+    );
+    assert.equal(
+      floodBurnCapacityCoreBonus(FLOOD_INCINERATOR_CAPACITY_MAX_LEVEL),
+      FLOOD_INCINERATOR_CAPACITY_MAX_LEVEL *
+        FLOOD_BURN_CAPACITY_CORE_BONUS_PER_LEVEL,
+    );
+    assert.equal(
+      floodBurnCapacityCoreBonus(99),
+      FLOOD_INCINERATOR_CAPACITY_MAX_LEVEL *
+        FLOOD_BURN_CAPACITY_CORE_BONUS_PER_LEVEL,
     );
   });
 });

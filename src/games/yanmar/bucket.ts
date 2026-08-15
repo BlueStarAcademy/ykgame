@@ -339,6 +339,8 @@ export interface DigFeedback {
   hillCooldownEtaSec: number;
   /** 수해복구 구역 HUD / 리젠. */
   floodActive: boolean;
+  /** 플레이어가 수해복구 작업 반경 안인지 (HUD 근접 표시용). */
+  inFloodZone: boolean;
   floodPhase: string;
   floodCollectedUnits: number;
   floodCollectionThreshold: number;
@@ -405,6 +407,7 @@ export function createDigFeedback(): DigFeedback {
     crashCooldownEtaSec: 0,
     hillCooldownEtaSec: 0,
     floodActive: false,
+    inFloodZone: false,
     floodPhase: "idle",
     floodCollectedUnits: 0,
     floodCollectionThreshold: 500,
@@ -480,6 +483,7 @@ export function isDigFeedbackHudEqual(prev: DigFeedback, next: DigFeedback) {
     Math.abs(prev.crashCooldownEtaSec - next.crashCooldownEtaSec) < 0.15 &&
     Math.abs(prev.hillCooldownEtaSec - next.hillCooldownEtaSec) < 0.15 &&
     prev.floodActive === next.floodActive &&
+    prev.inFloodZone === next.inFloodZone &&
     prev.floodPhase === next.floodPhase &&
     Math.abs(prev.floodCollectedUnits - next.floodCollectedUnits) < 1 &&
     prev.floodCollectionThreshold === next.floodCollectionThreshold &&

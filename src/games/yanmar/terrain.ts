@@ -15,6 +15,7 @@ import {
   FLOOD_BASE_BURN_SEC,
   FLOOD_COLLECTION_THRESHOLD,
   FLOOD_INCINERATOR_BASE_CAPACITY,
+  FLOOD_COLLECTION_ACCEPT_MARGIN,
   FLOOD_INCINERATOR_DEPOSIT_RADIUS,
   FLOOD_INCINERATOR_SAFE_RADIUS,
   FLOOD_RECOVERY_UNLOCK_LEVEL,
@@ -1505,6 +1506,18 @@ export function advanceFloodDebrisBladePush(
     if (!pile.cleaved) {
       cleaveFloodDebrisAcrossBlade(zone, pile, rightX, rightZ, heading);
     }
+
+    // Once a windrow is near the painted pad, ease it inward so a valid blade
+    // pass does not leave a thin line just outside the transfer radius.
+    const toPadX = zone.collectionX - pile.x;
+    const toPadZ = zone.collectionZ - pile.z;
+    const toPadDist = Math.hypot(toPadX, toPadZ);
+    const acceptR = zone.collectionRadius + FLOOD_COLLECTION_ACCEPT_MARGIN;
+    if (toPadDist > 0.05 && toPadDist <= acceptR + 1.4) {
+      const pull = Math.min(0.55, travel * 1.25 + 0.08);
+      pile.x += (toPadX / toPadDist) * pull;
+      pile.z += (toPadZ / toPadDist) * pull;
+    }
   }
 }
 
@@ -1527,13 +1540,14 @@ export function pushFloodDebrisToCollection(
   // A blade stroke only scores trash that it has actually delivered onto the
   // collection pad. This keeps the visual windrow and the transferred units in
   // sync instead of removing a distant pile as soon as the player starts moving.
+  const acceptRadius = zone.collectionRadius + FLOOD_COLLECTION_ACCEPT_MARGIN;
   const collectable = zone.debris
     .filter(
       (pile) =>
         pile.active &&
         pile.remaining > 0 &&
         Math.hypot(pile.x - zone.collectionX, pile.z - zone.collectionZ) <=
-          zone.collectionRadius + 0.5,
+          acceptRadius,
     )
     .sort((a, b) => {
       const da = Math.hypot(a.x - zone.collectionX, a.z - zone.collectionZ);

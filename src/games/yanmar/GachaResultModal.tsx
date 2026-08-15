@@ -43,6 +43,8 @@ interface GachaResultModalProps {
   titleKey?: "title" | "synthesisTitle";
   /** 카드마다 획득 효과음 (기본: 연속 공개 시 항상, 단건도 강제하려면 true) */
   perRevealSfx?: boolean;
+  /** 모든 결과를 한 번에 공개한다. */
+  revealAll?: boolean;
 }
 
 function isGearSlot(v: unknown): v is GearSlot {
@@ -81,6 +83,7 @@ export function GachaResultModal({
   title,
   titleKey = "title",
   perRevealSfx = false,
+  revealAll = false,
 }: GachaResultModalProps) {
   const t = useTranslations("yanmar.gacha");
   const catalogT = useTranslations("yanmar");
@@ -143,6 +146,20 @@ export function GachaResultModal({
       if (cancelled) return;
       await sleep(FIRST_LEAD_MS);
       if (cancelled) return;
+
+      if (revealAll) {
+        const hasMaster = pullItems.some(
+          (item) => normalizeGrade(item.grade) === "MASTER",
+        );
+        if (hasMaster) {
+          yanmarAudio.playMasterItemAcquire();
+        } else {
+          yanmarAudio.playItemAcquire();
+        }
+        setRevealedCount(pullItems.length);
+        setPhase("done");
+        return;
+      }
 
       for (let i = 0; i < pullItems.length; i++) {
         if (cancelled) return;
@@ -210,7 +227,7 @@ export function GachaResultModal({
       cancelled = true;
       wakeRef.current?.();
     };
-  }, [open, sessionKey, jackpotGrade, perRevealSfx]);
+  }, [open, sessionKey, jackpotGrade, perRevealSfx, revealAll]);
 
   const handleSkip = () => {
     if (phase !== "playing" || count <= 1) return;
