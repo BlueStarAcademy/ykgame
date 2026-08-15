@@ -11,7 +11,7 @@ export const PLAYER_UNLOCKS = {
 } as const;
 
 /** 연습·튜토리얼에서 맵/부착물을 전부 열 때 쓰는 유효 레벨 */
-export const PRACTICE_FULL_UNLOCK_LEVEL = PLAYER_UNLOCKS.GRAPPLE;
+export const PRACTICE_FULL_UNLOCK_LEVEL = PLAYER_UNLOCKS.FLOOD_RECOVERY;
 
 export type PlayerUnlockKind = keyof typeof PLAYER_UNLOCKS;
 

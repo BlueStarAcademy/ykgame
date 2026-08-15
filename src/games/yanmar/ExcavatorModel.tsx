@@ -29,7 +29,9 @@ import {
 } from "./chassisVisualConfig";
 import type { ChassisModelId } from "./chassisCatalog";
 
-const PAINT_GFX = getGraphicsProfile();
+function paintGfx() {
+  return getGraphicsProfile();
+}
 
 /**
  * Undercarriage / swing-bearing center in body local +X.
@@ -804,7 +806,8 @@ function PaintMaterial({
   color?: string;
   dark?: boolean;
 }) {
-  if (PAINT_GFX.quality === "performance") {
+  const gfx = paintGfx();
+  if (gfx.quality === "performance") {
     return (
       <meshStandardMaterial
         color={color}
@@ -818,9 +821,9 @@ function PaintMaterial({
       color={color}
       roughness={YANMAR_PAINT_MATERIAL.roughness}
       metalness={YANMAR_PAINT_MATERIAL.metalness}
-      clearcoat={PAINT_GFX.paintClearcoat}
+      clearcoat={gfx.paintClearcoat}
       clearcoatRoughness={YANMAR_PAINT_MATERIAL.clearcoatRoughness}
-      envMapIntensity={PAINT_GFX.paintEnvMapIntensity}
+      envMapIntensity={gfx.paintEnvMapIntensity}
     />
   );
 }

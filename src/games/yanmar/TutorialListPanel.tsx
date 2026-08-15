@@ -8,7 +8,56 @@ import {
   type TutorialStep,
   type TutorialStepId,
 } from "./tutorial";
-import type { YanmarTutorialState } from "./tutorialProgress";
+import {
+  isCurrencyTutorialReward,
+  isGearTutorialReward,
+  type TutorialRewardDef,
+  type YanmarTutorialState,
+} from "./tutorialProgress";
+
+const CORE_ICON = "/images/yanmar/2d/enhance-core.png?v=3";
+const TICKET_STANDARD_ICON = "/images/yanmar/2d/gacha-ticket-standard.svg";
+const TICKET_PREMIUM_ICON = "/images/yanmar/2d/gacha-ticket-premium.svg";
+const STAR_ICON = "/images/star-currency.svg";
+/** 보상 아이콘 테두리(둥근 사각형) — 빛이 이 경로를 따라 한 바퀴 돈다. */
+const REWARD_RING_PATH =
+  "M13 2H87A11 11 0 0 1 98 13V87A11 11 0 0 1 87 98H13A11 11 0 0 1 2 87V13A11 11 0 0 1 13 2Z";
+
+function TutorialRewardVisual({ reward }: { reward: TutorialRewardDef }) {
+  if (isGearTutorialReward(reward)) {
+    return (
+      <GearIconCell
+        slot={reward.slot}
+        grade={reward.grade}
+        size="sm"
+      />
+    );
+  }
+
+  if (!isCurrencyTutorialReward(reward)) return null;
+
+  const amount =
+    reward.stars ??
+    reward.enhanceCores ??
+    reward.gachaTicketsStandard ??
+    reward.gachaTicketsPremium ??
+    0;
+  const src = reward.stars
+    ? STAR_ICON
+    : reward.enhanceCores
+      ? CORE_ICON
+      : reward.gachaTicketsPremium
+        ? TICKET_PREMIUM_ICON
+        : TICKET_STANDARD_ICON;
+
+  return (
+    <span className="yanmar-tutorial-list-currency-reward">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" draggable={false} decoding="async" />
+      {amount > 0 ? <em>×{amount}</em> : null}
+    </span>
+  );
+}
 
 export function TutorialListPanel({
   open,
@@ -65,75 +114,110 @@ export function TutorialListPanel({
             !tutorial.seenNew.includes(step.id);
           const reward = step.reward;
           const active = activeId === step.id;
+          const canClaim = Boolean(reward) && completed && !claimed;
+          const doneMark = claimed || (completed && !reward);
           return (
             <li key={step.id}>
-              <button
-                type="button"
-                disabled={!unlocked}
-                onClick={() => {
-                  if (!unlocked) return;
-                  onSelect(index, step);
-                }}
+              <div
                 className={`yanmar-tutorial-list-row${
                   active ? " is-active" : ""
                 }${completed ? " is-done" : ""}${
-                  unlocked ? "" : " is-locked"
-                }`}
+                  claimed ? " is-claimed" : ""
+                }${unlocked ? "" : " is-locked"}`}
               >
-                <span className="yanmar-tutorial-list-index">
-                  {index + 1}
-                </span>
-                <span className="yanmar-tutorial-list-copy">
-                  <span className="yanmar-tutorial-list-title">
-                    {t(`steps.${step.id}.title`)}
-                    {isNew ? (
-                      <em className="yanmar-tutorial-list-new">{t("new")}</em>
-                    ) : null}
-                  </span>
-                  <span className="yanmar-tutorial-list-desc">
-                    {unlocked
-                      ? t(`steps.${step.id}.instruction`)
-                      : t("unlockLevel", { level: step.unlockLevel })}
-                  </span>
-                </span>
-                {reward ? (
+                <button
+                  type="button"
+                  disabled={!unlocked}
+                  onClick={() => {
+                    if (!unlocked) return;
+                    onSelect(index, step);
+                  }}
+                  className="yanmar-tutorial-list-select"
+                >
                   <span
-                    className={`yanmar-tutorial-list-reward${
-                      claimed ? " is-claimed" : ""
-                    }${completed && !claimed ? " is-ready" : ""}`}
-                    onClick={(event) => {
-                      if (!completed || claimed) return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onClaim(step.id);
-                    }}
-                    role={completed && !claimed ? "button" : undefined}
-                    aria-label={
-                      claimed
-                        ? t("claimed")
-                        : completed
-                          ? claimingId === step.id
-                            ? t("claiming")
-                            : t("claimReward")
-                          : t("completionReward")
-                    }
+                    className={`yanmar-tutorial-list-index${
+                      doneMark ? " is-checked" : ""
+                    }`}
+                    aria-hidden={doneMark}
                   >
-                    <GearIconCell
-                      slot={reward.slot}
-                      grade={reward.grade}
-                      size="sm"
-                    />
-                    {completed && !claimed ? (
-                      <span className="yanmar-tutorial-list-claim">{t("claim")}</span>
-                    ) : null}
+                    {doneMark ? "✓" : index + 1}
                   </span>
+                  <span className="yanmar-tutorial-list-copy">
+                    <span className="yanmar-tutorial-list-title">
+                      {t(`steps.${step.id}.title`)}
+                      {isNew ? (
+                        <em className="yanmar-tutorial-list-new">{t("new")}</em>
+                      ) : null}
+                    </span>
+                    <span className="yanmar-tutorial-list-desc">
+                      {unlocked
+                        ? t(`steps.${step.id}.instruction`)
+                        : t("unlockLevel", { level: step.unlockLevel })}
+                    </span>
+                  </span>
+                </button>
+                {reward ? (
+                  canClaim ? (
+                    <button
+                      type="button"
+                      className="yanmar-tutorial-list-reward is-ready"
+                      disabled={claimingId === step.id}
+                      onClick={() => onClaim(step.id)}
+                      aria-label={
+                        claimingId === step.id
+                          ? t("claiming")
+                          : t("claimReward")
+                      }
+                    >
+                      <TutorialRewardVisual reward={reward} />
+                      <svg
+                        className="yanmar-tutorial-list-reward-trace"
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="none"
+                        aria-hidden
+                      >
+                        <path
+                          className="is-track"
+                          d={REWARD_RING_PATH}
+                          pathLength={100}
+                        />
+                        <path
+                          className="is-beam"
+                          d={REWARD_RING_PATH}
+                          pathLength={100}
+                        />
+                      </svg>
+                      <span className="yanmar-tutorial-list-reward-mark is-claim">
+                        {claimingId === step.id ? t("claiming") : t("claim")}
+                      </span>
+                    </button>
+                  ) : (
+                    <span
+                      className={`yanmar-tutorial-list-reward${
+                        claimed ? " is-claimed" : ""
+                      }`}
+                      aria-label={
+                        claimed ? t("claimed") : t("completionReward")
+                      }
+                    >
+                      <TutorialRewardVisual reward={reward} />
+                      {claimed ? (
+                        <span
+                          className="yanmar-tutorial-list-reward-mark is-done"
+                          aria-hidden
+                        >
+                          ✓
+                        </span>
+                      ) : null}
+                    </span>
+                  )
                 ) : null}
                 {!unlocked ? (
                   <span className="yanmar-tutorial-list-lock">
                     Lv.{step.unlockLevel}
                   </span>
                 ) : null}
-              </button>
+              </div>
             </li>
           );
         })}

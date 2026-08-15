@@ -156,6 +156,7 @@ export function ExcavatorMapModal({
               sportsMeetUnlocked={sportsMeetUnlocked}
               showLegend={false}
               showRegionLabels={false}
+              onSelectDestination={setPendingTeleport}
             />
           </div>
 

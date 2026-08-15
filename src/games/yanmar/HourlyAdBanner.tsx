@@ -24,9 +24,9 @@ import {
   type HourlyAdSlotId,
 } from "./hourlyAdReward";
 import { yanmarAudio } from "./yanmarAudio";
+import { runRewardReelSpin } from "./rewardReelSpin";
 
 const REEL_LOOPS = 18;
-const ITEM_HEIGHT = 4.6; /* rem — keep in sync with CSS .slotItem */
 
 const REWARD_PREVIEW_ITEMS = [
   {
@@ -113,7 +113,7 @@ export function HourlyAdBanner({
   const [reelItems, setReelItems] = useState<
     { kind: string; label: string; icon: string }[]
   >([]);
-  const [reelOffsetRem, setReelOffsetRem] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
   const spinRafRef = useRef(0);
   const spinningRef = useRef(false);
   const stopRequestedRef = useRef(false);
@@ -267,63 +267,35 @@ export function HourlyAdBanner({
 
     const { items, stopIndex } = buildReel(won);
     setReelItems(items);
-    setReelOffsetRem(0);
     spinningRef.current = true;
     stopRequestedRef.current = false;
     setPhase("spinning");
     yanmarAudio.playRouletteSpin();
 
-    const endOffset = stopIndex * ITEM_HEIGHT;
-    const start = performance.now();
-    let fromOffset = 0;
-    let segmentStart = start;
-    let segmentDuration = HOURLY_AD_SLOT_DECAY_MS;
-    let finishing = false;
-
-    /** Fast start, long soft landing — reads like a physical reel. */
-    const spinEase = (t: number) => {
-      const clamped = Math.min(1, Math.max(0, t));
-      // Blend: mostly easeOutQuint, with a bit of easeOutExpo for a softer tail.
-      const quint = 1 - (1 - clamped) ** 5;
-      const expo = clamped === 1 ? 1 : 1 - 2 ** (-10 * clamped);
-      return quint * 0.72 + expo * 0.28;
+    const applyOffset = (px: number) => {
+      const track = trackRef.current;
+      if (track) track.style.transform = `translate3d(0, ${-px}px, 0)`;
     };
 
-    const frame = (now: number) => {
-      if (!spinningRef.current) return;
-
-      if (!finishing && stopRequestedRef.current) {
-        finishing = true;
-        const progress = Math.min(
-          1,
-          (now - segmentStart) / segmentDuration,
-        );
-        fromOffset = fromOffset + (endOffset - fromOffset) * spinEase(progress);
-        segmentStart = now;
-        const remain = 1 - progress;
-        segmentDuration = Math.min(1600, Math.max(900, remain * 1800));
-      }
-
-      const t = Math.min(1, (now - segmentStart) / segmentDuration);
-      const offset = fromOffset + (endOffset - fromOffset) * spinEase(t);
-      setReelOffsetRem(offset);
-
-      if (t >= 1) {
-        spinningRef.current = false;
+    runRewardReelSpin({
+      getItemHeight: () =>
+        (trackRef.current?.firstElementChild as HTMLElement | undefined)
+          ?.getBoundingClientRect().height ?? 0,
+      stopIndex,
+      durationMs: HOURLY_AD_SLOT_DECAY_MS,
+      spinningRef,
+      stopRequestedRef,
+      rafRef: spinRafRef,
+      applyOffset,
+      onDone: () => {
         yanmarAudio.stopRouletteSpin();
-        setReelOffsetRem(endOffset);
         setPhase("result");
         yanmarAudio.playItemAcquire();
         if (won.kind === "stars") {
           yanmarAudio.playStarAcquire();
         }
-        return;
-      }
-
-      spinRafRef.current = requestAnimationFrame(frame);
-    };
-
-    spinRafRef.current = requestAnimationFrame(frame);
+      },
+    });
   }
 
   function requestStopSpin() {
@@ -390,7 +362,6 @@ export function HourlyAdBanner({
     setPhase("idle");
     setReward(null);
     setReelItems([]);
-    setReelOffsetRem(0);
   }
 
   if (!mounted) return null;
@@ -620,10 +591,8 @@ export function HourlyAdBanner({
                       <div className={styles.slotPointer} aria-hidden />
                       <div className={styles.slotWindow}>
                         <div
+                          ref={trackRef}
                           className={styles.slotTrack}
-                          style={{
-                            transform: `translate3d(0, -${reelOffsetRem}rem, 0)`,
-                          }}
                         >
                           {reelItems.map((item, i) => (
                             <div className={styles.slotItem} key={`${item.kind}-${i}`}>

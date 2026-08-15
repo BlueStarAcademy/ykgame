@@ -36,6 +36,7 @@ import {
   type SfxDetailId,
   type SfxDetailSettings,
 } from "./soundSettings";
+import type { GraphicsQuality } from "./graphicsQuality";
 
 type SettingsTab = "display" | "sound" | "other";
 
@@ -338,6 +339,8 @@ interface YanmarGameSettingsMenuProps {
   onToggleMinimap: () => void;
   showMissionQuest: boolean;
   onToggleMissionQuest: () => void;
+  graphicsQuality: GraphicsQuality;
+  onGraphicsQualityChange: (quality: GraphicsQuality) => void;
   bgmEnabled: boolean;
   onToggleBgm: () => void;
   bgmVolume: number;
@@ -383,6 +386,8 @@ export function YanmarGameSettingsMenu({
   onToggleMinimap,
   showMissionQuest,
   onToggleMissionQuest,
+  graphicsQuality,
+  onGraphicsQualityChange,
   bgmEnabled,
   onToggleBgm,
   bgmVolume,
@@ -569,6 +574,32 @@ export function YanmarGameSettingsMenu({
               on={showMissionQuest}
               onToggle={onToggleMissionQuest}
             />
+            <div className="flex w-full items-center justify-between gap-2 px-2.5 py-2">
+              <span className="text-[11px] font-semibold text-white">
+                {t("graphicsQuality")}
+              </span>
+              <div className="flex shrink-0 gap-1">
+                {(
+                  [
+                    { id: "performance", label: t("graphicsPerformance") },
+                    { id: "high", label: t("graphicsHigh") },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => onGraphicsQualityChange(opt.id)}
+                    className={`rounded-md px-2 py-1 text-[10px] font-black tracking-wide transition-colors ${
+                      graphicsQuality === opt.id
+                        ? "bg-sky-400/20 text-sky-300 ring-1 ring-sky-300/40"
+                        : "bg-white/8 text-white/40 ring-1 ring-white/10"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </>
         ) : null}
 

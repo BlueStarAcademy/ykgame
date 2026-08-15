@@ -1365,6 +1365,7 @@ function BladeLever({
   onChange,
   embedded = false,
   onInactivePress,
+  highlighted = false,
 }: {
   value: number;
   enabled: boolean;
@@ -1377,6 +1378,7 @@ function BladeLever({
   onChange: (value: number) => void;
   embedded?: boolean;
   onInactivePress?: () => void;
+  highlighted?: boolean;
 }) {
   const { cockpit } = useCockpitTranslations();
   const blade = layout.blade;
@@ -1517,7 +1519,9 @@ function BladeLever({
   if (embedded) {
     return (
       <div
-        className={`yanmar-blade-lever-embedded relative h-full w-full touch-none${lockedClass}`}
+        className={`yanmar-blade-lever-embedded relative h-full w-full touch-none${lockedClass}${
+          highlighted ? " yanmar-visual-highlight" : ""
+        }`}
         onContextMenu={(e) => e.preventDefault()}
       >
         <div className="yanmar-blade-lever-visual yanmar-blade-lever-visual-embedded pointer-events-none" aria-hidden>
@@ -1949,6 +1953,7 @@ interface FunctionMenuProps {
   unlockAllAttachments?: boolean;
   onAttachmentChange: (attachment: AttachmentType) => void;
   onInactiveMachinePress?: () => void;
+  highlightBlade?: boolean;
 }
 
 const ATTACHMENTS: Array<{
@@ -2038,6 +2043,7 @@ function FunctionMenu({
   unlockAllAttachments,
   onAttachmentChange,
   onInactiveMachinePress,
+  highlightBlade = false,
 }: FunctionMenuProps) {
   const { cockpit } = useCockpitTranslations();
   const anchorCx = layout.left.cx;
@@ -2163,6 +2169,7 @@ function FunctionMenu({
             layout={layout}
             isPortrait={isPortrait}
             embedded
+            highlighted={highlightBlade}
             onInactivePress={
               !auxiliary.engineOn ? onInactiveMachinePress : undefined
             }
@@ -2722,6 +2729,7 @@ export function CockpitOverlay({
     tutorialStep?.highlight === "right" || tutorialStep?.highlight === "both";
   const highlightTravel = tutorialStep?.highlight === "travel";
   const highlightBreaker = tutorialStep?.highlight === "breaker";
+  const highlightBlade = tutorialStep?.highlight === "blade";
   const layout = PORTRAIT_COCKPIT_LAYOUT;
   const isPortrait = true;
   const useDPad = mode !== "intro";
@@ -2793,6 +2801,11 @@ export function CockpitOverlay({
     if (auxiliary.blade <= BLADE_RAISED) return;
     onAuxiliaryChange((current) => ({ ...current, blade: BLADE_RAISED }));
   }, [auxiliary.blade, bladeUnlocked, onAuxiliaryChange]);
+
+  useEffect(() => {
+    if (!highlightBlade) return;
+    setFunctionMenuExpanded(true);
+  }, [highlightBlade]);
 
   return (
     <CockpitTranslationContext.Provider value={{ cockpit, hud }}>
@@ -3007,6 +3020,7 @@ export function CockpitOverlay({
             unlockAllAttachments={unlockAllAttachments}
             onAttachmentChange={onAttachmentChange}
             onInactiveMachinePress={engineOffPress}
+            highlightBlade={highlightBlade}
           />
           <EngineStartButton
             engineOn={auxiliary.engineOn}

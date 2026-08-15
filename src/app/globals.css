@@ -2808,51 +2808,243 @@ body {
 }
 
 .yanmar-tutorial-guide {
-  width: min(16.5rem, 100%);
-  pointer-events: none;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(251, 191, 36, 0.32);
-  background: rgba(2, 6, 23, 0.9);
-  padding: 0.42rem 0.5rem 0.45rem;
+  --tutorial-guide-accent: #f3c04a;
+  --tutorial-guide-accent-soft: rgba(243, 192, 74, 0.55);
+  position: relative;
+  width: min(20rem, 100%);
+  /* 중앙 상태 안내(타격가능/집게가능 등)가 보이도록 아래로 내림 */
+  margin-top: 2.65rem;
+  overflow: hidden;
+  pointer-events: auto;
+  border-radius: 0.82rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 30%),
+    linear-gradient(180deg, rgba(19, 22, 30, 0.68) 0%, rgba(9, 11, 17, 0.72) 100%);
   color: #fff;
-  box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(8px);
+  box-shadow:
+    0 0.9rem 2rem -0.6rem rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px) saturate(120%);
+  animation: yanmar-tutorial-guide-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.yanmar-tutorial-guide-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  background: radial-gradient(
+    90% 130% at 0% 0%,
+    var(--tutorial-guide-accent-soft),
+    transparent 46%
+  );
+}
+
+.yanmar-tutorial-guide-bar {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  height: 0.18rem;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.yanmar-tutorial-guide-bar i {
+  flex: 1;
+  background: transparent;
+  transition: background 0.3s ease;
+}
+
+.yanmar-tutorial-guide-bar i.is-done,
+.yanmar-tutorial-guide-bar i.is-active {
+  background: linear-gradient(90deg, var(--tutorial-guide-accent), #fff3d0);
+  box-shadow: 0 0 0.5rem var(--tutorial-guide-accent-soft);
+}
+
+.yanmar-tutorial-guide-bar i.is-active {
+  animation: yanmar-tutorial-guide-bar-pulse 1.6s ease-in-out infinite;
+}
+
+.yanmar-tutorial-guide.is-phase {
+  --tutorial-guide-accent: #34d399;
+  --tutorial-guide-accent-soft: rgba(52, 211, 153, 0.5);
+  border-color: rgba(110, 231, 183, 0.28);
+}
+
+.yanmar-tutorial-guide.is-complete {
+  --tutorial-guide-accent: #fbbf24;
+  --tutorial-guide-accent-soft: rgba(251, 191, 36, 0.55);
+  border-color: rgba(253, 230, 138, 0.4);
 }
 
 .yanmar-tutorial-guide-head {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
+  gap: 0.5rem;
+  padding: 0.46rem 0.5rem 0.46rem 0.52rem;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.055),
+    rgba(255, 255, 255, 0.012)
+  );
+}
+
+.yanmar-tutorial-guide-head::after {
+  content: "";
+  position: absolute;
+  left: 0.52rem;
+  right: 0.52rem;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.24),
+    rgba(255, 255, 255, 0.06) 65%,
+    transparent
+  );
+}
+
+.yanmar-tutorial-guide-badge {
+  display: grid;
+  width: 1.6rem;
+  height: 1.6rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 0.48rem;
+  background: linear-gradient(
+    160deg,
+    #fff7e0 0%,
+    var(--tutorial-guide-accent) 45%,
+    #a97612 100%
+  );
+  color: #3a2807;
+  font-size: 0.8rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(90, 60, 5, 0.45),
+    0 0.18rem 0.45rem rgba(0, 0, 0, 0.5);
+}
+
+.yanmar-tutorial-guide.is-phase .yanmar-tutorial-guide-badge {
+  background: linear-gradient(160deg, #e9fff6 0%, #34d399 46%, #0f7a52 100%);
+  color: #04291b;
+}
+
+.yanmar-tutorial-guide-titles {
+  min-width: 0;
+  flex: 1;
+}
+
+.yanmar-tutorial-guide-kicker {
+  display: block;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.46rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  line-height: 1;
 }
 
 .yanmar-tutorial-guide-title {
-  margin: 0;
-  color: #fbbf24;
-  font-size: 0.62rem;
+  display: block;
+  margin: 0.13rem 0 0;
+  min-width: 0;
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.86rem;
   font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-.yanmar-tutorial-guide-phase {
-  margin: 0;
+.yanmar-tutorial-guide-exit {
+  display: inline-flex;
   flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 0.56rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  align-items: center;
+  gap: 0.26rem;
+  height: 1.4rem;
+  padding: 0 0.48rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.02)
+  );
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease,
+    transform 0.12s ease;
+}
+
+.yanmar-tutorial-guide-exit svg {
+  display: block;
+}
+
+.yanmar-tutorial-guide-exit:hover {
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fff;
+  background: linear-gradient(
+    180deg,
+    rgba(248, 113, 113, 0.3),
+    rgba(127, 29, 29, 0.4)
+  );
+}
+
+.yanmar-tutorial-guide-exit:active {
+  transform: scale(0.95);
+}
+
+.yanmar-tutorial-guide-body {
+  position: relative;
+  z-index: 1;
+  padding: 0.48rem 0.58rem 0.5rem 0.52rem;
 }
 
 .yanmar-tutorial-guide-copy {
-  margin: 0.18rem 0 0;
-  color: rgba(255, 255, 255, 0.88);
-  font-size: clamp(7px, 2.35vw, 10px);
-  font-weight: 650;
-  line-height: 1.35;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.34rem;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.42;
+  letter-spacing: -0.015em;
+}
+
+.yanmar-tutorial-guide-check {
+  display: inline-grid;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  place-items: center;
+  margin-top: 0.06rem;
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.2);
+  color: #6ee7b7;
+  font-size: 0.6rem;
+  font-weight: 900;
 }
 
 .yanmar-tutorial-guide-copy.is-phase {
-  color: #6ee7b7;
-  font-weight: 800;
+  color: #d7fbe9;
+  font-weight: 750;
 }
 
 .yanmar-tutorial-guide-copy.is-complete {
@@ -2860,15 +3052,71 @@ body {
   font-weight: 800;
 }
 
-.yanmar-tutorial-guide-goal {
-  margin: 0.22rem 0 0;
-  color: #7dd3fc;
+.yanmar-tutorial-guide-copy.is-complete .yanmar-tutorial-guide-check {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fde68a;
+}
+
+.yanmar-tutorial-guide-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.22rem;
+  margin: 0.42rem 0 0;
+  padding: 0 0.5rem 0 0.42rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(226, 232, 240, 0.88);
   font-size: 0.58rem;
-  font-weight: 800;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.yanmar-tutorial-guide-chip-dot {
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--tutorial-guide-accent);
+  box-shadow: 0 0 0.35rem var(--tutorial-guide-accent-soft);
+  animation: yanmar-tutorial-guide-goal-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes yanmar-tutorial-guide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.35rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes yanmar-tutorial-guide-goal-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes yanmar-tutorial-guide-bar-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .yanmar-layout-portrait:has(.yanmar-tutorial-guide) .yanmar-tutorial-list {
-  top: 8.15rem;
+  top: 11.5rem;
 }
 
 .yanmar-tutorial-list {
@@ -2932,20 +3180,23 @@ body {
   min-height: 0;
   flex: 1;
   list-style: none;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 0.35rem;
+  padding: 0.55rem 0.35rem 0.35rem;
 }
 
 .yanmar-tutorial-list-row {
+  position: relative;
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   margin-bottom: 0.28rem;
+  overflow: visible;
   border-radius: 0.65rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
-  padding: 0.38rem 0.4rem;
+  padding: 0.42rem 0.32rem 0.28rem 0.18rem;
   text-align: left;
   color: #e2e8f0;
 }
@@ -2959,8 +3210,30 @@ body {
   border-color: rgba(52, 211, 153, 0.28);
 }
 
+.yanmar-tutorial-list-row.is-claimed {
+  border-color: rgba(52, 211, 153, 0.42);
+}
+
 .yanmar-tutorial-list-row.is-locked {
   opacity: 0.55;
+}
+
+.yanmar-tutorial-list-select {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  background: transparent;
+  padding: 0.1rem 0.08rem;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.yanmar-tutorial-list-select:disabled {
+  cursor: not-allowed;
 }
 
 .yanmar-tutorial-list-index {
@@ -2972,6 +3245,11 @@ body {
   color: #fbbf24;
   font-size: 0.72rem;
   font-weight: 900;
+}
+
+.yanmar-tutorial-list-index.is-checked {
+  color: #6ee7b7;
+  font-size: 0.85rem;
 }
 
 .yanmar-tutorial-list-copy {
@@ -3010,28 +3288,155 @@ body {
 .yanmar-tutorial-list-reward {
   position: relative;
   flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  overflow: visible;
+}
+
+.yanmar-tutorial-list-currency-reward {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(15, 23, 42, 0.92);
+}
+
+.yanmar-tutorial-list-currency-reward img {
+  display: block;
+  width: 1.45rem;
+  height: 1.45rem;
+  object-fit: contain;
+}
+
+.yanmar-tutorial-list-currency-reward em {
+  position: absolute;
+  right: 0.08rem;
+  bottom: 0.04rem;
+  font-style: normal;
+  font-size: 0.5rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #fde68a;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
 }
 
 .yanmar-tutorial-list-reward.is-claimed {
-  opacity: 0.42;
+  pointer-events: none;
 }
 
 .yanmar-tutorial-list-reward.is-ready {
   cursor: pointer;
+  isolation: isolate;
+  border-radius: 0.52rem;
+  padding: 0.11rem;
 }
 
-.yanmar-tutorial-list-claim {
+.yanmar-tutorial-list-reward.is-ready > .yanmar-gear-icon-cell,
+.yanmar-tutorial-list-reward.is-ready > .yanmar-tutorial-list-currency-reward {
+  position: relative;
+  z-index: 1;
+}
+
+/* 통화 아이콘만 중앙을 불투명하게 — 장비는 등급 프레임 색을 유지한다. */
+.yanmar-tutorial-list-reward.is-ready > .yanmar-tutorial-list-currency-reward {
+  border-color: transparent;
+  border-radius: 0.4rem;
+  background: rgba(15, 23, 42, 0.98);
+}
+
+.yanmar-tutorial-list-reward-trace {
   position: absolute;
-  right: 0;
-  bottom: -0.15rem;
-  left: 0;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.yanmar-tutorial-list-reward-trace path {
+  fill: none;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.yanmar-tutorial-list-reward-trace path.is-track {
+  stroke: rgba(251, 191, 36, 0.22);
+  stroke-width: 1.2;
+}
+
+.yanmar-tutorial-list-reward-trace path.is-beam {
+  stroke: #fff4cf;
+  stroke-width: 2.2;
+  stroke-dasharray: 22 78;
+  filter: drop-shadow(0 0 1.5px rgba(251, 191, 36, 0.9));
+  animation: yanmar-tutorial-reward-trace 1.5s linear infinite;
+}
+
+.yanmar-tutorial-list-reward.is-ready:disabled {
+  cursor: wait;
+  opacity: 0.78;
+}
+
+.yanmar-tutorial-list-reward.is-ready:disabled .yanmar-tutorial-list-reward-trace
+  path.is-beam {
+  animation-play-state: paused;
+  opacity: 0.55;
+}
+
+@keyframes yanmar-tutorial-reward-trace {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+.yanmar-tutorial-list-reward-mark {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 0.92rem;
+  padding: 0 0.28rem;
   border-radius: 999px;
-  background: #f59e0b;
-  color: #111827;
-  font-size: 0.48rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  font-size: 0.46rem;
   font-weight: 900;
-  line-height: 1.2;
-  text-align: center;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 0.12rem 0.35rem rgba(0, 0, 0, 0.45);
+}
+
+.yanmar-tutorial-list-reward-mark.is-claim {
+  background: linear-gradient(180deg, #fde68a, #f59e0b);
+  color: #1f1404;
+}
+
+.yanmar-tutorial-list-reward-mark.is-done {
+  min-width: 0.95rem;
+  height: 0.95rem;
+  padding: 0;
+  border-color: rgba(167, 243, 208, 0.55);
+  background: linear-gradient(180deg, #6ee7b7, #059669);
+  color: #042f1c;
+  font-size: 0.58rem;
 }
 
 .yanmar-tutorial-list-lock {
@@ -17734,14 +18139,14 @@ button.yanmar-gear-icon-cell {
   font-weight: 900;
   color: #fef3c7;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
-  overflow: visible;
+  overflow: hidden;
 }
 
 .yanmar-profile-chip-avatar-img {
   width: 100%;
   height: 100%;
   border-radius: 999px;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   overflow: hidden;
 }
@@ -17817,7 +18222,7 @@ button.yanmar-gear-icon-cell {
   display: flex;
   flex-direction: column;
   color: #f8fafc;
-  height: min(90dvh, 44rem);
+  height: auto;
   max-height: min(90dvh, 44rem);
   overflow: hidden;
   background: linear-gradient(180deg, #1a1f2b 0%, #0b0e14 100%);
@@ -17868,7 +18273,7 @@ button.yanmar-gear-icon-cell {
 }
 
 .yanmar-profile-modal-body {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   overflow: auto;
   padding: 0.7rem 0.8rem 0.9rem;
@@ -17888,15 +18293,6 @@ button.yanmar-gear-icon-cell {
 
 .yanmar-chat-user-profile-gear {
   min-width: 0;
-}
-
-.yanmar-chat-user-profile.yanmar-profile-modal {
-  height: auto;
-  max-height: min(90dvh, 44rem);
-}
-
-.yanmar-chat-user-profile .yanmar-profile-modal-body {
-  flex: 0 1 auto;
 }
 
 .yanmar-chat-user-profile-gear .yanmar-gear-mgr-compact {
@@ -17925,12 +18321,13 @@ button.yanmar-gear-icon-cell {
 
 .yanmar-profile-avatar-img {
   position: absolute;
-  inset: 4%;
-  width: 92%;
-  height: 92%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   margin: auto;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
+  border-radius: inherit;
 }
 
 .yanmar-profile-avatar-initial,
@@ -18220,16 +18617,15 @@ button.yanmar-gear-icon-cell {
   width: 100%;
   aspect-ratio: 1;
   box-sizing: border-box;
-  padding: 0.28rem;
-  border-radius: 0.35rem;
-  border: 1px solid rgba(212, 175, 105, 0.55);
+  padding: 0.18rem;
+  border-radius: 999px;
+  border: 1.5px solid rgba(212, 175, 105, 0.5);
   background:
-    linear-gradient(145deg, rgba(252, 211, 77, 0.18), transparent 42%),
-    linear-gradient(180deg, #3a2f22 0%, #1a1612 55%, #0f0d0b 100%);
+    linear-gradient(145deg, rgba(252, 211, 77, 0.16), transparent 42%),
+    linear-gradient(180deg, #2a241c 0%, #12100e 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 236, 179, 0.28),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.45),
-    0 0.35rem 0.7rem rgba(0, 0, 0, 0.35);
+    inset 0 1px 0 rgba(255, 236, 179, 0.2),
+    0 0.3rem 0.65rem rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
 
@@ -18237,39 +18633,32 @@ button.yanmar-gear-icon-cell {
   width: 100% !important;
   height: 100% !important;
   border: 0;
-  border-radius: 0.15rem;
+  border-radius: 999px;
   box-shadow: none;
+  background: #0b0e14;
 }
 
 .yanmar-profile-avatar-frame::before {
-  content: "";
-  position: absolute;
-  inset: 0.38rem;
-  border-radius: 0.18rem;
-  border: 1px solid rgba(245, 215, 142, 0.22);
-  pointer-events: none;
-  z-index: 1;
+  content: none;
 }
 
 .yanmar-profile-avatar-option.is-selected .yanmar-profile-avatar-frame {
   border-color: rgba(252, 211, 77, 0.95);
   box-shadow:
-    inset 0 1px 0 rgba(255, 236, 179, 0.4),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 236, 179, 0.35),
     0 0 0 2px rgba(251, 191, 36, 0.35),
-    0 0.4rem 0.9rem rgba(180, 83, 9, 0.35);
+    0 0.35rem 0.85rem rgba(180, 83, 9, 0.35);
 }
 
-.yanmar-profile-avatar-frame img {
+.yanmar-profile-avatar-frame img,
+.yanmar-profile-avatar-frame .yanmar-profile-avatar-img {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
-  border-radius: 0.15rem;
-  background:
-    radial-gradient(circle at 50% 35%, rgba(148, 163, 184, 0.16), transparent 62%),
-    rgba(8, 10, 14, 0.92);
+  border-radius: 999px;
+  background: transparent;
 }
 
 .yanmar-profile-avatar-label {

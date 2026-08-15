@@ -34,6 +34,15 @@ export function isMobileDevice(): boolean {
 }
 
 /**
+ * Desktop / wide browser: keep the immersive game in a phone-width column
+ * so portrait-first HUD does not stretch across the monitor.
+ */
+export function prefersDesktopGameFrame(): boolean {
+  if (typeof window === "undefined") return false;
+  return !isMobileDevice();
+}
+
+/**
  * standalone PWA는 OS 크롬이 이미 숨겨져 있으므로 Fullscreen API는 건너뛴다.
  * 모바일 브라우저도 건너뛴다 — Android Fullscreen이 landscape로 강제하는 경우가 많음.
  * 데스크톱 브라우저 탭에서만 인게임 Fullscreen을 허용한다.

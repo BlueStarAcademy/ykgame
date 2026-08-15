@@ -33,7 +33,6 @@ import {
   resolveMaxMasterByKey,
 } from "./gearGenerate";
 import { GearIconCell } from "./GearIconCell";
-import type { TutorialGearAction } from "./tutorial";
 import {
   GachaResultModal,
   type GachaResultItem,
@@ -221,8 +220,6 @@ interface GearPanelProps {
     | null
     | void;
   onExpandInventory?: () => void | Promise<void>;
-  tutorialGearAction?: TutorialGearAction | null;
-  onTutorialGearAction?: (action: TutorialGearAction) => void;
 }
 
 type BubbleState =
@@ -449,8 +446,6 @@ export function GearPanel({
   onSellMany,
   onSynthesize,
   onExpandInventory,
-  tutorialGearAction = null,
-  onTutorialGearAction,
 }: GearPanelProps) {
   const t = useTranslations("yanmar.gear");
   const catalogT = useTranslations("yanmar");
@@ -1286,40 +1281,31 @@ export function GearPanel({
     <div className="yanmar-gear-mgr-actions yanmar-gear-mgr-actions--four">
       <button
         type="button"
-        className={`yanmar-gear-btn yanmar-gear-btn--enhance${
-          tutorialGearAction === "enhance" ? " is-tutorial-target" : ""
-        }`}
+        className="yanmar-gear-btn yanmar-gear-btn--enhance"
         disabled={busy || item.enhanceLevel >= 10}
         onClick={() => {
           setEnhanceItemId(item.id);
-          onTutorialGearAction?.("enhance");
         }}
       >
         {t("enhance")}
       </button>
       <button
         type="button"
-        className={`yanmar-gear-btn yanmar-gear-btn--synth${
-          tutorialGearAction === "synthesize" ? " is-tutorial-target" : ""
-        }`}
+        className="yanmar-gear-btn yanmar-gear-btn--synth"
         disabled={busy || !!item.equippedSlot}
         onClick={() => {
           openSynth(item);
-          onTutorialGearAction?.("synthesize");
         }}
       >
         {t("synthesize")}
       </button>
       <button
         type="button"
-        className={`yanmar-gear-btn yanmar-gear-btn--sell${
-          tutorialGearAction === "dismantle" ? " is-tutorial-target" : ""
-        }`}
+        className="yanmar-gear-btn yanmar-gear-btn--sell"
         disabled={busy || !!item.equippedSlot}
         onClick={() => {
           setPendingDismantleId(item.id);
           closeBubble();
-          onTutorialGearAction?.("dismantle");
         }}
       >
         {t("dismantle")}
@@ -1445,13 +1431,10 @@ export function GearPanel({
                 <>
                   <button
                     type="button"
-                    className={`yanmar-gear-bulk-btn yanmar-gear-bulk-btn--dismantle${
-                      tutorialGearAction === "dismantle" ? " is-tutorial-target" : ""
-                    }`}
+                    className="yanmar-gear-bulk-btn yanmar-gear-bulk-btn--dismantle"
                     disabled={busy}
                     onClick={() => {
                       enterBulkMode("dismantle");
-                      onTutorialGearAction?.("dismantle");
                     }}
                   >
                     {t("bulkDismantle")}
@@ -1466,13 +1449,10 @@ export function GearPanel({
                   </button>
                   <button
                     type="button"
-                    className={`yanmar-gear-bulk-btn yanmar-gear-bulk-btn--synth${
-                      tutorialGearAction === "synthesize" ? " is-tutorial-target" : ""
-                    }`}
+                    className="yanmar-gear-bulk-btn yanmar-gear-bulk-btn--synth"
                     disabled={busy}
                     onClick={() => {
                       enterBulkMode("synth");
-                      onTutorialGearAction?.("synthesize");
                     }}
                   >
                     {t("bulkSynth")}

@@ -309,7 +309,10 @@
       "admin": "관리",
       "inquiry": "고객문의",
       "language": "언어",
-      "detailedSettings": "상세 설정"
+      "detailedSettings": "상세 설정",
+      "graphicsQuality": "그래픽",
+      "graphicsPerformance": "성능",
+      "graphicsHigh": "고화질"
     },
     "ads": {
       "rewardHint": "보상 보기",
@@ -1138,44 +1141,41 @@
       "claimReward": "보상 수령",
       "completionReward": "완료 보상",
       "claim": "수령",
+      "exit": "종료",
       "skipToGame": "SKIP · 게임으로",
       "goalDistance": "목표까지 {meters}m",
       "steps": {
         "travel": {
           "title": "주행",
-          "instruction": "전진·후진·왼레버 우회전·오른레버 좌회전을 각각 10m씩 연습합니다"
+          "instruction": "전진/후진/회전 연습"
         },
         "boom": {
           "title": "붐",
-          "instruction": "붐을 최대로 올렸다가 최대로 내리기를 3회 반복합니다"
+          "instruction": "붐 올리고 내리기"
         },
         "arm": {
           "title": "암",
-          "instruction": "암을 최대로 올렸다가 최대로 내리기를 3회 반복합니다"
+          "instruction": "암 접고 뻗기"
+        },
+        "swing": {
+          "title": "상부회전",
+          "instruction": "좌우 90도 회전"
         },
         "bucket": {
           "title": "버켓",
-          "instruction": "흙지역에서 적재한 뒤 덤프트럭에 하역합니다"
+          "instruction": "흙 적재 후 하역"
         },
         "breaker": {
           "title": "브레이커",
-          "instruction": "아스팔트에 수직으로 대고 발판 좌측으로 파쇄합니다"
+          "instruction": "아스팔트 파쇄"
         },
         "grapple": {
           "title": "집게",
-          "instruction": "돌을 집어 적재한 뒤 돌트럭에 하역합니다"
+          "instruction": "돌 집어 하역"
         },
-        "gearDismantle": {
-          "title": "장비 분해",
-          "instruction": "장비를 분해하면 강화코어를 획득합니다"
-        },
-        "gearEnhance": {
-          "title": "장비 강화",
-          "instruction": "강화코어를 사용해 장비를 강화합니다"
-        },
-        "gearSynth": {
-          "title": "장비 합성",
-          "instruction": "같은 등급 장비 3개를 합성합니다"
+        "blade": {
+          "title": "블레이드",
+          "instruction": "블레이드 내리고 전진"
         }
       }
     },
@@ -1193,7 +1193,8 @@
       "eyebrow": "Site Survey",
       "title": "현장 맵",
       "closeAriaLabel": "맵 닫기",
-      "subtitle": "빨간 화살표가 현재 위치와 진행 방향입니다",
+      "subtitle": "빨간 화살표가 현재 위치입니다. 지도나 아래 색인을 누르면 순간이동합니다",
+      "clickToTeleportAria": "지도를 눌러 순간이동할 위치를 선택합니다",
       "legendAriaLabel": "맵 범례",
       "legend": {
         "dig": "흙더미",

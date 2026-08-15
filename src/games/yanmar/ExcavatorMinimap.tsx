@@ -4,7 +4,12 @@ import { useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import type { ExcavatorSimState } from "./ExcavatorScene";
 import type { TerrainData } from "./terrain";
-import { DUMP_ZONE, getActiveDigZones, getMapWorldBounds } from "./terrain";
+import {
+  DIG_ZONE,
+  DUMP_ZONE,
+  getActiveDigZones,
+  getMapWorldBounds,
+} from "./terrain";
 import type { TutorialStep, TutorialWaypoint } from "./tutorial";
 import { REPAIR_TENT } from "./gearCatalog";
 import { SITE_LAYOUT } from "./siteLayout";
@@ -12,7 +17,15 @@ import type { MonumentPhase } from "./monument/types";
 import type { WorldPickupsState } from "./worldPickups";
 import { getGraphicsProfile } from "./graphicsQuality";
 
-const MINIMAP_GFX = getGraphicsProfile();
+type MapMarkerIcon =
+  | "dig"
+  | "dump"
+  | "crash"
+  | "hill"
+  | "flood"
+  | "repair"
+  | "sports"
+  | "monument";
 
 interface ExcavatorMinimapProps {
   simRef: React.RefObject<ExcavatorSimState>;
@@ -34,6 +47,8 @@ interface ExcavatorMinimapProps {
   onExpand?: () => void;
   /** Lv.25+ sports meet portal marker */
   sportsMeetUnlocked?: boolean;
+  /** Expanded map: clicking a site marker opens teleport confirm */
+  onSelectDestination?: (destination: MapMarkerIcon) => void;
 }
 
 const DEFAULT_DISPLAY_SIZE = 120;
@@ -67,13 +82,151 @@ function worldToMinimap(
   };
 }
 
+function monumentMarkerPosition(
+  px: number,
+  py: number,
+  size: number,
+  pad: number,
+  scale: number,
+) {
+  const edgePad = 7 * scale;
+  return {
+    px: Math.min(size - pad - edgePad, Math.max(pad + edgePad, px)),
+    py: Math.min(
+      size - pad - edgePad,
+      Math.max(pad + edgePad + 2 * scale, py),
+    ),
+  };
+}
+
+function worldPixelRadius(
+  worldRadius: number,
+  bounds: { minX: number; maxX: number },
+  inner: number,
+) {
+  const span = bounds.maxX - bounds.minX;
+  if (span <= 0) return 0;
+  return (worldRadius / span) * inner;
+}
+
+function getTeleportHitTargets(
+  terrain: TerrainData,
+  bounds: { minX: number; maxX: number; minZ: number; maxZ: number },
+  size: number,
+  pad: number,
+  monumentPhase: MonumentPhase,
+  sportsMeetUnlocked: boolean,
+) {
+  const inner = size - pad * 2;
+  const scale = size / DEFAULT_DISPLAY_SIZE;
+  const minHit = Math.max(22, 10 * scale);
+  const targets: {
+    id: MapMarkerIcon;
+    px: number;
+    py: number;
+    hitR: number;
+  }[] = [];
+
+  const add = (
+    id: MapMarkerIcon,
+    px: number,
+    py: number,
+    hitR: number,
+  ) => {
+    targets.push({ id, px, py, hitR: Math.max(minHit, hitR) });
+  };
+
+  const digZones = getActiveDigZones(terrain);
+  if (digZones.length > 0) {
+    for (const zone of digZones) {
+      const dig = worldToMinimap(zone.x, zone.z, bounds, size, pad);
+      const digR = worldPixelRadius(zone.radius, bounds, inner);
+      add("dig", dig.px, dig.py, Math.max(digR, 4.5 * scale));
+    }
+  } else {
+    const dig = worldToMinimap(DIG_ZONE.x, DIG_ZONE.z, bounds, size, pad);
+    const digR = worldPixelRadius(DIG_ZONE.radius, bounds, inner);
+    add("dig", dig.px, dig.py, Math.max(digR, 4.5 * scale));
+  }
+
+  const dump = worldToMinimap(DUMP_ZONE.x, DUMP_ZONE.z, bounds, size, pad);
+  const dumpR = worldPixelRadius(DUMP_ZONE.radius, bounds, inner);
+  add("dump", dump.px, dump.py, Math.max(dumpR, 3.5 * scale));
+
+  if (terrain.crashZone) {
+    const crash = worldToMinimap(
+      terrain.crashZone.centerX,
+      terrain.crashZone.centerZ,
+      bounds,
+      size,
+      pad,
+    );
+    const width = worldPixelRadius(terrain.crashZone.width / 2, bounds, inner);
+    const depth = worldPixelRadius(terrain.crashZone.depth / 2, bounds, inner);
+    add("crash", crash.px, crash.py, Math.max(width, depth));
+  }
+
+  if (terrain.hillZone) {
+    const hill = worldToMinimap(
+      terrain.hillZone.centerX,
+      terrain.hillZone.centerZ,
+      bounds,
+      size,
+      pad,
+    );
+    const radius = worldPixelRadius(terrain.hillZone.radius, bounds, inner);
+    add("hill", hill.px, hill.py, Math.max(radius, 5));
+  }
+
+  if (terrain.floodZone) {
+    const flood = worldToMinimap(
+      terrain.floodZone.centerX,
+      terrain.floodZone.centerZ,
+      bounds,
+      size,
+      pad,
+    );
+    const radius = worldPixelRadius(terrain.floodZone.radius, bounds, inner);
+    add("flood", flood.px, flood.py, Math.max(radius * 0.55, 5));
+  }
+
+  const repair = worldToMinimap(REPAIR_TENT.x, REPAIR_TENT.z, bounds, size, pad);
+  const repairR = worldPixelRadius(REPAIR_TENT.radius, bounds, inner);
+  add("repair", repair.px, repair.py, Math.max(repairR, 4.2 * scale));
+
+  if (sportsMeetUnlocked) {
+    const portal = worldToMinimap(
+      SITE_LAYOUT.sportsPortal[0],
+      SITE_LAYOUT.sportsPortal[1],
+      bounds,
+      size,
+      pad,
+    );
+    add("sports", portal.px, portal.py, 5 * scale);
+  }
+
+  if (monumentPhase !== "locked") {
+    const mon = worldToMinimap(
+      SITE_LAYOUT.monument[0],
+      SITE_LAYOUT.monument[1],
+      bounds,
+      size,
+      pad,
+    );
+    const pinned = monumentMarkerPosition(mon.px, mon.py, size, pad, scale);
+    add("monument", pinned.px, pinned.py, 7.5 * scale);
+  }
+
+  return targets;
+}
+
 function setupHiDpiCanvas(canvas: HTMLCanvasElement, displaySize: number) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
   const dpr = Math.min(
     window.devicePixelRatio || 1,
-    MINIMAP_GFX.minimapMaxDpr,
+    getGraphicsProfile().minimapMaxDpr,
   );
   const bufW = Math.round(displaySize * dpr);
   const bufH = Math.round(displaySize * dpr);
@@ -95,7 +248,7 @@ function ensureMinimapHiDpi(
 ): CanvasRenderingContext2D {
   const dpr = Math.min(
     window.devicePixelRatio || 1,
-    MINIMAP_GFX.minimapMaxDpr,
+    getGraphicsProfile().minimapMaxDpr,
   );
   const bufW = Math.round(displaySize * dpr);
   const bufH = Math.round(displaySize * dpr);
@@ -175,16 +328,6 @@ function drawMinimapBooster(
   ctx.fillStyle = prevFill;
   ctx.strokeStyle = prevStroke;
 }
-
-type MapMarkerIcon =
-  | "dig"
-  | "dump"
-  | "crash"
-  | "hill"
-  | "flood"
-  | "repair"
-  | "sports"
-  | "monument";
 
 /**
  * Readable at the HUD scale and detailed enough for the expanded map.
@@ -417,6 +560,7 @@ export function ExcavatorMinimap({
   showRegionLabels = true,
   onExpand,
   sportsMeetUnlocked = false,
+  onSelectDestination,
 }: ExcavatorMinimapProps) {
   const t = useTranslations("yanmar.map");
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -434,7 +578,7 @@ export function ExcavatorMinimap({
     let ctx = setupHiDpiCanvas(canvas, size)?.ctx ?? null;
     if (!ctx) return;
     let lastDraw = 0;
-    const minFrameMs = 1000 / Math.max(1, MINIMAP_GFX.minimapFps);
+    const minFrameMs = 1000 / Math.max(1, getGraphicsProfile().minimapFps);
 
     const draw = (now: number) => {
       raf = requestAnimationFrame(draw);
@@ -729,14 +873,12 @@ export function ExcavatorMinimap({
         );
         // Keep the pylon mark inside the padded map so it doesn't sit under
         // the red shell stroke at the north edge (same red = invisible).
-        const edgePad = 7 * repairScale;
-        const monPx = Math.min(
-          size - pad - edgePad,
-          Math.max(pad + edgePad, mon.px),
-        );
-        const monPy = Math.min(
-          size - pad - edgePad,
-          Math.max(pad + edgePad + 2 * repairScale, mon.py),
+        const { px: monPx, py: monPy } = monumentMarkerPosition(
+          mon.px,
+          mon.py,
+          size,
+          pad,
+          repairScale,
         );
         const pillarW = 5.5 * repairScale;
         const pillarH = 10 * repairScale;
@@ -963,7 +1105,53 @@ export function ExcavatorMinimap({
           </span>
         </button>
       ) : (
-        <canvas ref={canvasRef} className="block" aria-label="미니맵" />
+        <canvas
+          ref={canvasRef}
+          className={
+            onSelectDestination
+              ? "block cursor-pointer pointer-events-auto"
+              : "block"
+          }
+          aria-label={
+            onSelectDestination ? t("clickToTeleportAria") : "미니맵"
+          }
+          onClick={
+            onSelectDestination
+              ? (event) => {
+                  const canvas = canvasRef.current;
+                  const terrain = terrainRef.current;
+                  if (!canvas || !terrain) return;
+                  const rect = canvas.getBoundingClientRect();
+                  if (rect.width <= 0 || rect.height <= 0) return;
+                  const { displaySize: size, pad } =
+                    getMinimapLayout(displaySize);
+                  const x =
+                    ((event.clientX - rect.left) / rect.width) * size;
+                  const y =
+                    ((event.clientY - rect.top) / rect.height) * size;
+                  const bounds = getMapWorldBounds(terrain);
+                  const targets = getTeleportHitTargets(
+                    terrain,
+                    bounds,
+                    size,
+                    pad,
+                    monumentPhase,
+                    sportsMeetUnlocked,
+                  );
+                  let best: (typeof targets)[number] | null = null;
+                  let bestDist = Infinity;
+                  for (const target of targets) {
+                    const dist = Math.hypot(x - target.px, y - target.py);
+                    if (dist <= target.hitR && dist < bestDist) {
+                      best = target;
+                      bestDist = dist;
+                    }
+                  }
+                  if (best) onSelectDestination(best.id);
+                }
+              : undefined
+          }
+        />
       )}
       {showLegend ? (
         <ul

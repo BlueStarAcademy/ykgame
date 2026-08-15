@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { GameChatBoard } from "@/components/games/GameChatBoard";
@@ -8,6 +8,7 @@ import { useGameFullscreen } from "@/hooks/useGameFullscreen";
 import {
   enableInGamePortrait,
   isApiFullscreenActive,
+  prefersDesktopGameFrame,
 } from "@/lib/fullscreen";
 import { enablePwaMode } from "@/lib/pwa-mode";
 
@@ -63,8 +64,16 @@ export function GameImmersiveOverlay({
 }: GameImmersiveOverlayProps) {
   const t = useTranslations("games.immersive");
   const containerRef = useRef<HTMLDivElement>(null);
+  const [desktopFrame, setDesktopFrame] = useState(false);
   const { canFullscreen, apiFullscreen, isStandalone, enter, leave } =
     useGameFullscreen({ active, containerRef });
+
+  useEffect(() => {
+    const syncFrame = () => setDesktopFrame(prefersDesktopGameFrame());
+    syncFrame();
+    window.addEventListener("resize", syncFrame);
+    return () => window.removeEventListener("resize", syncFrame);
+  }, []);
 
   useEffect(() => {
     if (!active) {
@@ -104,7 +113,8 @@ export function GameImmersiveOverlay({
       <div
         ref={containerRef}
         data-game-immersive=""
-        className="fixed inset-0 z-[200] flex flex-col"
+        data-desktop-frame={desktopFrame ? "" : undefined}
+        className="fixed inset-0 z-[200] flex justify-center"
         style={{
           backgroundColor: shellColor,
           paddingTop: "env(safe-area-inset-top)",
@@ -113,64 +123,73 @@ export function GameImmersiveOverlay({
           paddingRight: "env(safe-area-inset-right)",
         }}
       >
-      <div
-        className="relative z-30 grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 px-3 py-2 text-white pointer-events-auto"
-        style={{ backgroundColor: headerColor }}
-      >
-        <div className="flex min-w-0 max-w-full items-center gap-2 justify-self-stretch overflow-visible">
-          {!hideExitButton ? (
-            <button
-              type="button"
-              onClick={() => {
-                void leave();
-                onExit();
-              }}
-              className="shrink-0 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold"
-            >
-              ✕ {t("exit")}
-            </button>
-          ) : null}
-          <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 max-w-full flex-1 items-center overflow-visible" />
-        </div>
         <div
-          id={GAME_IMMERSIVE_HEADER_CENTER_ID}
-          className="z-[1] flex shrink-0 items-center justify-center justify-self-center"
-        />
-        <div className="flex shrink-0 items-center justify-end gap-2 justify-self-end">
+          className={
+            desktopFrame
+              ? "game-immersive-stage flex h-full max-h-[min(100%,52rem)] w-full max-w-[min(100%,28rem)] self-center flex-col overflow-hidden shadow-[0_0_0_1px_rgba(15,23,42,0.35),0_18px_48px_rgba(0,0,0,0.45)]"
+              : "game-immersive-stage flex h-full w-full flex-col overflow-hidden"
+          }
+          style={{ backgroundColor: shellColor }}
+        >
           <div
-            id={GAME_IMMERSIVE_HEADER_RIGHT_ID}
-            className="flex shrink-0 items-center justify-end gap-2"
-          />
-          {!hideHeaderStats && (
-            <span className="shrink-0 text-[10px] opacity-80">
-              {myRank ? `#${myRank}` : "-"} · {t("points", { score: bestScore > 0 ? bestScore : 0 })}
-            </span>
-          )}
-          {!hideFullscreenButton && canFullscreen && !apiFullscreen && !isStandalone && (
-            <button
-              type="button"
-              onClick={() => {
-                void enter();
-              }}
-              className="shrink-0 rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
-            >
-              ⛶ {t("fullscreen")}
-            </button>
-          )}
-          {!hideRankingButton && (
-            <button
-              type="button"
-              onClick={onShowRanking}
-              className="shrink-0 rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
-            >
-              📊
-            </button>
-          )}
+            className="relative z-30 grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 px-3 py-2 text-white pointer-events-auto"
+            style={{ backgroundColor: headerColor }}
+          >
+            <div className="flex min-w-0 max-w-full items-center gap-2 justify-self-stretch overflow-visible">
+              {!hideExitButton ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void leave();
+                    onExit();
+                  }}
+                  className="shrink-0 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold"
+                >
+                  ✕ {t("exit")}
+                </button>
+              ) : null}
+              <div id={GAME_IMMERSIVE_HEADER_LEFT_ID} className="flex min-w-0 max-w-full flex-1 items-center overflow-visible" />
+            </div>
+            <div
+              id={GAME_IMMERSIVE_HEADER_CENTER_ID}
+              className="z-[1] flex shrink-0 items-center justify-center justify-self-center"
+            />
+            <div className="flex shrink-0 items-center justify-end gap-2 justify-self-end">
+              <div
+                id={GAME_IMMERSIVE_HEADER_RIGHT_ID}
+                className="flex shrink-0 items-center justify-end gap-2"
+              />
+              {!hideHeaderStats && (
+                <span className="shrink-0 text-[10px] opacity-80">
+                  {myRank ? `#${myRank}` : "-"} · {t("points", { score: bestScore > 0 ? bestScore : 0 })}
+                </span>
+              )}
+              {!hideFullscreenButton && canFullscreen && !apiFullscreen && !isStandalone && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void enter();
+                  }}
+                  className="shrink-0 rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
+                >
+                  ⛶ {t("fullscreen")}
+                </button>
+              )}
+              {!hideRankingButton && (
+                <button
+                  type="button"
+                  onClick={onShowRanking}
+                  className="shrink-0 rounded-lg bg-white/20 px-2 py-1 text-[10px] font-semibold"
+                >
+                  📊
+                </button>
+              )}
+            </div>
+          </div>
+          <GameChatBoard />
+          {/* z-0 traps in-game stacking (e.g. minimap z-30) below the header menu dropdown */}
+          <div className="relative z-0 min-h-0 flex-1 overflow-hidden">{children}</div>
         </div>
-      </div>
-      <GameChatBoard />
-      {/* z-0 traps in-game stacking (e.g. minimap z-30) below the header menu dropdown */}
-      <div className="relative z-0 min-h-0 flex-1 overflow-hidden">{children}</div>
       </div>
     </ImmersiveFullscreenContext.Provider>,
     document.body,

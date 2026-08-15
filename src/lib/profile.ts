@@ -101,5 +101,5 @@ export function profileAvatarSrc(
   const avatarId = resolveProfileAvatarId(profileAvatarId);
   return avatarId === "initial"
     ? null
-    : `/images/yanmar/2d/avatars/${avatarId}.png?v=1`;
+    : `/images/yanmar/2d/avatars/${avatarId}.png?v=2`;
 }

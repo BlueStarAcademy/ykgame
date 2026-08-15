@@ -309,7 +309,10 @@
       "admin": "管理",
       "inquiry": "お問い合わせ",
       "language": "言語",
-      "detailedSettings": "詳細設定"
+      "detailedSettings": "詳細設定",
+      "graphicsQuality": "グラフィック",
+      "graphicsPerformance": "パフォーマンス",
+      "graphicsHigh": "高画質"
     },
     "ads": {
       "rewardHint": "報酬を見る",
@@ -1138,44 +1141,41 @@
       "claimReward": "報酬を受け取る",
       "completionReward": "完了報酬",
       "claim": "受取",
+      "exit": "終了",
       "skipToGame": "SKIP · ゲームへ",
       "goalDistance": "目標まで {meters}m",
       "steps": {
         "travel": {
           "title": "走行",
-          "instruction": "前進・後退・左レバー右旋回・右レバー左旋回をそれぞれ10m練習します"
+          "instruction": "前進/後退/旋回練習"
         },
         "boom": {
           "title": "ブーム",
-          "instruction": "ブームを最大まで上げてから最大まで下げる動作を3回繰り返します"
+          "instruction": "ブームの上げ下げ"
         },
         "arm": {
           "title": "アーム",
-          "instruction": "アームを最大まで上げてから最大まで下げる動作を3回繰り返します"
+          "instruction": "アームの折り伸ばし"
+        },
+        "swing": {
+          "title": "上部旋回",
+          "instruction": "左右90度旋回"
         },
         "bucket": {
           "title": "バケット",
-          "instruction": "土エリアで積込んだあとダンプトラックに荷下ろしします"
+          "instruction": "積込み後に荷下ろし"
         },
         "breaker": {
           "title": "ブレーカー",
-          "instruction": "アスファルトに垂直に当て、ペダル左側で破砕します"
+          "instruction": "アスファルト破砕"
         },
         "grapple": {
           "title": "グラップル",
-          "instruction": "石を掴んで積込み、石トラックに荷下ろしします"
+          "instruction": "石を掴んで荷下ろし"
         },
-        "gearDismantle": {
-          "title": "装備分解",
-          "instruction": "装備を分解すると強化コアを獲得します"
-        },
-        "gearEnhance": {
-          "title": "装備強化",
-          "instruction": "強化コアを使って装備を強化します"
-        },
-        "gearSynth": {
-          "title": "装備合成",
-          "instruction": "同じ等級の装備3個を合成します"
+        "blade": {
+          "title": "ブレード",
+          "instruction": "ブレードを下げて前進"
         }
       }
     },
@@ -1193,7 +1193,8 @@
       "eyebrow": "Site Survey",
       "title": "現場マップ",
       "closeAriaLabel": "マップを閉じる",
-      "subtitle": "赤い矢印は現在位置と進行方向を示します",
+      "subtitle": "赤い矢印は現在位置です。マップまたは凡例をタップすると瞬間移動できます",
+      "clickToTeleportAria": "マップをタップして瞬間移動する場所を選びます",
       "legendAriaLabel": "マップの凡例",
       "legend": {
         "dig": "土砂",

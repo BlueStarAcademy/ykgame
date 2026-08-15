@@ -5,13 +5,14 @@
 /** Must run before `@react-three/drei` Text pulls Troika fonts. */
 import "./troikaTextSetup";
 import { YANMAR_SCENE_FONT } from "./troikaTextSetup";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { useTranslations } from "next-intl";
 import { Billboard, ContactShadows, RoundedBox, Text } from "@react-three/drei";
 import * as THREE from "three";
 import { YK_GEONGI_LOGO } from "@/lib/brand-assets";
 import { getGraphicsProfile } from "./graphicsQuality";
+import type { GraphicsQuality } from "./graphicsQuality";
 import type { AuxiliaryControlState, ExcavatorControlState, ControlMask, HydraulicVelocity } from "./controls";
 import { DEFAULT_BOOM_SWING } from "./controls";
 import { ExcavatorBucket } from "./ExcavatorBucket";
@@ -213,6 +214,8 @@ interface ExcavatorSceneProps {
   /** Start-gate open after countdown GO (false while ready/countdown). */
   sportsMeetGateOpen?: boolean;
   levelUpBurst?: { key: number; level: number } | null;
+  /** When set, remounts Canvas profile for this quality tier. */
+  graphicsQuality?: GraphicsQuality;
 }
 
 function TerrainMesh({
@@ -4147,7 +4150,10 @@ function SceneReadySignal({ onReady }: { onReady?: () => void }) {
 function SceneContent(props: ExcavatorSceneProps) {
   const terrainRevision = props.terrainRevision ?? 0;
   const sportsArena = Boolean(props.sportsArenaActive);
-  const gfx = useMemo(() => getGraphicsProfile(), []);
+  const gfx = useMemo(
+    () => getGraphicsProfile(props.graphicsQuality),
+    [props.graphicsQuality],
+  );
   const shadowExtent = gfx.shadowCameraExtent;
   return (
     <>
@@ -4342,16 +4348,38 @@ const CANVAS_SHADOWS = {
   type: THREE.PCFShadowMap,
 } as const;
 
+/**
+ * Remounting the Canvas creates another WebGL context. If losses keep coming
+ * (browser context limit, GPU reset), remounting forever just re-loses it and
+ * the screen flickers, so stop after a couple of tries and wait for the
+ * browser's own `webglcontextrestored`.
+ */
+const MAX_GL_REMOUNT_RECOVERIES = 2;
+
 export function ExcavatorScene(props: ExcavatorSceneProps) {
   const [glRecoveryKey, setGlRecoveryKey] = useState(0);
   const recoveringRef = useRef(false);
-  const gfx = useMemo(() => getGraphicsProfile(), []);
+  const remountCountRef = useRef(0);
+  const recoveryTimerRef = useRef<number | null>(null);
+  const gfx = useMemo(
+    () => getGraphicsProfile(props.graphicsQuality),
+    [props.graphicsQuality],
+  );
   const canvasShadows =
     gfx.shadows === false ? false : CANVAS_SHADOWS;
 
+  useEffect(
+    () => () => {
+      if (recoveryTimerRef.current !== null) {
+        window.clearTimeout(recoveryTimerRef.current);
+      }
+    },
+    [],
+  );
+
   return (
     <Canvas
-      key={glRecoveryKey}
+      key={`${glRecoveryKey}-${gfx.quality}`}
       shadows={canvasShadows}
       gl={{
         antialias: gfx.antialias,
@@ -4376,13 +4404,22 @@ export function ExcavatorScene(props: ExcavatorSceneProps) {
           if (recoveringRef.current) return;
           recoveringRef.current = true;
           // Prefer browser restore; only remount Canvas if context never comes back.
-          const fallback = window.setTimeout(() => {
-            setGlRecoveryKey((key) => key + 1);
-            recoveringRef.current = false;
-          }, 1200);
+          const canRemount =
+            remountCountRef.current < MAX_GL_REMOUNT_RECOVERIES;
+          const fallback = canRemount
+            ? window.setTimeout(() => {
+                recoveryTimerRef.current = null;
+                remountCountRef.current += 1;
+                setGlRecoveryKey((key) => key + 1);
+                recoveringRef.current = false;
+              }, 1200)
+            : null;
+          recoveryTimerRef.current = fallback;
           const onRestored = () => {
-            window.clearTimeout(fallback);
+            if (fallback !== null) window.clearTimeout(fallback);
+            recoveryTimerRef.current = null;
             recoveringRef.current = false;
+            remountCountRef.current = 0;
             canvas.removeEventListener("webglcontextrestored", onRestored);
             try {
               gl.setSize(canvas.clientWidth, canvas.clientHeight, false);

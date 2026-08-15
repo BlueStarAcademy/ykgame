@@ -309,7 +309,10 @@
       "admin": "Admin",
       "inquiry": "Support",
       "language": "Language",
-      "detailedSettings": "Details"
+      "detailedSettings": "Details",
+      "graphicsQuality": "Graphics",
+      "graphicsPerformance": "Performance",
+      "graphicsHigh": "High"
     },
     "ads": {
       "rewardHint": "View reward",
@@ -1138,44 +1141,41 @@
       "claimReward": "Claim reward",
       "completionReward": "Completion reward",
       "claim": "Claim",
+      "exit": "Exit",
       "skipToGame": "SKIP · Go to game",
       "goalDistance": "{meters}m to goal",
       "steps": {
         "travel": {
           "title": "Travel",
-          "instruction": "Practice forward, reverse, left-lever right turn, and right-lever left turn for 10m each"
+          "instruction": "Forward / reverse / turn practice"
         },
         "boom": {
           "title": "Boom",
-          "instruction": "Raise the boom to max, then lower to max, three times"
+          "instruction": "Raise and lower boom"
         },
         "arm": {
           "title": "Arm",
-          "instruction": "Raise the arm to max, then lower to max, three times"
+          "instruction": "Curl and extend arm"
+        },
+        "swing": {
+          "title": "Swing",
+          "instruction": "90° left/right swing"
         },
         "bucket": {
           "title": "Bucket",
-          "instruction": "Load soil in the dirt zone, then dump it into the dump truck"
+          "instruction": "Load dirt, then dump"
         },
         "breaker": {
           "title": "Breaker",
-          "instruction": "Place the breaker vertically on asphalt and break with the left pedal"
+          "instruction": "Break asphalt"
         },
         "grapple": {
           "title": "Grapple",
-          "instruction": "Pick up a rock, load it, then dump it into the rock truck"
+          "instruction": "Pick up and unload rock"
         },
-        "gearDismantle": {
-          "title": "Dismantle gear",
-          "instruction": "Dismantling gear grants enhance cores"
-        },
-        "gearEnhance": {
-          "title": "Enhance gear",
-          "instruction": "Use enhance cores to upgrade your gear"
-        },
-        "gearSynth": {
-          "title": "Synthesize gear",
-          "instruction": "Synthesize three gear pieces of the same grade"
+        "blade": {
+          "title": "Blade",
+          "instruction": "Lower blade and drive"
         }
       }
     },
@@ -1193,7 +1193,8 @@
       "eyebrow": "Site Survey",
       "title": "Site map",
       "closeAriaLabel": "Close map",
-      "subtitle": "The red arrow shows your current position and direction.",
+      "subtitle": "The red arrow is your position. Tap the map or a legend item to teleport.",
+      "clickToTeleportAria": "Tap the map to choose a teleport destination",
       "legendAriaLabel": "Map legend",
       "legend": {
         "dig": "Soil pile",

@@ -12,6 +12,7 @@ import {
   type MaintenancePointKind,
 } from "./maintenance";
 import { yanmarAudio } from "./yanmarAudio";
+import { runRewardReelSpin } from "./rewardReelSpin";
 import styles from "./MaintenanceBonusRoulette.module.css";
 
 const STAR_ICON = "/images/star-currency.svg";
@@ -26,7 +27,6 @@ const POINT_ICONS: Record<MaintenancePointKind, string> = {
 };
 
 const REEL_LOOPS = 16;
-const ITEM_HEIGHT = 4.6; /* rem — keep in sync with CSS .slotItem */
 const SPIN_MS = 5_800;
 
 type ReelItem = {
@@ -176,81 +176,56 @@ export function MaintenanceBonusRoulette({
   onDone: () => void;
 }) {
   const t = useTranslations("yanmar");
+  const tRef = useRef(t);
+  tRef.current = t;
+  const grantedRef = useRef(granted);
+  grantedRef.current = granted;
   const [phase, setPhase] = useState<Phase>("spinning");
   const [reelItems, setReelItems] = useState<ReelItem[]>([]);
-  const [reelOffsetRem, setReelOffsetRem] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
   const spinRafRef = useRef(0);
   const spinningRef = useRef(false);
   const stopRequestedRef = useRef(false);
-  const startedRef = useRef(false);
 
   useEffect(() => {
+    const { items, stopIndex } = buildReel(fluidId, bonus, tRef.current);
+    setReelItems(items);
+    setPhase("spinning");
+    spinningRef.current = true;
+    stopRequestedRef.current = false;
+    yanmarAudio.playRouletteSpin();
+
+    const applyOffset = (px: number) => {
+      const track = trackRef.current;
+      if (track) track.style.transform = `translate3d(0, ${-px}px, 0)`;
+    };
+
+    runRewardReelSpin({
+      getItemHeight: () =>
+        (trackRef.current?.firstElementChild as HTMLElement | undefined)
+          ?.getBoundingClientRect().height ?? 0,
+      stopIndex,
+      durationMs: SPIN_MS,
+      spinningRef,
+      stopRequestedRef,
+      rafRef: spinRafRef,
+      applyOffset,
+      onDone: () => {
+        yanmarAudio.stopRouletteSpin();
+        setPhase("reveal");
+        yanmarAudio.playItemAcquire();
+        if (grantedRef.current.stars > 0) {
+          yanmarAudio.playStarAcquire();
+        }
+      },
+    });
+
     return () => {
       if (spinRafRef.current) cancelAnimationFrame(spinRafRef.current);
       spinningRef.current = false;
       yanmarAudio.stopRouletteSpin();
     };
-  }, []);
-
-  useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-
-    const { items, stopIndex } = buildReel(fluidId, bonus, t);
-    setReelItems(items);
-    setReelOffsetRem(0);
-    spinningRef.current = true;
-    stopRequestedRef.current = false;
-    setPhase("spinning");
-    yanmarAudio.playRouletteSpin();
-
-    const endOffset = stopIndex * ITEM_HEIGHT;
-    const start = performance.now();
-    let fromOffset = 0;
-    let segmentStart = start;
-    let segmentDuration = SPIN_MS;
-    let finishing = false;
-
-    const spinEase = (t: number) => {
-      const clamped = Math.min(1, Math.max(0, t));
-      const quint = 1 - (1 - clamped) ** 5;
-      const expo = clamped === 1 ? 1 : 1 - 2 ** (-10 * clamped);
-      return quint * 0.72 + expo * 0.28;
-    };
-
-    const frame = (now: number) => {
-      if (!spinningRef.current) return;
-
-      if (!finishing && stopRequestedRef.current) {
-        finishing = true;
-        const progress = Math.min(1, (now - segmentStart) / segmentDuration);
-        fromOffset = fromOffset + (endOffset - fromOffset) * spinEase(progress);
-        segmentStart = now;
-        const remain = 1 - progress;
-        segmentDuration = Math.min(1600, Math.max(900, remain * 1800));
-      }
-
-      const t = Math.min(1, (now - segmentStart) / segmentDuration);
-      const offset = fromOffset + (endOffset - fromOffset) * spinEase(t);
-      setReelOffsetRem(offset);
-
-      if (t >= 1) {
-        spinningRef.current = false;
-        yanmarAudio.stopRouletteSpin();
-        setReelOffsetRem(endOffset);
-        setPhase("reveal");
-        yanmarAudio.playItemAcquire();
-        if (granted.stars > 0) {
-          yanmarAudio.playStarAcquire();
-        }
-        return;
-      }
-
-      spinRafRef.current = requestAnimationFrame(frame);
-    };
-
-    spinRafRef.current = requestAnimationFrame(frame);
-  }, [fluidId, bonus, granted.stars, t]);
+  }, [fluidId, bonus]);
 
   function requestStopSpin() {
     if (phase !== "spinning") return;
@@ -275,10 +250,8 @@ export function MaintenanceBonusRoulette({
               <div className={styles.slotPointer} aria-hidden />
               <div className={styles.slotWindow}>
                 <div
+                  ref={trackRef}
                   className={styles.slotTrack}
-                  style={{
-                    transform: `translate3d(0, -${reelOffsetRem}rem, 0)`,
-                  }}
                 >
                   {reelItems.map((item, i) => (
                     <div className={styles.slotItem} key={`${item.key}-${i}`}>

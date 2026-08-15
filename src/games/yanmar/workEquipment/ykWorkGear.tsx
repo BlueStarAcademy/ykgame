@@ -27,7 +27,6 @@ import { getGraphicsProfile } from "../graphicsQuality";
 const RED = YANMAR_PAINT_RED;
 const CHROME = YANMAR_MACHINE_COLORS.chrome;
 const BARREL = YANMAR_MACHINE_COLORS.frame;
-const PAINT_GFX = getGraphicsProfile();
 
 /** Solid section — slightly stout, with a dark silhouette rim. */
 const BOOM_H = 0.34;
@@ -38,7 +37,8 @@ const ARM_D = 0.26;
 const RIM = 0.02;
 
 function Paint(_props?: { dark?: boolean }) {
-  if (PAINT_GFX.quality === "performance") {
+  const gfx = getGraphicsProfile();
+  if (gfx.quality === "performance") {
     return (
       <meshStandardMaterial
         color={RED}
@@ -52,9 +52,9 @@ function Paint(_props?: { dark?: boolean }) {
       color={RED}
       roughness={YANMAR_PAINT_MATERIAL.roughness}
       metalness={YANMAR_PAINT_MATERIAL.metalness}
-      clearcoat={PAINT_GFX.paintClearcoat}
+      clearcoat={gfx.paintClearcoat}
       clearcoatRoughness={YANMAR_PAINT_MATERIAL.clearcoatRoughness}
-      envMapIntensity={PAINT_GFX.paintEnvMapIntensity}
+      envMapIntensity={gfx.paintEnvMapIntensity}
     />
   );
 }

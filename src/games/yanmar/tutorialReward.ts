@@ -9,11 +9,17 @@ import {
   clampGearInventorySlots,
   GEAR_INVENTORY_BASE,
 } from "./gearCatalog";
-import { TUTORIAL_REWARDS, type TutorialStepId } from "./tutorialProgress";
+import { cappedCurrencyIncrement } from "@/lib/currency";
+import {
+  TUTORIAL_REWARDS,
+  isCurrencyTutorialReward,
+  isGearTutorialReward,
+  type TutorialStepId,
+} from "./tutorialProgress";
 
 type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
-export async function grantTutorialRewardGear(
+export async function grantTutorialReward(
   tx: Tx,
   userId: string,
   stepId: TutorialStepId,
@@ -21,6 +27,69 @@ export async function grantTutorialRewardGear(
 ) {
   const reward = TUTORIAL_REWARDS[stepId];
   if (!reward) {
+    return { granted: false as const, reason: "no_reward" as const };
+  }
+
+  if (isCurrencyTutorialReward(reward)) {
+    const stars = Math.max(0, reward.stars ?? 0);
+    const enhanceCores = Math.max(0, reward.enhanceCores ?? 0);
+    const gachaTicketsStandard = Math.max(0, reward.gachaTicketsStandard ?? 0);
+    const gachaTicketsPremium = Math.max(0, reward.gachaTicketsPremium ?? 0);
+    if (
+      stars <= 0 &&
+      enhanceCores <= 0 &&
+      gachaTicketsStandard <= 0 &&
+      gachaTicketsPremium <= 0
+    ) {
+      return { granted: false as const, reason: "no_reward" as const };
+    }
+
+    const before = await tx.user.findUnique({
+      where: { id: userId },
+      select: { currency: true },
+    });
+    const { next: nextCurrency, granted: grantedStars } = cappedCurrencyIncrement(
+      before?.currency ?? 0,
+      stars,
+    );
+
+    const user = await tx.user.update({
+      where: { id: userId },
+      data: {
+        ...(grantedStars > 0 ? { currency: nextCurrency } : {}),
+        ...(enhanceCores > 0
+          ? { enhanceCores: { increment: enhanceCores } }
+          : {}),
+        ...(gachaTicketsStandard > 0
+          ? { gachaTicketsStandard: { increment: gachaTicketsStandard } }
+          : {}),
+        ...(gachaTicketsPremium > 0
+          ? { gachaTicketsPremium: { increment: gachaTicketsPremium } }
+          : {}),
+      },
+      select: {
+        currency: true,
+        enhanceCores: true,
+        gachaTicketsStandard: true,
+        gachaTicketsPremium: true,
+      },
+    });
+
+    return {
+      granted: true as const,
+      kind: "currency" as const,
+      currency: user.currency,
+      enhanceCores: user.enhanceCores,
+      gachaTicketsStandard: user.gachaTicketsStandard,
+      gachaTicketsPremium: user.gachaTicketsPremium,
+      grantedStars,
+      grantedEnhanceCores: enhanceCores,
+      grantedGachaTicketsStandard: gachaTicketsStandard,
+      grantedGachaTicketsPremium: gachaTicketsPremium,
+    };
+  }
+
+  if (!isGearTutorialReward(reward)) {
     return { granted: false as const, reason: "no_reward" as const };
   }
 
@@ -69,9 +138,20 @@ export async function grantTutorialRewardGear(
 
   return {
     granted: true as const,
+    kind: "gear" as const,
     item: created,
     nameSnapshot: data.nameSnapshot,
     gradeLabel: ITEM_GRADE_LABEL[data.grade],
     slotLabel: GEAR_SLOT_LABEL[data.slot],
   };
+}
+
+/** @deprecated Prefer grantTutorialReward */
+export async function grantTutorialRewardGear(
+  tx: Tx,
+  userId: string,
+  stepId: TutorialStepId,
+  gameId = "yanmar",
+) {
+  return grantTutorialReward(tx, userId, stepId, gameId);
 }

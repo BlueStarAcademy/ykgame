@@ -361,7 +361,7 @@ export function PlayerProfileModal({
       <AppModalOverlay
         open={open}
         onClose={handleClose}
-        panelClassName="!max-w-[min(96vw,42rem)] !max-h-[min(94dvh,44rem)] !overflow-hidden !p-0 landscape:!max-h-[min(96dvh,36rem)]"
+        panelClassName="!h-auto !max-h-[min(90dvh,44rem)] !max-w-[min(96vw,42rem)] !overflow-hidden !p-0"
       >
         <div className="yanmar-profile-modal">
           <div className="yanmar-profile-modal-header">

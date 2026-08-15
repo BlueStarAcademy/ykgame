@@ -96,6 +96,11 @@ import { DumpHintPanel } from "./DumpHintPanel";
 import { YanmarGameSettingsMenu } from "./YanmarGameSettingsMenu";
 import { type HornId } from "./soundSettings";
 import { useSoundSettings } from "./useSoundSettings";
+import {
+  getGraphicsQuality,
+  setGraphicsQuality,
+  type GraphicsQuality,
+} from "./graphicsQuality";
 import { yanmarAudio } from "./yanmarAudio";
 import { QuestPanel } from "./QuestPanel";
 import { ShopPanel, type GachaPayWith } from "./ShopPanel";
@@ -191,6 +196,7 @@ import {
 } from "./dumpTruckState";
 import {
   applyFloodZoneUpgradeStats,
+  DIG_ZONE,
   ensureFloodZoneForLevel,
   expandTerrainForLevel,
   fastForwardHaulTruckState,
@@ -253,6 +259,7 @@ import {
   loadMonumentQuestState,
   markMonumentDailyClaimed,
   MONUMENT_POINTS_ICON,
+  MONUMENT_SIGN,
   MONUMENT_UNLOCK_LEVEL,
   monumentStorageCap,
   pushMonumentQuestProgress,
@@ -300,10 +307,14 @@ import {
   getTutorialWaypoint,
   TUTORIAL_STEPS,
   getNewTutorialStepIds,
+  getTutorialStepIndex,
+  findRegionTutorialOffer,
+  isInTutorialRegion,
+  isTutorialStepUnlocked,
   waypointDistance,
   type GameMode,
-  type TutorialGearAction,
   type TutorialPhaseProgress,
+  type TutorialRegionId,
   type TutorialStep,
   type TutorialStepId,
   type TutorialWaypoint,
@@ -315,7 +326,7 @@ import {
   parseYanmarTutorialState,
   withCompletedStep,
   withSeenNew,
-  countClaimableTutorialRewards,
+  countUnclaimedTutorialRewardNotices,
   type YanmarTutorialState,
 } from "./tutorialProgress";
 import {
@@ -418,6 +429,27 @@ function resetSim(sim: import("./types").ExcavatorSimState, vel: HydraulicVeloci
   Object.assign(vel, createHydraulicVelocity());
 }
 
+/** World units ≈ meters. Map teleport lands this far from the landmark. */
+const MAP_TELEPORT_OFFSET_M = 10;
+
+function mapTeleportApproach(
+  centerX: number,
+  centerZ: number,
+  awayX: number,
+  awayZ: number,
+  clearanceM = 0,
+) {
+  const length = Math.hypot(awayX, awayZ) || 1;
+  const nx = awayX / length;
+  const nz = awayZ / length;
+  const distance = Math.max(MAP_TELEPORT_OFFSET_M, clearanceM);
+  return {
+    x: centerX + nx * distance,
+    z: centerZ + nz * distance,
+    heading: Math.atan2(-nx, -nz),
+  };
+}
+
 function HudFeatureLock({ locked, level }: { locked: boolean; level: number }) {
   if (!locked) return null;
   return (
@@ -455,6 +487,7 @@ function TutorialGuideHud({
   guide,
   showWaypoint,
   goalDist,
+  onExit,
 }: {
   step: TutorialStep;
   phaseDisplay: { current: number; total: number };
@@ -462,32 +495,91 @@ function TutorialGuideHud({
   guide: string;
   showWaypoint: boolean;
   goalDist: number;
+  onExit: () => void;
 }) {
   const t = useTranslations("yanmar.tutorial");
+  const flashKind = flash?.kind ?? null;
+  const stateClass =
+    flashKind === "phase"
+      ? " is-phase"
+      : flashKind === "complete"
+        ? " is-complete"
+        : "";
+  const lessonNo = getTutorialStepIndex(step.id) + 1;
+  const phaseTotal = Math.max(1, phaseDisplay.total);
+  const phaseCurrent = Math.min(Math.max(1, phaseDisplay.current), phaseTotal);
   return (
-    <div className="yanmar-tutorial-guide" role="status" aria-live="polite">
-      <div className="yanmar-tutorial-guide-head">
-        <p className="yanmar-tutorial-guide-title">{step.title}</p>
-        <p className="yanmar-tutorial-guide-phase">
-          {phaseDisplay.current}/{phaseDisplay.total}
-        </p>
+    <div
+      className={`yanmar-tutorial-guide${stateClass}`}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="yanmar-tutorial-guide-glow" aria-hidden />
+      <div className="yanmar-tutorial-guide-bar" aria-hidden>
+        {Array.from({ length: phaseTotal }, (_, i) => (
+          <i
+            key={i}
+            className={
+              i < phaseCurrent - 1
+                ? "is-done"
+                : i === phaseCurrent - 1
+                  ? "is-active"
+                  : ""
+            }
+          />
+        ))}
       </div>
-      <p
-        className={`yanmar-tutorial-guide-copy${
-          flash?.kind === "phase"
-            ? " is-phase"
-            : flash?.kind === "complete"
-              ? " is-complete"
-              : ""
-        }`}
-      >
-        {flash ? `✓ ${flash.message}` : guide || step.instruction}
-      </p>
-      {showWaypoint ? (
-        <p className="yanmar-tutorial-guide-goal">
-          {t("goalDistance", { meters: goalDist })}
+      <div className="yanmar-tutorial-guide-head">
+        {lessonNo > 0 ? (
+          <span className="yanmar-tutorial-guide-badge" aria-hidden>
+            {lessonNo}
+          </span>
+        ) : null}
+        <span className="yanmar-tutorial-guide-titles">
+          <span className="yanmar-tutorial-guide-kicker">
+            {phaseTotal > 1
+              ? `STEP ${phaseCurrent} / ${phaseTotal}`
+              : "TUTORIAL"}
+          </span>
+          <span className="yanmar-tutorial-guide-title">{step.title}</span>
+        </span>
+        <button
+          type="button"
+          className="yanmar-tutorial-guide-exit"
+          onClick={onExit}
+          aria-label={t("exit")}
+        >
+          <svg viewBox="0 0 16 16" width="9" height="9" fill="none" aria-hidden>
+            <path
+              d="M4.2 4.2l7.6 7.6M11.8 4.2L4.2 11.8"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+            />
+          </svg>
+          <span>{t("exit")}</span>
+        </button>
+      </div>
+      <div className="yanmar-tutorial-guide-body">
+        <p className={`yanmar-tutorial-guide-copy${stateClass}`}>
+          {flash ? (
+            <>
+              <span className="yanmar-tutorial-guide-check" aria-hidden>
+                ✓
+              </span>
+              {flash.message}
+            </>
+          ) : (
+            guide || step.instruction
+          )}
         </p>
-      ) : null}
+        {showWaypoint ? (
+          <p className="yanmar-tutorial-guide-chip">
+            <span className="yanmar-tutorial-guide-chip-dot" aria-hidden />
+            {t("goalDistance", { meters: goalDist })}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1496,6 +1588,9 @@ export function ExcavatorGameWrapper({
   const tutorialCelebratedPhaseRef = useRef(-1);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [soundSettings, updateSoundSettings] = useSoundSettings();
+  const [graphicsQuality, setGraphicsQualityState] = useState<GraphicsQuality>(
+    () => getGraphicsQuality(),
+  );
   const [showMinimap, setShowMinimap] = useState(true);
   const [showMapModal, setShowMapModal] = useState(false);
   const [showMissionQuest, setShowMissionQuest] = useState(true);
@@ -1507,7 +1602,11 @@ export function ExcavatorGameWrapper({
   tutorialStateRef.current = tutorialState;
   const [claimingTutorialId, setClaimingTutorialId] =
     useState<TutorialStepId | null>(null);
-  const tutorialGearOpenedRef = useRef(false);
+  const claimingTutorialIdRef = useRef<TutorialStepId | null>(null);
+  /** Edge-detect region entry for auto tutorial offers (game mode). */
+  const tutorialRegionInsideRef = useRef<Partial<Record<TutorialRegionId, boolean>>>(
+    {},
+  );
   const [showQuestPanel, setShowQuestPanel] = useState(false);
   const [showShopPanel, setShowShopPanel] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -2783,21 +2882,66 @@ export function ExcavatorGameWrapper({
       const target = (() => {
         switch (destination) {
           case "dig":
-            return { x: SITE_LAYOUT.dig[0], z: SITE_LAYOUT.dig[1], heading: 0 };
+            return mapTeleportApproach(
+              SITE_LAYOUT.dig[0],
+              SITE_LAYOUT.dig[1],
+              0,
+              -1,
+              DIG_ZONE.radius + 2,
+            );
           case "dump":
-            return { x: SITE_LAYOUT.dump[0] - 7, z: SITE_LAYOUT.dump[1], heading: Math.PI / 2 };
+            return mapTeleportApproach(
+              SITE_LAYOUT.dump[0],
+              SITE_LAYOUT.dump[1],
+              -1,
+              0,
+            );
           case "crash":
-            return { x: SITE_LAYOUT.crash[0] - 10, z: SITE_LAYOUT.crash[1], heading: Math.PI / 2 };
+            return mapTeleportApproach(
+              SITE_LAYOUT.crash[0],
+              SITE_LAYOUT.crash[1],
+              -1,
+              0,
+            );
           case "hill":
-            return { x: SITE_LAYOUT.hill[0] + 8, z: SITE_LAYOUT.hill[1] - 9, heading: 0 };
+            return mapTeleportApproach(
+              SITE_LAYOUT.hill[0],
+              SITE_LAYOUT.hill[1],
+              8,
+              -9,
+            );
           case "flood":
-            return { x: SITE_LAYOUT.flood[0] - 18, z: SITE_LAYOUT.flood[1] - 10, heading: Math.atan2(18, 10) };
+            return mapTeleportApproach(
+              SITE_LAYOUT.flood[0],
+              SITE_LAYOUT.flood[1],
+              -18,
+              -10,
+            );
           case "repair":
-            return { x: REPAIR_TENT.x - REPAIR_TENT.radius - 3, z: REPAIR_TENT.z, heading: Math.PI / 2 };
+            // Bay doors face the worksite. Do not offset west: the shop sits
+            // on the SW map edge, so that landing is clamped into the building.
+            return mapTeleportApproach(
+              REPAIR_TENT.x,
+              REPAIR_TENT.z,
+              Math.sin(REPAIR_TENT.rotationY),
+              Math.cos(REPAIR_TENT.rotationY),
+              5 + MAP_TELEPORT_OFFSET_M,
+            );
           case "monument":
-            return { x: SITE_LAYOUT.monument[0], z: SITE_LAYOUT.monument[1] - 8, heading: 0 };
+            return mapTeleportApproach(
+              SITE_LAYOUT.monument[0],
+              SITE_LAYOUT.monument[1],
+              0,
+              -1,
+              MONUMENT_SIGN.radius + 2,
+            );
           case "sports":
-            return { x: SITE_LAYOUT.sportsPortal[0] - 6, z: SITE_LAYOUT.sportsPortal[1], heading: Math.PI / 2 };
+            return mapTeleportApproach(
+              SITE_LAYOUT.sportsPortal[0],
+              SITE_LAYOUT.sportsPortal[1],
+              -1,
+              0,
+            );
         }
       })();
 
@@ -5678,25 +5822,19 @@ export function ExcavatorGameWrapper({
 
     resetDumpTruckState(dumpTruckStateRef.current);
     dumpTruckPoseRef.current = getDumpTruckPose(dumpTruckStateRef.current);
-    tutorialGearOpenedRef.current = false;
-    if (!step?.gearAction) {
-      const running = {
-        ...auxiliaryRef.current,
-        engineOn: true,
-        safetyLocked: false,
-      };
-      auxiliaryRef.current = running;
-      setAuxiliary(running);
-    }
-    if (step?.gearAction) {
-      setShowEquipmentUpgrade(true);
-    } else {
-      setShowEquipmentUpgrade(false);
-    }
+    const running = {
+      ...auxiliaryRef.current,
+      engineOn: true,
+      safetyLocked: false,
+    };
+    auxiliaryRef.current = running;
+    setAuxiliary(running);
+    setShowEquipmentUpgrade(false);
 
     setTutorialIndex(index);
     setShowQuestPanel(false);
     setShowShopPanel(false);
+    setShowTutorialMenu(false);
     setMode("tutorial");
   }, [
     clearTutorialFlashTimers,
@@ -5764,6 +5902,29 @@ export function ExcavatorGameWrapper({
     startGameDirect();
   }, [persistTutorialPatch, startGameDirect]);
 
+  const exitTutorial = useCallback(() => {
+    clearTutorialFlashTimers();
+    tutorialCompletingRef.current = false;
+    tutorialUiPauseUntilRef.current = 0;
+    tutorialStepRef.current = null;
+    tutorialPhaseRef.current = null;
+    tutorialWaypointRef.current = null;
+    tutorialGuideRef.current = "";
+    tutorialCelebratedPhaseRef.current = -1;
+    setTutorialIndex(-1);
+    setTutorialGuide("");
+    setTutorialHasWaypoint(false);
+    setTutorialFlash(null);
+    setShowEquipmentUpgrade(false);
+    setShowTutorialMenu(false);
+    persistTutorialPatch({ introDone: true });
+    startGameDirect();
+  }, [
+    clearTutorialFlashTimers,
+    persistTutorialPatch,
+    startGameDirect,
+  ]);
+
   useRegisterInGameBackDismiss(
     showTutorialMenu && tutorialState.introDone,
     () => setShowTutorialMenu(false),
@@ -5771,6 +5932,12 @@ export function ExcavatorGameWrapper({
 
   const claimTutorialReward = useCallback(async (stepId: TutorialStepId) => {
     if (!session?.user?.id) return;
+    const current = tutorialStateRef.current;
+    if (!current.completed.includes(stepId) || current.claimed.includes(stepId)) {
+      return;
+    }
+    if (claimingTutorialIdRef.current) return;
+    claimingTutorialIdRef.current = stepId;
     setClaimingTutorialId(stepId);
     try {
       const res = await fetch("/api/yanmar/tutorial/claim", {
@@ -5781,8 +5948,19 @@ export function ExcavatorGameWrapper({
       const data = (await res.json()) as {
         error?: string;
         tutorial?: unknown;
+        kind?: "gear" | "currency";
+        item?: { slot?: string; grade?: string; nameSnapshot?: string };
+        nameSnapshot?: string;
         items?: unknown;
         stats?: unknown;
+        currency?: number;
+        enhanceCores?: number;
+        gachaTicketsStandard?: number;
+        gachaTicketsPremium?: number;
+        grantedStars?: number;
+        grantedEnhanceCores?: number;
+        grantedGachaTicketsStandard?: number;
+        grantedGachaTicketsPremium?: number;
       };
       if (res.status === 409 || data.error === "INVENTORY_FULL") {
         setShowInventoryFullModal(true);
@@ -5792,23 +5970,70 @@ export function ExcavatorGameWrapper({
       const next = parseYanmarTutorialState(data.tutorial);
       tutorialStateRef.current = next;
       setTutorialState(next);
-      if (Array.isArray(data.items)) {
-        setGearItems(data.items as typeof gearItems);
-      }
-      if (data.stats) {
-        publishEquipmentStatsRef.current(data.stats as never);
+      if (data.kind === "currency") {
+        if (typeof data.currency === "number") {
+          currencyRef.current = data.currency;
+          setCurrency(data.currency);
+          setPreviewStars(data.currency);
+          void updateSessionRef.current({
+            user: { currency: data.currency },
+          });
+        }
+        if (typeof data.enhanceCores === "number") {
+          setEnhanceCores(data.enhanceCores);
+        }
+        if (typeof data.gachaTicketsStandard === "number") {
+          setGachaTicketsStandard(data.gachaTicketsStandard);
+        }
+        if (typeof data.gachaTicketsPremium === "number") {
+          setGachaTicketsPremium(data.gachaTicketsPremium);
+        }
+        const grantedStars = Math.max(0, data.grantedStars ?? 0);
+        const grantedCores = Math.max(0, data.grantedEnhanceCores ?? 0);
+        const grantedStd = Math.max(0, data.grantedGachaTicketsStandard ?? 0);
+        const grantedPrem = Math.max(0, data.grantedGachaTicketsPremium ?? 0);
+        if (
+          grantedStars > 0 ||
+          grantedCores > 0 ||
+          grantedStd > 0 ||
+          grantedPrem > 0
+        ) {
+          if (grantedStars > 0) {
+            rewardStarsRef.current += grantedStars;
+            yanmarAudio.playStarAcquire();
+          } else {
+            yanmarAudio.playItemAcquire();
+          }
+          showStandaloneRewardPanelRef.current?.(
+            0,
+            false,
+            grantedStars,
+            0,
+            "",
+            grantedCores,
+            0,
+            grantedStd,
+            grantedPrem,
+          );
+        }
+      } else {
+        if (Array.isArray(data.items)) {
+          setGearItems(data.items as typeof gearItems);
+        }
+        if (data.stats) {
+          publishEquipmentStatsRef.current(data.stats as never);
+        }
+        notifyGearDrop({
+          nameSnapshot: data.nameSnapshot ?? data.item?.nameSnapshot,
+          grade: data.item?.grade,
+          slot: data.item?.slot,
+        });
       }
     } finally {
+      claimingTutorialIdRef.current = null;
       setClaimingTutorialId(null);
     }
-  }, [session?.user?.id]);
-
-  const handleTutorialGearAction = useCallback((action: TutorialGearAction) => {
-    const step = tutorialStepRef.current;
-    if (step?.gearAction === action) {
-      tutorialGearOpenedRef.current = true;
-    }
-  }, []);
+  }, [notifyGearDrop, session?.user?.id]);
 
   const handleSimTick = useCallback(() => {
     syncDigHud();
@@ -6004,6 +6229,62 @@ export function ExcavatorGameWrapper({
       }
     }
 
+    if (modeRef.current === "game") {
+      const sim = simRef.current;
+      const terrain = terrainRef.current;
+      if (
+        sim &&
+        terrain &&
+        !tutorialCompletingRef.current &&
+        !tutorialStepRef.current &&
+        !showTutorialMenu
+      ) {
+        const regions: TutorialRegionId[] = ["dig", "crash", "hill", "flood"];
+        const playerLevel = getPlayerLevelProgress(totalXpRef.current).level;
+        for (const region of regions) {
+          const inside = isInTutorialRegion(
+            region,
+            terrain,
+            sim.posX,
+            sim.posZ,
+          );
+          const wasInside = tutorialRegionInsideRef.current[region] === true;
+          tutorialRegionInsideRef.current[region] = inside;
+          if (!inside || wasInside) continue;
+          const offer = findRegionTutorialOffer(
+            region,
+            playerLevel,
+            tutorialStateRef.current,
+          );
+          if (!offer) continue;
+          const index = getTutorialStepIndex(offer.id);
+          if (index < 0) continue;
+          if (
+            offer.unlockLevel > 1 &&
+            !tutorialStateRef.current.seenNew.includes(offer.id)
+          ) {
+            persistTutorialPatch({
+              seenNew: withSeenNew(tutorialStateRef.current, [offer.id])
+                .seenNew,
+            });
+          }
+          startTutorialRef.current(index);
+          break;
+        }
+      } else if (sim && terrain) {
+        // Keep edge state in sync while a tutorial/menu is open.
+        const regions: TutorialRegionId[] = ["dig", "crash", "hill", "flood"];
+        for (const region of regions) {
+          tutorialRegionInsideRef.current[region] = isInTutorialRegion(
+            region,
+            terrain,
+            sim.posX,
+            sim.posZ,
+          );
+        }
+      }
+    }
+
     if (modeRef.current !== "tutorial") return;
     if (tutorialCompletingRef.current) return;
 
@@ -6034,8 +6315,8 @@ export function ExcavatorGameWrapper({
       travelBlockedRaiseArm: fb.travelBlockedRaiseArm,
       canDump: fb.canDump,
       grappleOpen: auxiliaryRef.current.grappleOpen,
-      gearActionOpened: tutorialGearOpenedRef.current,
       tipTouchingGround: fb.groundDepth >= -0.15,
+      blade: auxiliaryRef.current.blade,
     });
 
     const wp = getTutorialWaypoint(step, phase) ?? null;
@@ -6101,8 +6382,10 @@ export function ExcavatorGameWrapper({
     grantSportsMeetCourseStar,
     persistDumpTruckCooldown,
     persistGameSession,
+    persistTutorialPatch,
     pushQuestProgress,
     showTutorialComplete,
+    showTutorialMenu,
     showTutorialPhaseSuccess,
     syncDigHud,
     setHud,
@@ -7575,20 +7858,38 @@ export function ExcavatorGameWrapper({
   const playerLevelNow = getPlayerLevelProgress(totalXp).level;
   const gearCraftUnlocked = isGearCraftUnlocked(playerLevelNow);
   const questPanelUnlocked = isQuestPanelUnlocked(playerLevelNow);
-  const tutorialNotifyCount = countClaimableTutorialRewards(tutorialState);
-  const tutorialNotify =
-    tutorialNotifyCount === 0 &&
-    getNewTutorialStepIds(playerLevelNow, tutorialState.seenNew).length > 0;
+  const tutorialNotifyCount = countUnclaimedTutorialRewardNotices(
+    tutorialState,
+    new Set(
+      TUTORIAL_STEPS.filter((step) =>
+        isTutorialStepUnlocked(step, playerLevelNow),
+      ).map((step) => step.id),
+    ),
+  );
+  const tutorialNotify = false;
   const tutorialGuideHud =
     mode === "tutorial" && tutorialStep ? (
-      <TutorialGuideHud
-        step={tutorialStep}
-        phaseDisplay={tutorialPhaseDisplay}
-        flash={tutorialFlash}
-        guide={tutorialGuide}
-        showWaypoint={tutorialHasWaypoint}
-        goalDist={hud.goalDist}
-      />
+      <>
+        <TutorialGuideHud
+          step={tutorialStep}
+          phaseDisplay={tutorialPhaseDisplay}
+          flash={tutorialFlash}
+          guide={tutorialGuide}
+          showWaypoint={tutorialHasWaypoint}
+          goalDist={hud.goalDist}
+          onExit={exitTutorial}
+        />
+        {digFeedback.crashTileMaxHp > 0 ? (
+          <div className="pointer-events-none mt-1">
+            <CrashAsphaltHpPanel
+              hp={digFeedback.crashTileHp}
+              maxHp={digFeedback.crashTileMaxHp}
+              hitTick={digFeedback.crashHitTick}
+              hitDamage={digFeedback.crashHitDamage}
+            />
+          </div>
+        ) : null}
+      </>
     ) : null;
 
   return (
@@ -7649,10 +7950,7 @@ export function ExcavatorGameWrapper({
           }}
         />
         <GearPanel
-          open={
-            showEquipmentUpgrade &&
-            (gearCraftUnlocked || Boolean(tutorialStep?.gearAction))
-          }
+          open={showEquipmentUpgrade && gearCraftUnlocked}
           onClose={() => setShowEquipmentUpgrade(false)}
           items={gearItems}
           currency={mode === "game" ? currency : previewStars}
@@ -7692,8 +7990,6 @@ export function ExcavatorGameWrapper({
           onSellMany={async (ids) => runGearSellMany(ids)}
           onSynthesize={(itemIds) => runGearSynthesize(itemIds)}
           onExpandInventory={() => void handleExpandInventory()}
-          tutorialGearAction={tutorialStep?.gearAction ?? null}
-          onTutorialGearAction={handleTutorialGearAction}
         />
         <PlayerProfileModal
           open={showProfileModal}
@@ -8361,37 +8657,6 @@ export function ExcavatorGameWrapper({
                       level={PLAYER_UNLOCKS.GEAR_CRAFT}
                     />
                   </button>
-                  {mode !== "sportsRanked" && mode !== "sportsPractice" ? (
-                    <button
-                      type="button"
-                      onPointerDown={activateOnPointerDown(openTutorialList)}
-                      className="relative h-[2.75rem] rounded-lg border border-white/20 bg-black/70 px-2.5 text-[11px] font-bold text-white shadow-lg backdrop-blur-sm hover:bg-black/85"
-                      aria-label={
-                        tutorialNotifyCount > 0
-                          ? hudT("tutorialOpenClaimable", {
-                              count: tutorialNotifyCount,
-                            })
-                          : hudT("tutorial")
-                      }
-                    >
-                      {hudT("tutorial")}
-                      {tutorialNotifyCount > 0 ? (
-                        <span
-                          className="yanmar-quest-notify-badge is-icon"
-                          aria-hidden
-                        >
-                          {tutorialNotifyCount > 9
-                            ? "9+"
-                            : tutorialNotifyCount}
-                        </span>
-                      ) : tutorialNotify ? (
-                        <span
-                          className="yanmar-quest-notify-badge is-dot"
-                          aria-hidden
-                        />
-                      ) : null}
-                    </button>
-                  ) : null}
                 {nearMonument &&
                 !showMonumentPanel &&
                 !nearRepairTent &&
@@ -8636,7 +8901,11 @@ export function ExcavatorGameWrapper({
         ) : null}
 
         {mode !== "intro" && mode !== "ride" && (
-          <div className="pointer-events-none absolute left-1/2 top-14 z-50 flex -translate-x-1/2 flex-col items-center gap-1">
+          <div
+            className={`pointer-events-none absolute left-1/2 top-14 flex -translate-x-1/2 flex-col items-center gap-1 ${
+              mode === "tutorial" ? "z-[98]" : "z-50"
+            }`}
+          >
             {!(immersive && headerHudReady) ? (
               <div className="flex min-w-[5.5rem] flex-col items-center rounded-xl border border-white/15 bg-black/45 px-3 py-1.5 text-white shadow-lg backdrop-blur-sm">
                 <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/70">
@@ -8769,7 +9038,7 @@ export function ExcavatorGameWrapper({
                 {hudT("status.carryingTrash")}
               </div>
             ) : null}
-            {digFeedback.crashTileMaxHp > 0 ? (
+            {mode !== "tutorial" && digFeedback.crashTileMaxHp > 0 ? (
               <CrashAsphaltHpPanel
                 hp={digFeedback.crashTileHp}
                 maxHp={digFeedback.crashTileMaxHp}
@@ -9339,6 +9608,11 @@ export function ExcavatorGameWrapper({
           onToggleMinimap={() => setShowMinimap((v) => !v)}
           showMissionQuest={showMissionQuest}
           onToggleMissionQuest={() => setShowMissionQuest((v) => !v)}
+          graphicsQuality={graphicsQuality}
+          onGraphicsQualityChange={(quality) => {
+            setGraphicsQuality(quality);
+            setGraphicsQualityState(quality);
+          }}
           bgmEnabled={soundSettings.bgmEnabled}
           onToggleBgm={() => {
             const bgmEnabled = !soundSettings.bgmEnabled;
@@ -9447,6 +9721,7 @@ export function ExcavatorGameWrapper({
               lookOffsetRef={lookOffsetRef}
               endedRef={endedRef}
               activeChassisId={String(activeChassisId)}
+              graphicsQuality={graphicsQuality}
               onSceneReady={handleSceneReady}
               worldPickupsRef={
                 mode === "game" && session?.user?.id

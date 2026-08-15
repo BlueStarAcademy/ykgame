@@ -3,12 +3,12 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { asJson } from "@/games/yanmar/jsonCompat";
 import { ensureYanmarGearMigration } from "@/games/yanmar/gearMigrate";
-import { grantTutorialRewardGear } from "@/games/yanmar/tutorialReward";
+import { grantTutorialReward } from "@/games/yanmar/tutorialReward";
 import { loadUserFinalStats } from "@/games/yanmar/gearService";
 import {
   parseYanmarTutorialState,
   withClaimedStep,
-  TUTORIAL_REWARDS,
+  hasTutorialReward,
   TUTORIAL_STEP_IDS,
   type TutorialStepId,
 } from "@/games/yanmar/tutorialProgress";
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid step" }, { status: 400 });
   }
   const id = stepId as TutorialStepId;
-  if (!TUTORIAL_REWARDS[id]) {
+  if (!hasTutorialReward(id)) {
     return NextResponse.json({ error: "NO_REWARD" }, { status: 400 });
   }
 
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
         throw new Error("ALREADY_CLAIMED");
       }
 
-      const grant = await grantTutorialRewardGear(tx, session.user.id, id);
+      const grant = await grantTutorialReward(tx, session.user.id, id);
       if (!grant.granted) {
         if (grant.reason === "inventory_full") {
           throw new Error("INVENTORY_FULL");
@@ -66,10 +66,28 @@ export async function POST(req: Request) {
         where: { id: session.user.id },
         data: { yanmarTutorial: asJson(next) },
       });
+
+      if (grant.kind === "currency") {
+        return {
+          ok: true,
+          tutorial: next,
+          kind: "currency" as const,
+          currency: grant.currency,
+          enhanceCores: grant.enhanceCores,
+          gachaTicketsStandard: grant.gachaTicketsStandard,
+          gachaTicketsPremium: grant.gachaTicketsPremium,
+          grantedStars: grant.grantedStars,
+          grantedEnhanceCores: grant.grantedEnhanceCores,
+          grantedGachaTicketsStandard: grant.grantedGachaTicketsStandard,
+          grantedGachaTicketsPremium: grant.grantedGachaTicketsPremium,
+        };
+      }
+
       const loaded = await loadUserFinalStats(tx, session.user.id);
       return {
         ok: true,
         tutorial: next,
+        kind: "gear" as const,
         item: grant.item,
         nameSnapshot: grant.nameSnapshot,
         gradeLabel: grant.gradeLabel,

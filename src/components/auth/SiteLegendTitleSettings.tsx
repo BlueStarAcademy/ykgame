@@ -7,6 +7,11 @@ import { YanmarGameSettingsMenu } from "@/games/yanmar/YanmarGameSettingsMenu";
 import { yanmarAudio } from "@/games/yanmar/yanmarAudio";
 import type { HornId } from "@/games/yanmar/soundSettings";
 import { useSoundSettings } from "@/games/yanmar/useSoundSettings";
+import {
+  getGraphicsQuality,
+  setGraphicsQuality,
+  type GraphicsQuality,
+} from "@/games/yanmar/graphicsQuality";
 
 interface SiteLegendTitleSettingsProps {
   open: boolean;
@@ -24,6 +29,9 @@ export function SiteLegendTitleSettings({
   rankingNickname,
 }: SiteLegendTitleSettingsProps) {
   const [soundSettings, updateSoundSettings] = useSoundSettings();
+  const [graphicsQuality, setGraphicsQualityState] = useState<GraphicsQuality>(
+    () => getGraphicsQuality(),
+  );
   const [showMinimap, setShowMinimap] = useState(true);
   const [showMissionQuest, setShowMissionQuest] = useState(true);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -52,6 +60,11 @@ export function SiteLegendTitleSettings({
         onToggleMinimap={() => setShowMinimap((v) => !v)}
         showMissionQuest={showMissionQuest}
         onToggleMissionQuest={() => setShowMissionQuest((v) => !v)}
+        graphicsQuality={graphicsQuality}
+        onGraphicsQualityChange={(quality) => {
+          setGraphicsQuality(quality);
+          setGraphicsQualityState(quality);
+        }}
         bgmEnabled={soundSettings.bgmEnabled}
         onToggleBgm={handleToggleBgm}
         bgmVolume={soundSettings.bgmVolume}

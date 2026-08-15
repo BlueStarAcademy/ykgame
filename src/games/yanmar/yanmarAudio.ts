@@ -52,7 +52,6 @@ const BUFF_ACQUIRE_SRC = `${SOUND_BASE}/buff-acquire.ogg`;
 const ITEM_ACQUIRE_SRC = `${SOUND_BASE}/item-acquire.ogg`;
 const MASTER_ITEM_ACQUIRE_SRC = `${SOUND_BASE}/master-item-acquire.ogg`;
 const SPORTS_COUNTDOWN_SRC = `${SOUND_BASE}/countdown.ogg`;
-const SPIN_WHOOSH_SRC = `${SOUND_BASE}/spin-whoosh.ogg?v=2`;
 const ATTACHMENT_UNLOCK_SRC = `${SOUND_BASE}/attachment-unlock.ogg`;
 const TRAVEL_1_SRC = `${SOUND_BASE}/travel-1.ogg`;
 const TRAVEL_2_SRC = `${SOUND_BASE}/travel-2.ogg`;
@@ -75,7 +74,7 @@ const BUFF_ACQUIRE_BASE_VOLUME = 0.88;
 const ITEM_ACQUIRE_BASE_VOLUME = 0.88;
 const MASTER_ITEM_ACQUIRE_BASE_VOLUME = 0.92;
 const SPORTS_COUNTDOWN_BASE_VOLUME = 0.9;
-const SPIN_WHOOSH_BASE_VOLUME = 0.82;
+const ROULETTE_SPIN_BASE_VOLUME = 0.78;
 const ATTACHMENT_UNLOCK_BASE_VOLUME = 0.9;
 /** Subtle granular sounds; keep them well below the hydraulic and travel loops. */
 const SOIL_LOAD_BASE_GAIN = 0.16;
@@ -89,7 +88,7 @@ const TRAVEL_FADE_IN_SEC = 0.09;
 const GLOBAL_CTRL = "__ykYanmarAudioCtrl";
 const GLOBAL_CTRL_REV = "__ykYanmarAudioCtrlRev";
 /** Bump when controller public surface changes (forces HMR refresh). */
-const CTRL_REV = 11;
+const CTRL_REV = 12;
 
 type TravelRpm = 1 | 2;
 
@@ -141,12 +140,60 @@ function makeSeamlessLoopBuffer(
   return out;
 }
 
+/** Seamless mechanical reel ticks — slot-machine clacks, not a whoosh bed. */
+function synthesizeRouletteSpinBuffer(ctx: AudioContext): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const ticksPerLoop = 16;
+  const tickHz = 21;
+  const duration = ticksPerLoop / tickHz;
+  const frames = Math.max(1, Math.floor(rate * duration));
+  const buffer = ctx.createBuffer(1, frames, rate);
+  const samples = buffer.getChannelData(0);
+  const tickInterval = Math.floor(frames / ticksPerLoop);
+
+  let brown = 0;
+  for (let i = 0; i < frames; i++) {
+    brown = (brown + (Math.random() * 2 - 1) * 0.018) * 0.996;
+    const rumble =
+      Math.sin((2 * Math.PI * 62 * i) / rate) * 0.04 +
+      Math.sin((2 * Math.PI * 93 * i) / rate) * 0.025;
+    samples[i] = brown * 0.12 + rumble;
+  }
+
+  const clickLen = Math.max(8, Math.floor(rate * 0.014));
+  for (let tick = 0; tick < ticksPerLoop; tick++) {
+    const start = tick * tickInterval;
+    const accent = tick % 4 === 0 ? 1.18 : 0.86 + (tick % 3) * 0.05;
+    const freqA = 1680 + (tick % 5) * 70;
+    const freqB = 720 + (tick % 4) * 40;
+    for (let j = 0; j < clickLen && start + j < frames; j++) {
+      const env = Math.exp(-j / (rate * 0.0032));
+      const click =
+        Math.sin((2 * Math.PI * freqA * j) / rate) * 0.52 +
+        Math.sin((2 * Math.PI * freqB * j) / rate) * 0.28 +
+        (Math.random() * 2 - 1) * 0.16;
+      samples[start + j] += click * env * accent;
+    }
+  }
+
+  let peak = 0.0001;
+  for (let i = 0; i < frames; i++) {
+    peak = Math.max(peak, Math.abs(samples[i]));
+  }
+  const gain = 0.92 / peak;
+  for (let i = 0; i < frames; i++) {
+    samples[i] *= gain;
+  }
+  return buffer;
+}
+
 class YanmarAudioController {
   /** Decoded one-shot / loop SFX — Web Audio avoids OS media-player chrome. */
   private sfxBuffers = new Map<string, AudioBuffer>();
   private sfxBufferLoadings = new Map<string, Promise<AudioBuffer | null>>();
   private rouletteSpinSource: AudioBufferSourceNode | null = null;
   private rouletteSpinGain: GainNode | null = null;
+  private rouletteSpinBuffer: AudioBuffer | null = null;
   private rouletteSpinToken = 0;
   private sportsCountdownSource: AudioBufferSourceNode | null = null;
   private engineStartSource: AudioBufferSourceNode | null = null;
@@ -251,6 +298,7 @@ class YanmarAudioController {
           this.sfxBufferLoadings.clear();
           this.rouletteSpinSource = null;
           this.rouletteSpinGain = null;
+          this.rouletteSpinBuffer = null;
           this.sportsCountdownSource = null;
           this.engineStartSource = null;
         }
@@ -455,7 +503,7 @@ class YanmarAudioController {
   private applyLiveWebSfxVolumes() {
     if (this.rouletteSpinGain) {
       this.rouletteSpinGain.gain.value =
-        SPIN_WHOOSH_BASE_VOLUME * this.effectGain("roulette");
+        ROULETTE_SPIN_BASE_VOLUME * this.effectGain("roulette");
     }
   }
 
@@ -470,7 +518,6 @@ class YanmarAudioController {
       if (!ctx) return;
       this.unlocked = true;
       void this.ensureBreakerBuffer();
-      void this.ensureSfxBuffer(SPIN_WHOOSH_SRC);
       void this.ensureSfxBuffer(ITEM_ACQUIRE_SRC);
       void this.ensureSfxBuffer(STAR_ACQUIRE_SRC);
       this.syncBgm();
@@ -860,13 +907,18 @@ class YanmarAudioController {
     if (!this.canPlayEffect("roulette")) return;
     this.cutRouletteSpinNodes();
     const ctx = await this.ensureAudioContext();
-    const buffer = await this.ensureSfxBuffer(SPIN_WHOOSH_SRC);
     if (token !== this.rouletteSpinToken) return;
-    if (!ctx || !buffer || !this.canPlayEffect("roulette")) return;
+    if (!ctx || !this.canPlayEffect("roulette")) return;
     if (this.rouletteSpinSource) return;
 
+    const buffer =
+      this.rouletteSpinBuffer && this.rouletteSpinBuffer.sampleRate === ctx.sampleRate
+        ? this.rouletteSpinBuffer
+        : synthesizeRouletteSpinBuffer(ctx);
+    this.rouletteSpinBuffer = buffer;
+
     const gain = ctx.createGain();
-    gain.gain.value = SPIN_WHOOSH_BASE_VOLUME * this.effectGain("roulette");
+    gain.gain.value = ROULETTE_SPIN_BASE_VOLUME * this.effectGain("roulette");
     gain.connect(ctx.destination);
 
     const source = ctx.createBufferSource();
