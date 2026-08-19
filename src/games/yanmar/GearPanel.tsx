@@ -1038,7 +1038,7 @@ export function GearPanel({
     }
 
     // 선택한 재료를 한 요청으로 모두 소모하고, 결과도 한 번에 공개한다.
-    exitBulkMode();
+    // (예: 12개 선택 → 4개 완성품을 한 화면에 공개)
     let results: SynthesizeActionResult[] = [];
     try {
       if (onSynthesizeMany) {
@@ -1069,15 +1069,20 @@ export function GearPanel({
       slot: result.item.slot,
       upgraded: result.upgraded,
     }));
-    if (pullResults.length > 0) {
-      if (pullResults.length === 1 && pullResults[0]?.grade === "MASTER") {
-        yanmarAudio.playMasterItemAcquire();
-      } else {
-        yanmarAudio.playItemAcquire();
-      }
-      setSynthPullResults(pullResults);
-      setSynthPullOpen(true);
+    if (pullResults.length === 0) {
+      // Keep selection so the player can retry after a failed request.
+      setBulkConfirmOpen(false);
+      return;
     }
+
+    exitBulkMode();
+    if (pullResults.length === 1 && pullResults[0]?.grade === "MASTER") {
+      yanmarAudio.playMasterItemAcquire();
+    } else {
+      yanmarAudio.playItemAcquire();
+    }
+    setSynthPullResults(pullResults);
+    setSynthPullOpen(true);
   }
 
   async function confirmSynthesize() {

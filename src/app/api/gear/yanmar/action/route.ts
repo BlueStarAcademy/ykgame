@@ -182,7 +182,8 @@ export async function POST(req: Request) {
             gameId: "yanmar",
           },
         });
-        if (items.length !== 3) throw new Error("NOT_FOUND");
+        // synthesizeMany may consume 3, 6, 9… pieces — never hard-code length 3.
+        if (items.length !== itemIds.length) throw new Error("NOT_FOUND");
         if (items.some((item) => item.equippedSlot)) throw new Error("EQUIPPED");
 
         const grade = items[0]!.grade as ItemGrade;
@@ -200,8 +201,9 @@ export async function POST(req: Request) {
 
         const loadedBefore = await loadUserFinalStats(tx, session.user.id);
         const durabilityMax = loadedBefore.stats.durabilityMaxPerPiece;
+        const batchCount = itemIds.length / 3;
         const createdResults = [];
-        for (let index = 0; index < itemIds.length; index += 3) {
+        for (let batch = 0; batch < batchCount; batch += 1) {
           const resultGrade = rollSynthesizeResultGrade(grade);
           const data = createGearItem(pickSlot(), resultGrade, durabilityMax);
           const created = await tx.gearItem.create({
