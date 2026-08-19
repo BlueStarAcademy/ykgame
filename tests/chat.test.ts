@@ -4,10 +4,11 @@ import {
   CHAT_BODY_MAX_LENGTH,
   CHAT_CHANNEL_MAX,
   CHAT_CHANNEL_MIN,
-  CHAT_RETENTION_MS,
+  CHAT_RETENTION_DAYS,
   chatRetentionCutoff,
   clampChatBody,
   isValidChatChannel,
+  isWithinChatRetention,
 } from "../src/lib/chat-constants";
 import { nextAutoChannels } from "../src/lib/chat/presence";
 import {
@@ -50,11 +51,21 @@ test("chat redis keys stay namespaced", () => {
   assert.equal(chatPubSubChannel("ykgame"), "ykgame:v1:chat:pubsub");
 });
 
-test("chat retention cutoff is three days before now", () => {
-  const now = Date.UTC(2026, 7, 15, 6, 0, 0);
+test("chat retention keeps three KST calendar days including today", () => {
+  assert.equal(CHAT_RETENTION_DAYS, 3);
+  // 2026-08-19 09:26 KST = 2026-08-19 00:26 UTC
+  const now = Date.parse("2026-08-19T00:26:00.000Z");
   const cutoff = chatRetentionCutoff(now);
-  assert.equal(cutoff.getTime(), now - CHAT_RETENTION_MS);
-  assert.equal(CHAT_RETENTION_MS, 3 * 24 * 60 * 60 * 1000);
+  // Oldest kept day starts at Aug 17 00:00 KST = Aug 16 15:00 UTC
+  assert.equal(cutoff.toISOString(), "2026-08-16T15:00:00.000Z");
+
+  // Just inside window (Aug 17 00:00 KST)
+  assert.equal(isWithinChatRetention("2026-08-16T15:00:00.000Z", now), true);
+  // Just outside window (Aug 16 23:59:59 KST)
+  assert.equal(isWithinChatRetention("2026-08-16T14:59:59.000Z", now), false);
+  // Mid-window and today stay visible
+  assert.equal(isWithinChatRetention("2026-08-17T12:00:00.000Z", now), true);
+  assert.equal(isWithinChatRetention("2026-08-19T00:00:00.000Z", now), true);
 });
 
 test("master enhance announce condition helpers", () => {

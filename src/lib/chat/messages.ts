@@ -208,7 +208,7 @@ export async function getChatBootstrap(options: {
   memberCount: number | null;
   capacity: number;
 }> {
-  // Opportunistic cleanup so week-old messages disappear without a cron.
+  // Opportunistic cleanup so messages past the retention window disappear without a cron.
   void pruneExpiredChatMessages().catch(() => {
     /* ignore prune failures */
   });

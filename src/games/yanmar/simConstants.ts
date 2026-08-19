@@ -27,7 +27,7 @@ export const EXCAVATOR_MAP_WALL_MARGIN = 4.6;
 export const EXCAVATOR_COLLISION_RADIUS = 1.68;
 
 /** Extra gap kept between excavator circle and truck OBB after resolve. */
-export const TRUCK_BODY_SEPARATION_PAD = 0.24;
+export const TRUCK_BODY_SEPARATION_PAD = 0.32;
 
 /** 붐·암·버킷 vs 덤프트럭 고체 — 구(sphere) 근사 반경 */
 export const DUMP_TRUCK_ARM_PROBE_RADIUS = 0.32;

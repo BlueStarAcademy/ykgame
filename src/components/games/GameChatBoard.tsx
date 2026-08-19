@@ -15,8 +15,9 @@ import {
   CHAT_CHANNEL_MAX,
   CHAT_CHANNEL_MIN,
   CHAT_COOLDOWN_MS,
-  CHAT_RETENTION_MS,
   CHAT_SSE_MAX_MS,
+  CHAT_TZ,
+  isWithinChatRetention,
 } from "@/lib/chat-constants";
 import type {
   ChatGearSnapshot,
@@ -37,13 +38,6 @@ type JoinResponse = {
 };
 
 const CHAT_EMOJIS = ["😀", "😄", "😂", "😍", "🥳", "👍", "👏", "🔥", "💪", "🎉"];
-const CHAT_TZ = "Asia/Seoul";
-
-function isWithinChatRetention(createdAt: string, now = Date.now()): boolean {
-  const ts = Date.parse(createdAt);
-  if (Number.isNaN(ts)) return false;
-  return now - ts <= CHAT_RETENTION_MS;
-}
 
 function pruneRetainedMessages(
   list: ChatWireMessage[],
@@ -341,7 +335,7 @@ export function GameChatBoard() {
     return () => clearInterval(id);
   }, [cooldownUntil]);
 
-  // Drop messages as they age past the 3-day retention window.
+  // Drop messages once their KST calendar day falls outside the retention window.
   useEffect(() => {
     const id = setInterval(() => {
       setMessages((prev) => {

@@ -36,9 +36,10 @@ export type TruckAlignTarget = {
 export const HAUL_TRUCK_BODY_DROP = 0.35;
 
 /**
- * HaulTruckModel: group at drop, rotation Y = HAUL_TRUCK.rotation (+π/2).
- * Bed group local (-1.05, 0) → world offset (0, +1.05).
- * Chassis ~6.9 × 2.55 after rotation → halfZ≈3.45, halfX≈1.56.
+ * HaulTruckModel local space (before group Y rotation):
+ * - X = truck length (cab +X, bed −X), chassis ~±3.45, bumper ~3.41
+ * - Z = truck width (bed sides ~±1.71, wheels ±1.58)
+ * Collision OBB must use the same axes — do NOT swap for world rotation.
  * Vertical extents include {@link HAUL_TRUCK_BODY_DROP}.
  */
 export const HAUL_TRUCK_ALIGN = {
@@ -46,11 +47,13 @@ export const HAUL_TRUCK_ALIGN = {
   bedOffsetX: 0,
   bedOffsetZ: 1.05,
   collider: {
-    centerOffsetX: 0,
-    centerOffsetZ: -0.05,
-    /** 짐칸 측판·캡 폭(시각 ~3.3) + 궤도 침투 방지 여유 */
-    halfX: 1.95,
-    halfZ: 3.65,
+    /** Chassis box sits at local X −0.05 */
+    centerOffsetX: -0.05,
+    centerOffsetZ: 0,
+    /** Length half (model X) + skin so tracks cannot bury into cab/bed ends */
+    halfX: 3.72,
+    /** Width half (model Z) + skin past bed side panels / wheels */
+    halfZ: 2.05,
   },
   /** 붐·암 충돌용 높이·짐칸 공동 (휠 바닥=그룹 원점 기준) */
   solidMinY: 0.4,
@@ -58,7 +61,7 @@ export const HAUL_TRUCK_ALIGN = {
   /** 측판 위쪽만 공동 — 옆에서 뚫지 못하고 위에서 내려놓게 */
   cavityMinY: 2.05 - HAUL_TRUCK_BODY_DROP,
   cavityMaxY: 3.25 - HAUL_TRUCK_BODY_DROP,
-  /** 반드시 collider half보다 작아야 측판이 고체로 남음 */
+  /** 반드시 collider half보다 작아야 측판·엔드게이트가 고체로 남음 */
   cavityHalfX: 1.35,
   cavityHalfZ: 1.15,
   cavityCenterLocalX: -1.05,

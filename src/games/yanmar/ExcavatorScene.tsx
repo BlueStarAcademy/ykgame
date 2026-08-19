@@ -2419,13 +2419,15 @@ function SimLoop({
   const dustRef = useRef<THREE.Group>(null);
   const dumpSoilVisualRef = useRef<DumpSoilVisualState>(runtimeRef.current.dumpSoilVisual);
   const bladeSprayVisualRef = useRef<BladeSprayVisualState>(runtimeRef.current.bladeSpray);
+  const chassisVisual = getChassisVisualProfile(activeChassisId);
   const dozerBladeReach = getDozerBladeReach(
-    getChassisVisualProfile(activeChassisId).scale,
-    getChassisVisualProfile(activeChassisId).trackWidth,
+    chassisVisual.scale,
+    chassisVisual.trackWidth,
   );
   const excavatorCollisionRadius = getExcavatorCollisionRadius(
-    getChassisVisualProfile(activeChassisId).scale,
-    getChassisVisualProfile(activeChassisId).trackWidth,
+    chassisVisual.scale,
+    chassisVisual.trackWidth,
+    chassisVisual.bodyScale,
   );
 
   useFrame((_, delta) => {
