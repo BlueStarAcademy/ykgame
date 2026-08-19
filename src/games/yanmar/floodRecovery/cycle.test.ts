@@ -23,6 +23,7 @@ import {
   FLOOD_COLLECTION_ACCEPT_MARGIN,
   FLOOD_COLLECTION_GRAB_RADIUS,
   FLOOD_COLLECTION_THRESHOLD,
+  FLOOD_DEBRIS_PILE_COUNT,
   FLOOD_INCINERATOR_BASE_CAPACITY,
   FLOOD_INCINERATOR_DEPOSIT_RADIUS,
   FLOOD_RECOVERY_UNLOCK_LEVEL,
@@ -56,6 +57,42 @@ function placeSingleDebris(
 }
 
 describe("floodRecovery/cycle", () => {
+  it("spawns about twenty marked field debris piles clear of the collection pad", () => {
+    const terrain = withFloodTerrain();
+    const zone = terrain.floodZone!;
+    assert.equal(zone.debris.length, FLOOD_DEBRIS_PILE_COUNT);
+    assert.ok(zone.debris.every((d) => d.active && d.remaining > 0));
+    for (const pile of zone.debris) {
+      const dist = Math.hypot(
+        pile.x - zone.collectionX,
+        pile.z - zone.collectionZ,
+      );
+      assert.ok(
+        dist > zone.collectionRadius,
+        `pile ${pile.id} overlaps collection pad (${dist})`,
+      );
+    }
+  });
+
+  it("banks debris ahead of the blade in the travel direction from any approach", () => {
+    const terrain = withFloodTerrain();
+    const zone = terrain.floodZone!;
+    const heading = Math.PI; // push toward -Z
+    const bladeX = zone.collectionX;
+    const bladeZ = zone.collectionZ + 8;
+    const hit = placeSingleDebris(terrain, bladeX + 0.4, bladeZ - 1.1, 280);
+    const before = { x: hit.x, z: hit.z };
+
+    advanceFloodDebrisBladePush(terrain, bladeX, bladeZ, heading, 0.9);
+
+    // Travel direction is (sin π, cos π) = (0, -1) → z decreases.
+    assert.ok(hit.z < before.z);
+    assert.ok(Math.abs(hit.yaw! - heading) < 1e-6);
+    const localFwd =
+      (hit.x - bladeX) * Math.sin(heading) + (hit.z - bladeZ) * Math.cos(heading);
+    assert.ok(localFwd > 0.05, "scraped trash should stay ahead of the blade face");
+  });
+
   it("fills collection at 500 and awards collect only once per cycle", () => {
     const terrain = withFloodTerrain();
     const zone = terrain.floodZone!;
@@ -106,7 +143,7 @@ describe("floodRecovery/cycle", () => {
     const hit = placeSingleDebris(terrain, bladeX, bladeZ + 1.2, 300);
     zone.debris.push({
       id: `${zone.id}-miss`,
-      x: bladeX + 4.5,
+      x: bladeX + 5.5,
       z: bladeZ + 1.2,
       remaining: 300,
       active: true,

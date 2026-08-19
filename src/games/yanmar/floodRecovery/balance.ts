@@ -10,6 +10,9 @@ export const FLOOD_INCINERATOR_BASE_CAPACITY = 3000;
 /** Collection pad fill needed before grapple pickup is allowed. */
 export const FLOOD_COLLECTION_THRESHOLD = 500;
 
+/** How many visual field piles spawn each flood cycle. */
+export const FLOOD_DEBRIS_PILE_COUNT = 20;
+
 /**
  * Extra XZ margin outside the painted pad rim for blade→collection transfer.
  * Scraped windrows often sit just past the visible ring after a pass.

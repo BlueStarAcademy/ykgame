@@ -39,19 +39,22 @@ function FloodTrashPile({
   variant: number;
   scraped?: boolean;
 }) {
-  const fullness = Math.max(0.2, Math.min(1, amount / 500));
-  const pieces = Array.from({ length: scraped ? 6 : 8 }, (_, index) => {
-    const angle = index * 2.41 + variant * 0.73;
+  const fullness = Math.max(0.55, Math.min(1, amount / 160));
+  const junkColors = ["#ef4444", "#f59e0b", "#38bdf8", "#e5e7eb", "#a3e635", "#f472b6"];
+  const pieces = Array.from({ length: scraped ? 10 : 12 }, (_, index) => {
+    const angle = index * 2.15 + variant * 0.61;
     const radius = scraped
-      ? 0.2 + (index % 3) * 0.18
-      : 0.35 + (index % 4) * 0.28;
-    const lateral = scraped ? ((index % 5) - 2) * 0.22 : Math.cos(angle) * radius;
-    const depth = scraped ? (index % 2) * 0.12 - 0.05 : Math.sin(angle) * radius;
+      ? 0.35 + (index % 4) * 0.28
+      : 0.55 + (index % 5) * 0.32;
+    const lateral = scraped ? ((index % 6) - 2.5) * 0.38 : Math.cos(angle) * radius;
+    const depth = scraped ? ((index % 3) - 1) * 0.22 : Math.sin(angle) * radius;
     return {
       x: lateral,
       z: depth,
-      y: 0.04 + (index % 3) * 0.03,
-      yaw: scraped ? index * 0.55 : angle + index * 0.4,
+      y: 0.12 + (index % 4) * 0.08,
+      yaw: scraped ? index * 0.48 : angle + index * 0.35,
+      color: junkColors[(index + variant) % junkColors.length]!,
+      kind: index % 3,
     };
   });
 
@@ -59,102 +62,175 @@ function FloodTrashPile({
     <group
       scale={
         scraped
-          ? [fullness * 1.18, 0.62 + fullness * 0.22, fullness * 0.92]
-          : [fullness * 1.15, 0.55 + fullness * 0.2, fullness * 1.15]
+          ? [fullness * 1.55, 0.95 + fullness * 0.35, fullness * 1.15]
+          : [fullness * 1.45, 1.05 + fullness * 0.4, fullness * 1.45]
       }
     >
-      {/* A scraped windrow remains visibly chunky, rather than reading as a
-          stray line left on the ground after a valid blade pass. */}
+      {/* Ground marker ring — shows players where to drive the blade. */}
       <mesh
-        position={[0, 0.08, 0]}
-        scale={scraped ? [1.25, 0.3, 0.98] : [1.35, 0.22, 1.15]}
+        position={[0, 0.02, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        renderOrder={1}
+      >
+        <ringGeometry
+          args={scraped ? [1.15, 1.55, 36] : [1.35, 1.85, 40]}
+        />
+        <meshBasicMaterial
+          color={scraped ? "#fbbf24" : "#38bdf8"}
+          transparent
+          opacity={scraped ? 0.85 : 0.78}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh
+        position={[0, 0.015, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        renderOrder={1}
+      >
+        <circleGeometry args={[scraped ? 1.15 : 1.35, 28]} />
+        <meshBasicMaterial
+          color={scraped ? "#78350f" : "#0c4a6e"}
+          transparent
+          opacity={0.28}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Chunk mound — reads clearly from cockpit height. */}
+      <mesh
+        position={[0, 0.28, 0]}
+        scale={scraped ? [1.65, 0.55, 1.15] : [1.55, 0.7, 1.45]}
         castShadow
         receiveShadow
       >
-        <sphereGeometry args={[0.72, 12, 8]} />
+        <sphereGeometry args={[0.95, 14, 10]} />
         <meshStandardMaterial color="#1f2937" roughness={0.94} />
       </mesh>
       <mesh
-        position={scraped ? [0.15, 0.09, -0.08] : [0.2, 0.1, -0.15]}
-        scale={scraped ? [1.05, 0.24, 0.82] : [0.95, 0.18, 0.85]}
+        position={scraped ? [0.35, 0.32, -0.12] : [0.4, 0.38, -0.25]}
+        scale={scraped ? [1.25, 0.48, 0.95] : [1.15, 0.55, 1.05]}
         castShadow
         receiveShadow
       >
-        <sphereGeometry args={[0.55, 10, 7]} />
-        <meshStandardMaterial color="#334155" roughness={0.92} />
+        <sphereGeometry args={[0.72, 12, 9]} />
+        <meshStandardMaterial color="#334155" roughness={0.9} />
       </mesh>
       <mesh
-        position={[-0.15, 0.12, 0.05]}
-        rotation={[0.05, scraped ? 0.05 : 0.35, 0.02]}
+        position={scraped ? [-0.4, 0.34, 0.08] : [-0.35, 0.4, 0.2]}
+        scale={scraped ? [1.1, 0.42, 0.9] : [1.05, 0.5, 1.0]}
         castShadow
         receiveShadow
       >
-        <boxGeometry args={scraped ? [1.35, 0.12, 0.55] : [1.1, 0.14, 0.72]} />
-        <meshStandardMaterial color="#35556b" roughness={0.82} />
+        <sphereGeometry args={[0.62, 11, 8]} />
+        <meshStandardMaterial color="#3f3f46" roughness={0.92} />
       </mesh>
+
+      {/* Broken boards / crates */}
+      <mesh
+        position={[-0.15, 0.42, 0.05]}
+        rotation={[0.08, scraped ? 0.05 : 0.45, 0.04]}
+        castShadow
+      >
+        <boxGeometry args={scraped ? [2.1, 0.22, 0.85] : [1.7, 0.24, 1.05]} />
+        <meshStandardMaterial color="#57534e" roughness={0.88} />
+      </mesh>
+      <mesh
+        position={[0.55, 0.28, -0.45]}
+        rotation={[0.05, 0.85, 0.03]}
+        castShadow
+      >
+        <boxGeometry args={[1.35, 0.18, 0.8]} />
+        <meshStandardMaterial color="#d6d3d1" roughness={0.95} />
+      </mesh>
+      <mesh
+        position={[-0.65, 0.26, 0.4]}
+        rotation={[0.04, -0.65, 0.05]}
+        castShadow
+      >
+        <boxGeometry args={[1.1, 0.16, 0.65]} />
+        <meshStandardMaterial color="#78716c" roughness={0.93} />
+      </mesh>
+
       {pieces.map((piece, index) => (
         <group
           key={index}
           position={[piece.x, piece.y, piece.z]}
           rotation={[
-            Math.PI / 2 + 0.08 * (index % 2),
+            Math.PI / 2 + 0.1 * (index % 2),
             piece.yaw,
-            0.12 * ((index % 3) - 1),
+            0.15 * ((index % 3) - 1),
           ]}
         >
-          <mesh castShadow>
-            <cylinderGeometry args={[0.08, 0.09, 0.42, 10]} />
-            <meshStandardMaterial
-              color={index % 3 === 0 ? "#ef4444" : index % 3 === 1 ? "#facc15" : "#d1d5db"}
-              metalness={0.55}
-              roughness={0.35}
-            />
-          </mesh>
+          {piece.kind === 0 ? (
+            <mesh castShadow>
+              <cylinderGeometry args={[0.16, 0.18, 0.72, 12]} />
+              <meshStandardMaterial
+                color={piece.color}
+                metalness={0.55}
+                roughness={0.35}
+              />
+            </mesh>
+          ) : piece.kind === 1 ? (
+            <mesh castShadow>
+              <boxGeometry args={[0.55, 0.38, 0.42]} />
+              <meshStandardMaterial color={piece.color} roughness={0.7} />
+            </mesh>
+          ) : (
+            <mesh castShadow rotation={[0.2, 0.4, 0.1]}>
+              <sphereGeometry args={[0.28, 10, 8]} />
+              <meshStandardMaterial color={piece.color} roughness={0.55} />
+            </mesh>
+          )}
           {index % 2 === 0 ? (
-            <mesh position={[0.1, 0, 0.02]} rotation={[0, 0.2, 0.05]}>
-              <planeGeometry args={[0.5, 0.34]} />
-              <meshStandardMaterial color="#f8fafc" roughness={0.95} side={THREE.DoubleSide} />
+            <mesh position={[0.18, 0, 0.04]} rotation={[0, 0.25, 0.08]}>
+              <planeGeometry args={[0.72, 0.5]} />
+              <meshStandardMaterial
+                color="#f8fafc"
+                roughness={0.95}
+                side={THREE.DoubleSide}
+              />
             </mesh>
           ) : null}
         </group>
       ))}
-      <mesh position={[0.42, 0.08, -0.32]} rotation={[0.04, 0.7, 0.02]} castShadow>
-        <boxGeometry args={[0.9, 0.1, 0.55]} />
-        <meshStandardMaterial color="#d6d3d1" roughness={0.96} />
-      </mesh>
-      <mesh position={[-0.45, 0.07, 0.28]} rotation={[0.03, -0.5, 0.04]} castShadow>
-        <boxGeometry args={[0.7, 0.09, 0.42]} />
-        <meshStandardMaterial color="#78716c" roughness={0.94} />
-      </mesh>
     </group>
   );
 }
 
 function FloodCollectionLoad({ fill }: { fill: number }) {
   if (fill <= 0.02) return null;
-  const count = Math.max(2, Math.ceil(fill * 10));
+  const count = Math.max(4, Math.ceil(fill * 14));
   return (
-    <group position={[0, 0.08, 0]}>
+    <group position={[0, 0.1, 0]}>
       {Array.from({ length: count }, (_, index) => {
-        const angle = index * 2.4;
-        const radius = 0.35 + (index % 3) * 0.24;
+        const angle = index * 2.15;
+        const radius = 0.45 + (index % 4) * 0.32;
         return (
           <group
             key={index}
             position={[
               Math.cos(angle) * radius,
-              0.1 + Math.floor(index / 3) * 0.2,
+              0.16 + Math.floor(index / 4) * 0.28,
               Math.sin(angle) * radius,
             ]}
             rotation={[0.15, angle, 0.1 * (index % 2)]}
           >
             <mesh castShadow>
-              <sphereGeometry args={[0.38, 9, 7]} />
-              <meshStandardMaterial color={index % 2 ? "#334155" : "#4b5563"} roughness={0.94} />
+              <sphereGeometry args={[0.48, 10, 8]} />
+              <meshStandardMaterial
+                color={index % 2 ? "#334155" : "#4b5563"}
+                roughness={0.94}
+              />
             </mesh>
-            <mesh position={[0.18, 0.16, 0.08]} rotation={[0.25, 0.6, 0.15]}>
-              <cylinderGeometry args={[0.065, 0.075, 0.34, 9]} />
-              <meshStandardMaterial color={index % 3 ? "#f59e0b" : "#e5e7eb"} metalness={0.5} roughness={0.35} />
+            <mesh position={[0.22, 0.2, 0.1]} rotation={[0.25, 0.6, 0.15]}>
+              <cylinderGeometry args={[0.1, 0.12, 0.48, 10]} />
+              <meshStandardMaterial
+                color={index % 3 ? "#f59e0b" : "#e5e7eb"}
+                metalness={0.5}
+                roughness={0.35}
+              />
             </mesh>
           </group>
         );
@@ -227,14 +303,16 @@ function FloodDebrisPiles({
       group.visible = live;
       if (!live) continue;
       const y = sampleHeight(terrain, d.x, d.z);
-      const scale = 0.55 + Math.min(1, d.remaining / 500) * 0.65;
+      // Keep piles tall enough to read from the cockpit; scraped windrows
+      // stretch sideways along the blade while staying chunky.
+      const scale = 1.35 + Math.min(1, d.remaining / 180) * 0.7;
       const scraped = !!d.yaw || !!d.cleaved;
-      group.position.set(d.x, y + 0.02, d.z);
+      group.position.set(d.x, y + 0.03, d.z);
       group.rotation.set(0, d.yaw ?? group.rotation.y, 0);
       group.scale.set(
-        scraped ? scale * 1.15 : scale,
-        scale * (scraped ? 0.62 : 0.45),
-        scraped ? scale * 0.9 : scale,
+        scraped ? scale * 1.45 : scale,
+        scale * (scraped ? 0.95 : 1.05),
+        scraped ? scale * 0.95 : scale,
       );
     }
 
@@ -258,7 +336,7 @@ function FloodDebrisPiles({
         .filter((d) => d.active && d.remaining > 0)
         .map((d, index) => {
           const y = sampleHeight(terrainRef.current, d.x, d.z);
-          const scale = 0.55 + Math.min(1, d.remaining / 500) * 0.65;
+          const scale = 1.35 + Math.min(1, d.remaining / 180) * 0.7;
           const scraped = !!d.yaw || !!d.cleaved;
           return (
             <group
@@ -267,12 +345,12 @@ function FloodDebrisPiles({
                 if (node) groupRefs.current.set(d.id, node);
                 else groupRefs.current.delete(d.id);
               }}
-              position={[d.x, y + 0.02, d.z]}
+              position={[d.x, y + 0.03, d.z]}
               rotation={[0, d.yaw ?? index * 0.7, 0]}
               scale={[
-                scraped ? scale * 1.15 : scale,
-                scale * (scraped ? 0.62 : 0.45),
-                scraped ? scale * 0.9 : scale,
+                scraped ? scale * 1.45 : scale,
+                scale * (scraped ? 0.95 : 1.05),
+                scraped ? scale * 0.95 : scale,
               ]}
             >
               <FloodTrashPile
@@ -355,17 +433,17 @@ export function FloodRecoveryDecor({
       {(showActive || showRespawnPaint) && showZonePaint ? (
         <group position={[zone.centerX, groundY + GROUND_PAINT_LIFT, zone.centerZ]}>
           <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={0}>
-            <circleGeometry args={[zone.radius * 0.55, 48]} />
-            <meshBasicMaterial color="#0ea5e9" opacity={0.14} {...GROUND_PAINT_MATERIAL} />
+            <circleGeometry args={[zone.radius * 0.62, 48]} />
+            <meshBasicMaterial color="#0ea5e9" opacity={0.18} {...GROUND_PAINT_MATERIAL} />
           </mesh>
           <mesh position={[0, 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={0}>
-            <ringGeometry args={[zone.radius * 0.55 - 0.3, zone.radius * 0.55 + 0.1, 64]} />
-            <meshBasicMaterial color="#38bdf8" opacity={0.8} {...GROUND_PAINT_MATERIAL} />
+            <ringGeometry args={[zone.radius * 0.62 - 0.35, zone.radius * 0.62 + 0.15, 64]} />
+            <meshBasicMaterial color="#38bdf8" opacity={0.88} {...GROUND_PAINT_MATERIAL} />
           </mesh>
           <Text
             font={YANMAR_SCENE_FONT}
             ref={labelRef}
-            position={[0, 0.006, -zone.radius * 0.55 - 1.2]}
+            position={[0, 0.006, -zone.radius * 0.62 - 1.2]}
             rotation={[-Math.PI / 2, 0, Math.PI]}
             fontSize={1.4}
             color="#e0f2fe"

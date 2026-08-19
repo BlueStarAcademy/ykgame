@@ -14,6 +14,7 @@ import { SITE_LAYOUT } from "./siteLayout";
 import {
   FLOOD_BASE_BURN_SEC,
   FLOOD_COLLECTION_THRESHOLD,
+  FLOOD_DEBRIS_PILE_COUNT,
   FLOOD_INCINERATOR_BASE_CAPACITY,
   FLOOD_COLLECTION_ACCEPT_MARGIN,
   FLOOD_INCINERATOR_DEPOSIT_RADIUS,
@@ -1172,15 +1173,26 @@ function createFloodDebris(
   centerZ: number,
   totalUnits: number,
 ): FloodDebris[] {
-  const pileCount = 10;
-  const perPile = Math.floor(totalUnits / pileCount);
+  const pileCount = FLOOD_DEBRIS_PILE_COUNT;
+  const perPile = Math.max(1, Math.floor(totalUnits / pileCount));
+  // Keep the collection pad clear; scatter piles on two rings around it.
+  const collectionClear = 6.4;
   return Array.from({ length: pileCount }, (_, index) => {
-    const angle = (index / pileCount) * Math.PI * 2 + 0.4;
-    const ring = 7 + (index % 3) * 2.2;
+    const ring = index < pileCount / 2 ? 0 : 1;
+    const slot = ring === 0 ? index : index - Math.floor(pileCount / 2);
+    const slots = ring === 0 ? Math.floor(pileCount / 2) : Math.ceil(pileCount / 2);
+    const angle =
+      (slot / slots) * Math.PI * 2 + ring * 0.31 + (index % 5) * 0.07;
+    const radius =
+      collectionClear +
+      1.6 +
+      ring * 4.2 +
+      (index % 4) * 0.85 +
+      (index % 3) * 0.35;
     return {
       id: `${cycleId}-debris-${index + 1}`,
-      x: centerX + Math.cos(angle) * ring,
-      z: centerZ + Math.sin(angle) * ring,
+      x: centerX + Math.cos(angle) * radius,
+      z: centerZ + Math.sin(angle) * radius,
       remaining: perPile + (index === 0 ? totalUnits - perPile * pileCount : 0),
       active: true,
     };
@@ -1348,11 +1360,15 @@ export function isOutsideFloodIncineratorSafe(
 }
 
 /** Dozer moldboard half-width used for flood debris catch / cleave. */
-const FLOOD_BLADE_HALF_WIDTH = 1.4;
-const FLOOD_BLADE_CATCH_AHEAD = 2.4;
-const FLOOD_BLADE_CATCH_BEHIND = 0.65;
-const FLOOD_DEBRIS_MAX_PILES = 30;
-const FLOOD_CLEAVE_MIN_REMAINING = 100;
+const FLOOD_BLADE_HALF_WIDTH = 2.05;
+const FLOOD_BLADE_CATCH_AHEAD = 3.15;
+const FLOOD_BLADE_CATCH_BEHIND = 0.95;
+const FLOOD_DEBRIS_MAX_PILES = 48;
+const FLOOD_CLEAVE_MIN_REMAINING = 80;
+/** How far ahead of the blade face scraped trash is pressed. */
+const FLOOD_BLADE_FACE_TARGET = 0.55;
+/** Pile catch radius — matches the larger field debris footprint. */
+const FLOOD_DEBRIS_CATCH_RADIUS = 1.15;
 
 function floodBladeLocal(
   px: number,
@@ -1374,7 +1390,7 @@ function floodBladeLocal(
 
 function isInFloodBladeSweep(
   local: { fwd: number; right: number },
-  radius = 0.55,
+  radius = FLOOD_DEBRIS_CATCH_RADIUS,
 ): boolean {
   return (
     Math.abs(local.right) <= FLOOD_BLADE_HALF_WIDTH + radius &&
@@ -1397,9 +1413,9 @@ function cleaveFloodDebrisAcrossBlade(
     return;
   }
 
-  const leftAmt = Math.floor(pile.remaining * 0.34);
-  const rightAmt = Math.floor(pile.remaining * 0.34);
-  if (leftAmt < 25 || rightAmt < 25) {
+  const leftAmt = Math.floor(pile.remaining * 0.28);
+  const rightAmt = Math.floor(pile.remaining * 0.28);
+  if (leftAmt < 20 || rightAmt < 20) {
     pile.cleaved = true;
     return;
   }
@@ -1407,7 +1423,8 @@ function cleaveFloodDebrisAcrossBlade(
   pile.cleaved = true;
   pile.yaw = heading;
 
-  const lateral = 0.7 + (pile.remaining % 7) * 0.08;
+  // Keep cleaved chunks on the moldboard so they still travel with the blade.
+  const lateral = 0.85 + (pile.remaining % 7) * 0.1;
   const stamp = Date.now().toString(36).slice(-4);
   zone.debris.push({
     id: `${pile.id}-L-${stamp}`,
@@ -1436,6 +1453,7 @@ function cleaveFloodDebrisAcrossBlade(
 /**
  * While the lowered blade scrapes forward, cleave nearby trash piles across the
  * moldboard and drag the resulting windrows with the blade face.
+ * Debris always accumulates ahead of the blade in the travel direction.
  */
 export function advanceFloodDebrisBladePush(
   terrain: TerrainData,
@@ -1451,10 +1469,11 @@ export function advanceFloodDebrisBladePush(
   const fwdZ = Math.cos(heading);
   const rightX = Math.cos(heading);
   const rightZ = -Math.sin(heading);
-  const pushDist = travel * 1.08;
-  const faceTarget = 0.42;
+  const pushDist = travel * 1.2;
+  const faceTarget = FLOOD_BLADE_FACE_TARGET;
   // Snapshot length so newly cleaved fragments are not double-pushed this frame.
   const pileCount = zone.debris.length;
+  const pushed: FloodDebris[] = [];
 
   for (let i = 0; i < pileCount; i += 1) {
     const pile = zone.debris[i]!;
@@ -1471,11 +1490,12 @@ export function advanceFloodDebrisBladePush(
     );
     if (!isInFloodBladeSweep(local)) continue;
 
+    // Always face / travel with the blade so windrows follow push direction.
     pile.yaw = heading;
     pile.x += fwdX * pushDist;
     pile.z += fwdZ * pushDist;
 
-    // Keep scraped debris pressed against the blade face (not under the tracks).
+    // Keep scraped debris pressed against the blade face (ahead of the tracks).
     const after = floodBladeLocal(
       pile.x,
       pile.z,
@@ -1487,25 +1507,28 @@ export function advanceFloodDebrisBladePush(
       rightZ,
     );
     if (after.fwd > faceTarget) {
-      const pull = Math.min(after.fwd - faceTarget, travel * 1.6 + 0.08);
+      const pull = Math.min(after.fwd - faceTarget, travel * 1.85 + 0.1);
       pile.x -= fwdX * pull;
       pile.z -= fwdZ * pull;
-    } else if (after.fwd < 0.12) {
-      const lift = Math.min(0.12 - after.fwd, travel * 0.9 + 0.04);
+    } else if (after.fwd < 0.18) {
+      const lift = Math.min(0.18 - after.fwd, travel * 1.05 + 0.06);
       pile.x += fwdX * lift;
       pile.z += fwdZ * lift;
     }
 
-    // Mild lateral spread so cleaved chunks stay spread along the blade.
-    if (pile.cleaved && Math.abs(after.right) < 0.2) {
-      const side = after.right >= 0 ? 1 : -1;
-      pile.x += rightX * side * travel * 0.35;
-      pile.z += rightZ * side * travel * 0.35;
+    // Softly gather toward the blade centerline so trash banks into one windrow.
+    if (Math.abs(after.right) > 0.35) {
+      const gather = Math.min(Math.abs(after.right) - 0.25, travel * 0.55 + 0.04);
+      const side = after.right > 0 ? -1 : 1;
+      pile.x += rightX * side * gather;
+      pile.z += rightZ * side * gather;
     }
 
     if (!pile.cleaved) {
       cleaveFloodDebrisAcrossBlade(zone, pile, rightX, rightZ, heading);
     }
+
+    pushed.push(pile);
 
     // Once a windrow is near the painted pad, ease it inward so a valid blade
     // pass does not leave a thin line just outside the transfer radius.
@@ -1513,10 +1536,52 @@ export function advanceFloodDebrisBladePush(
     const toPadZ = zone.collectionZ - pile.z;
     const toPadDist = Math.hypot(toPadX, toPadZ);
     const acceptR = zone.collectionRadius + FLOOD_COLLECTION_ACCEPT_MARGIN;
-    if (toPadDist > 0.05 && toPadDist <= acceptR + 1.4) {
-      const pull = Math.min(0.55, travel * 1.25 + 0.08);
+    if (toPadDist > 0.05 && toPadDist <= acceptR + 1.6) {
+      const pull = Math.min(0.65, travel * 1.35 + 0.1);
       pile.x += (toPadX / toPadDist) * pull;
       pile.z += (toPadZ / toPadDist) * pull;
+    }
+  }
+
+  // Cluster piles riding the same blade stroke into a single forward bank.
+  if (pushed.length >= 2) {
+    let sumRight = 0;
+    let sumFwd = 0;
+    for (const pile of pushed) {
+      const local = floodBladeLocal(
+        pile.x,
+        pile.z,
+        bladeX,
+        bladeZ,
+        fwdX,
+        fwdZ,
+        rightX,
+        rightZ,
+      );
+      sumRight += local.right;
+      sumFwd += local.fwd;
+    }
+    const avgRight = sumRight / pushed.length;
+    const avgFwd = sumFwd / pushed.length;
+    for (const pile of pushed) {
+      const local = floodBladeLocal(
+        pile.x,
+        pile.z,
+        bladeX,
+        bladeZ,
+        fwdX,
+        fwdZ,
+        rightX,
+        rightZ,
+      );
+      const blend = Math.min(0.35, travel * 0.45 + 0.08);
+      const targetRight = local.right + (avgRight - local.right) * blend;
+      // Prefer banking slightly ahead of the average so trash leads the blade.
+      const targetFwd =
+        local.fwd + (Math.max(avgFwd, faceTarget) - local.fwd) * blend * 0.65;
+      pile.x = bladeX + fwdX * targetFwd + rightX * targetRight;
+      pile.z = bladeZ + fwdZ * targetFwd + rightZ * targetRight;
+      pile.yaw = heading;
     }
   }
 }
