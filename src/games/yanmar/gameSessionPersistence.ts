@@ -49,12 +49,26 @@ function normalizeHillZone(zone: HillZone): HillZone {
         typeof rock.comOffsetZ === "number" && Number.isFinite(rock.comOffsetZ)
           ? rock.comOffsetZ
           : (((index * 29) % 7) / 7) * 0.35 - 0.175;
+      const homeX =
+        typeof rock.homeX === "number" && Number.isFinite(rock.homeX)
+          ? rock.homeX
+          : rock.x;
+      const homeZ =
+        typeof rock.homeZ === "number" && Number.isFinite(rock.homeZ)
+          ? rock.homeZ
+          : rock.z;
       return {
         ...rock,
         size,
         roundness,
         comOffsetX,
         comOffsetZ,
+        homeX,
+        homeZ,
+        respawnAt:
+          typeof rock.respawnAt === "number" && Number.isFinite(rock.respawnAt)
+            ? rock.respawnAt
+            : null,
         extracted:
           typeof rock.extracted === "boolean"
             ? rock.extracted

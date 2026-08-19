@@ -25,9 +25,12 @@ type TroikaLabel = THREE.Object3D & { text?: string };
 const TILE_VISUAL_MIN_MS = 125;
 
 function crashZoneLabelText(
-  respawnEtaSec: number,
+  zone: NonNullable<TerrainData["crashZone"]>,
   t: (key: string, values?: Record<string, string | number>) => string,
 ) {
+  const hasWorkable = zone.tiles.some((tile) => tile.active);
+  if (hasWorkable) return t("crashZone");
+  const respawnEtaSec = getCrashZoneRespawnEtaSec(zone);
   return respawnEtaSec > 0
     ? t("crashZoneRespawn", {
         time: formatDumpTruckReturnTime(respawnEtaSec),
@@ -77,7 +80,7 @@ export function CrashZoneDecor({
 
     const label = labelRef.current;
     if (label && "text" in label) {
-      const nextLabel = crashZoneLabelText(getCrashZoneRespawnEtaSec(zone), t);
+      const nextLabel = crashZoneLabelText(zone, t);
       if (label.text !== nextLabel) label.text = nextLabel;
     }
 
@@ -226,7 +229,7 @@ export function CrashZoneDecor({
           outlineWidth={0.06}
           outlineColor="#111827"
         >
-          {crashZoneLabelText(getCrashZoneRespawnEtaSec(zone), t)}
+          {crashZoneLabelText(zone, t)}
         </Text>
       ) : null}
     </group>

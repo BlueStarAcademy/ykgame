@@ -40,6 +40,7 @@ function hillZoneLabelText(
     (rock) => rock.active && !rock.delivered && !rock.extracted,
   ).length;
   const respawnEtaSec = getHillZoneRespawnEtaSec(zone);
+  if (remaining > 0) return t("hillZoneCount", { count: remaining });
   if (respawnEtaSec > 0) {
     return t("hillZoneRespawn", {
       time: formatDumpTruckReturnTime(respawnEtaSec),
@@ -272,7 +273,11 @@ export function HillZoneDecor({
   const topY = sampleHeight(terrain, zone.centerX, zone.centerZ);
   const dropY = sampleHeight(terrain, zone.dropX, zone.dropZ);
   const showQuarry = zone.active;
-  const showRespawnPaint = !zone.active && getHillZoneRespawnEtaSec(zone) > 0;
+  const showRespawnPaint =
+    getHillZoneRespawnEtaSec(zone) > 0 &&
+    !zone.boulders.some(
+      (rock) => rock.active && !rock.delivered && !rock.extracted,
+    );
   return (
     <group>
       {(showQuarry || showRespawnPaint) && showZonePaint ? (

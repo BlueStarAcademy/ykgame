@@ -15,6 +15,8 @@ import {
   FLOOD_BASE_BURN_SEC,
   FLOOD_COLLECTION_THRESHOLD,
   FLOOD_DEBRIS_PILE_COUNT,
+  FLOOD_DEBRIS_PILE_MAX_UNITS,
+  FLOOD_DEBRIS_PILE_MIN_UNITS,
   FLOOD_INCINERATOR_BASE_CAPACITY,
   FLOOD_COLLECTION_ACCEPT_MARGIN,
   FLOOD_INCINERATOR_DEPOSIT_RADIUS,
@@ -34,7 +36,7 @@ export const DIG_ZONE_COUNT = 1;
 export const DIG_ZONE_RESPAWN_MS = 60 * 1000;
 export const DIG_ZONE_REGEN_UNITS_PER_SEC =
   DIG_ZONE_CAPACITY_UNITS / (DIG_ZONE_RESPAWN_MS / 1000);
-/** 아스팔트·돌 구역: 이탈 후(또는 전량 소진 후) 풀 리젠까지 대기. */
+/** 아스팔트 타일 1칸: 파괴 직후부터 풀 리젠까지 대기 (구역 안에 있어도 진행). */
 export const CRASH_ZONE_RESPAWN_MS = 5 * 60 * 1000;
 export const CRASH_TILE_MAX_HP = 2000;
 export const CRASH_HIT_DAMAGE = 10;
@@ -52,9 +54,9 @@ export const HAUL_TRUCK_ENGINE_START_SEC = 2.2;
 export const HAUL_TRUCK_DEPART_SEC = 5.8;
 export const HAUL_TRUCK_ARRIVE_SEC = 10;
 export const HILL_BOULDER_COUNT = 5;
-/** 돌 구역: 전량 반출 후 풀 리젠까지 대기 (재진입으로 타이머 초기화하지 않음). */
+/** 돌 1개: 반출/파괴 직후부터 풀 리젠까지 대기 (구역 안에 있어도 진행). */
 export const HILL_ZONE_RESPAWN_MS = 300 * 1000;
-/** 수해복구 구역: 소각 완료 후 풀 리젠까지 대기. */
+/** 쓰레기 더미 1개·소각 사이클: 소모/완료 직후부터 풀 리젠까지 대기. */
 export const FLOOD_ZONE_RESPAWN_MS = 5 * 60 * 1000;
 /** 채취량은 유지하되 화면에 보이는 지형 침하는 완만하게 제한한다. */
 const DIG_TERRAIN_DEFORMATION_SCALE = 0.16;
@@ -79,6 +81,8 @@ export interface CrashTile {
   hp: number;
   maxHp: number;
   active: boolean;
+  /** Destroyed tile restores at this wall time; null while intact. */
+  respawnAt: number | null;
 }
 
 export interface CrashZone {
@@ -97,10 +101,15 @@ export interface HillBoulder {
   id: string;
   x: number;
   z: number;
+  /** Spawn slot — restored here after per-rock regen. */
+  homeX: number;
+  homeZ: number;
   active: boolean;
   delivered: boolean;
   /** 집어서 구역 밖으로 반출되었거나 트럭에 적재됨. */
   extracted: boolean;
+  /** Extracted rock restores at this wall time; null while available/carried. */
+  respawnAt: number | null;
   /** 0~1 — 클수록 밀착감↓ (비주얼 스케일과 동기). */
   size: number;
   /** 0~1 — 둥글수록 밀착감↓. */
@@ -158,9 +167,21 @@ export interface FloodDebris {
   id: string;
   x: number;
   z: number;
+  /** Spawn slot — restored here after per-pile regen. */
+  homeX: number;
+  homeZ: number;
+  /** Full units for this spawn slot (fragments copy their birth amount). */
+  maxRemaining: number;
   /** Remaining source debris units at this pile (visual). */
   remaining: number;
   active: boolean;
+  /**
+   * Original field spawn slots regenerate after emptying.
+   * Blade-cleaved fragments do not.
+   */
+  regen: boolean;
+  /** Emptied regen pile restores at this wall time. */
+  respawnAt: number | null;
   /** World yaw when scraped into a blade windrow (radians). */
   yaw?: number;
   /** True after the blade has cleaved this pile into side chunks. */
@@ -207,10 +228,11 @@ export interface FloodRecoveryZone {
   clearedAt: number | null;
   respawnAt: number | null;
   /**
-   * Leave-based field debris regen (crash-style). Starts when the player is
-   * outside the flood circle while piles are depleted; cancelled on re-enter.
+   * @deprecated Leave-based field regen removed; per-pile `respawnAt` is used.
+   * Kept for session snapshot compatibility.
    */
   debrisLeftAt: number | null;
+  /** @deprecated Prefer per-pile `FloodDebris.respawnAt`. */
   debrisRespawnAt: number | null;
 }
 
@@ -763,6 +785,10 @@ export function normalizeCrashZone(zone: CrashZone): CrashZone {
         ...tile,
         maxHp: CRASH_TILE_MAX_HP,
         hp: tile.active ? Math.round(ratio * CRASH_TILE_MAX_HP) : 0,
+        respawnAt:
+          typeof tile.respawnAt === "number" && Number.isFinite(tile.respawnAt)
+            ? tile.respawnAt
+            : null,
       };
     }),
   };
@@ -779,18 +805,30 @@ export function getCrashZoneRespawnEtaSec(
   zone: CrashZone | null | undefined,
   now = Date.now(),
 ) {
-  if (!zone || zone.respawnAt == null) return 0;
-  if (isCrashZoneFull(zone)) return 0;
-  return Math.max(0, (zone.respawnAt - now) / 1000);
+  if (!zone) return 0;
+  let soonest = Number.POSITIVE_INFINITY;
+  for (const tile of zone.tiles) {
+    if (tile.active || tile.respawnAt == null) continue;
+    soonest = Math.min(soonest, tile.respawnAt);
+  }
+  if (zone.respawnAt != null) soonest = Math.min(soonest, zone.respawnAt);
+  if (!Number.isFinite(soonest)) return 0;
+  return Math.max(0, (soonest - now) / 1000);
 }
 
 export function getHillZoneRespawnEtaSec(
   zone: HillZone | null | undefined,
   now = Date.now(),
 ) {
-  if (!zone || zone.respawnAt == null) return 0;
-  if (isHillZoneFull(zone)) return 0;
-  return Math.max(0, (zone.respawnAt - now) / 1000);
+  if (!zone) return 0;
+  let soonest = Number.POSITIVE_INFINITY;
+  for (const rock of zone.boulders) {
+    if (!rock.extracted || rock.respawnAt == null) continue;
+    soonest = Math.min(soonest, rock.respawnAt);
+  }
+  if (zone.respawnAt != null) soonest = Math.min(soonest, zone.respawnAt);
+  if (!Number.isFinite(soonest)) return 0;
+  return Math.max(0, (soonest - now) / 1000);
 }
 
 function createDigZone(
@@ -1087,6 +1125,7 @@ function createCrashZone(
       hp: CRASH_TILE_MAX_HP,
       maxHp: CRASH_TILE_MAX_HP,
       active: true,
+      respawnAt: null,
     })),
     clearedAt: null,
     respawnAt: null,
@@ -1114,13 +1153,18 @@ function createHillBoulders(
     // Keep harvestable rocks inside the painted stone ring
     // (radius * HILL_ZONE_CORE_RADIUS_SCALE ≈ 13.75).
     const ring = 5.2 + (index % 3) * 1.8;
+    const x = centerX + Math.cos(angle) * ring;
+    const z = centerZ + Math.sin(angle) * ring;
     return {
       id: `${cycleId}-rock-${index + 1}`,
-      x: centerX + Math.cos(angle) * ring,
-      z: centerZ + Math.sin(angle) * ring,
+      x,
+      z,
+      homeX: x,
+      homeZ: z,
       active: true,
       delivered: false,
       extracted: false,
+      respawnAt: null,
       ...createHillBoulderAttrs(index),
     };
   });
@@ -1167,14 +1211,39 @@ export function createSportsHillZone(
   return createHillZone(centerX, centerZ, haulTruck, boulderCount);
 }
 
+function floodDebrisPilePlan(totalUnits: number): {
+  pileCount: number;
+  perPile: number;
+} {
+  const total = Math.max(1, Math.floor(totalUnits));
+  if (total < FLOOD_DEBRIS_PILE_MIN_UNITS) {
+    return { pileCount: 1, perPile: total };
+  }
+  // Prefer ~400u piles so each field mound is a meaningful blade scoop (300–500).
+  let pileCount = Math.round(total / 400);
+  pileCount = Math.max(1, Math.min(FLOOD_DEBRIS_PILE_COUNT, pileCount));
+  while (
+    pileCount > 1 &&
+    Math.floor(total / pileCount) < FLOOD_DEBRIS_PILE_MIN_UNITS
+  ) {
+    pileCount -= 1;
+  }
+  while (
+    pileCount < FLOOD_DEBRIS_PILE_COUNT &&
+    Math.ceil(total / pileCount) > FLOOD_DEBRIS_PILE_MAX_UNITS
+  ) {
+    pileCount += 1;
+  }
+  return { pileCount, perPile: Math.floor(total / pileCount) };
+}
+
 function createFloodDebris(
   cycleId: string,
   centerX: number,
   centerZ: number,
   totalUnits: number,
 ): FloodDebris[] {
-  const pileCount = FLOOD_DEBRIS_PILE_COUNT;
-  const perPile = Math.max(1, Math.floor(totalUnits / pileCount));
+  const { pileCount, perPile } = floodDebrisPilePlan(totalUnits);
   // Keep the collection pad clear; scatter piles on two rings around it.
   const collectionClear = 6.4;
   return Array.from({ length: pileCount }, (_, index) => {
@@ -1182,19 +1251,28 @@ function createFloodDebris(
     const slot = ring === 0 ? index : index - Math.floor(pileCount / 2);
     const slots = ring === 0 ? Math.floor(pileCount / 2) : Math.ceil(pileCount / 2);
     const angle =
-      (slot / slots) * Math.PI * 2 + ring * 0.31 + (index % 5) * 0.07;
+      (slot / Math.max(1, slots)) * Math.PI * 2 + ring * 0.31 + (index % 5) * 0.07;
     const radius =
       collectionClear +
       1.6 +
       ring * 4.2 +
       (index % 4) * 0.85 +
       (index % 3) * 0.35;
+    const x = centerX + Math.cos(angle) * radius;
+    const z = centerZ + Math.sin(angle) * radius;
+    const remaining =
+      perPile + (index === 0 ? totalUnits - perPile * pileCount : 0);
     return {
       id: `${cycleId}-debris-${index + 1}`,
-      x: centerX + Math.cos(angle) * radius,
-      z: centerZ + Math.sin(angle) * radius,
-      remaining: perPile + (index === 0 ? totalUnits - perPile * pileCount : 0),
+      x,
+      z,
+      homeX: x,
+      homeZ: z,
+      remaining,
+      maxRemaining: remaining,
       active: true,
+      regen: true,
+      respawnAt: null,
     };
   });
 }
@@ -1297,12 +1375,43 @@ export function normalizeFloodRecoveryZone(
     debrisLeftAt: zone.debrisLeftAt ?? null,
     debrisRespawnAt: zone.debrisRespawnAt ?? null,
     debris: zone.debris.map((d) => {
-      if (!centerFar) return { ...d };
-      // Keep debris relative to the shifted field center.
+      const shiftedX = centerFar ? d.x + (centerX - zone.centerX) : d.x;
+      const shiftedZ = centerFar ? d.z + (centerZ - zone.centerZ) : d.z;
+      const homeX =
+        typeof d.homeX === "number" && Number.isFinite(d.homeX)
+          ? centerFar
+            ? d.homeX + (centerX - zone.centerX)
+            : d.homeX
+          : shiftedX;
+      const homeZ =
+        typeof d.homeZ === "number" && Number.isFinite(d.homeZ)
+          ? centerFar
+            ? d.homeZ + (centerZ - zone.centerZ)
+            : d.homeZ
+          : shiftedZ;
+      const remaining =
+        typeof d.remaining === "number" && Number.isFinite(d.remaining)
+          ? d.remaining
+          : 0;
+      const maxRemaining =
+        typeof d.maxRemaining === "number" &&
+        Number.isFinite(d.maxRemaining) &&
+        d.maxRemaining > 0
+          ? d.maxRemaining
+          : Math.max(remaining, 1);
       return {
         ...d,
-        x: d.x + (centerX - zone.centerX),
-        z: d.z + (centerZ - zone.centerZ),
+        x: shiftedX,
+        z: shiftedZ,
+        homeX,
+        homeZ,
+        remaining,
+        maxRemaining,
+        regen: typeof d.regen === "boolean" ? d.regen : true,
+        respawnAt:
+          typeof d.respawnAt === "number" && Number.isFinite(d.respawnAt)
+            ? d.respawnAt
+            : null,
       };
     }),
   };
@@ -1360,15 +1469,18 @@ export function isOutsideFloodIncineratorSafe(
 }
 
 /** Dozer moldboard half-width used for flood debris catch / cleave. */
-const FLOOD_BLADE_HALF_WIDTH = 2.05;
-const FLOOD_BLADE_CATCH_AHEAD = 3.15;
-const FLOOD_BLADE_CATCH_BEHIND = 0.95;
+const FLOOD_BLADE_HALF_WIDTH = 2.35;
+const FLOOD_BLADE_CATCH_AHEAD = 3.6;
+const FLOOD_BLADE_CATCH_BEHIND = 1.25;
 const FLOOD_DEBRIS_MAX_PILES = 48;
 const FLOOD_CLEAVE_MIN_REMAINING = 80;
 /** How far ahead of the blade face scraped trash is pressed. */
 const FLOOD_BLADE_FACE_TARGET = 0.55;
-/** Pile catch radius — matches the larger field debris footprint. */
-const FLOOD_DEBRIS_CATCH_RADIUS = 1.15;
+/**
+ * Pile catch radius — must cover the painted ground ring (local ~1.85) after
+ * group scale, otherwise the blade "hits" the outline but never moves trash.
+ */
+const FLOOD_DEBRIS_CATCH_RADIUS = 2.75;
 
 function floodBladeLocal(
   px: number,
@@ -1430,11 +1542,17 @@ function cleaveFloodDebrisAcrossBlade(
     id: `${pile.id}-L-${stamp}`,
     x: pile.x + rightX * lateral,
     z: pile.z + rightZ * lateral,
+    homeX: pile.x + rightX * lateral,
+    homeZ: pile.z + rightZ * lateral,
     remaining: leftAmt,
+    maxRemaining: leftAmt,
     active: true,
     yaw: heading,
     cleaved: true,
+    regen: false,
+    respawnAt: null,
   });
+  clampFloodDebrisToZone(zone, zone.debris[zone.debris.length - 1]!);
   if (
     zone.debris.reduce((n, d) => n + (d.active ? 1 : 0), 0) < FLOOD_DEBRIS_MAX_PILES
   ) {
@@ -1442,11 +1560,17 @@ function cleaveFloodDebrisAcrossBlade(
       id: `${pile.id}-R-${stamp}`,
       x: pile.x - rightX * lateral,
       z: pile.z - rightZ * lateral,
+      homeX: pile.x - rightX * lateral,
+      homeZ: pile.z - rightZ * lateral,
       remaining: rightAmt,
+      maxRemaining: rightAmt,
       active: true,
       yaw: heading,
       cleaved: true,
+      regen: false,
+      respawnAt: null,
     });
+    clampFloodDebrisToZone(zone, zone.debris[zone.debris.length - 1]!);
   }
 }
 
@@ -1528,8 +1652,6 @@ export function advanceFloodDebrisBladePush(
       cleaveFloodDebrisAcrossBlade(zone, pile, rightX, rightZ, heading);
     }
 
-    pushed.push(pile);
-
     // Once a windrow is near the painted pad, ease it inward so a valid blade
     // pass does not leave a thin line just outside the transfer radius.
     const toPadX = zone.collectionX - pile.x;
@@ -1541,6 +1663,9 @@ export function advanceFloodDebrisBladePush(
       pile.x += (toPadX / toPadDist) * pull;
       pile.z += (toPadZ / toPadDist) * pull;
     }
+
+    clampFloodDebrisToZone(zone, pile);
+    pushed.push(pile);
   }
 
   // Cluster piles riding the same blade stroke into a single forward bank.
@@ -1582,8 +1707,26 @@ export function advanceFloodDebrisBladePush(
       pile.x = bladeX + fwdX * targetFwd + rightX * targetRight;
       pile.z = bladeZ + fwdZ * targetFwd + rightZ * targetRight;
       pile.yaw = heading;
+      clampFloodDebrisToZone(zone, pile);
     }
   }
+}
+
+/** Keep field trash inside the flood circle (inset so the mound stays on-paint). */
+const FLOOD_DEBRIS_ZONE_INSET = 1.15;
+
+function clampFloodDebrisToZone(
+  zone: FloodRecoveryZone,
+  pile: FloodDebris,
+): void {
+  const maxR = Math.max(1, zone.radius - FLOOD_DEBRIS_ZONE_INSET);
+  const dx = pile.x - zone.centerX;
+  const dz = pile.z - zone.centerZ;
+  const dist = Math.hypot(dx, dz);
+  if (dist <= maxR || dist < 1e-6) return;
+  const scale = maxR / dist;
+  pile.x = zone.centerX + dx * scale;
+  pile.z = zone.centerZ + dz * scale;
 }
 
 /**
@@ -1752,10 +1895,17 @@ export function getFloodZoneRespawnEtaSec(
   now = Date.now(),
 ): number {
   if (!zone) return 0;
-  // Mid-cycle: leave-based debris regen countdown.
-  if (zone.active && zone.phase === "active" && zone.debrisRespawnAt != null) {
-    if (isFloodDebrisFull(zone)) return 0;
-    return Math.max(0, (zone.debrisRespawnAt - now) / 1000);
+  // Mid-cycle: soonest per-pile regen.
+  if (zone.active && zone.phase === "active") {
+    let soonest = Number.POSITIVE_INFINITY;
+    for (const pile of zone.debris) {
+      if (!pile.regen || pile.respawnAt == null) continue;
+      if (pile.active && pile.remaining > 0) continue;
+      soonest = Math.min(soonest, pile.respawnAt);
+    }
+    if (Number.isFinite(soonest)) {
+      return Math.max(0, (soonest - now) / 1000);
+    }
   }
   // Post-burn: full zone respawn.
   if (!zone.respawnAt || zone.active) return 0;
@@ -1792,7 +1942,7 @@ export function isInsideFloodRecoveryCircle(
   return Math.hypot(wx - zone.centerX, wz - zone.centerZ) <= zone.radius;
 }
 
-/** Restore scattered piles to the remaining cycle budget (leave-based regen). */
+/** Restore scattered piles to the remaining cycle budget (manual / test helper). */
 export function respawnFloodFieldDebris(zone: FloodRecoveryZone): void {
   const total = floodFieldDebrisBudget(zone);
   zone.sourceRemaining = total;
@@ -1802,6 +1952,23 @@ export function respawnFloodFieldDebris(zone: FloodRecoveryZone): void {
       : [];
   zone.debrisLeftAt = null;
   zone.debrisRespawnAt = null;
+}
+
+function syncFloodSourceRemaining(zone: FloodRecoveryZone) {
+  zone.sourceRemaining = zone.debris.reduce(
+    (sum, pile) => sum + (pile.active && pile.remaining > 0 ? pile.remaining : 0),
+    0,
+  );
+}
+
+function restoreFloodDebrisPile(pile: FloodDebris) {
+  pile.x = pile.homeX;
+  pile.z = pile.homeZ;
+  pile.remaining = pile.maxRemaining;
+  pile.active = true;
+  pile.respawnAt = null;
+  delete pile.yaw;
+  delete pile.cleaved;
 }
 
 export function isInCrashZone(
@@ -1922,12 +2089,15 @@ export function damageCrashTile(
   if (!zone || !tile?.active) return null;
   tile.hp = Math.max(0, tile.hp - damage);
   const destroyed = tile.hp === 0;
-  if (destroyed) tile.active = false;
+  if (destroyed) {
+    tile.active = false;
+    // Per-tile timer is armed in updateSpecialZones (honors crashRespawnSec).
+  }
   const zoneCleared = zone.tiles.every((item) => !item.active);
   if (zoneCleared) {
     zone.active = false;
     zone.clearedAt = now;
-    zone.respawnAt = now + CRASH_ZONE_RESPAWN_MS;
+    zone.respawnAt = null;
   }
   return { tile, destroyed, zoneCleared };
 }
@@ -1985,28 +2155,26 @@ export function markHillRockExtracted(
   if (!zone?.active || !rock || rock.extracted) return false;
   rock.extracted = true;
   rock.active = false;
+  if (rock.respawnAt == null) rock.respawnAt = now + HILL_ZONE_RESPAWN_MS;
   return tryClearHillZone(terrain, now);
 }
 
+/**
+ * Zone stays active so remaining rocks stay harvestable.
+ * Extracted rocks refill individually via {@link updateSpecialZones}.
+ */
 export function tryClearHillZone(
-  terrain: TerrainData,
-  now = Date.now(),
+  _terrain: TerrainData,
+  _now = Date.now(),
 ): boolean {
-  const zone = terrain.hillZone;
-  if (!zone?.active) return false;
-  if (!zone.boulders.every((rock) => rock.extracted || rock.delivered)) {
-    return false;
-  }
-  zone.active = false;
-  zone.clearedAt = now;
-  zone.respawnAt = now + HILL_ZONE_RESPAWN_MS;
-  return true;
+  return false;
 }
 
 /**
- * 아스팔트: 구역에 남아 있어도 플레이어가 나가 있으면 리젠 타이머를 돌리고,
- * 시간이 지나면 100%로 채운다. 구역 안에 있으면(아직 활성일 때) 타이머를 취소한다.
- * 돌 구역: 전량 반출(`!active`) 후에만 리젠 타이머를 돌리며, 재진입해도 초기화하지 않는다.
+ * Per-item regen: each destroyed asphalt tile, extracted rock, and emptied
+ * trash spawn-slot restores after its own 5-minute timer — even while the
+ * player stays inside the zone. Timers are not cancelled on re-entry.
+ * Flood post-burn still recreates the whole cycle after FLOOD_ZONE_RESPAWN_MS.
  */
 export function updateSpecialZones(
   terrain: TerrainData,
@@ -2015,56 +2183,63 @@ export function updateSpecialZones(
   crashRespawnSec = CRASH_ZONE_RESPAWN_MS / 1000,
   haulTruckCooldownSec = HAUL_TRUCK_COOLDOWN_SEC,
   hillBoulderCount = HILL_BOULDER_COUNT,
-  playerX?: number,
-  playerZ?: number,
+  _playerX?: number,
+  _playerZ?: number,
 ) {
   const crash = terrain.crashZone;
   if (crash) {
-    const playerInCrash =
-      playerX != null &&
-      playerZ != null &&
-      crash.active &&
-      isInCrashZone(terrain, playerX, playerZ);
-    if (isCrashZoneFull(crash)) {
-      crash.clearedAt = null;
-      crash.respawnAt = null;
-    } else if (playerInCrash) {
-      crash.clearedAt = null;
-      crash.respawnAt = null;
-    } else {
-      if (crash.clearedAt == null) crash.clearedAt = now;
-      crash.respawnAt = crash.clearedAt + crashRespawnSec * 1000;
-      if (now >= crash.respawnAt) {
-        terrain.crashZone = createCrashZone(crash.centerX, crash.centerZ);
-        rebakeSpecialSiteSurfaces(terrain);
+    let crashRestored = false;
+    const delayMs = Math.max(1, crashRespawnSec) * 1000;
+    for (const tile of crash.tiles) {
+      if (tile.active) {
+        if (tile.hp >= tile.maxHp) tile.respawnAt = null;
+        continue;
+      }
+      if (tile.respawnAt == null) tile.respawnAt = now + delayMs;
+      if (now >= tile.respawnAt) {
+        tile.hp = tile.maxHp;
+        tile.active = true;
+        tile.respawnAt = null;
+        crashRestored = true;
       }
     }
+    if (crash.tiles.some((tile) => tile.active)) {
+      crash.active = true;
+      crash.clearedAt = null;
+      crash.respawnAt = null;
+    } else if (crash.active) {
+      crash.active = false;
+      if (crash.clearedAt == null) crash.clearedAt = now;
+    }
+    if (crashRestored) rebakeSpecialSiteSurfaces(terrain);
   }
 
   const hill = terrain.hillZone;
   if (hill) {
-    if (isHillZoneFull(hill)) {
-      hill.clearedAt = null;
-      hill.respawnAt = null;
-    } else if (hill.active) {
-      // Still has rocks to harvest — no leave-based regen (avoids timer
-      // cancel/restart when re-entering mid-cycle).
-      hill.clearedAt = null;
-      hill.respawnAt = null;
-    } else {
-      // Fully cleared: keep counting down even if the player drives back in.
-      if (hill.clearedAt == null) hill.clearedAt = now;
-      hill.respawnAt = hill.clearedAt + HILL_ZONE_RESPAWN_MS;
-      if (now >= hill.respawnAt) {
-        terrain.hillZone = createHillZone(
-          hill.centerX,
-          hill.centerZ,
-          hill.haulTruck,
-          hillBoulderCount,
-        );
-        rebakeSpecialSiteSurfaces(terrain);
+    let hillRestored = false;
+    for (const rock of hill.boulders) {
+      if (!rock.extracted) {
+        rock.respawnAt = null;
+        continue;
+      }
+      if (rock.respawnAt == null) rock.respawnAt = now + HILL_ZONE_RESPAWN_MS;
+      if (now >= rock.respawnAt) {
+        rock.x = rock.homeX;
+        rock.z = rock.homeZ;
+        rock.active = true;
+        rock.extracted = false;
+        rock.delivered = false;
+        rock.respawnAt = null;
+        hillRestored = true;
       }
     }
+    // Stay active while any rock is available or regenerating.
+    hill.active = true;
+    hill.clearedAt = null;
+    hill.respawnAt = null;
+    void hillRestored;
+    // hillBoulderCount kept for API compat with sports-meet callers.
+    void hillBoulderCount;
   }
 
   const truck = terrain.hillZone?.haulTruck;
@@ -2074,9 +2249,9 @@ export function updateSpecialZones(
 
   const flood = terrain.floodZone;
   if (flood) {
+    flood.debrisLeftAt = null;
+    flood.debrisRespawnAt = null;
     if (flood.phase === "completed" || !flood.active) {
-      flood.debrisLeftAt = null;
-      flood.debrisRespawnAt = null;
       if (flood.clearedAt == null) flood.clearedAt = now;
       flood.respawnAt = flood.clearedAt + FLOOD_ZONE_RESPAWN_MS;
       if (now >= flood.respawnAt) {
@@ -2088,29 +2263,22 @@ export function updateSpecialZones(
         );
       }
     } else if (flood.phase === "active") {
-      // Crash-style: while piles are depleted and the player stays outside the
-      // flood circle, restore all field debris after FLOOD_ZONE_RESPAWN_MS.
-      const playerInCircle =
-        playerX != null &&
-        playerZ != null &&
-        isInsideFloodRecoveryCircle(flood, playerX, playerZ);
-      if (isFloodDebrisFull(flood)) {
-        flood.debrisLeftAt = null;
-        flood.debrisRespawnAt = null;
-      } else if (playerInCircle) {
-        flood.debrisLeftAt = null;
-        flood.debrisRespawnAt = null;
-      } else {
-        if (flood.debrisLeftAt == null) flood.debrisLeftAt = now;
-        flood.debrisRespawnAt = flood.debrisLeftAt + FLOOD_ZONE_RESPAWN_MS;
-        if (now >= flood.debrisRespawnAt) {
-          respawnFloodFieldDebris(flood);
+      let debrisChanged = false;
+      for (const pile of flood.debris) {
+        if (!pile.regen) continue;
+        if (pile.active && pile.remaining > 0) {
+          pile.respawnAt = null;
+          continue;
+        }
+        if (pile.respawnAt == null) {
+          pile.respawnAt = now + FLOOD_ZONE_RESPAWN_MS;
+        }
+        if (now >= pile.respawnAt) {
+          restoreFloodDebrisPile(pile);
+          debrisChanged = true;
         }
       }
-    } else {
-      // readyToBurn / burning — field regen paused.
-      flood.debrisLeftAt = null;
-      flood.debrisRespawnAt = null;
+      if (debrisChanged) syncFloodSourceRemaining(flood);
     }
   }
 }

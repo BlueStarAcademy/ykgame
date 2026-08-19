@@ -8,10 +8,7 @@ import {
   createTerrain,
   depositFloodTrashToIncinerator,
   failFloodTrashCarry,
-  floodFieldDebrisBudget,
-  isFloodDebrisFull,
   isInsideFloodIncinerator,
-  isInsideFloodRecoveryCircle,
   pushFloodDebrisToCollection,
   respawnFloodFieldDebris,
   tryStartFloodBurn,
@@ -48,8 +45,13 @@ function placeSingleDebris(
       id: `${zone.id}-probe`,
       x,
       z,
+      homeX: x,
+      homeZ: z,
       remaining,
+      maxRemaining: remaining,
       active: true,
+      regen: true,
+      respawnAt: null,
     },
   ];
   zone.sourceRemaining = remaining;
@@ -57,12 +59,21 @@ function placeSingleDebris(
 }
 
 describe("floodRecovery/cycle", () => {
-  it("spawns about twenty marked field debris piles clear of the collection pad", () => {
+  it("spawns field debris piles of about 300–500 units each", () => {
     const terrain = withFloodTerrain();
     const zone = terrain.floodZone!;
-    assert.equal(zone.debris.length, FLOOD_DEBRIS_PILE_COUNT);
+    assert.ok(zone.debris.length >= 1);
+    assert.ok(zone.debris.length <= FLOOD_DEBRIS_PILE_COUNT);
     assert.ok(zone.debris.every((d) => d.active && d.remaining > 0));
     for (const pile of zone.debris) {
+      assert.ok(
+        pile.remaining >= 300,
+        `pile ${pile.id} too small (${pile.remaining})`,
+      );
+      assert.ok(
+        pile.remaining <= 500 + 50,
+        `pile ${pile.id} too large (${pile.remaining})`,
+      );
       const dist = Math.hypot(
         pile.x - zone.collectionX,
         pile.z - zone.collectionZ,
@@ -72,6 +83,26 @@ describe("floodRecovery/cycle", () => {
         `pile ${pile.id} overlaps collection pad (${dist})`,
       );
     }
+  });
+
+  it("moves debris when the blade clips the painted outline from a side approach", () => {
+    const terrain = withFloodTerrain();
+    const zone = terrain.floodZone!;
+    // Push east (+X). Pile sits on the lateral rim of the catch zone (~2.4m right).
+    const heading = Math.PI / 2;
+    let bladeX = zone.collectionX + 10;
+    const bladeZ = zone.collectionZ + 8;
+    const hit = placeSingleDebris(terrain, bladeX + 0.6, bladeZ + 2.4, 400);
+    const before = { x: hit.x, z: hit.z };
+
+    // Advance the blade like a real scrape so face-snapping cannot cancel motion.
+    for (let step = 0; step < 4; step += 1) {
+      bladeX += 0.7;
+      advanceFloodDebrisBladePush(terrain, bladeX, bladeZ, heading, 0.7);
+    }
+
+    assert.ok(hit.x > before.x + 1.5, "pile on the outline rim should still ride the blade");
+    assert.ok(Math.abs(hit.yaw! - heading) < 1e-6);
   });
 
   it("banks debris ahead of the blade in the travel direction from any approach", () => {
@@ -145,8 +176,13 @@ describe("floodRecovery/cycle", () => {
       id: `${zone.id}-miss`,
       x: bladeX + 5.5,
       z: bladeZ + 1.2,
+      homeX: bladeX + 5.5,
+      homeZ: bladeZ + 1.2,
       remaining: 300,
+      maxRemaining: 300,
       active: true,
+      regen: true,
+      respawnAt: null,
     });
     zone.sourceRemaining = 600;
     const miss = zone.debris[1]!;
@@ -323,6 +359,8 @@ describe("floodRecovery/cycle", () => {
       id: "trash-probe",
       x: 0,
       z: 0,
+      homeX: 0,
+      homeZ: 0,
       size: 0.52,
       roundness: 0.58,
       comOffsetX: 0,
@@ -330,6 +368,7 @@ describe("floodRecovery/cycle", () => {
       active: true,
       delivered: false,
       extracted: false,
+      respawnAt: null,
     });
     const poseRadius = envelope.horizontalRadius + 0.4;
     assert.ok(poseRadius < zone.collectionRadius);
@@ -359,30 +398,56 @@ describe("floodRecovery/cycle", () => {
     );
   });
 
-  it("respawns field debris 5 minutes after the player leaves the flood circle", () => {
+  it("keeps blade-pushed debris inside the flood circle", () => {
     const terrain = withFloodTerrain();
     const zone = terrain.floodZone!;
-    assert.equal(isFloodDebrisFull(zone), true);
+    const edgeX = zone.centerX;
+    const edgeZ = zone.centerZ + zone.radius - 1.2;
+    const pile = placeSingleDebris(terrain, edgeX, edgeZ, 400);
 
-    // Empty the field (scraped into the pad / burned path) so leave-regen can arm.
-    zone.sourceRemaining = 0;
-    zone.debris = zone.debris.map((d) => ({
-      ...d,
-      remaining: 0,
-      active: false,
-    }));
-    assert.equal(isFloodDebrisFull(zone), false);
+    // Push outward past the painted flood radius.
+    for (let i = 0; i < 24; i += 1) {
+      advanceFloodDebrisBladePush(terrain, edgeX, edgeZ - 1.5, 0, 1.2);
+    }
 
-    const outsideX = zone.centerX + zone.radius + 2;
-    const outsideZ = zone.centerZ;
-    assert.equal(isInsideFloodRecoveryCircle(zone, outsideX, outsideZ), false);
+    const dist = Math.hypot(pile.x - zone.centerX, pile.z - zone.centerZ);
+    assert.ok(
+      dist <= zone.radius - 1.0,
+      `debris escaped flood circle (dist=${dist}, radius=${zone.radius})`,
+    );
+  });
+
+  it("respawns each emptied trash pile after 5 minutes even inside the circle", () => {
+    const terrain = withFloodTerrain();
+    const zone = terrain.floodZone!;
+    const pile = zone.debris[0]!;
+    const other = zone.debris[1]!;
+    assert.ok(pile && other);
+
+    const emptiedMax = pile.maxRemaining;
+    pile.remaining = 0;
+    pile.active = false;
+    zone.sourceRemaining = zone.debris
+      .filter((d) => d.active && d.remaining > 0)
+      .reduce((sum, d) => sum + d.remaining, 0);
 
     const t0 = 1_000_000;
-    updateSpecialZones(terrain, 0, t0, undefined, undefined, undefined, outsideX, outsideZ);
-    assert.equal(zone.debrisLeftAt, t0);
-    assert.equal(zone.debrisRespawnAt, t0 + FLOOD_ZONE_RESPAWN_MS);
+    // Still standing in the flood circle — timer must arm anyway.
+    updateSpecialZones(
+      terrain,
+      0,
+      t0,
+      undefined,
+      undefined,
+      undefined,
+      zone.centerX,
+      zone.centerZ,
+    );
+    assert.equal(pile.respawnAt, t0 + FLOOD_ZONE_RESPAWN_MS);
+    assert.equal(other.respawnAt, null);
+    assert.ok(other.active && other.remaining > 0);
 
-    // Re-entering cancels the leave timer (crash-style).
+    // Staying inside does not cancel the timer.
     updateSpecialZones(
       terrain,
       0,
@@ -393,40 +458,7 @@ describe("floodRecovery/cycle", () => {
       zone.centerX,
       zone.centerZ,
     );
-    assert.equal(zone.debrisLeftAt, null);
-    assert.equal(zone.debrisRespawnAt, null);
-
-    // Leave again and wait out the full 5 minutes.
-    updateSpecialZones(terrain, 0, t0 + 120_000, undefined, undefined, undefined, outsideX, outsideZ);
-    assert.equal(zone.debrisLeftAt, t0 + 120_000);
-    updateSpecialZones(
-      terrain,
-      0,
-      t0 + 120_000 + FLOOD_ZONE_RESPAWN_MS,
-      undefined,
-      undefined,
-      undefined,
-      outsideX,
-      outsideZ,
-    );
-    assert.equal(isFloodDebrisFull(zone), true);
-    assert.equal(zone.sourceRemaining, floodFieldDebrisBudget(zone));
-    assert.ok(zone.debris.some((d) => d.active && d.remaining > 0));
-    assert.equal(zone.debrisLeftAt, null);
-    assert.equal(zone.debrisRespawnAt, null);
-  });
-
-  it("also arms debris regen when piles were blade-scraped", () => {
-    const terrain = withFloodTerrain();
-    const zone = terrain.floodZone!;
-    zone.debris[0]!.yaw = 1.2;
-    zone.debris[0]!.cleaved = true;
-    assert.equal(isFloodDebrisFull(zone), false);
-
-    const outsideX = zone.centerX + zone.radius + 2;
-    const t0 = 2_000_000;
-    updateSpecialZones(terrain, 0, t0, undefined, undefined, undefined, outsideX, zone.centerZ);
-    assert.ok(zone.debrisRespawnAt);
+    assert.equal(pile.respawnAt, t0 + FLOOD_ZONE_RESPAWN_MS);
 
     updateSpecialZones(
       terrain,
@@ -435,11 +467,46 @@ describe("floodRecovery/cycle", () => {
       undefined,
       undefined,
       undefined,
-      outsideX,
+      zone.centerX,
       zone.centerZ,
     );
-    assert.equal(isFloodDebrisFull(zone), true);
-    assert.equal(zone.debris.some((d) => d.cleaved || d.yaw != null), false);
+    assert.equal(pile.active, true);
+    assert.equal(pile.remaining, emptiedMax);
+    assert.equal(pile.x, pile.homeX);
+    assert.equal(pile.z, pile.homeZ);
+    assert.equal(pile.respawnAt, null);
+  });
+
+  it("does not regenerate cleaved fragments, only spawn-slot piles", () => {
+    const terrain = withFloodTerrain();
+    const zone = terrain.floodZone!;
+    const pile = zone.debris[0]!;
+    pile.remaining = 0;
+    pile.active = false;
+    zone.debris.push({
+      id: `${pile.id}-fragment`,
+      x: pile.x + 1,
+      z: pile.z + 1,
+      homeX: pile.x + 1,
+      homeZ: pile.z + 1,
+      remaining: 0,
+      maxRemaining: 120,
+      active: false,
+      cleaved: true,
+      regen: false,
+      respawnAt: null,
+    });
+    const fragment = zone.debris[zone.debris.length - 1]!;
+
+    const t0 = 3_000_000;
+    updateSpecialZones(terrain, 0, t0);
+    assert.equal(pile.respawnAt, t0 + FLOOD_ZONE_RESPAWN_MS);
+    assert.equal(fragment.respawnAt, null);
+
+    updateSpecialZones(terrain, 0, t0 + FLOOD_ZONE_RESPAWN_MS);
+    assert.equal(pile.active, true);
+    assert.equal(fragment.active, false);
+    assert.equal(fragment.respawnAt, null);
   });
 
   it("respawnFloodFieldDebris keeps incinerator and pad progress", () => {
@@ -458,5 +525,6 @@ describe("floodRecovery/cycle", () => {
       zone.incineratorCapacity - 1000 - FLOOD_COLLECTION_THRESHOLD,
     );
     assert.ok(zone.debris.length > 0);
+    assert.ok(zone.debris.every((d) => d.regen && d.maxRemaining > 0));
   });
 });

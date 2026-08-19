@@ -28,7 +28,21 @@ const GROUND_PAINT_MATERIAL = {
 
 const GROUND_PAINT_LIFT = 0.055;
 
+/** World scale for field trash mounds (gameplay catch radius stays larger). */
+const FLOOD_DEBRIS_VISUAL_BASE = 0.58;
+const FLOOD_DEBRIS_VISUAL_BY_AMOUNT = 0.2;
+
 type TroikaLabel = THREE.Object3D & { text?: string };
+
+function floodDebrisVisualScale(remaining: number, scraped: boolean) {
+  const amount = Math.max(0, Math.min(1, remaining / 400));
+  const scale = FLOOD_DEBRIS_VISUAL_BASE + amount * FLOOD_DEBRIS_VISUAL_BY_AMOUNT;
+  return {
+    x: scraped ? scale * 1.18 : scale,
+    y: scale * (scraped ? 0.92 : 1.0),
+    z: scraped ? scale * 0.92 : scale,
+  };
+}
 
 function FloodTrashPile({
   amount,
@@ -39,19 +53,19 @@ function FloodTrashPile({
   variant: number;
   scraped?: boolean;
 }) {
-  const fullness = Math.max(0.55, Math.min(1, amount / 160));
+  const fullness = Math.max(0.72, Math.min(1, amount / 400));
   const junkColors = ["#ef4444", "#f59e0b", "#38bdf8", "#e5e7eb", "#a3e635", "#f472b6"];
-  const pieces = Array.from({ length: scraped ? 10 : 12 }, (_, index) => {
+  const pieces = Array.from({ length: scraped ? 8 : 10 }, (_, index) => {
     const angle = index * 2.15 + variant * 0.61;
     const radius = scraped
-      ? 0.35 + (index % 4) * 0.28
-      : 0.55 + (index % 5) * 0.32;
-    const lateral = scraped ? ((index % 6) - 2.5) * 0.38 : Math.cos(angle) * radius;
-    const depth = scraped ? ((index % 3) - 1) * 0.22 : Math.sin(angle) * radius;
+      ? 0.18 + (index % 4) * 0.14
+      : 0.22 + (index % 5) * 0.13;
+    const lateral = scraped ? ((index % 6) - 2.5) * 0.2 : Math.cos(angle) * radius;
+    const depth = scraped ? ((index % 3) - 1) * 0.12 : Math.sin(angle) * radius;
     return {
       x: lateral,
       z: depth,
-      y: 0.12 + (index % 4) * 0.08,
+      y: 0.08 + (index % 4) * 0.045,
       yaw: scraped ? index * 0.48 : angle + index * 0.35,
       color: junkColors[(index + variant) % junkColors.length]!,
       kind: index % 3,
@@ -62,18 +76,18 @@ function FloodTrashPile({
     <group
       scale={
         scraped
-          ? [fullness * 1.55, 0.95 + fullness * 0.35, fullness * 1.15]
-          : [fullness * 1.45, 1.05 + fullness * 0.4, fullness * 1.45]
+          ? [fullness * 0.95, 0.88 + fullness * 0.18, fullness * 0.9]
+          : [fullness * 0.92, 0.9 + fullness * 0.2, fullness * 0.92]
       }
     >
-      {/* Ground marker ring — shows players where to drive the blade. */}
+      {/* Compact ground marker — visual only; blade catch stays wider. */}
       <mesh
         position={[0, 0.02, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         renderOrder={1}
       >
         <ringGeometry
-          args={scraped ? [1.15, 1.55, 36] : [1.35, 1.85, 40]}
+          args={scraped ? [0.48, 0.7, 32] : [0.52, 0.74, 36]}
         />
         <meshBasicMaterial
           color={scraped ? "#fbbf24" : "#38bdf8"}
@@ -88,7 +102,7 @@ function FloodTrashPile({
         rotation={[-Math.PI / 2, 0, 0]}
         renderOrder={1}
       >
-        <circleGeometry args={[scraped ? 1.15 : 1.35, 28]} />
+        <circleGeometry args={[scraped ? 0.48 : 0.52, 24]} />
         <meshBasicMaterial
           color={scraped ? "#78350f" : "#0c4a6e"}
           transparent
@@ -98,58 +112,58 @@ function FloodTrashPile({
         />
       </mesh>
 
-      {/* Chunk mound — reads clearly from cockpit height. */}
+      {/* Chunk mound — about excavator-bucket scale. */}
       <mesh
-        position={[0, 0.28, 0]}
-        scale={scraped ? [1.65, 0.55, 1.15] : [1.55, 0.7, 1.45]}
+        position={[0, 0.16, 0]}
+        scale={scraped ? [0.95, 0.38, 0.72] : [0.9, 0.46, 0.85]}
         castShadow
         receiveShadow
       >
-        <sphereGeometry args={[0.95, 14, 10]} />
+        <sphereGeometry args={[0.72, 14, 10]} />
         <meshStandardMaterial color="#1f2937" roughness={0.94} />
       </mesh>
       <mesh
-        position={scraped ? [0.35, 0.32, -0.12] : [0.4, 0.38, -0.25]}
-        scale={scraped ? [1.25, 0.48, 0.95] : [1.15, 0.55, 1.05]}
+        position={scraped ? [0.2, 0.18, -0.08] : [0.24, 0.22, -0.14]}
+        scale={scraped ? [0.72, 0.32, 0.58] : [0.68, 0.36, 0.62]}
         castShadow
         receiveShadow
       >
-        <sphereGeometry args={[0.72, 12, 9]} />
+        <sphereGeometry args={[0.55, 12, 9]} />
         <meshStandardMaterial color="#334155" roughness={0.9} />
       </mesh>
       <mesh
-        position={scraped ? [-0.4, 0.34, 0.08] : [-0.35, 0.4, 0.2]}
-        scale={scraped ? [1.1, 0.42, 0.9] : [1.05, 0.5, 1.0]}
+        position={scraped ? [-0.22, 0.19, 0.05] : [-0.2, 0.23, 0.12]}
+        scale={scraped ? [0.64, 0.28, 0.54] : [0.6, 0.32, 0.58]}
         castShadow
         receiveShadow
       >
-        <sphereGeometry args={[0.62, 11, 8]} />
+        <sphereGeometry args={[0.48, 11, 8]} />
         <meshStandardMaterial color="#3f3f46" roughness={0.92} />
       </mesh>
 
       {/* Broken boards / crates */}
       <mesh
-        position={[-0.15, 0.42, 0.05]}
+        position={[-0.08, 0.24, 0.03]}
         rotation={[0.08, scraped ? 0.05 : 0.45, 0.04]}
         castShadow
       >
-        <boxGeometry args={scraped ? [2.1, 0.22, 0.85] : [1.7, 0.24, 1.05]} />
+        <boxGeometry args={scraped ? [1.15, 0.12, 0.48] : [0.95, 0.14, 0.58]} />
         <meshStandardMaterial color="#57534e" roughness={0.88} />
       </mesh>
       <mesh
-        position={[0.55, 0.28, -0.45]}
+        position={[0.3, 0.16, -0.24]}
         rotation={[0.05, 0.85, 0.03]}
         castShadow
       >
-        <boxGeometry args={[1.35, 0.18, 0.8]} />
+        <boxGeometry args={[0.72, 0.1, 0.44]} />
         <meshStandardMaterial color="#d6d3d1" roughness={0.95} />
       </mesh>
       <mesh
-        position={[-0.65, 0.26, 0.4]}
+        position={[-0.36, 0.15, 0.22]}
         rotation={[0.04, -0.65, 0.05]}
         castShadow
       >
-        <boxGeometry args={[1.1, 0.16, 0.65]} />
+        <boxGeometry args={[0.6, 0.09, 0.36]} />
         <meshStandardMaterial color="#78716c" roughness={0.93} />
       </mesh>
 
@@ -165,7 +179,7 @@ function FloodTrashPile({
         >
           {piece.kind === 0 ? (
             <mesh castShadow>
-              <cylinderGeometry args={[0.16, 0.18, 0.72, 12]} />
+              <cylinderGeometry args={[0.09, 0.1, 0.4, 10]} />
               <meshStandardMaterial
                 color={piece.color}
                 metalness={0.55}
@@ -174,18 +188,18 @@ function FloodTrashPile({
             </mesh>
           ) : piece.kind === 1 ? (
             <mesh castShadow>
-              <boxGeometry args={[0.55, 0.38, 0.42]} />
+              <boxGeometry args={[0.3, 0.22, 0.24]} />
               <meshStandardMaterial color={piece.color} roughness={0.7} />
             </mesh>
           ) : (
             <mesh castShadow rotation={[0.2, 0.4, 0.1]}>
-              <sphereGeometry args={[0.28, 10, 8]} />
+              <sphereGeometry args={[0.16, 10, 8]} />
               <meshStandardMaterial color={piece.color} roughness={0.55} />
             </mesh>
           )}
           {index % 2 === 0 ? (
-            <mesh position={[0.18, 0, 0.04]} rotation={[0, 0.25, 0.08]}>
-              <planeGeometry args={[0.72, 0.5]} />
+            <mesh position={[0.1, 0, 0.02]} rotation={[0, 0.25, 0.08]}>
+              <planeGeometry args={[0.4, 0.28]} />
               <meshStandardMaterial
                 color="#f8fafc"
                 roughness={0.95}
@@ -274,7 +288,7 @@ function floodVisualSig(zone: FloodRecoveryZone) {
     zone.debris
       .map(
         (d) =>
-          `${d.id}:${d.active ? 1 : 0}:${Math.floor(d.remaining)}:${d.cleaved ? 1 : 0}`,
+          `${d.id}:${d.active ? 1 : 0}:${Math.floor(d.remaining)}:${d.cleaved ? 1 : 0}:${d.respawnAt ?? ""}`,
       )
       .join(","),
   ].join("|");
@@ -303,17 +317,11 @@ function FloodDebrisPiles({
       group.visible = live;
       if (!live) continue;
       const y = sampleHeight(terrain, d.x, d.z);
-      // Keep piles tall enough to read from the cockpit; scraped windrows
-      // stretch sideways along the blade while staying chunky.
-      const scale = 1.35 + Math.min(1, d.remaining / 180) * 0.7;
       const scraped = !!d.yaw || !!d.cleaved;
+      const scale = floodDebrisVisualScale(d.remaining, scraped);
       group.position.set(d.x, y + 0.03, d.z);
       group.rotation.set(0, d.yaw ?? group.rotation.y, 0);
-      group.scale.set(
-        scraped ? scale * 1.45 : scale,
-        scale * (scraped ? 0.95 : 1.05),
-        scraped ? scale * 0.95 : scale,
-      );
+      group.scale.set(scale.x, scale.y, scale.z);
     }
 
     const membership = zone.debris
@@ -336,8 +344,8 @@ function FloodDebrisPiles({
         .filter((d) => d.active && d.remaining > 0)
         .map((d, index) => {
           const y = sampleHeight(terrainRef.current, d.x, d.z);
-          const scale = 1.35 + Math.min(1, d.remaining / 180) * 0.7;
           const scraped = !!d.yaw || !!d.cleaved;
+          const scale = floodDebrisVisualScale(d.remaining, scraped);
           return (
             <group
               key={d.id}
@@ -347,11 +355,7 @@ function FloodDebrisPiles({
               }}
               position={[d.x, y + 0.03, d.z]}
               rotation={[0, d.yaw ?? index * 0.7, 0]}
-              scale={[
-                scraped ? scale * 1.45 : scale,
-                scale * (scraped ? 0.95 : 1.05),
-                scraped ? scale * 0.95 : scale,
-              ]}
+              scale={[scale.x, scale.y, scale.z]}
             >
               <FloodTrashPile
                 amount={d.remaining}

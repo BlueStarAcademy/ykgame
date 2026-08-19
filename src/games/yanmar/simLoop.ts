@@ -69,6 +69,7 @@ import {
   type HillBoulder,
   DUMP_ZONE,
   DUMP_TRUCK,
+  HILL_ZONE_RESPAWN_MS,
 } from "./terrain";
 import { FLOOD_BASE_PUSH_UNITS, FLOOD_COLLECTION_THRESHOLD } from "./floodRecovery/balance";
 import {
@@ -199,9 +200,12 @@ function floodTrashGripTarget(
     id: trashId,
     x: zone.collectionX,
     z: zone.collectionZ,
+    homeX: zone.collectionX,
+    homeZ: zone.collectionZ,
     active: true,
     delivered: false,
     extracted: false,
+    respawnAt: null,
     ...FLOOD_TRASH_GRIP_PROFILE,
   };
 }
@@ -542,6 +546,7 @@ function placeCarriedRockOnGround(
   rock.active = true;
   rock.delivered = false;
   rock.extracted = false;
+  rock.respawnAt = null;
   return "placed";
 }
 
@@ -549,6 +554,9 @@ function destroyCarriedRock(rock: HillBoulder) {
   rock.active = false;
   rock.delivered = false;
   rock.extracted = true;
+  if (rock.respawnAt == null) {
+    rock.respawnAt = Date.now() + HILL_ZONE_RESPAWN_MS;
+  }
 }
 
 function constrainExcavatorToMap(sim: ExcavatorSimState, terrain: TerrainData) {
@@ -1720,6 +1728,9 @@ export function tickExcavatorSim(params: SimTickParams) {
             rock.delivered = true;
             rock.extracted = true;
             rock.active = false;
+            if (rock.respawnAt == null) {
+              rock.respawnAt = Date.now() + HILL_ZONE_RESPAWN_MS;
+            }
           }
           const deliveredId = sim.carriedBoulderId;
           sim.carriedBoulderId = null;
@@ -2684,7 +2695,9 @@ export function tickExcavatorSim(params: SimTickParams) {
     floodZone.phase === "active" &&
     isInFloodZone(terrain, bladeContact.x, bladeContact.z);
   // Keep the blade engaged as the windrow crosses the collection-pad rim.
-  let floodStraightPush = false;
+  // Field scraping itself must work from any approach — only pad *scoring*
+  // cares about facing the collection center (see stroke credit below).
+  let floodTowardPad = false;
   if (bladeInFloodField && floodZone) {
     // Judge the push from the blade itself, not the excavator's turn centre:
     // a fully lowered blade can be several metres ahead while the body is
@@ -2698,7 +2711,7 @@ export function tickExcavatorSim(params: SimTickParams) {
     const travelDirZ = Math.cos(sim.heading);
     const align =
       (travelDirX * toPadX + travelDirZ * toPadZ) / toPadLen;
-    floodStraightPush =
+    floodTowardPad =
       toPadDistance <= floodZone.collectionRadius || align > 0.2;
   }
   const bladeScraping =
@@ -2707,11 +2720,10 @@ export function tickExcavatorSim(params: SimTickParams) {
     forwardTravel > 0.35 &&
     bladeInSoilField;
   const bladeFloodPush =
-    effectiveBlade > 0.55 &&
-    bladeClearance < DOZER_BLADE_ON_GROUND_CLEARANCE &&
-    forwardTravel > 0.35 &&
+    effectiveBlade > 0.45 &&
+    bladeClearance < DOZER_BLADE_ON_GROUND_CLEARANCE + 0.06 &&
+    forwardTravel > 0.22 &&
     bladeInFloodField &&
-    floodStraightPush &&
     !sim.carriedTrashId &&
     !sim.carriedBoulderId;
   if (bladeScraping) {
@@ -2760,7 +2772,8 @@ export function tickExcavatorSim(params: SimTickParams) {
     runtime.bladeSpray.y = bladeGroundY + 0.06;
     runtime.bladeSpray.z = bladeContact.z;
     runtime.bladeSpray.heading = sim.heading + sim.swing;
-    if (rt.floodBladeStrokeDist >= 0.75) {
+    // Only credit collection fill when the stroke is aimed at / onto the pad.
+    if (floodTowardPad && rt.floodBladeStrokeDist >= 0.75) {
       rt.floodBladeStrokeDist -= 0.75;
       const pushUnits = Math.max(
         FLOOD_BASE_PUSH_UNITS,

@@ -10,8 +10,11 @@ export const FLOOD_INCINERATOR_BASE_CAPACITY = 3000;
 /** Collection pad fill needed before grapple pickup is allowed. */
 export const FLOOD_COLLECTION_THRESHOLD = 500;
 
-/** How many visual field piles spawn each flood cycle. */
-export const FLOOD_DEBRIS_PILE_COUNT = 20;
+/** How many visual field piles spawn each flood cycle (≈375 units at base 3000). */
+export const FLOOD_DEBRIS_PILE_COUNT = 8;
+/** Each field pile should feel like a full blade scoop. */
+export const FLOOD_DEBRIS_PILE_MIN_UNITS = 300;
+export const FLOOD_DEBRIS_PILE_MAX_UNITS = 500;
 
 /**
  * Extra XZ margin outside the painted pad rim for blade→collection transfer.
