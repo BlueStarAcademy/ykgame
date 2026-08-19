@@ -17,7 +17,7 @@ const MAX_STARS_PER_RUN =
   SPORTS_MEET_MISSION_DEFAULTS.drive.starCount * 4; // 4 drive legs (incl. finish)
 
 /**
- * Grant currency for one ranked sports-meet course star (10–30).
+ * Grant currency for one ranked sports-meet course star (20–60).
  * Practice mode never calls this. Idempotent per runId+starId.
  */
 export async function POST(request: Request) {

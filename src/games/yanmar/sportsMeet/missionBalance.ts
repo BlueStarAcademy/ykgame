@@ -24,8 +24,8 @@ export const SPORTS_MEET_MISSION_DEFAULTS = {
 } as const;
 
 /** Ranked-mode course star currency grant (per pickup). */
-export const SPORTS_MEET_STAR_REWARD_MIN = 10;
-export const SPORTS_MEET_STAR_REWARD_MAX = 30;
+export const SPORTS_MEET_STAR_REWARD_MIN = 20;
+export const SPORTS_MEET_STAR_REWARD_MAX = 60;
 
 export type SportsMeetMissionBalance = {
   drive: {

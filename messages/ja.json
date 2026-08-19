@@ -1521,7 +1521,8 @@
       "floodLeaveIncinerator": "焼却場の外へ移動してください",
       "floodBurning": "焼却中 · {percent}%",
       "floodCollection": "集結 {current}/{capacity}",
-      "floodIncinerator": "焼却場 {current}/{capacity}"
+      "floodIncinerator": "焼却場 {current}/{capacity}",
+      "floodDebrisAmount": "{amount}"
     },
     "sitePrompt": {
       "monument": "モニュメント",

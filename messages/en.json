@@ -1521,7 +1521,8 @@
       "floodLeaveIncinerator": "Move away from the incinerator",
       "floodBurning": "Burning · {percent}%",
       "floodCollection": "Collect {current}/{capacity}",
-      "floodIncinerator": "Incinerator {current}/{capacity}"
+      "floodIncinerator": "Incinerator {current}/{capacity}",
+      "floodDebrisAmount": "{amount}"
     },
     "sitePrompt": {
       "monument": "Monument",

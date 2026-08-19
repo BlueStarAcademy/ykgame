@@ -1521,7 +1521,8 @@
       "floodLeaveIncinerator": "소각장 밖으로 이동하세요",
       "floodBurning": "소각 중 · {percent}%",
       "floodCollection": "집결 {current}/{capacity}",
-      "floodIncinerator": "소각장 {current}/{capacity}"
+      "floodIncinerator": "소각장 {current}/{capacity}",
+      "floodDebrisAmount": "{amount}"
     },
     "sitePrompt": {
       "monument": "조형물",

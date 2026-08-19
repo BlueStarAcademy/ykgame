@@ -4208,7 +4208,6 @@ export function ExcavatorGameWrapper({
         });
         const data = await res.json();
         if (!res.ok) return null;
-        pushQuestProgress("gearSynthesize", 1);
         if (data.stats) {
           publishEquipmentStats(data.stats);
         }
@@ -4231,7 +4230,7 @@ export function ExcavatorGameWrapper({
         setGearBusy(false);
       }
     },
-    [loadEquipment, publishEquipmentStats, pushQuestProgress],
+    [loadEquipment, publishEquipmentStats],
   );
 
   const runGearSynthesize = useCallback(
@@ -4271,6 +4270,7 @@ export function ExcavatorGameWrapper({
           durabilityMax: number;
         } | null;
         if (!created?.id) return null;
+        pushQuestProgress("gearSynthesize", 1);
         const slot = created.slot;
         const grade = created.grade;
         return {
@@ -4300,7 +4300,7 @@ export function ExcavatorGameWrapper({
         setGearBusy(false);
       }
     },
-    [loadEquipment, publishEquipmentStats],
+    [loadEquipment, publishEquipmentStats, pushQuestProgress],
   );
 
   const runGearSynthesizeMany = useCallback(
@@ -4327,7 +4327,7 @@ export function ExcavatorGameWrapper({
           setEnhanceCores(data.enhanceCores);
         }
         await loadEquipment();
-        return (data.items as unknown[]).flatMap((rawResult) => {
+        const results = (data.items as unknown[]).flatMap((rawResult) => {
           const result = rawResult as {
             item?: unknown;
             resultGrade?: unknown;
@@ -4374,11 +4374,15 @@ export function ExcavatorGameWrapper({
             upgraded: Boolean(result.upgraded),
           }];
         });
+        if (results.length > 0) {
+          pushQuestProgress("gearSynthesize", results.length);
+        }
+        return results;
       } finally {
         setGearBusy(false);
       }
     },
-    [loadEquipment, publishEquipmentStats],
+    [loadEquipment, publishEquipmentStats, pushQuestProgress],
   );
 
   const handleExpandInventory = useCallback(async () => {
