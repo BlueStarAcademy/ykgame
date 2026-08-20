@@ -93,7 +93,9 @@ export type MissionTaskKind =
   | "swing180"
   | "travel"
   | "dumpTruckDepart"
-  | "haulTruckDepart";
+  | "haulTruckDepart"
+  | "trashCollect"
+  | "trashBurnComplete";
 
 export type MissionTaskDef = {
   id: string;
@@ -117,7 +119,7 @@ export type YanmarQuestState = {
   version: 2;
   dayKey: string;
   ownerId: string;
-  levelBand: "under10" | "lv10" | "lv15";
+  levelBand: "under10" | "lv10" | "lv15" | "lv23";
   daily: DailyQuestProgress[];
   missions: MissionRound[];
   /** 오늘 클리어(클레임)한 미션 수 0~QUEST_MISSIONS_PER_DAY */

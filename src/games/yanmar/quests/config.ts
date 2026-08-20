@@ -221,16 +221,17 @@ export const MISSION_DIFFICULTY_REWARDS: Record<1 | 2 | 3 | 4 | 5, QuestReward> 
   },
 };
 
-export type MissionLevelBand = "under10" | "lv10" | "lv15";
+export type MissionLevelBand = "under10" | "lv10" | "lv15" | "lv23";
 
 export function getMissionLevelBand(level: number): MissionLevelBand {
+  if (level >= 23) return "lv23";
   if (level >= 15) return "lv15";
   if (level >= 10) return "lv10";
   return "under10";
 }
 
 export function getMissionMaxDifficulty(band: MissionLevelBand): 2 | 3 | 5 {
-  if (band === "lv15") return 5;
+  if (band === "lv23" || band === "lv15") return 5;
   if (band === "lv10") return 3;
   return 2;
 }
@@ -373,6 +374,72 @@ export const MISSION_POOL: Record<MissionLevelBand, MissionPoolEntry[]> = {
       label: (t) => `돌트럭 보내기 ${t}회`,
       min: 1,
       max: 1,
+      required: false,
+    },
+  ],
+  lv23: [
+    {
+      kind: "soilDump",
+      metric: "soilDump",
+      label: (t) => `흙 하역 ${t.toLocaleString()}`,
+      min: 1500,
+      max: 3000,
+      required: true,
+    },
+    {
+      kind: "asphaltBreak",
+      metric: "asphaltBreak",
+      label: (t) => `파쇄 ${t}개`,
+      min: 3,
+      max: 5,
+      required: true,
+    },
+    {
+      kind: "rockLoad",
+      metric: "rockLoad",
+      label: (t) => `돌 적재 성공 ${t}회`,
+      min: 1,
+      max: 2,
+      required: true,
+    },
+    {
+      kind: "trashCollect",
+      metric: "trashCollect",
+      label: (t) => `쓰레기 집결 ${t.toLocaleString()}`,
+      min: 1000,
+      max: 2500,
+      required: true,
+    },
+    {
+      kind: "trashBurnComplete",
+      metric: "trashBurnComplete",
+      label: (t) => `쓰레기 소각 ${t}회`,
+      min: 1,
+      max: 1,
+      required: false,
+    },
+    {
+      kind: "dumpTruckDepart",
+      metric: "dumpTruckDepart",
+      label: (t) => `덤프트럭 보내기 ${t}회`,
+      min: 1,
+      max: 1,
+      required: false,
+    },
+    {
+      kind: "haulTruckDepart",
+      metric: "haulTruckDepart",
+      label: (t) => `돌트럭 보내기 ${t}회`,
+      min: 1,
+      max: 1,
+      required: false,
+    },
+    {
+      kind: "travel",
+      metric: "travel",
+      label: (t) => `주행거리 ${t}m`,
+      min: 200,
+      max: 500,
       required: false,
     },
   ],

@@ -1119,7 +1119,10 @@
           "asphaltBreak": "破砕 {target}個",
           "haulTruckDepart": "石トラック {target}回 出発",
           "rockDump": "石の荷降ろし {target}個",
-          "travel": "走行距離 {target}m"
+          "travel": "走行距離 {target}m",
+          "trashCollect": "ごみ集結 {target}",
+          "trashGrapple": "グラップル積載成功 {target}回",
+          "trashBurn": "ごみ焼却 {target}"
         }
       },
       "secondsPreview": "{from}秒 → {to}秒"

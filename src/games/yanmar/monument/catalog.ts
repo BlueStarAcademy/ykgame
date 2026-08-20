@@ -104,6 +104,27 @@ export const MONUMENT_QUEST_POOL: readonly Omit<MonumentQuestDef, "id">[] = [
     rewardPoints: 15,
     kind: "daily",
   },
+  {
+    title: "쓰레기 집결",
+    metric: "trashCollect",
+    target: 1500,
+    rewardPoints: 35,
+    kind: "daily",
+  },
+  {
+    title: "집게 적재 성공",
+    metric: "trashGrapple",
+    target: 2,
+    rewardPoints: 30,
+    kind: "daily",
+  },
+  {
+    title: "쓰레기 소각",
+    metric: "trashBurn",
+    target: 1000,
+    rewardPoints: 35,
+    kind: "daily",
+  },
 ];
 
 export const MONUMENT_DAILY_QUEST_COUNT = 3;
@@ -148,6 +169,24 @@ export const MONUMENT_REPEAT_QUEST_POOL: readonly Omit<
     metric: "travel",
     target: 300,
     rewardPoints: 5,
+  },
+  {
+    title: "쓰레기 집결",
+    metric: "trashCollect",
+    target: 800,
+    rewardPoints: 12,
+  },
+  {
+    title: "집게 적재 성공",
+    metric: "trashGrapple",
+    target: 1,
+    rewardPoints: 10,
+  },
+  {
+    title: "쓰레기 소각",
+    metric: "trashBurn",
+    target: 500,
+    rewardPoints: 12,
   },
 ];
 

@@ -103,9 +103,13 @@ describe("floodRecovery/balance", () => {
     );
   });
 
-  it("keeps burn star rewards lean and grants capacity-scaled core bonuses", () => {
-    assert.equal(YANMAR_FLOOD_REWARD_CONFIG.burn.minStarReward, 8);
-    assert.equal(YANMAR_FLOOD_REWARD_CONFIG.burn.maxStarReward, 15);
+  it("pays flood burn above a full stone-zone clear and scales core bonuses", () => {
+    assert.equal(YANMAR_FLOOD_REWARD_CONFIG.burn.minStarReward, 70);
+    assert.equal(YANMAR_FLOOD_REWARD_CONFIG.burn.maxStarReward, 100);
+    assert.ok(
+      YANMAR_FLOOD_REWARD_CONFIG.burn.xpMin >
+        YANMAR_FLOOD_REWARD_CONFIG.grapple.xpMax,
+    );
     assert.equal(floodBurnCapacityCoreBonus(0), 0);
     assert.equal(
       floodBurnCapacityCoreBonus(1),

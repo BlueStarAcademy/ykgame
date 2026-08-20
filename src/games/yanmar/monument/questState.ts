@@ -108,9 +108,14 @@ function rollDailyQuests(dayKey: string, ownerId: string): MonumentQuestDef[] {
 function rollSingleRepeatQuest(
   ownerId: string,
   seed: string,
+  excludeMetrics: ReadonlySet<MonumentQuestMetric> = new Set(),
 ): MonumentQuestDef {
   const rand = mulberry32(hashSeed(`${ownerId}:${seed}:monument-repeat`));
-  const pool = [...MONUMENT_REPEAT_QUEST_POOL];
+  const preferred = MONUMENT_REPEAT_QUEST_POOL.filter(
+    (q) => !excludeMetrics.has(q.metric),
+  );
+  const pool =
+    preferred.length > 0 ? preferred : [...MONUMENT_REPEAT_QUEST_POOL];
   const idx = Math.floor(rand() * pool.length);
   const base = pool[idx]!;
   const id = `monument-repeat-${hashSeed(`${ownerId}:${seed}`).toString(36)}`;
@@ -119,8 +124,11 @@ function rollSingleRepeatQuest(
 
 function rollRepeatQuests(ownerId: string, count: number): MonumentQuestDef[] {
   const quests: MonumentQuestDef[] = [];
+  const usedMetrics = new Set<MonumentQuestMetric>();
   for (let i = 0; i < count; i++) {
-    quests.push(rollSingleRepeatQuest(ownerId, `init-${i}`));
+    const quest = rollSingleRepeatQuest(ownerId, `init-${i}`, usedMetrics);
+    usedMetrics.add(quest.metric);
+    quests.push(quest);
   }
   return quests;
 }
@@ -340,6 +348,7 @@ export function claimMonumentRepeatQuest(
   const newQuest = rollSingleRepeatQuest(
     state.ownerId,
     `${questId}:${Date.now()}`,
+    new Set([quest.metric]),
   );
   const repeat = state.repeat.map((q) =>
     q.id === questId ? newQuest : q,

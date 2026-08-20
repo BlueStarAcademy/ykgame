@@ -77,29 +77,29 @@ export const FLOOD_INCINERATOR_CAPACITY_MAX_LEVEL = 5;
 
 export const YANMAR_FLOOD_REWARD_CONFIG = {
   collect: {
-    baseScoreMin: 400,
-    baseScoreMax: 500,
-    minStarReward: 8,
-    maxStarReward: 15,
-    xpMin: 800,
-    xpMax: 1000,
+    baseScoreMin: 1000,
+    baseScoreMax: 1200,
+    minStarReward: 22,
+    maxStarReward: 32,
+    xpMin: 2000,
+    xpMax: 2400,
   },
   grapple: {
-    baseScoreMin: 500,
-    baseScoreMax: 600,
-    minStarReward: 10,
-    maxStarReward: 18,
-    xpMin: 1000,
-    xpMax: 1200,
+    baseScoreMin: 1200,
+    baseScoreMax: 1500,
+    minStarReward: 28,
+    maxStarReward: 40,
+    xpMin: 2400,
+    xpMax: 2900,
   },
   burn: {
-    baseScoreMin: 2000,
-    baseScoreMax: 2500,
-    /** Stars are intentionally lean so flood recovery pays in enhance cores. */
-    minStarReward: 8,
-    maxStarReward: 15,
-    xpMin: 3000,
-    xpMax: 4000,
+    baseScoreMin: 4500,
+    baseScoreMax: 5500,
+    /** Burn is the main flood payday — above a full stone-zone clear. */
+    minStarReward: 70,
+    maxStarReward: 100,
+    xpMin: 7000,
+    xpMax: 8500,
   },
 } as const;
 

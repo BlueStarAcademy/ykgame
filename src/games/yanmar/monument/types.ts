@@ -13,7 +13,10 @@ export type MonumentQuestMetric =
   | "asphaltBreak"
   | "haulTruckDepart"
   | "rockDump"
-  | "travel";
+  | "travel"
+  | "trashCollect"
+  | "trashGrapple"
+  | "trashBurn";
 
 export interface MonumentUpgradeDef {
   key: MonumentUpgradeKey;

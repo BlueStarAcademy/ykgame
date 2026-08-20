@@ -1119,7 +1119,10 @@
           "asphaltBreak": "Break {target} asphalt pieces",
           "haulTruckDepart": "Send stone truck {target} time(s)",
           "rockDump": "Unload {target} rocks",
-          "travel": "Travel {target}m"
+          "travel": "Travel {target}m",
+          "trashCollect": "Collect {target} trash",
+          "trashGrapple": "Grapple trash {target} time(s)",
+          "trashBurn": "Incinerate {target} trash"
         }
       },
       "secondsPreview": "{from}s → {to}s"

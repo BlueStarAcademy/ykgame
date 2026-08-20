@@ -15,7 +15,8 @@ import type { QuestReward } from "@/games/yanmar/quests/types";
 const BAND_LABELS: Record<MissionLevelBand, string> = {
   under10: "레벨 1~9",
   lv10: "레벨 10~14",
-  lv15: "레벨 15+",
+  lv15: "레벨 15~22",
+  lv23: "레벨 23+",
 };
 
 function taskKindLabel(kind: string) {
@@ -36,6 +37,10 @@ function taskKindLabel(kind: string) {
       return "덤프트럭 보내기";
     case "haulTruckDepart":
       return "돌트럭 보내기";
+    case "trashCollect":
+      return "쓰레기 집결";
+    case "trashBurnComplete":
+      return "쓰레기 소각";
     default:
       return kind;
   }
@@ -67,8 +72,9 @@ export function getQuestAdminReport() {
     value: formatQuestReward(reward),
   }));
 
-  const bandSections = (["under10", "lv10", "lv15"] as MissionLevelBand[]).map(
-    (band) => {
+  const bandSections = (
+    ["under10", "lv10", "lv15", "lv23"] as MissionLevelBand[]
+  ).map((band) => {
       const pool = MISSION_POOL[band];
       const required = pool.filter((entry) => entry.required);
       const optional = pool.filter((entry) => !entry.required);
@@ -201,9 +207,14 @@ export function getQuestAdminReport() {
             detail: "흙 하역·파쇄 필수 + 선택 2개",
           },
           {
-            label: "레벨 15+",
+            label: "레벨 15~22",
             value: `최대 D${getMissionMaxDifficulty("lv15")} · 선택 ${getMissionOptionalCount("lv15")}개`,
-            detail: "흙 하역·파쇄·돌 적재 필수 + 선택 2개",
+            detail: "흙 하역·파쇄·돌 적재 필수 + 선택 1개",
+          },
+          {
+            label: "레벨 23+",
+            value: `최대 D${getMissionMaxDifficulty("lv23")} · 선택 ${getMissionOptionalCount("lv23")}개`,
+            detail: "흙 하역·파쇄·돌 적재·쓰레기 집결 필수 + 소각/트럭/주행 중 선택 1개",
           },
         ],
       },

@@ -2757,7 +2757,10 @@ export function ExcavatorGameWrapper({
         monumentMetric === "asphaltBreak" ||
         monumentMetric === "haulTruckDepart" ||
         monumentMetric === "rockDump" ||
-        monumentMetric === "travel"
+        monumentMetric === "travel" ||
+        monumentMetric === "trashCollect" ||
+        monumentMetric === "trashGrapple" ||
+        monumentMetric === "trashBurn"
       ) {
         const mq = monumentQuestStateRef.current;
         if (mq) {

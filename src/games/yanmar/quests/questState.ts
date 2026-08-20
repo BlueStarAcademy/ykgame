@@ -248,12 +248,13 @@ export function loadQuestState(ownerId: string, level: number): YanmarQuestState
 
     const needsMissionReset =
       !Array.isArray(parsed.missions) ||
-      parsed.missions.length !== QUEST_MISSIONS_PER_DAY;
+      parsed.missions.length !== QUEST_MISSIONS_PER_DAY ||
+      parsed.levelBand !== band;
 
     return syncMetaDailyQuests({
       ...parsed,
       version: QUEST_STATE_VERSION,
-      levelBand: parsed.levelBand ?? band,
+      levelBand: band,
       daily: mergedDaily,
       repeat: mergedRepeat,
       missions: needsMissionReset

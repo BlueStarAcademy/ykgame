@@ -1119,7 +1119,10 @@
           "asphaltBreak": "파쇄 {target}개",
           "haulTruckDepart": "돌 트럭 {target}회 보내기",
           "rockDump": "돌 하역 {target}개",
-          "travel": "주행 거리 {target}m"
+          "travel": "주행 거리 {target}m",
+          "trashCollect": "쓰레기 집결 {target}",
+          "trashGrapple": "집게 적재 성공 {target}회",
+          "trashBurn": "쓰레기 소각 {target}"
         }
       },
       "secondsPreview": "{from}초 → {to}초"
