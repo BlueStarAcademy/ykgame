@@ -700,7 +700,9 @@
         "swing180": "上部180°旋回 {target}回",
         "travel": "走行距離 {target}m",
         "dumpTruckDepart": "ダンプトラックを{target}回送る",
-        "haulTruckDepart": "石トラックを{target}回送る"
+        "haulTruckDepart": "石トラックを{target}回送る",
+        "trashCollect": "ごみ集結 {target}",
+        "trashBurnComplete": "ごみ焼却 {target}回"
       },
       "defs": {
         "repeat-soil-dump-10000": "土の荷下ろし {target}",

@@ -700,7 +700,9 @@
         "swing180": "상부 180° 회전 {target}회",
         "travel": "주행거리 {target}m",
         "dumpTruckDepart": "덤프트럭 보내기 {target}회",
-        "haulTruckDepart": "돌트럭 보내기 {target}회"
+        "haulTruckDepart": "돌트럭 보내기 {target}회",
+        "trashCollect": "쓰레기 집결 {target}",
+        "trashBurnComplete": "쓰레기 소각 {target}회"
       },
       "defs": {
         "repeat-soil-dump-10000": "흙 하역하기 {target}",

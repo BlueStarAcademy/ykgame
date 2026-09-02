@@ -700,7 +700,9 @@
         "swing180": "Swing upper body 180° {target} times",
         "travel": "Travel {target}m",
         "dumpTruckDepart": "Send dump truck {target} times",
-        "haulTruckDepart": "Send stone truck {target} times"
+        "haulTruckDepart": "Send stone truck {target} times",
+        "trashCollect": "Collect {target} trash",
+        "trashBurnComplete": "Incinerate trash {target} times"
       },
       "defs": {
         "repeat-soil-dump-10000": "Dump soil {target}",
