@@ -9653,6 +9653,22 @@ html.pwa-mode .pwa-shell .app-shell {
   overflow: hidden;
 }
 
+/* Admin uses native document scroll (no fixed PWA shell) for correct iOS scroll + inputs. */
+html.pwa-mode .admin-shell {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* iOS zooms inputs under 16px and that fights keyboard/viewport — keep admin fields readable. */
+@supports (-webkit-touch-callout: none) {
+  .admin-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+  .admin-shell textarea,
+  .admin-shell select {
+    font-size: 16px;
+  }
+}
+
 html.pwa-mode .pwa-shell .app-shell-main {
   /* sticky 헤더가 흐름을 차지하므로 fixed용 상단 패딩 제거 */
   padding-top: 0.5rem;

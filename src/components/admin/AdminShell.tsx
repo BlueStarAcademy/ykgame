@@ -32,8 +32,8 @@ export function AdminShell({
           : "뒤로");
 
   return (
-    <main className="min-h-screen bg-slate-100 p-4">
-      <div className="mx-auto max-w-3xl space-y-4">
+    <main className="admin-shell min-h-dvh bg-slate-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
+      <div className="mx-auto w-full max-w-3xl space-y-4 pb-8">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             {onBack ? (

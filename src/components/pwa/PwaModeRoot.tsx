@@ -25,10 +25,16 @@ function clearPwaShellViewport() {
   root.style.removeProperty("--pwa-shell-top");
 }
 
+/** Form-heavy routes need native document scroll on iOS (fixed shell + visualViewport sync inverts scroll and hides focused inputs). */
+function usesDocumentScroll(pathname: string) {
+  return pathname === "/" || pathname.startsWith("/admin");
+}
+
 function PwaModeRootInner({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const [active, setActive] = useState(false);
+  const documentScroll = usesDocumentScroll(pathname);
 
   useEffect(() => {
     // Older builds locked landscape on game enter. Clear once per tab session.
@@ -85,12 +91,17 @@ function PwaModeRootInner({ children }: { children: React.ReactNode }) {
     }
 
     document.documentElement.classList.add("pwa-mode");
+
+    // Admin / landing: native page scroll. Avoid visualViewport-driven fixed shell.
+    if (documentScroll) {
+      clearPwaShellViewport();
+      return;
+    }
+
     syncPwaShellViewport();
 
     const prevOverflow = document.body.style.overflow;
-    if (pathname !== "/") {
-      document.body.style.overflow = "hidden";
-    }
+    document.body.style.overflow = "hidden";
 
     const isEditableTarget = (target: EventTarget | null) => {
       if (!(target instanceof HTMLElement)) return false;
@@ -127,9 +138,9 @@ function PwaModeRootInner({ children }: { children: React.ReactNode }) {
       window.removeEventListener("orientationchange", onViewportChange);
       clearPwaShellViewport();
     };
-  }, [searchParams, pathname]);
+  }, [searchParams, pathname, documentScroll]);
 
-  if (!active || pathname === "/") {
+  if (!active || documentScroll) {
     return <>{children}</>;
   }
 

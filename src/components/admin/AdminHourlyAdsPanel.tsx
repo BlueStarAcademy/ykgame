@@ -260,8 +260,8 @@ export function AdminHourlyAdsPanel() {
         {loading ? (
           <p className="text-sm text-slate-500">불러오는 중…</p>
         ) : (
-          <div className="-mx-1 overflow-x-auto pb-1">
-            <div className="flex min-w-max gap-3 px-1">
+          <div className="-mx-1 pb-1 sm:overflow-x-auto">
+            <div className="flex flex-col gap-3 px-1 sm:min-w-max sm:flex-row">
               {cards.map((slot) => {
                 const isDraft = slot.id === HOURLY_AD_DRAFT_SLOT_ID;
                 const draft = drafts[slot.id] ?? emptyDraft();
@@ -283,7 +283,7 @@ export function AdminHourlyAdsPanel() {
                 return (
                   <section
                     key={slot.id}
-                    className={`w-[14rem] shrink-0 rounded-2xl border p-3 shadow-sm ${
+                    className={`w-full rounded-2xl border p-3 shadow-sm sm:w-[14rem] sm:shrink-0 ${
                       isDraft
                         ? "border-dashed border-slate-300 bg-slate-50"
                         : "border-slate-200 bg-white"
@@ -406,14 +406,19 @@ export function AdminHourlyAdsPanel() {
                       링크 이동
                     </label>
                     <input
-                      type="url"
+                      type="text"
+                      inputMode="url"
+                      enterKeyHint="done"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       placeholder="https://"
                       value={draft.linkUrl}
                       disabled={!draft.linkEnabled}
                       onChange={(e) =>
                         updateDraft(slot.id, { linkUrl: e.target.value })
                       }
-                      className={`mt-1 w-full rounded-lg border px-2 py-1.5 text-xs ${
+                      className={`mt-1 w-full rounded-lg border px-2 py-1.5 text-base sm:text-xs ${
                         draft.linkEnabled
                           ? "border-slate-200 bg-white text-slate-900"
                           : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400"

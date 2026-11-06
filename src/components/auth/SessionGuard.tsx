@@ -5,7 +5,10 @@ import { useSession } from "next-auth/react";
 import { AppModalOverlay } from "@/components/layout/AppModalOverlay";
 import { clientLogout } from "@/lib/client-logout";
 
-const POLL_INTERVAL_MS = 30_000;
+/** While the tab is visible — keep takeover nearly immediate. */
+const VISIBLE_POLL_MS = 5_000;
+/** Background tabs can poll more slowly. */
+const HIDDEN_POLL_MS = 20_000;
 
 /**
  * Polls session status while authenticated. If another device takes over,
@@ -20,6 +23,7 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
     if (status !== "authenticated" || kickedRef.current) return;
 
     let cancelled = false;
+    let timer: number | null = null;
 
     async function check() {
       if (cancelled || kickedRef.current) return;
@@ -33,17 +37,48 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
         if (data.status === "superseded") {
           kickedRef.current = true;
           setKicked(true);
+          if (timer != null) {
+            window.clearInterval(timer);
+            timer = null;
+          }
         }
       } catch {
         // Ignore transient network errors
       }
     }
 
+    function pollIntervalMs() {
+      if (typeof document === "undefined") return VISIBLE_POLL_MS;
+      return document.visibilityState === "hidden"
+        ? HIDDEN_POLL_MS
+        : VISIBLE_POLL_MS;
+    }
+
+    function startPolling() {
+      if (timer != null) window.clearInterval(timer);
+      timer = window.setInterval(() => void check(), pollIntervalMs());
+    }
+
+    function onForeground() {
+      void check();
+      startPolling();
+    }
+
     void check();
-    const timer = window.setInterval(() => void check(), POLL_INTERVAL_MS);
+    startPolling();
+
+    document.addEventListener("visibilitychange", onForeground);
+    window.addEventListener("focus", onForeground);
+    window.addEventListener("pageshow", onForeground);
+    window.addEventListener("online", onForeground);
+
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      if (timer != null) window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onForeground);
+      window.removeEventListener("focus", onForeground);
+      window.removeEventListener("pageshow", onForeground);
+      window.removeEventListener("online", onForeground);
     };
   }, [status]);
 
