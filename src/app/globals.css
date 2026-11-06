@@ -16685,8 +16685,8 @@ button.yanmar-gear-icon-cell {
 .yanmar-gear-mgr-inv-bar-left {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  flex-wrap: nowrap;
+  gap: 0.28rem;
   min-width: 0;
   flex: 1;
 }
@@ -16694,9 +16694,10 @@ button.yanmar-gear-icon-cell {
 .yanmar-gear-bulk-toolbar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.28rem;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .yanmar-gear-bulk-hint {
@@ -16711,11 +16712,12 @@ button.yanmar-gear-icon-cell {
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(248, 250, 252, 0.9);
-  padding: 0.28rem 0.5rem;
-  font-size: 0.62rem;
+  padding: 0.28rem 0.42rem;
+  font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.01em;
   white-space: nowrap;
+  flex-shrink: 0;
   cursor: pointer;
 }
 
@@ -16809,6 +16811,7 @@ button.yanmar-gear-icon-cell {
   font-weight: 800;
   color: rgba(246, 231, 194, 0.7);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .yanmar-gear-filter-row {
@@ -16945,21 +16948,32 @@ button.yanmar-gear-icon-cell {
 
 .yanmar-gear-filter-dd {
   position: relative;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .yanmar-gear-filter-dd-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  max-width: 14rem;
+  gap: 0.28rem;
+  max-width: 6.5rem;
+  min-width: 0;
   border-radius: 0.35rem;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.06);
   color: #e2e8f0;
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 800;
-  padding: 0.28rem 0.5rem;
+  padding: 0.28rem 0.42rem;
   cursor: pointer;
+  overflow: hidden;
+}
+
+.yanmar-gear-filter-dd-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .yanmar-gear-filter-dd-menu {

@@ -1368,7 +1368,9 @@ export function GearPanel({
                   aria-expanded={filterOpen}
                   disabled={!!bulkMode}
                 >
-                  {filterSummary}
+                  <span className="yanmar-gear-filter-dd-label">
+                    {filterSummary}
+                  </span>
                   <span aria-hidden>▾</span>
                 </button>
                 {filterOpen && !bulkMode ? (
@@ -1407,7 +1409,7 @@ export function GearPanel({
                 ) : null}
               </div>
               {!bulkMode ? (
-                <>
+                <div className="yanmar-gear-bulk-toolbar">
                   <button
                     type="button"
                     className="yanmar-gear-bulk-btn yanmar-gear-bulk-btn--dismantle"
@@ -1436,9 +1438,9 @@ export function GearPanel({
                   >
                     {t("bulkSynth")}
                   </button>
-                </>
+                </div>
               ) : (
-                <>
+                <div className="yanmar-gear-bulk-toolbar">
                   {bulkMode === "dismantle" || bulkMode === "sell" ? (
                     <button
                       type="button"
@@ -1488,7 +1490,7 @@ export function GearPanel({
                         ? t("doSell")
                         : t("doSynthesize")}
                   </button>
-                </>
+                </div>
               )}
             </div>
             <span className="yanmar-gear-mgr-cap">
