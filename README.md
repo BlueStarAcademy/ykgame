@@ -79,10 +79,14 @@ AUTH_URL="http://localhost:3000"
 로컬에서는 `DATABASE_PUBLIC_URL`이 자동 사용됩니다.
 
 ```bash
-npx prisma migrate deploy   # 최초 1회
+npx prisma migrate deploy   # 최초 1회 / git pull 후
 npm run db:seed               # 최초 1회 (선택)
 npm run dev
 ```
+
+> `git pull` 뒤에는 `npx prisma migrate deploy`를 실행하세요.  
+> Prisma Client는 `npm install` / `postinstall`에서 자동 생성됩니다.  
+> 스키마 관련 500이 나면 `.next` 삭제 후 `npm run dev`를 재시작하세요.
 
 ---
 

@@ -523,6 +523,27 @@ model TickerSettings {
   updatedAt     DateTime @updatedAt
 }
 
+/** 인게임 좌측 정시 광고 슬롯 (고정 id: m15 / m30 / m45) */
+model HourlyAdSlot {
+  id               String   @id
+  sortOrder        Int      @default(0)
+  title            String   @default("")
+  /** 매시간 노출 시작 분 (0=정시 … 59) */
+  offsetMin        Int      @default(0)
+  /** 노출 지속 시간 (분) */
+  durationMin      Int      @default(15)
+  /** 업로드 없을 때 쓰는 기본 정적 경로 */
+  defaultImagePath String
+  imageMime        String?
+  imageData        Bytes?
+  linkEnabled      Boolean  @default(false)
+  linkUrl          String?
+  active           Boolean  @default(true)
+  updatedAt        DateTime @updatedAt
+
+  @@index([active, sortOrder])
+}
+
 /** 쿠폰·스타 당첨 등 실시간 전광판 이벤트 (최근분만 유지) */
 model TickerWinEvent {
   id        String   @id @default(cuid())

@@ -15,6 +15,7 @@ import {
   rollHourlyAdReward,
   type HourlyAdReward,
 } from "@/games/yanmar/hourlyAdReward";
+import { syncHourlyAdRuntimeFromDb } from "@/lib/hourly-ads";
 
 function grantSelect() {
   return {
@@ -121,6 +122,11 @@ export async function POST(request: Request) {
 
   const eventId = parseRewardEventId(body?.eventId);
   const parsed = eventId ? parseHourlyAdEventId(eventId) : null;
+  try {
+    await syncHourlyAdRuntimeFromDb();
+  } catch (error) {
+    console.error("[yanmar-hourly-ad] config sync failed:", error);
+  }
   const active = getActiveHourlyAd();
   const currentBucket = getHourlyAdHourBucket();
 

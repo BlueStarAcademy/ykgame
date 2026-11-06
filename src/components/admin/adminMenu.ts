@@ -42,6 +42,13 @@ export const ADMIN_MENU_ITEMS = [
     color: "border-rose-200 bg-gradient-to-br from-rose-50 to-white",
   },
   {
+    href: "/admin/hourly-ads",
+    emoji: "🪧",
+    title: "광고 관리",
+    desc: "인게임 좌측 광고 이미지·노출 시간·링크 관리",
+    color: "border-orange-200 bg-gradient-to-br from-orange-50 to-white",
+  },
+  {
     href: "/admin/chat",
     emoji: "🗨️",
     title: "채팅 관리",

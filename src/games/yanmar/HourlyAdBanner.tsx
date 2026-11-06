@@ -7,7 +7,9 @@ import { useRegisterInGameBackDismiss } from "@/hooks/useInGameBackNavigation";
 import type { Locale } from "@/i18n/config";
 import { localizedAsset } from "@/i18n/localizedAsset";
 import styles from "./HourlyAdBanner.module.css";
+import { isLegacyHourlyAdSlotId } from "@/lib/hourly-ad-constants";
 import {
+  applyHourlyAdPublicConfig,
   HOURLY_AD_REWARD_POOL,
   HOURLY_AD_SLOT_DECAY_MS,
   HOURLY_AD_WATCH_SEC,
@@ -25,6 +27,29 @@ import {
 } from "./hourlyAdReward";
 import { yanmarAudio } from "./yanmarAudio";
 import { runRewardReelSpin } from "./rewardReelSpin";
+
+type PublicHourlyAdConfig = {
+  slots: Array<{
+    id: HourlyAdSlotId;
+    offsetMin: number;
+    durationMin: number;
+    title: string;
+    imageUrl: string;
+    hasCustomImage: boolean;
+    defaultImagePath: string;
+    linkEnabled: boolean;
+    linkUrl: string | null;
+    active: boolean;
+  }>;
+};
+
+function openExternalLink(url: string) {
+  try {
+    window.open(url, "_blank", "noopener,noreferrer");
+  } catch {
+    /* ignore popup blockers */
+  }
+}
 
 const REEL_LOOPS = 18;
 
@@ -128,6 +153,32 @@ export function HourlyAdBanner({
 
   useEffect(() => {
     if (!enabled || !mounted) return;
+    let cancelled = false;
+
+    const loadConfig = async () => {
+      try {
+        const res = await fetch("/api/hourly-ads/config", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as PublicHourlyAdConfig;
+        if (cancelled || !Array.isArray(data.slots)) return;
+        applyHourlyAdPublicConfig(data);
+      } catch {
+        /* keep built-in defaults */
+      }
+    };
+
+    void loadConfig();
+    const refreshId = window.setInterval(() => {
+      void loadConfig();
+    }, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshId);
+    };
+  }, [enabled, mounted]);
+
+  useEffect(() => {
+    if (!enabled || !mounted) return;
 
     const tick = () => {
       const active = getActiveHourlyAd();
@@ -166,16 +217,39 @@ export function HourlyAdBanner({
     bannerSec > 0 &&
     creative !== null &&
     phase === "idle";
+  const useLegacyCopy =
+    Boolean(activeSlotId) &&
+    isLegacyHourlyAdSlotId(activeSlotId!) &&
+    !creative?.hasCustomImage;
   const creativeCopy =
     activeSlotId && creative
       ? {
-          teaserTitle: t(`ads.${activeSlotId}.teaserTitle`),
-          teaserSub: t(`ads.${activeSlotId}.teaserSub`),
-          panelEyebrow: t(`ads.${activeSlotId}.panelEyebrow`),
-          panelTitle: t(`ads.${activeSlotId}.panelTitle`),
-          imageAlt: t(`ads.${activeSlotId}.imageAlt`),
-          ariaLabel: t(`ads.${activeSlotId}.ariaLabel`),
-          image: localizedAsset(creative.image, locale as Locale),
+          teaserTitle: useLegacyCopy
+            ? t(`ads.${activeSlotId}.teaserTitle`)
+            : creative.panelTitle,
+          teaserSub: useLegacyCopy
+            ? t(`ads.${activeSlotId}.teaserSub`)
+            : t("ads.rewardHint"),
+          panelEyebrow: useLegacyCopy
+            ? t(`ads.${activeSlotId}.panelEyebrow`)
+            : "AD",
+          panelTitle: useLegacyCopy
+            ? t(`ads.${activeSlotId}.panelTitle`)
+            : creative.panelTitle,
+          imageAlt: useLegacyCopy
+            ? t(`ads.${activeSlotId}.imageAlt`)
+            : creative.imageAlt,
+          ariaLabel: useLegacyCopy
+            ? t(`ads.${activeSlotId}.ariaLabel`)
+            : creative.ariaLabel,
+          image: creative.hasCustomImage
+            ? creative.image
+            : localizedAsset(
+                creative.defaultImagePath ?? creative.image,
+                locale as Locale,
+              ),
+          linkEnabled: creative.linkEnabled && Boolean(creative.linkUrl),
+          linkUrl: creative.linkUrl,
         }
       : null;
 
@@ -236,9 +310,18 @@ export function HourlyAdBanner({
 
   function openAd() {
     if (claimed || bannerSec <= 0 || !creative) return;
+    if (creative.linkEnabled && creative.linkUrl) {
+      openExternalLink(creative.linkUrl);
+    }
     setClaimError(null);
     setConfirmClose(false);
     setPhase("ad");
+  }
+
+  function openCreativeLink(event?: { stopPropagation?: () => void }) {
+    event?.stopPropagation?.();
+    if (!creative?.linkEnabled || !creative.linkUrl) return;
+    openExternalLink(creative.linkUrl);
   }
 
   function requestCloseAd() {
@@ -373,7 +456,11 @@ export function HourlyAdBanner({
           type="button"
           className={styles.teaser}
           onClick={openAd}
-          aria-label={`${creativeCopy.ariaLabel} — ${t("ads.rewardHint")}`}
+          aria-label={
+            creativeCopy.linkEnabled
+              ? `${creativeCopy.ariaLabel} — 링크 열기`
+              : `${creativeCopy.ariaLabel} — ${t("ads.rewardHint")}`
+          }
         >
           <span className={styles.teaserShine} aria-hidden />
           <div className={styles.teaserMedia}>
@@ -387,7 +474,8 @@ export function HourlyAdBanner({
               draggable={false}
               onError={(event) => {
                 event.currentTarget.onerror = null;
-                event.currentTarget.src = creative.image;
+                event.currentTarget.src =
+                  creative.defaultImagePath ?? creative.image;
               }}
             />
           </div>
@@ -434,15 +522,36 @@ export function HourlyAdBanner({
                     <span className={styles.adMarker} aria-hidden>
                       AD
                     </span>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={creativeCopy.image}
-                      alt={creativeCopy.imageAlt}
-                      onError={(event) => {
-                        event.currentTarget.onerror = null;
-                        event.currentTarget.src = creative.image;
-                      }}
-                    />
+                    {creativeCopy.linkEnabled && creativeCopy.linkUrl ? (
+                      <button
+                        type="button"
+                        className={styles.adLinkHit}
+                        onClick={openCreativeLink}
+                        aria-label={`${creativeCopy.ariaLabel} 링크 열기`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={creativeCopy.image}
+                          alt={creativeCopy.imageAlt}
+                          onError={(event) => {
+                            event.currentTarget.onerror = null;
+                            event.currentTarget.src =
+                              creative.defaultImagePath ?? creative.image;
+                          }}
+                        />
+                      </button>
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={creativeCopy.image}
+                        alt={creativeCopy.imageAlt}
+                        onError={(event) => {
+                          event.currentTarget.onerror = null;
+                          event.currentTarget.src =
+                            creative.defaultImagePath ?? creative.image;
+                        }}
+                      />
+                    )}
                   </div>
                   {watchLeft > 0 ? (
                     <p className={styles.adHint}>

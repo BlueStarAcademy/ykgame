@@ -1,15 +1,23 @@
 import {
+  HOURLY_AD_DURATION_MIN_DEFAULT,
+  isHourlyAdSlotId,
+  type HourlyAdSlotId,
+} from "@/lib/hourly-ad-constants";
+import {
   getWorldPickupHourBucket,
   getWorldPickupHourStartMs,
 } from "./worldPickups";
+
+export type { HourlyAdSlotId };
+export { isHourlyAdSlotId };
 
 function randomInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 const MINUTE_MS = 60_000;
-/** Each hourly ad teaser stays visible for 15 minutes. */
-export const HOURLY_AD_BANNER_MS = 15 * MINUTE_MS;
+/** Fallback duration when runtime config is not loaded yet. */
+export const HOURLY_AD_BANNER_MS = HOURLY_AD_DURATION_MIN_DEFAULT * MINUTE_MS;
 /** Ad watch gate before claim is enabled. */
 export const HOURLY_AD_WATCH_SEC = 10;
 /** Slot reel decelerates to a stop over this duration when not interrupted. */
@@ -17,10 +25,11 @@ export const HOURLY_AD_SLOT_DECAY_MS = 5_800;
 
 export const HOURLY_AD_EVENT_PREFIX = "hourly-ad:";
 
-export type HourlyAdSlotId = "m15" | "m30" | "m45";
-
 export type HourlyAdCreative = {
   image: string;
+  /** Prefer static default path for locale variants when no custom upload. */
+  defaultImagePath?: string;
+  hasCustomImage?: boolean;
   teaserTitle: string;
   teaserSub: string;
   panelEyebrow: string;
@@ -29,25 +38,35 @@ export type HourlyAdCreative = {
   ariaLabel: string;
   /** False until creative art is supplied (slot stays closed). */
   ready: boolean;
+  linkEnabled: boolean;
+  linkUrl: string | null;
 };
 
 export type HourlyAdSlot = {
   id: HourlyAdSlotId;
   /** Minutes after KST hour start when the teaser opens. */
   offsetMin: number;
+  /** How long this slot stays visible. */
+  durationMs: number;
   creative: HourlyAdCreative;
 };
 
+export type HourlyAdRuntimeConfig = {
+  slots: readonly HourlyAdSlot[];
+};
+
 /**
- * Three staggered ads per KST hour:
- * :15 existing launch creative, :30 parts pre-order, :45 next upload.
+ * Three staggered ads per KST hour (defaults until DB config loads).
  */
 export const HOURLY_AD_SLOTS: readonly HourlyAdSlot[] = [
   {
     id: "m15",
-    offsetMin: 15,
+    offsetMin: 0,
+    durationMs: HOURLY_AD_BANNER_MS,
     creative: {
       image: "/images/yanmar/ads/sv10-sv11-launch.png",
+      defaultImagePath: "/images/yanmar/ads/sv10-sv11-launch.png",
+      hasCustomImage: false,
       teaserTitle: "SV10·SV11 출시!",
       teaserSub: "탭하고 보상 받기",
       panelEyebrow: "Yanmar New Model",
@@ -55,13 +74,18 @@ export const HOURLY_AD_SLOTS: readonly HourlyAdSlot[] = [
       imageAlt: "얀마 SV10·SV11 미니굴착기 출시",
       ariaLabel: "SV10·SV11 출시 광고",
       ready: true,
+      linkEnabled: false,
+      linkUrl: null,
     },
   },
   {
     id: "m30",
-    offsetMin: 30,
+    offsetMin: 15,
+    durationMs: HOURLY_AD_BANNER_MS,
     creative: {
       image: "/images/yanmar/ads/parts-preorder.png",
+      defaultImagePath: "/images/yanmar/ads/parts-preorder.png",
+      hasCustomImage: false,
       teaserTitle: "부품 사전 주문!",
       teaserSub: "탭하고 보상 받기",
       panelEyebrow: "Yanmar Parts Promo",
@@ -69,13 +93,18 @@ export const HOURLY_AD_SLOTS: readonly HourlyAdSlot[] = [
       imageAlt: "얀마 부품 사전 주문 프로모션 — 고무트랙·롤러·스프로켓·아이들러",
       ariaLabel: "부품 사전 주문 프로모션 광고",
       ready: true,
+      linkEnabled: false,
+      linkUrl: null,
     },
   },
   {
     id: "m45",
-    offsetMin: 45,
+    offsetMin: 30,
+    durationMs: HOURLY_AD_BANNER_MS,
     creative: {
       image: "/images/yanmar/ads/hourly-ad-45.png",
+      defaultImagePath: "/images/yanmar/ads/hourly-ad-45.png",
+      hasCustomImage: false,
       teaserTitle: "존디어 부품 20%!",
       teaserSub: "탭하고 보상 받기",
       panelEyebrow: "YK건기 × John Deere",
@@ -84,13 +113,38 @@ export const HOURLY_AD_SLOTS: readonly HourlyAdSlot[] = [
         "YK건기 × 존디어 — 존디어 모든 순정 부품 20% 인하 프로모션",
       ariaLabel: "존디어 순정 부품 20% 인하 광고",
       ready: true,
+      linkEnabled: false,
+      linkUrl: null,
     },
   },
 ] as const;
 
-const SLOT_BY_ID = Object.fromEntries(
-  HOURLY_AD_SLOTS.map((slot) => [slot.id, slot]),
-) as Record<HourlyAdSlotId, HourlyAdSlot>;
+const DEFAULT_RUNTIME: HourlyAdRuntimeConfig = {
+  slots: HOURLY_AD_SLOTS,
+};
+
+let runtimeConfig: HourlyAdRuntimeConfig = DEFAULT_RUNTIME;
+
+export function setHourlyAdRuntimeConfig(config: HourlyAdRuntimeConfig) {
+  runtimeConfig = {
+    slots: config.slots.map((slot) => ({
+      ...slot,
+      durationMs: Math.max(MINUTE_MS, slot.durationMs),
+    })),
+  };
+}
+
+export function getHourlyAdRuntimeConfig(): HourlyAdRuntimeConfig {
+  return runtimeConfig;
+}
+
+function slotById(slotId: HourlyAdSlotId) {
+  return (
+    runtimeConfig.slots.find((slot) => slot.id === slotId) ??
+    HOURLY_AD_SLOTS.find((slot) => slot.id === slotId) ??
+    null
+  );
+}
 
 export type HourlyAdRewardKind =
   | "stars"
@@ -185,12 +239,8 @@ export function getHourlyAdHourStartMs(hourBucket: number) {
   return getWorldPickupHourStartMs(hourBucket);
 }
 
-export function isHourlyAdSlotId(value: string): value is HourlyAdSlotId {
-  return value === "m15" || value === "m30" || value === "m45";
-}
-
 export function getHourlyAdSlot(slotId: HourlyAdSlotId) {
-  return SLOT_BY_ID[slotId];
+  return slotById(slotId);
 }
 
 /** KST wall-clock open time for a slot inside the given hour bucket. */
@@ -199,6 +249,7 @@ export function getHourlyAdSlotWindowStartMs(
   slotId: HourlyAdSlotId,
 ) {
   const slot = getHourlyAdSlot(slotId);
+  if (!slot) return getHourlyAdHourStartMs(hourBucket);
   return getHourlyAdHourStartMs(hourBucket) + slot.offsetMin * MINUTE_MS;
 }
 
@@ -208,21 +259,34 @@ export type ActiveHourlyAd = {
   remainingMs: number;
 };
 
-/** Active ready slot for `now`, or null outside all windows. */
+/**
+ * Active ready slot for `now`, or null outside all windows.
+ * When windows overlap, the later-started (next) ad wins and the earlier one
+ * is treated as ended.
+ */
 export function getActiveHourlyAd(now = Date.now()): ActiveHourlyAd | null {
   const hourBucket = getHourlyAdHourBucket(now);
-  for (const slot of HOURLY_AD_SLOTS) {
+  const { slots } = getHourlyAdRuntimeConfig();
+  let best: ActiveHourlyAd | null = null;
+  let bestStart = -Infinity;
+
+  for (const slot of slots) {
     if (!slot.creative.ready) continue;
-    const start = getHourlyAdSlotWindowStartMs(hourBucket, slot.id);
+    if (slot.offsetMin < 0 || slot.offsetMin >= 60) continue;
+    const durationMs = Math.max(MINUTE_MS, slot.durationMs);
+    const start = getHourlyAdHourStartMs(hourBucket) + slot.offsetMin * MINUTE_MS;
     const elapsed = now - start;
-    if (elapsed < 0 || elapsed >= HOURLY_AD_BANNER_MS) continue;
-    return {
-      hourBucket,
-      slot,
-      remainingMs: HOURLY_AD_BANNER_MS - elapsed,
-    };
+    if (elapsed < 0 || elapsed >= durationMs) continue;
+    if (start >= bestStart) {
+      bestStart = start;
+      best = {
+        hourBucket,
+        slot,
+        remainingMs: durationMs - elapsed,
+      };
+    }
   }
-  return null;
+  return best;
 }
 
 export function makeHourlyAdEventId(
@@ -362,7 +426,8 @@ export function loadLatestHourlyAdGrantLocally(
   hourBucket: number,
 ): HourlyAdClaimResult | null {
   let latest: (HourlyAdClaimResult & { savedAtMs?: number }) | null = null;
-  for (const slot of HOURLY_AD_SLOTS) {
+  const slots = getHourlyAdRuntimeConfig().slots;
+  for (const slot of slots) {
     const grant = loadHourlyAdGrantLocally(hourBucket, slot.id) as
       | (HourlyAdClaimResult & { savedAtMs?: number })
       | null;
@@ -372,6 +437,52 @@ export function loadLatestHourlyAdGrantLocally(
     }
   }
   return latest;
+}
+
+/** Map public API config into the runtime schedule used by banner + claim. */
+export function applyHourlyAdPublicConfig(config: {
+  slots: Array<{
+    id: HourlyAdSlotId;
+    offsetMin: number;
+    durationMin: number;
+    title: string;
+    imageUrl: string;
+    hasCustomImage: boolean;
+    defaultImagePath: string;
+    linkEnabled: boolean;
+    linkUrl: string | null;
+    active: boolean;
+  }>;
+}) {
+  const defaultsById = Object.fromEntries(
+    HOURLY_AD_SLOTS.map((slot) => [slot.id, slot]),
+  ) as Record<HourlyAdSlotId, HourlyAdSlot>;
+
+  const slots: HourlyAdSlot[] = config.slots.map((slot) => {
+    const fallback = defaultsById[slot.id];
+    const title = slot.title.trim() || fallback?.creative.panelTitle || "광고";
+    return {
+      id: slot.id,
+      offsetMin: slot.offsetMin,
+      durationMs: Math.max(1, slot.durationMin) * MINUTE_MS,
+      creative: {
+        image: slot.imageUrl,
+        defaultImagePath: slot.defaultImagePath,
+        hasCustomImage: slot.hasCustomImage,
+        teaserTitle: fallback?.creative.teaserTitle ?? title,
+        teaserSub: fallback?.creative.teaserSub ?? "탭하고 보상 받기",
+        panelEyebrow: fallback?.creative.panelEyebrow ?? "AD",
+        panelTitle: title,
+        imageAlt: fallback?.creative.imageAlt ?? title,
+        ariaLabel: fallback?.creative.ariaLabel ?? title,
+        ready: slot.active,
+        linkEnabled: slot.linkEnabled && Boolean(slot.linkUrl),
+        linkUrl: slot.linkEnabled ? slot.linkUrl : null,
+      },
+    };
+  });
+
+  setHourlyAdRuntimeConfig({ slots });
 }
 
 export function rollHourlyAdReward(): HourlyAdReward {

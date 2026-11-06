@@ -8,11 +8,22 @@ import {
   isValidChatChannel,
 } from "@/lib/chat-constants";
 import {
+  memoryGetChannelMemberCount,
+  memoryGetUserChatChannel,
+  memoryHeartbeatChatPresence,
+  memoryJoinChatChannel,
+  memoryLeaveChatChannel,
+  memoryTryConsumeChatCooldown,
+} from "@/lib/chat/presence-memory";
+import { nextAutoChannels } from "@/lib/chat/presence-order";
+import {
   chatChannelMembersKey,
   chatCooldownKey,
   chatUserPresenceKey,
 } from "@/lib/redis-keys";
 import { runRedisCommand } from "@/lib/redis";
+
+export { nextAutoChannels };
 
 /**
  * Atomic join / switch.
@@ -158,14 +169,19 @@ export async function joinChatChannel(options: {
   explicitChannel?: number;
 }): Promise<ChatJoinResult> {
   const config = getRedisConfig();
-  if (!config.enabled) {
-    return { ok: false, reason: "unavailable" };
-  }
-
   const preferred = options.preferredChannel ?? CHAT_CHANNEL_MIN;
   const explicit = options.explicitChannel ?? 0;
   if (explicit !== 0 && !isValidChatChannel(explicit)) {
     return { ok: false, reason: "full", channel: explicit };
+  }
+
+  if (!config.enabled) {
+    return memoryJoinChatChannel({
+      userId: options.userId,
+      connectionId: options.connectionId,
+      preferredChannel: preferred,
+      explicitChannel: explicit || undefined,
+    });
   }
 
   const presenceKey = chatUserPresenceKey(config.prefix, options.userId);
@@ -186,7 +202,13 @@ export async function joinChatChannel(options: {
   );
 
   if (!result.available || !Array.isArray(result.value)) {
-    return { ok: false, reason: "unavailable" };
+    // Redis configured but unreachable — keep local chat usable in single-process.
+    return memoryJoinChatChannel({
+      userId: options.userId,
+      connectionId: options.connectionId,
+      preferredChannel: preferred,
+      explicitChannel: explicit || undefined,
+    });
   }
 
   const reply = result.value as unknown[];
@@ -214,7 +236,9 @@ export async function heartbeatChatPresence(options: {
   connectionId: string;
 }): Promise<ChatPresenceResult> {
   const config = getRedisConfig();
-  if (!config.enabled) return { ok: false, reason: "unavailable" };
+  if (!config.enabled) {
+    return memoryHeartbeatChatPresence(options);
+  }
 
   const result = await runRedisCommand("chat_heartbeat", (client) =>
     client.eval(HEARTBEAT_SCRIPT, {
@@ -231,7 +255,7 @@ export async function heartbeatChatPresence(options: {
   );
 
   if (!result.available || !Array.isArray(result.value)) {
-    return { ok: false, reason: "unavailable" };
+    return memoryHeartbeatChatPresence(options);
   }
   const reply = result.value as unknown[];
   if (Number(reply[0]) === 1) {
@@ -253,9 +277,12 @@ export async function leaveChatChannel(options: {
   connectionId?: string;
 }): Promise<void> {
   const config = getRedisConfig();
-  if (!config.enabled) return;
+  if (!config.enabled) {
+    memoryLeaveChatChannel(options);
+    return;
+  }
 
-  await runRedisCommand("chat_leave", (client) =>
+  const result = await runRedisCommand("chat_leave", (client) =>
     client.eval(LEAVE_SCRIPT, {
       keys: [
         chatUserPresenceKey(config.prefix, options.userId),
@@ -264,17 +291,21 @@ export async function leaveChatChannel(options: {
       arguments: [options.userId, options.connectionId ?? ""],
     }),
   );
+  if (!result.available) {
+    memoryLeaveChatChannel(options);
+  }
 }
 
 export async function getUserChatChannel(
   userId: string,
 ): Promise<number | null> {
   const config = getRedisConfig();
-  if (!config.enabled) return null;
+  if (!config.enabled) return memoryGetUserChatChannel(userId);
   const result = await runRedisCommand("chat_get_presence", (client) =>
     client.hGet(chatUserPresenceKey(config.prefix, userId), "channel"),
   );
-  if (!result.available || result.value == null) return null;
+  if (!result.available) return memoryGetUserChatChannel(userId);
+  if (result.value == null) return null;
   const channel = Number(result.value);
   return isValidChatChannel(channel) ? channel : null;
 }
@@ -282,12 +313,13 @@ export async function getUserChatChannel(
 export async function getChannelMemberCount(
   channel: number,
 ): Promise<number | null> {
+  if (!isValidChatChannel(channel)) return null;
   const config = getRedisConfig();
-  if (!config.enabled || !isValidChatChannel(channel)) return null;
+  if (!config.enabled) return memoryGetChannelMemberCount(channel);
   const result = await runRedisCommand("chat_channel_count", (client) =>
     client.sCard(chatChannelMembersKey(config.prefix, channel)),
   );
-  if (!result.available) return null;
+  if (!result.available) return memoryGetChannelMemberCount(channel);
   return Number(result.value);
 }
 
@@ -295,7 +327,9 @@ export async function tryConsumeChatCooldown(
   userId: string,
 ): Promise<{ allowed: boolean; unavailable?: boolean }> {
   const config = getRedisConfig();
-  if (!config.enabled) return { allowed: false, unavailable: true };
+  if (!config.enabled) {
+    return memoryTryConsumeChatCooldown(userId);
+  }
 
   const result = await runRedisCommand("chat_cooldown", (client) =>
     client.set(chatCooldownKey(config.prefix, userId), "1", {
@@ -303,20 +337,6 @@ export async function tryConsumeChatCooldown(
       PX: CHAT_COOLDOWN_MS,
     }),
   );
-  if (!result.available) return { allowed: false, unavailable: true };
+  if (!result.available) return memoryTryConsumeChatCooldown(userId);
   return { allowed: result.value === "OK" };
-}
-
-/** Exported for unit tests — pure channel selection helper. */
-export function nextAutoChannels(
-  preferred: number,
-  min = CHAT_CHANNEL_MIN,
-  max = CHAT_CHANNEL_MAX,
-): number[] {
-  const start =
-    preferred < min || preferred > max ? min : preferred;
-  const list: number[] = [];
-  for (let ch = start; ch <= max; ch += 1) list.push(ch);
-  for (let ch = min; ch < start; ch += 1) list.push(ch);
-  return list;
 }

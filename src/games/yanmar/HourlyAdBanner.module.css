@@ -317,6 +317,20 @@
   object-position: center;
 }
 
+.adLinkHit {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.adLinkHit:active {
+  opacity: 0.92;
+}
+
 .adHint {
   margin: 0;
   text-align: center;
