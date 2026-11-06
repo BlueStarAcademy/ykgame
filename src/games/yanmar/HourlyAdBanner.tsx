@@ -310,9 +310,6 @@ export function HourlyAdBanner({
 
   function openAd() {
     if (claimed || bannerSec <= 0 || !creative) return;
-    if (creative.linkEnabled && creative.linkUrl) {
-      openExternalLink(creative.linkUrl);
-    }
     setClaimError(null);
     setConfirmClose(false);
     setPhase("ad");
@@ -456,11 +453,7 @@ export function HourlyAdBanner({
           type="button"
           className={styles.teaser}
           onClick={openAd}
-          aria-label={
-            creativeCopy.linkEnabled
-              ? `${creativeCopy.ariaLabel} — 링크 열기`
-              : `${creativeCopy.ariaLabel} — ${t("ads.rewardHint")}`
-          }
+          aria-label={`${creativeCopy.ariaLabel} — ${t("ads.rewardHint")}`}
         >
           <span className={styles.teaserShine} aria-hidden />
           <div className={styles.teaserMedia}>

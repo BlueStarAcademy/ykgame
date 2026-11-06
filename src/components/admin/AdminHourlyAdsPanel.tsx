@@ -260,8 +260,8 @@ export function AdminHourlyAdsPanel() {
         {loading ? (
           <p className="text-sm text-slate-500">불러오는 중…</p>
         ) : (
-          <div className="-mx-1 pb-1 sm:overflow-x-auto">
-            <div className="flex flex-col gap-3 px-1 sm:min-w-max sm:flex-row">
+          <div className="-mx-1 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch]">
+            <div className="flex min-w-max gap-3 px-1">
               {cards.map((slot) => {
                 const isDraft = slot.id === HOURLY_AD_DRAFT_SLOT_ID;
                 const draft = drafts[slot.id] ?? emptyDraft();
@@ -283,7 +283,7 @@ export function AdminHourlyAdsPanel() {
                 return (
                   <section
                     key={slot.id}
-                    className={`w-full rounded-2xl border p-3 shadow-sm sm:w-[14rem] sm:shrink-0 ${
+                    className={`w-[14rem] shrink-0 rounded-2xl border p-3 shadow-sm ${
                       isDraft
                         ? "border-dashed border-slate-300 bg-slate-50"
                         : "border-slate-200 bg-white"
